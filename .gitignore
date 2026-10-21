@@ -1,0 +1,43 @@
+﻿# Builds output (includes large exports like *.gcode / *.nc)
+builds/
+# FreeCAD / CAD temp & backups
+*.FCStd1
+*.FCBak
+*.bak
+*.tmp
+# Python
+__pycache__/
+*.pyc
+.venv/
+# Logs
+*.log
+# OS
+Thumbs.db
+desktop.ini
+# Editor local settings
+.vscode/
+.vs/
+
+# C++ / Qt / CMake
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+CMakeUserPresets.json
+compile_commands.json
+*.user
+*.autosave
+*.pro.user
+*.obj
+*.o
+*.exe
+*.ilk
+*.pdb
+*.lib
+*.exp
+*.dll
+moc_*
+ui_*
+qrc_*.cpp

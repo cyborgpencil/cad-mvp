@@ -1,0 +1,9 @@
+{
+  "skill": "tooling-priority",
+  "test_cases": [
+    {"input": "How should I prioritize Grok Build, Cursor, and Grok Bots for this project?", "should_trigger": true},
+    {"input": "Use as many Grok Build tokens as possible first, then Cursor, then Bots.", "should_trigger": true},
+    {"input": "What is the weather today?", "should_trigger": false},
+    {"input": "Write a Python function to reverse a string.", "should_trigger": false}
+  ]
+}

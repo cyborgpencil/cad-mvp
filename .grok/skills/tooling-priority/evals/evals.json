@@ -1,0 +1,20 @@
+{
+  "skill": "tooling-priority",
+  "test_cases": [
+    {
+      "name": "plan_large_feature",
+      "input": "Plan how to implement the new validation module across the codebase.",
+      "assertions": ["Starts in Grok Build plan mode", "Does not assign primary coding to Grok Bots"]
+    },
+    {
+      "name": "debug_edge_case",
+      "input": "The export is failing on one specific model. Help me debug it interactively.",
+      "assertions": ["Recommends or uses Cursor for interactive debugging", "Does not start a long unattended Build run first"]
+    },
+    {
+      "name": "weekly_research",
+      "input": "Set up a weekly check for new library updates and summarize them.",
+      "assertions": ["Assigns the recurring research task to a Grok Bot", "Does not use Build or Cursor tokens for the standing routine"]
+    }
+  ]
+}
