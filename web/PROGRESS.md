@@ -64,3 +64,13 @@ Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
 - Palette values are TBD placeholders in `:root`. Listed in `mockup/PROGRESS.md`. No Modo assets.
 - CTest in `builds/solid-check`: 5/5 passed (`watertight`, `units`, `export`, `gate`, `create`).
 - Screenshots were not taken. This session does not start an http server.
+
+## Next: selection, primitives, MODO feel (Erik, 2026-10-21 3:44 PM MT)
+- Reference video: https://youtu.be/HhuccQ20YVM. The GUI should feel similar, not match exactly, with clearly contrasting buttons when selected or active.
+- A selection gizmo showing which faces, edges or vertices are selected.
+- Primitives (box, cylinder, etc.) with editable parameters, which can then be modified.
+- Keep the Export gate and the interim banner. Palette hex values stay TBD until Research Digest samples them.
+- Phase 2 (libcascade OCCT gate) is in progress with Pilot.
+- R3 is still provisional (code read only); a live R3 check is due at the next checkpoint.
+- Correction (3:46 PM MT): phase 2 never launched after the 3:15 AM plan. Order of work per Chief: the OCCT gate session first, then the selection and primitives session following Research Digest's spec (research/gui/modo-selection-primitives.md, in progress).
+- Live: the restyle build is deployed as 6a04ad5 at https://cyborgpencil.github.io/cad-mvp/ (banner on, Export locked). Each push to main now deploys through Actions.
