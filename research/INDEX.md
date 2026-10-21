@@ -36,3 +36,5 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [occt-wasm/pages-hosting.md](occt-wasm/pages-hosting.md): does the single-threaded OCCT WASM build fit GitHub Pages (limits, MIME, headers) (2026-10-21).
 - [occt-wasm/prebuilt-options.md](occt-wasm/prebuilt-options.md): prebuilt OCCT WASM options (libcascade, opencascade.js, occt-import-js, official build) and reuse-vs-build verdict (2026-10-21).
 - [projects/blink-mount.md](projects/blink-mount.md): Blink XT/XT2/Indoor/Outdoor mount specs (official vs measured), US door casing sizes, wood screw pilot/clearance holes for the L-bracket (2026-10-21).
+- [gui/modo-tools.md](gui/modo-tools.md): Modo layout, theme (docs say orange accent; teal hex TBD) and MVP tools (Boolean, Edge Bevel, Work Plane, Action Center, snapping) with mockup restyle notes (2026-10-21).
+- [occt-wasm/booleans.md](occt-wasm/booleans.md): why Modo mesh Booleans fail, OCCT 8.0.1 Fuzzy/Glue/NonDestructive/SimplifyResult with libcascade 3.1.0 bindings, live-drag preview (ghost or manifold-3d) and exact OCCT on release (2026-10-21).
