@@ -47,3 +47,7 @@ Stop at 60 minutes, or at any checkpoint failure, and report what was done, what
 
 ## Next-session rule (2026-10-21 16:20 MT): occt_gate in CI
 - occt_gate must FAIL when libcascade is missing and CI is set (env CI=true, as on GitHub Actions); it may skip only on local runs. A failed libcascade fetch in pages.yml must fail the deploy, never ship green without the gate.
+
+## Queued after CI fix (2026-10-21 17:10 MT)
+- Gizmo must stay visible over solids (it hides inside the cylinder). Suggested approach (team suggestion, not from MODO docs): draw it last with depth test off, or on an overlay layer.
+- Hotkey 4 is TBD for Erik (spec maps only 1/2/3/5). Don't lock in the Export-tab mapping.

@@ -37,7 +37,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site/dist
-          cp web/index.html web/cadcam.js web/cadcam.wasm web/occt-gate.mjs _site/
+          cp web/index.html web/cadcam.js web/cadcam.wasm web/*.mjs _site/
           cp web/dist/init.single.js web/dist/opencascade_single.js web/dist/opencascade_single.wasm _site/dist/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
