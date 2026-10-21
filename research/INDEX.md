@@ -31,3 +31,4 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 
 Update research here first. Propagate only confirmed changes into MVP or vision docs. Keep documents consistent with the project-organizer skill (`../.grok/skills/project-organizer/`). Note: a "document-upgrader" skill was referenced here but does not exist in the repo.
 - [gui/ui-layout-review.md](gui/ui-layout-review.md): Fusion, Onshape, FreeCAD and Blender UI layout review with tab-layout takeaways (2026-10-21).
+- [gui/usability-checks.md](gui/usability-checks.md): pass/fail GUI checklist for touch targets, shortcuts, the Export gate, layout and the Repair tab (2026-10-21).
