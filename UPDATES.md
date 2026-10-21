@@ -1,4 +1,4 @@
-﻿# Project Updates Log
+# Project Updates Log
 
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
@@ -45,3 +45,4 @@ Newest entries at the top.
 > Use the document-upgrader skill for research or requirements updates.
 - Created `mvp/gui-plan.md` (draft GUI plan per Erik via 3T): Fusion-style layout, Blender-style operations mapped to B-rep, exploring the model, sketch, input, WASM feasibility, phases P1-P5 with GUI test matrices. Watertight and units checks are now a gate, not the main focus. Scope conflicts C1-C5 are flagged for Erik.
 - `mvp/gui-plan.md`: added C6 (Qt harness vs product), the faces-and-edges rule for Blender tools, Pilot's note that Qt fillet and cut are mesh code today, the tests/gui/baselines/ path, and a link to research/gui/README.md.
+- `mvp/gui-plan.md`: pulled in Research Digest's research/gui/README.md picks (three.js stack, OCCT routes, PlaneGCS, Pointer Events, Playwright, Web Worker) and added scope conflicts C7-C9.
