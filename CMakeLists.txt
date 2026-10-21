@@ -69,6 +69,25 @@ if(EXISTS "${_occt_wasm}")
     endif()
 endif()
 
+# Pages file set in headless Edge/Chromium. The script exits 77 only when
+# the browser or libcascade is missing and CI is unset. CI must not skip.
+find_program(CADCAM_PYTHON NAMES python3 python py)
+if(CADCAM_PYTHON)
+    add_test(
+        NAME deploy_smoke
+        COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/deploy_smoke.py"
+    )
+    set_tests_properties(deploy_smoke PROPERTIES
+        TIMEOUT 600
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI})
+    message(FATAL_ERROR "deploy_smoke requires Python; CI must not skip it")
+else()
+    message(STATUS "deploy_smoke not added: Python was not found")
+endif()
+
 add_library(model
     src/model/shapes.cpp
     src/model/sketch.cpp

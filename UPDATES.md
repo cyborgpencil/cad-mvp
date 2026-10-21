@@ -116,3 +116,10 @@ Newest entries at the top.
 
 ## 2026-10-21 17:23 MT - L-bracket prompt drafted
 - prompts/l-bracket-fillet-chamfer.md from research/gui/booleans-fillet-chamfer.md; gate after every op, TBDs listed for Erik. Queued after the CI session.
+
+## 2026-10-21 17:35 MT - Deploy smoke test (local, uncommitted)
+- Grok Build session 01a160c4 (5:21-5:34 PM MT, $0.53, +36/-4 on 96ebafd). CTest 7/7 on Z13.
+- web/assemble_site.py is now the single site file list for pages.yml and the smoke test. tests/deploy_smoke.py loads the site headless with the cache off and fails on any non-2xx response, console/page error or unhandled rejection. It checks three scenes: closed_box PASS with Export enabled, open_box FAIL with Export locked, box with a face selected PASS.
+- Negative check: leaving out selection.mjs makes the test exit 1 with HTTP 404. Favicon is now a data URI so /favicon.ico no longer 404s.
+- Not yet proven: first CI run on the Linux runner. Erik to review the pages.yml diff.
+- Still open: occt_gate CI fail, gizmo drawn on top, hotkey 4 removal (Pilot follow-up).
