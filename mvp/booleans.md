@@ -30,3 +30,7 @@ Fuzzy tolerance value; whether Intersect stays test-only (per `ui-redesign.md` i
 - On failure: keep the last good shape, show the error, snap the tool body back, and keep Export disabled.
 - Pilot to confirm the API names in a libcascade 3.1.0 test build.
 - Still TBD: fuzzy tolerance, preview mesh coarseness, WASM Boolean timing, manifold-3d download size, Push/Pull scope.
+## Chief decision (2026-10-21)
+- MVP live drag: a see-through ghost while dragging. On release, the exact OCCT Boolean runs, then check and repair, then the watertight and units gate; roll back on any failure.
+- manifold-3d stays out unless Erik asks to watch the cut or union happen live.
+- Open for Erik: fuzzy tolerance (mm), Intersect as a user tool or test-only, phone preview speed target, ghost vs live preview.
