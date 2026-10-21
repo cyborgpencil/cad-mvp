@@ -52,3 +52,5 @@ Newest entries at the top.
 - `prompts/gui-mockup.md`: three.js must be inlined and pinned (Chrome blocks module files over file://), per Research Digest and Repo Keeper.
 - `AGENTS.md`: added Erik's keep-finished-work rule (no rewrites or deletions, reason posted first, tests keep passing, OCCT next to the mesh path). `mvp/gui-plan.md` C9 reworded to match.
 - `mvp/gui-plan.md` section 6: changed 'move to OCCT' to 'add OCCT alongside the mesh code', matching AGENTS.md and research/gui/README.md.
+- 2026-10-21 00:32 MT (Doc Steward): prompts/gui-mockup.md now says Pilot takes the mockup screenshots with headless Edge (same sizes and paths), not Grok.
+- 2026-10-21 00:33 MT (Doc Steward): AGENTS.md has a new Z13-only execution rule (direct Shell on Z13, no Ally or WinRM route), per Erik via 3T.

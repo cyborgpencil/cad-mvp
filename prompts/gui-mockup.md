@@ -1,6 +1,6 @@
 # Prompt: clickable GUI mockup (Grok Build)
 
-Working dir: C:\Dev\cadcam-mvp\mockup\ on Z13. Write nothing outside mockup\ except the two screenshots.
+Working dir: C:\Dev\cadcam-mvp\mockup\ on Z13. Write nothing outside mockup\.
 Goal: a clickable layout mockup so Erik can give quick feedback. No real geometry and no OCCT.
 
 ## Must have
@@ -19,7 +19,7 @@ Goal: a clickable layout mockup so Erik can give quick feedback. No real geometr
 
 ## Done when
 - mockup\index.html opens by double-click in Chrome.
-- Screenshots at desktop width (1440x900) and phone width (390x844) are saved as builds\screenshots\mockup-desktop.png and builds\screenshots\mockup-phone.png.
+- Do not take screenshots. Grok Build Pilot captures them afterward with headless Edge at 1440x900 and 390x844, saved as builds\screenshots\mockup-desktop.png and builds\screenshots\mockup-phone.png.
 - Report the files created and their sizes.
 
 The watertight and units gate does not apply, because this mockup exports nothing real. Scope questions C1-C9 in mvp/gui-plan.md are deferred: show the tools, decide nothing.

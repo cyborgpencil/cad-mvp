@@ -30,3 +30,6 @@ Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns
 - The mockup lives only in mockup/. Stack work builds on what is there.
 - OpenCASCADE fillet and cut are added next to the existing mesh code, not in place of it. Changing or removing the mesh path later needs a posted reason first.
 - Repo Keeper runs git diff --stat before every commit and holds any commit that changes code outside mockup/ or the docs without a posted reason.
+
+## Z13-only execution (Erik's rule, 2026-10-21)
+All project work runs through Shell aimed directly at ErmoZ13 (Z13). Nothing runs from ErmoAlly, and nothing goes through a WinRM hop. Grok Build sessions, captures, builds and git all run on Z13.
