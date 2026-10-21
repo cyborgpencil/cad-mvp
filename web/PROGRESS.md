@@ -77,3 +77,17 @@ Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
 - Chief ruling (3:48 PM MT): selection and hover colours are named CSS variables marked TBD. Don't hardcode orange (MODO docs) or teal (Erik) until Erik decides.
 
 - 15:50 MT: UI spec ready: research/gui/modo-selection-primitives.md. Use for selection/gizmo/primitives session after OCCT gate.
+
+## Phase 2 — libcascade OCCT gate (2026-10-21)
+
+Done. Prebuilt taucad libcascade 3.1.0 single-threaded WASM (OCCT V8_0_1, Emscripten 6.0.5) from `https://registry.npmjs.org/libcascade/-/libcascade-3.1.0.tgz`. Canonical files stay under gitignored `builds/libcascade/`; `web/fetch-libcascade.py` stages `web/dist/` (gitignored). Loaded next to `cadcam.wasm` with no `-pthread`.
+
+`web/occt-gate.mjs` sews the current mesh, then requires `BRepCheck_Analyzer.IsValid()` and `ShapeAnalysis_FreeBounds` with zero free edges. Export enables only when watertight, units, and OCCT all pass. The interim banner hides only while the OCCT badge is green for the current shape.
+
+`src/` was not edited. OCCT runs in JS beside the existing mesh WASM.
+
+Acceptance (headless Edge + CTest `occt_gate`):
+- `closed_box`: OCCT PASS, Export enabled, banner hidden.
+- `open_box`: OCCT FAIL (4 free edges), Export locked, banner stays.
+- CTest 6/6: watertight, units, export, gate, occt_gate, create.
+

@@ -1,6 +1,6 @@
 # WASM app build
 
-Single-threaded Emscripten build of the existing mesh checks. No OpenCASCADE in this slice. No `-pthread`, so the page is static files and needs no COOP/COEP headers (`research/occt-wasm/pages-hosting.md`).
+Single-threaded Emscripten build of the existing mesh checks, plus the libcascade 3.1.0 OCCT gate loaded as a second WASM. No `-pthread`, so the page is static files and needs no COOP/COEP headers (`research/occt-wasm/pages-hosting.md`).
 
 `src/solid/watertight.cpp`, `src/units/units.cpp`, and `src/model/repair.cpp` are not edited. The gate in `src/export/gate.cpp` calls `check_watertight` and `export_units`. Volume is the triple sum from `mvp/solid-check.md` divided by 6, computed here so the checker stays the PASS/FAIL source. That is a new readout, not a change to the checker rules.
 
@@ -14,7 +14,7 @@ cmake --build builds\solid-check --target test_watertight test_units test_export
 ctest --test-dir builds\solid-check --output-on-failure
 ```
 
-`builds\` is gitignored. The `gate` test covers the watertight result, the millimeter lock, the volume, and the export block.
+`builds\` is gitignored. The `gate` test covers the watertight result, the millimeter lock, the volume, and the export block. After `python web\fetch-libcascade.py`, CTest also runs `occt_gate` (Node, libcascade `BRepCheck_Analyzer` + `ShapeAnalysis_FreeBounds` on `closed_box` / `open_box`).
 
 ## Emscripten (this machine)
 
@@ -38,6 +38,16 @@ cmake --build builds\wasm
 
 Do not add `-pthread`. Do not commit `web/cadcam.wasm` or `web/cadcam.js`.
 
+## libcascade 3.1.0 (OCCT gate)
+
+Prebuilt taucad `libcascade` 3.1.0, single-threaded (`opencascade_single.wasm`, no `-pthread`, no SharedArrayBuffer, no COOP/COEP). Canonical copy lives only under gitignored `builds/libcascade/`. The page loads a staged copy from gitignored `web/dist/`.
+
+```bat
+python web\fetch-libcascade.py
+```
+
+Source: `https://registry.npmjs.org/libcascade/-/libcascade-3.1.0.tgz` (OCCT V8_0_1, Emscripten 6.0.5). The OCCT check is `web/occt-gate.mjs`: sew the current mesh, then `BRepCheck_Analyzer.IsValid()` and `ShapeAnalysis_FreeBounds` with zero free edges.
+
 ## Serve
 
 Static files only. No custom headers and no app server.
@@ -48,8 +58,8 @@ python -m http.server 8765 --directory web
 
 Open `http://127.0.0.1:8765/`. Optional query, still behind the same gate: `?fixture=closed_box&tab=export` or `?fixture=open_box&tab=export`. Fixtures are `closed_box`, `open_box`, `box20`, and `flipped_box`.
 
-File → Load closed box / Load open box / Load 20 mm box switches the mesh. The status bar and the Export tab read `gate()` from the wasm module. Export stays disabled until watertight and the millimeter lock both pass, and the button title is the block reason. STL and 3MF then download from the same writers as the native export.
+File → Load closed box / Load open box / Load 20 mm box switches the mesh. The status bar and the Export tab read `gate()` from the wasm module. Export stays disabled until watertight, the millimeter lock, and the OCCT gate all pass, and the button title is the block reason. STL and 3MF then download from the same writers as the native export. The interim banner hides only while the OCCT gate is green for the current shape.
 
 ## Pages
 
-GitHub Actions builds this and deploys the static `web/` output plus the generated wasm. Repo Keeper owns that workflow. This session does not add a workflow and does not commit the wasm.
+GitHub Actions builds this and deploys the static `web/` output plus the generated wasm and the libcascade 3.1.0 single-threaded files (fetched at build time, never committed). Repo Keeper owns that workflow.

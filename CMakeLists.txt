@@ -50,6 +50,25 @@ add_executable(test_gate tests/test_gate.cpp)
 target_link_libraries(test_gate PRIVATE export_mesh)
 add_test(NAME gate COMMAND test_gate)
 
+# OCCT gate is JS-side libcascade (BRepCheck_Analyzer + ShapeAnalysis_FreeBounds).
+# The prebuilt wasm lives under gitignored builds/libcascade; skip if it is absent.
+set(_occt_wasm "${CMAKE_SOURCE_DIR}/builds/libcascade/dist/opencascade_single.wasm")
+if(EXISTS "${_occt_wasm}")
+    find_program(CADCAM_NODE node
+        PATHS
+            "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit"
+            "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit/bin"
+        NO_DEFAULT_PATH
+    )
+    if(NOT CADCAM_NODE)
+        find_program(CADCAM_NODE node)
+    endif()
+    if(CADCAM_NODE)
+        add_test(NAME occt_gate COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_occt_gate.mjs")
+        set_tests_properties(occt_gate PROPERTIES TIMEOUT 180)
+    endif()
+endif()
+
 add_library(model
     src/model/shapes.cpp
     src/model/sketch.cpp

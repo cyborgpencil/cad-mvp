@@ -964,7 +964,7 @@
 </svg>
 
 <div id="app">
-  <div class="interim-banner" role="status">Interim build: OCCT check pending</div>
+  <div class="interim-banner" id="occtBanner" role="status">Interim build: OCCT check pending</div>
   <header class="topbar">
     <button type="button" class="drawer-btn show-narrow" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree">Tree</button>
     <div class="brand">
@@ -1311,15 +1311,26 @@ async function boot() {
     return;
   }
   try {
+    const occtPromise = import('./dist/init.single.js').then(function (mod) {
+      return mod.createInstance();
+    }).catch(function (err) {
+      console.error('libcascade failed', err);
+      return null;
+    });
+    const gatePromise = import('./occt-gate.mjs').catch(function (err) {
+      console.error('occt-gate failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    main(Module);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise]);
+    main(Module, occtLoaded[0], occtLoaded[1]);
   } catch (err) {
     showError(err && err.message ? err.message : String(err));
   }
 }
 boot();
 
-function main(Module) {
+function main(Module, oc, gateApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -1433,6 +1444,8 @@ function main(Module) {
     watertight: false,
     unitsPass: false,
     occtGate: false,
+    occtReady: false,
+    occtMessage: '',
     preview: false,
     side: 'properties',
     exportAllowed: false,
@@ -1917,7 +1930,8 @@ function main(Module) {
   }
 
   function exportBlockText() {
-    if (state.occtGate !== true) return 'Export blocked: the OCCT check is pending.';
+    if (state.occtReady !== true) return 'Export blocked: the OCCT check is pending.';
+    if (state.occtGate !== true) return state.occtMessage || 'Export blocked: the OCCT check failed.';
     return (state.failReason || 'Checks have not passed') + ' Export stays blocked until watertight and units both pass.';
   }
 
@@ -1928,10 +1942,13 @@ function main(Module) {
     setBadge('gateUnits', state.unitsPass);
     const occtEl = document.getElementById('gateOcct');
     if (occtEl) {
-      occtEl.textContent = state.occtGate ? 'PASS' : 'PENDING';
-      occtEl.classList.toggle('pass', !!state.occtGate);
-      occtEl.classList.toggle('fail', !state.occtGate);
+      if (state.occtReady !== true) occtEl.textContent = 'PENDING';
+      else occtEl.textContent = state.occtGate ? 'PASS' : 'FAIL';
+      occtEl.classList.toggle('pass', state.occtReady === true && !!state.occtGate);
+      occtEl.classList.toggle('fail', !(state.occtReady === true && state.occtGate));
     }
+    paintBanner();
+    publishGateState();
     const blocked = exportBlockText();
     const reason = document.getElementById('gateReason');
     if (reason) {
@@ -2036,10 +2053,52 @@ function main(Module) {
     placeHandles();
   }
 
+  function paintBanner() {
+    const banner = document.getElementById('occtBanner');
+    if (!banner) return;
+    banner.hidden = state.occtGate === true;
+  }
+
+  function publishGateState() {
+    const banner = document.getElementById('occtBanner');
+    const btn = document.getElementById('exportBtn');
+    const occtEl = document.getElementById('gateOcct');
+    window.__cadcamExportState = {
+      fixture: Module.fixtureName(),
+      occtReady: state.occtReady === true,
+      occtGate: state.occtGate === true,
+      occtMessage: state.occtMessage || '',
+      watertight: state.watertight === true,
+      unitsPass: state.unitsPass === true,
+      exportAllowed: state.exportAllowed === true,
+      bannerHidden: !!(banner && banner.hidden),
+      exportDisabled: !!(btn && btn.disabled),
+      gateOcct: occtEl ? occtEl.textContent : ''
+    };
+  }
+
+  function runOcctGate() {
+    if (!oc || !gateApi || typeof gateApi.checkOcctGate !== 'function') {
+      state.occtReady = false;
+      state.occtGate = false;
+      state.occtMessage = 'FAIL: OCCT module is not loaded.';
+      paintExport();
+      return;
+    }
+    const mesh = gateApi.meshFromFlat(Module.meshPositions(), Module.meshIndices());
+    const result = gateApi.checkOcctGate(oc, mesh);
+    state.occtReady = true;
+    state.occtGate = result.pass === true;
+    state.occtMessage = result.message || '';
+    paintExport();
+    setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+  }
+
   function syncFromKernel() {
     applyReport(Module.gate());
     replaceBody();
     refreshUnits();
+    runOcctGate();
   }
 
   function updateGate() {
@@ -2272,9 +2331,9 @@ function main(Module) {
     applyReport(report);
     refreshUnits();
     if (!state.exportAllowed) {
-      const why = state.occtGate ? (state.failReason || 'checks failed') : 'the OCCT check is pending';
-      toast('Export blocked: ' + why);
-      setHint('Export blocked: ' + why);
+      const why = exportBlockText();
+      toast(why);
+      setHint(why);
       if (exportMenu) exportMenu.hidden = true;
       return;
     }
@@ -2443,7 +2502,7 @@ function main(Module) {
       applyReport(report);
       refreshUnits();
       if (!state.exportAllowed) {
-        message = state.occtGate ? ('Export blocked: ' + (state.failReason || 'checks failed')) : exportBlockText();
+        message = exportBlockText();
         setHint(message);
       } else if (exportMenu) {
         exportMenu.hidden = !exportMenu.hidden;

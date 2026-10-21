@@ -29,10 +29,16 @@ jobs:
           emcmake cmake -S web -B builds/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build builds/wasm
           test -f web/cadcam.js && test -f web/cadcam.wasm
+      - name: Fetch libcascade 3.1.0 single-threaded WASM
+        run: |
+          python3 web/fetch-libcascade.py
+          test -f web/dist/opencascade_single.wasm
+          test -f web/occt-gate.mjs
       - name: Assemble site
         run: |
-          mkdir -p _site
-          cp web/index.html web/cadcam.js web/cadcam.wasm _site/
+          mkdir -p _site/dist
+          cp web/index.html web/cadcam.js web/cadcam.wasm web/occt-gate.mjs _site/
+          cp web/dist/init.single.js web/dist/opencascade_single.js web/dist/opencascade_single.wasm _site/dist/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
