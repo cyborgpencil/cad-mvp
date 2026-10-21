@@ -12,7 +12,7 @@ Build the MVP core on OpenCASCADE (OCCT), compiled to WebAssembly with Emscripte
 - Export: binary STL and 3MF only (3MF with unit="millimeter").
 - Out of scope: STEP import, freeform mesh, feature history, multi-body, revolve, chamfer, MCP, Qt desktop GUI work.
 
-## Environment (ErmoZ13)
+## Environment (the dev PC)
 - Repo: C:\Dev\cadcam-mvp. Run Grok from this folder.
 - SDKs (emsdk, Node, vcpkg tree) go in C:\Dev\sdk\, never inside the repo. Build output and vcpkg_installed go under builds\ (gitignored).
 - OCCT 8.0.1 (sources: research\occt-wasm\README.md). Native Z13 build: vcpkg `opencascade` port in manifest mode.
