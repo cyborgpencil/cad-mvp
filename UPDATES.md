@@ -130,3 +130,13 @@ Newest entries at the top.
 - Grok hung after its done marker again; the watcher killed it within about a minute.
 - Fresh shots at 5:49 PM MT in cadmvp-shots: wasm-desktop, wasm-portrait, wasm-landscape, wasm-cylinder-desktop.
 - Erik to review the pages.yml and CMakeLists.txt diffs. Next: Repo Keeper push and confirm occt_gate runs on Linux (not skipped); then Pilot runs the L-bracket prompt with TBD constants.
+
+## 2026-10-21 17:52 MT - CI follow-up pushed
+- 5c2918c (Pilot's five files) pushed; Pages run 39696038487 passed and deployed.
+- Gap: no workflow runs ctest, so occt_gate's CI-fail path is still untested on Linux. Fix: add a CTest step to pages.yml or a separate test workflow (Erik reviews, with the CMakeLists.txt diff).
+- Tree clean; L-bracket prompt cleared to start.
+
+## 2026-10-21 17:57 MT - CTest gates the deploy (local, uncommitted)
+- Session 01a160e1 (5:53-5:56 PM MT, $0.18). pages.yml now has a Native CTest step (Node 22, g++, cmake; builds builds/native, runs ctest --output-on-failure with CI=true; deploy_smoke runs inside the suite). It sits after the libcascade fetch and site assembly, before configure-pages and the upload, so a failing occt_gate blocks the release.
+- Files: pages.yml and web/PROGRESS.md. Z13 CTest 7/7.
+- Risk: first GCC build on Linux. Next: Repo Keeper pushes and confirms occt_gate ran and passed (not skipped) in the Linux log; then L-bracket. Erik to review the pages.yml diff.
