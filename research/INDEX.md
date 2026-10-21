@@ -1,4 +1,4 @@
-# CAD/CAM Project Research Index
+﻿# CAD/CAM Project Research Index
 
 Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adobe, FreeCAD, and Blender features.
 
@@ -25,6 +25,7 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 - `architecture/`: Kernel, components, performance notes. (MVP scope section conflicts with design-to-print scope; pending Erik.)
 - `occt-wasm/`: OCCT to WebAssembly build options. (MVP)
 - `healing/`: B-Rep and mesh validation and repair. (MVP)
+- `gui/`: Fusion-style layout, Blender-style ops mapped to OCCT B-rep, browser input, and GUI screenshot tests (`gui/README.md`). (plan input; scope conflicts pending Erik)
 
 ## Notes
 
