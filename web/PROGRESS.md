@@ -74,3 +74,6 @@ Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
 - R3 is still provisional (code read only); a live R3 check is due at the next checkpoint.
 - Correction (3:46 PM MT): phase 2 never launched after the 3:15 AM plan. Order of work per Chief: the OCCT gate session first, then the selection and primitives session following Research Digest's spec (research/gui/modo-selection-primitives.md, in progress).
 - Live: the restyle build is deployed as 6a04ad5 at https://cyborgpencil.github.io/cad-mvp/ (banner on, Export locked). Each push to main now deploys through Actions.
+- Chief ruling (3:48 PM MT): selection and hover colours are named CSS variables marked TBD. Don't hardcode orange (MODO docs) or teal (Erik) until Erik decides.
+
+- 15:50 MT: UI spec ready: research/gui/modo-selection-primitives.md. Use for selection/gizmo/primitives session after OCCT gate.
