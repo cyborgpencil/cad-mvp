@@ -6,7 +6,7 @@ Newest entries at the top.
 ## 2026-10-21
 
 - Research Digest checked every volume formula in `mvp/test-matrix.md` (no corrections needed), added per-row measurement methods, failure reasons for coplanar, tiny-feature, thin-wall, and curved cases, proposed tolerances derived from mesh chord error (needs Erik's sign-off), and a Sources section.
-- Recorded the agreed push cadence in `AGENTS.md`. Corrected the internal-void note in `mvp/test-matrix.md`: the Qt run's 23536.9 mm3 comes from fillet-then-cut, not a defect. Added row O5b (filleted internal void, 23538.74 mm3) and marked chamfer, sphere, cone, and intersect as test-only until Erik confirms scope.
+- Recorded the agreed push cadence in `AGENTS.md`. Corrected the internal-void note in `mvp/test-matrix.md`: the Qt run's 23536.9 mm3 comes from fillet-then-cut, not a defect. Added row O5b (filleted internal void, 23538.74 mm3) and marked chamfer, sphere, cone, and intersect as test-only until Erik confirms scope (merged Research Digest's duplicate note; 3T set this interim, not Erik).
 
 ## 2026-10-20
 

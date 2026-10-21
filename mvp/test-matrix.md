@@ -85,7 +85,6 @@ All volume formulas above were re-derived by hand. No corrections were needed.
 ## Scope flags for Erik
 Until Erik answers, chamfer (O9, O10), sphere (S3), cone (S4), and intersect (O6) run as test-only cases, not MVP features.
 
-- Erik (via 3T, 2026-10-21): chamfer, sphere, cone, and intersect are test-only cases for now, not MVP features.
 - Chamfer (O9, O10) was listed as out of scope in `prompts/wasm-occt-core.md`. Erik's matrix request includes it, so it needs his confirmation that chamfer is now in MVP scope.
 - Sphere, cone, and intersect are also new compared with the WASM prompt's scope. Same confirmation needed.
 
