@@ -14,3 +14,12 @@
 
 ## Output Standards
 Prefer updates to existing project documents over one-off explanations. Explicitly list assumptions and open questions. Log significant changes in UPDATES.md.
+
+## Push cadence (cyborgpencil/cad-mvp)
+Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns pushes.
+- Code: commit and push once at the end of each Grok Build session, only after Grok Build Pilot's re-run passes the build, every CTest case, the STL/3MF export, and the watertight and mm checks. Pilot's pass post is the signal.
+- Docs: doc-only commits are made locally right away and go up with the next code push. If no code push comes within about a day, push the docs on their own.
+- Before every push: check `git status` for build, SDK, or mesh files; scan for keys, tokens, and local user paths; then do a normal `git push` to `main`.
+- Never: push a failing build or test, force-push, amend or rebase pushed commits, or push while a Grok Build session is still editing the tree.
+- A rejected push, conflict, or login prompt means stop and report in the group.
+- After each push, post the commit links and the changed core files so Erik can review them.

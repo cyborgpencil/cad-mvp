@@ -3,8 +3,14 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-21
+
+- Research Digest checked every volume formula in `mvp/test-matrix.md` (no corrections needed), added per-row measurement methods, failure reasons for coplanar, tiny-feature, thin-wall, and curved cases, proposed tolerances derived from mesh chord error (needs Erik's sign-off), and a Sources section.
+- Recorded the agreed push cadence in `AGENTS.md`. Corrected the internal-void note in `mvp/test-matrix.md`: the Qt run's 23536.9 mm3 comes from fillet-then-cut, not a defect. Added row O5b (filleted internal void, 23538.74 mm3) and marked chamfer, sphere, cone, and intersect as test-only until Erik confirms scope.
+
 ## 2026-10-20
 
+- Added `mvp/test-matrix.md`: 9 shape and 12 operation cases on OpenCASCADE, each exported to STL and 3MF and checked for watertight, volume, bounding box, `unit="millimeter"`, and Orca read-back. Tolerances and tiny-feature behavior are TBD. Chamfer, sphere, cone, and intersect need Erik to confirm they are in scope.
 - Re-check after Grok Build's create-to-export run (finished 11:47 PM MT, goal marked achieved), run by Grok Build Pilot at 11:55 PM MT: the MSVC/NMake build passed, CTest passed 4 of 4 (watertight, units, export, create), and the CLI `export_part` wrote `box.stl` and `box.3mf`. Watertight: `check_solid` exited 0, and OrcaSlicer reports manifold yes for both files at 40 × 30 × 20 mm, with 2 parts (the outer solid plus the closed interior void). Units: the 3MF carries `unit="millimeter"` and the units test passed. Logs are in `builds/logs/20261020-2355-*`.
 - Files that run changed: edits to `CMakeLists.txt`, `UPDATES.md`, `mvp/mesh-view.md`, `research/occt-wasm/README.md`, and `src/gui/main_window.*` and `mesh_view.*`. New files: `mvp/create-export.md`, `mvp/export.md`, `mvp/units.md`, `src/export/`, `src/export_box.cpp`, `src/export_part.cpp`, `src/model/`, `src/units/`, and `tests/test_create.cpp`, `test_export.cpp`, `test_units.cpp`. Also new: `prompts/wasm-occt-core.md`, the prompt for the next headless WASM + OCCT 8.0.1 session (Chrome on Windows, Android, and iPhone; mm with an inch toggle; STL/3MF only).
 - Open doc issue: the "Published the initial tree to GitHub" entry below doesn't match `git status`, which shows branch `main` with no commits yet. That entry needs to be confirmed or corrected.
