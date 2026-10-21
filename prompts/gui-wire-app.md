@@ -6,7 +6,7 @@ Status: READY (Doc Steward, 2026-10-21). Target = **WASM only** (Erik, 2026-10-2
 Connect the approved layout (`mvp/ui-redesign.md`, mockup in `mockup/index.html`) to real geometry so the status bar and Export show real results, not placeholders.
 
 ## Scope
-- Tools: only those listed in `mvp/ui-redesign.md`. Chamfer, sphere, cone and intersect are test-only. Whether the full Model tool set stays or is cut to five is TBD for Erik.
+- Tools: only those listed in `mvp/ui-redesign.md`. Chamfer is a user tool (Erik, 2026-10-21); sphere, cone and intersect are test-only. Whether the full Model tool set stays or is cut to five is TBD for Erik.
 - FixGaps (the small-gaps fix) is OUT. It's TBD for Erik, so add no button or stub for it.
 - Strict MVP scope: no features beyond the docs. Mark anything missing as TBD and stop. Don't invent it.
 

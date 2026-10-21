@@ -39,7 +39,7 @@ Phone (narrow) layout: tabs become a bottom tab bar, the tab toolbar becomes a h
 | Tab | Tools (MVP candidates from sections 2 to 4) | Notes |
 |---|---|---|
 | Sketch | Line, rectangle, circle, arc, constraints (coincident, parallel, perpendicular, equal, dimension), trim, finish sketch | PlaneGCS solver (section 4) |
-| Model | Extrude, push/pull, fillet, chamfer, shell TBD, union / cut / intersect, loop cut, knife, inset, primitives (box, cylinder; sphere and cone test-only) | B-rep where possible (section 2); chamfer, sphere, cone, intersect stay test-only (C4) |
+| Model | Extrude, push/pull, fillet, chamfer, shell TBD, union / cut / intersect, loop cut, knife, inset, primitives (box, cylinder; sphere and cone test-only) | B-rep where possible (section 2); sphere, cone, intersect stay test-only (C4); chamfer is a user tool (Erik, 2026-10-21) |
 | Mesh/Repair | Watertight check, fix normals, fill holes, merge vertices, self-intersection report, volume and shell count | Exact repair tool list TBD (C2) |
 | Export | STL / 3MF export, units confirm, watertight gate, bounding box and volume readout, open in OrcaSlicer TBD | Export blocked unless the gate passes |
 
@@ -69,7 +69,7 @@ Phone (narrow) layout: tabs become a bottom tab bar, the tab toolbar becomes a h
 | Proposed tab | Mockup tab | Mockup controls |
 |---|---|---|
 | Sketch | Sketch | Line, Rectangle, Circle, Arc, Polygon, Sketch Fillet, Trim, Offset, Dimension; constraints Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent, Fixed |
-| Model | Solid | Extrude (Push/Pull), Inset, Fillet (Chamfer test-only), Loop Cut, Knife, Grab, Rotate, Scale, Snapping |
+| Model | Solid | Extrude (Push/Pull), Inset, Fillet, Chamfer, Loop Cut, Knife, Grab, Rotate, Scale, Snapping |
 | Mesh/Repair | Inspect | Section, Measure, display modes (Shaded, Shaded + Edges, Wireframe, X-Ray), Isolate, Hide |
 | Export | Export | Export STL, Export 3MF |
 | Shared (all tabs) | top bar, view bar, radial menu | Undo/Redo, mm/in, selection (Vertex, Edge, Face, Body), navigation (Orbit, Pan, Zoom, Fit, Front, Top, Right, Iso/Home), ViewCube, browser tree (Bodies, Sketches, Construction planes) |
