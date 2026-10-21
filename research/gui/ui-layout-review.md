@@ -16,6 +16,12 @@ Research Digest, 2026-10-21. Design input only; takeaways are proposals, not Eri
 5. Watertight and units check shown in Export/Print before every export.
 - TBD for Erik: units/export in top bar vs status bar.
 
+## Tab-switch shortcuts and tool search
+- **Blender:** Ctrl+PageUp / Ctrl+PageDown go to the previous / next workspace tab; Ctrl+Tab cycles panel tabs but not workspace tabs. [9][10]
+- **FreeCAD:** Std Workbench has no default shortcut; switch via the ComboBox/TabBar or View > Workbench. [7]
+- **Onshape:** Search tools (Alt/Opt+C) finds any tool, including ones removed from the toolbar, and can highlight it in the toolbar. On iOS/Android, search sits in the tools menu. The S key opens a customizable shortcut toolbar. [4][5]
+- Fusion: no shortcut for switching tabs found in the sources above; not claimed.
+- Proposal: adopt Ctrl+PageUp/PageDown for tabs (Blender precedent) and a tool search on a key like Onshape's, with a search button in the phone tools menu. Exact keys are TBD for Erik and must not clash with browser shortcuts (Chrome uses Ctrl+PageUp/Down for browser tabs, which is unverified here and needs a test).
 ## Sources
 1. Fusion Help, Workspaces: https://help.autodesk.com/view/fusion360/ENU/?guid=GS-WORKSPACES
 2. Fusion API, User-Interface Customization: https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/UserInterface_UM.htm
@@ -26,3 +32,5 @@ Research Digest, 2026-10-21. Design input only; takeaways are proposals, not Eri
 7. FreeCAD wiki, Std Workbench: https://wiki.freecad.org/Std_Workbench
 8. FreeCAD wiki, PartDesign NewSketch: https://wiki.freecad.org/PartDesign_NewSketch
 9. Blender Manual, Workspaces: https://docs.blender.org/manual/en/latest/interface/window_system/workspaces.html
+10. Blender Manual, Tabs & Panels: https://docs.blender.org/manual/en/latest/interface/window_system/tabs_panels.html
+
