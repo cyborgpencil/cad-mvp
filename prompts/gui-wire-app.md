@@ -44,3 +44,6 @@ Stop at 60 minutes, or at any checkpoint failure, and report what was done, what
 - Restyle: follow prompts/modo-restyle.md (visual only; hex values TBD).
 - Interactive Booleans: follow mvp/booleans.md. Ghost preview while dragging, exact OCCT Boolean on release, then the OCCT check and repair, then the watertight and units gate; roll back on failure. Test case: the off-center disc on the Blink bracket leg (mvp/projects/blink-l-bracket.md).
 - Do not add manifold-3d unless Erik approves it.- **Chief rulings (2026-10-21, after checkpoint 1):** no Pages deploy until the interim banner is visible and Export is locked to the OCCT gate, even after Erik's go. Stop the Grok session as soon as it reports done, without waiting for the cap. R2 and R3 need a live rotation test (a phone or DevTools rotation) before they count as a pass.
+
+## Next-session rule (2026-10-21 16:20 MT): occt_gate in CI
+- occt_gate must FAIL when libcascade is missing and CI is set (env CI=true, as on GitHub Actions); it may skip only on local runs. A failed libcascade fetch in pages.yml must fail the deploy, never ship green without the gate.

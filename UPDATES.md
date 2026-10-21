@@ -99,3 +99,5 @@ Newest entries at the top.
 - 2026-10-21 15:50 MT: Research Digest spec landed at research/gui/modo-selection-primitives.md (linked in research/INDEX.md). UI session follows it after the OCCT gate; colours stay TBD vars (--sel-color, --hover-color); Box centred via half-size offset; Cylinder base = centre - axis*h/2; primitives must pass watertight + units checks; banner and Export gate unchanged.
 
 - 2026-10-21 16:15 MT: Phase 2 OCCT gate done (Pilot, session 01a1606d, 3:45-3:58 PM MT, $1.21). closed_box passes (BRepCheck valid, 0 free edges, watertight+units pass, Export unlocks, banner hides); open_box fails (4 free edges, Export locked). CTest 6/6 incl. occt_gate. libcascade 3.1.0 / OCCT 8.0.1 prebuilt, single-threaded, 42.8 MB wasm, gitignored. R3 passes live in headless browser; real-phone check still pending (also for 42.8 MB wasm). Erik to review pages.yml (fetches libcascade at deploy) and index.html diffs. Next: selection/primitives UI session; colours stay TBD vars.
+
+- 2026-10-21 16:20 MT: prompts/gui-wire-app.md: added rule that occt_gate fails in CI when libcascade is missing (skip only locally), per Research Digest.

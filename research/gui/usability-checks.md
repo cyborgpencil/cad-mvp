@@ -54,6 +54,7 @@ Erik, 2026-10-21: one responsive WASM app for desktop and phone, in both orienta
 - **R3:** Rotate on every tab, and on a real phone with the OS rotation lock off. Expected: no "rotate your device" block, no `screen.orientation.lock()`, and all content works in both. Source: [11].
   - **Result: PROVISIONAL** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png). Code read only.
   - **Result (restyle): PASS** per Pilot report (Pilot restyle checkpoint, session 01a15dae, 2026-10-21 2:57-3:13 AM MT). Verification method TBD.
+  - **Result (Phase 2): PASS** (Pilot session 01a1606d, 2026-10-21 ~3:58 PM MT). Live in a headless browser: portrait to landscape and back flipped the layout without a reload, gate state held, and there is no orientation lock in the code. Real-phone check pending.
 - **R4:** At 844x390, measure the same controls as T1. Expected: each is at least 44 x 44 CSS px. Source: D9 [2].
   - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
   - **Result (restyle): PASS** (Pilot restyle checkpoint, session 01a15dae, 2026-10-21 2:57-3:13 AM MT).
