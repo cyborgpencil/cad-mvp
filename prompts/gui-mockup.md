@@ -7,7 +7,7 @@ Only run this after Erik approves the design.
 ## Must have
 - Top bar: File, Undo/Redo, the four tabs Sketch, Model, Repair and Export, and an mm/in toggle that only changes the labels.
 - Sketch is a mode. "New Sketch" on the Model tab switches to the Sketch tab, and a "Finish Sketch" bar returns you to Model. Sketch tools: Line, Rectangle, Circle, Arc, Polygon, Sketch Fillet, Trim, Offset, Dimension, plus the constraints Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent and Fixed.
-- Model tools: Extrude (Push/Pull), Inset, Bevel (Fillet/Chamfer), Loop Cut, Knife, Grab, Rotate, Scale, Snapping.
+- Model tools: Extrude (Push/Pull), Inset, Fillet (Chamfer is test-only, per Chief), Loop Cut, Knife, Grab, Rotate, Scale, Snapping.
 - Repair tab: Check shape, Find open edges, Auto-heal and Mesh repair (toast only). Add nothing else.
 - Export tab: a watertight and units check panel showing PASS/FAIL (fake), then the one Export button with STL and 3MF choices. The button stays disabled while the check shows FAIL. There's no other export path.
 - Shared on every tab: a browser tree on the left (Bodies, Sketches, Construction planes), an inspector on the right, one floating view bar (Select modes Vertex/Edge/Face/Body, Measure, Section, display modes, Orbit/Pan/Zoom/Fit, view presets, Isolate/Hide), the ViewCube top right, and a status bar showing units, watertight PASS/FAIL and volume (fake values).
