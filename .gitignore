@@ -20,6 +20,10 @@ desktop.ini
 
 # C++ / Qt / CMake
 build/
+# Emscripten glue and wasm. Actions builds these. Do not commit.
+web/cadcam.js
+web/cadcam.wasm
+web/*.wasm
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake

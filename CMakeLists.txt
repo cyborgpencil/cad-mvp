@@ -34,6 +34,7 @@ add_library(export_mesh
     src/export/stl.cpp
     src/export/threemf.cpp
     src/export/export_files.cpp
+    src/export/gate.cpp
 )
 target_include_directories(export_mesh PUBLIC src/export)
 target_link_libraries(export_mesh PUBLIC solid units)
@@ -44,6 +45,10 @@ target_link_libraries(export_box PRIVATE export_mesh)
 add_executable(test_export tests/test_export.cpp)
 target_link_libraries(test_export PRIVATE export_mesh)
 add_test(NAME export COMMAND test_export)
+
+add_executable(test_gate tests/test_gate.cpp)
+target_link_libraries(test_gate PRIVATE export_mesh)
+add_test(NAME gate COMMAND test_gate)
 
 add_library(model
     src/model/shapes.cpp
