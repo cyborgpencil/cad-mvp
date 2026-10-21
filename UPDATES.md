@@ -54,3 +54,5 @@ Newest entries at the top.
 - `mvp/gui-plan.md` section 6: changed 'move to OCCT' to 'add OCCT alongside the mesh code', matching AGENTS.md and research/gui/README.md.
 - 2026-10-21 00:32 MT (Doc Steward): prompts/gui-mockup.md now says Pilot takes the mockup screenshots with headless Edge (same sizes and paths), not Grok.
 - 2026-10-21 00:33 MT (Doc Steward): AGENTS.md has a new Z13-only execution rule (direct Shell on Z13, no Ally or WinRM route), per Erik via 3T.
+- 2026-10-21 00:42 MT (Doc Steward): AGENTS.md now documents the handoff folder C:\Users\cybor\Pictures\cadmvp-shots\ (handoff copies only, because the app's file copy only reads under the user profile).
+- 2026-10-21 00:43 MT (Doc Steward): AGENTS.md handoff section now says to delete nothing in the staging folder without Erik's go, and it points to the shared skill pull-files-from-user-pc.

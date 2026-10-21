@@ -33,3 +33,7 @@ Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns
 
 ## Z13-only execution (Erik's rule, 2026-10-21)
 All project work runs through Shell aimed directly at ErmoZ13 (Z13). Nothing runs from ErmoAlly, and nothing goes through a WinRM hop. Grok Build sessions, captures, builds and git all run on Z13.
+
+## Handoff folder for files going to Erik (2026-10-21)
+The app's file copy only reads under `C:\Users\cybor`, so it can't copy anything out of `C:\Dev\cadcam-mvp`. Files meant for Erik, such as screenshots or the mockup HTML, get one extra copy in `C:\Users\cybor\Pictures\cadmvp-shots\` on Z13. The working copy stays in `builds\`. This folder holds handoff copies only, never project work. It's an exception to the Z13-dev-folder-only rule, set by 3T; Erik can confirm or change it. Don't delete anything in this folder unless Erik says to (3T, 2026-10-21).
+The shared skill `pull-files-from-user-pc` covers this method: stage with Shell, leave the originals untouched, then copy from the staging folder.
