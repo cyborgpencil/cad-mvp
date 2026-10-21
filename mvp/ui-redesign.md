@@ -1,5 +1,5 @@
-# UI redesign: workbench tabs (proposal, design only, 2026-10-21)
-Erik asked for a friendlier, less plain UI built around process tabs. This section is design only: no code changes, and the Qt app and mockup stay as they are until Erik approves. It builds on Research Digest's sourced review in research/gui/ui-layout-review.md (Fusion, Onshape, FreeCAD, Blender). Section 2 of mvp/gui-plan.md lists the operations.
+# UI redesign: workbench tabs (approved by Erik 2026-10-21; implementation in progress)
+Erik asked for a friendlier, less plain UI built around process tabs. Erik approved the wireframes on 2026-10-21 and asked for the GUI to be built into the current project; Grok Build is implementing it. It builds on Research Digest's sourced review in research/gui/ui-layout-review.md (Fusion, Onshape, FreeCAD, Blender). Section 2 of mvp/gui-plan.md lists the operations.
 
 ## 1 Layout sketch
 ```

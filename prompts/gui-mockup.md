@@ -2,7 +2,7 @@
 
 Working dir: C:\Dev\cadcam-mvp\mockup\ on Z13. Write nothing outside mockup\.
 Goal: a clickable layout mockup that follows the final decisions in mvp/ui-redesign.md ("Team decisions (final)"), so Erik can give quick feedback. No real geometry and no OCCT. Replace mockup\index.html in place, with no versioned copies.
-Only run this after Erik approves the design.
+Erik approved the design on 2026-10-21. FixGaps (small-gaps fix) stays out; it is TBD for Erik.
 
 ## Must have
 - Top bar: File, Undo/Redo, the four tabs Sketch, Model, Repair and Export, and an mm/in toggle that only changes the labels.
