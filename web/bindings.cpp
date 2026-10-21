@@ -81,6 +81,37 @@ std::string fixture_name() {
     return g_fixture;
 }
 
+bool replace_mesh(const emscripten::val& positions, const emscripten::val& indices, const std::string& name) {
+    if (positions.isNull() || positions.isUndefined() || indices.isNull() || indices.isUndefined()) {
+        return false;
+    }
+    const unsigned length = positions["length"].as<unsigned>();
+    const unsigned index_length = indices["length"].as<unsigned>();
+    if (length % 3 != 0 || index_length % 3 != 0 || index_length == 0) {
+        return false;
+    }
+    MeshSolid mesh;
+    mesh.vertices.reserve(length / 3);
+    for (unsigned i = 0; i + 2 < length; i += 3) {
+        mesh.vertices.push_back({
+            positions[i].as<double>(),
+            positions[i + 1].as<double>(),
+            positions[i + 2].as<double>(),
+        });
+    }
+    mesh.triangles.reserve(index_length / 3);
+    for (unsigned i = 0; i + 2 < index_length; i += 3) {
+        mesh.triangles.push_back({
+            indices[i].as<std::uint32_t>(),
+            indices[i + 1].as<std::uint32_t>(),
+            indices[i + 2].as<std::uint32_t>(),
+        });
+    }
+    g_mesh = std::move(mesh);
+    g_fixture = name.empty() ? std::string("mesh") : name;
+    return true;
+}
+
 GateReport toggle_units() {
     g_lock.toggle();
     return gate();
@@ -160,6 +191,7 @@ EMSCRIPTEN_BINDINGS(cadcam) {
     emscripten::function("gate", &gate);
     emscripten::function("loadFixture", &load_fixture);
     emscripten::function("fixtureName", &fixture_name);
+    emscripten::function("replaceMesh", &replace_mesh);
     emscripten::function("toggleUnits", &toggle_units);
     emscripten::function("checkShape", &check_shape);
     emscripten::function("findOpenEdges", &find_open_edges);

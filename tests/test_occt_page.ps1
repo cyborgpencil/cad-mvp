@@ -18,6 +18,13 @@ $Port = 8766
 $Prof = Join-Path $Repo 'builds\edge-wasm-occt'
 New-Item -ItemType Directory -Force -Path $Prof | Out-Null
 
+function Stop-ProfileEdge {
+  Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$Prof*") } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+Stop-ProfileEdge
+
 $server = Start-Process $Py -ArgumentList ($PyArgs + @('-m','http.server',"$Port",'--directory',(Join-Path $Repo 'web'))) -WorkingDirectory $Repo -PassThru -WindowStyle Hidden
 Start-Sleep 1
 $edgeProc = $null
@@ -50,6 +57,8 @@ try {
       if ($json.id -eq $script:msgId) { return $json }
     }
   }
+  Cdp 'Network.enable' | Out-Null
+  Cdp 'Network.setCacheDisabled' @{ cacheDisabled = $true } | Out-Null
   function Wait-Gate($url, $timeoutSec) {
     Cdp 'Page.navigate' @{ url = $url } | Out-Null
     $deadline = (Get-Date).AddSeconds($timeoutSec)
@@ -67,6 +76,8 @@ try {
   }
   $closed = Wait-Gate "http://127.0.0.1:$Port/?fixture=closed_box&tab=export" 90
   $open = Wait-Gate "http://127.0.0.1:$Port/?fixture=open_box&tab=export" 90
+  $box = Wait-Gate "http://127.0.0.1:$Port/?primitive=box&select=face&tab=export" 120
+  $cyl = Wait-Gate "http://127.0.0.1:$Port/?primitive=cylinder&select=item&tab=export" 120
   $script:fail = 0
   function Expect($name, $ok) {
     if ($ok) { return }
@@ -81,13 +92,25 @@ try {
   Expect 'open export locked' ($open.exportAllowed -eq $false -and $open.exportDisabled -eq $true)
   Expect 'open banner stays' ($open.bannerHidden -eq $false)
   Expect 'open badge FAIL' ($open.gateOcct -eq 'FAIL')
+  Expect 'box occt green' ($box.occtGate -eq $true)
+  Expect 'box export on' ($box.exportAllowed -eq $true -and $box.exportDisabled -eq $false)
+  Expect 'box banner gone' ($box.bannerHidden -eq $true)
+  Expect 'box face mode' ($box.selectionMode -eq 'face')
+  Expect 'box face selected' ([int]$box.selectionCount -ge 1)
+  Expect 'box not all' ($box.selectionAll -eq $false)
+  Expect 'cylinder occt green' ($cyl.occtGate -eq $true)
+  Expect 'cylinder export on' ($cyl.exportAllowed -eq $true -and $cyl.exportDisabled -eq $false)
+  Expect 'cylinder banner gone' ($cyl.bannerHidden -eq $true)
+  Expect 'cylinder item selected' ($cyl.selectionMode -eq 'item' -and [int]$cyl.selectionCount -ge 1)
   Write-Host ('closed=' + ($closed | ConvertTo-Json -Compress))
   Write-Host ('open=' + ($open | ConvertTo-Json -Compress))
+  Write-Host ('box=' + ($box | ConvertTo-Json -Compress))
+  Write-Host ('cylinder=' + ($cyl | ConvertTo-Json -Compress))
   if ($fail -ne 0) { throw "$fail page checks failed" }
   Write-Host 'ok'
 } finally {
   if ($ws) { $ws.Dispose() }
   if ($edgeProc) { Stop-Process -Id $edgeProc.Id -Force -ErrorAction SilentlyContinue }
-  Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $Edge } | Stop-Process -Force -ErrorAction SilentlyContinue
+  Stop-ProfileEdge
   if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
 }

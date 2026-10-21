@@ -16,7 +16,7 @@ Research Digest, 2026-10-21 (MT). Target: OCCT 8.0.1, single-threaded, native wa
 - **License fit:** OCCT and libcascade are both LGPL-2.1 with the OCCT exception [1][8]. Static wasm linking under LGPL needs us to let users relink (publish our objects or source); our repo is already public on GitHub, so this is likely fine. Legal reading is a TBD for Erik, not advice.
 - **Not checked:** opencascade.js upstream (donalffons) GitHub activity and its v2 beta line; whether libcascade single build uses native wasm exceptions in the prebuilt binary (README says v3 does [1]; confirm in `opencascade_single.provenance.json`).
 
-- **Phase 2 (2026-10-21):** libcascade 3.1.0 prebuilt confirmed working (single-threaded, 42.8 MB .wasm uncompressed). Compressed transfer size over GitHub Pages: TBD, measure after deploy.
+- **Phase 2 (2026-10-21):** libcascade 3.1.0 prebuilt confirmed working (single-threaded, 42.8 MB .wasm uncompressed). Served gzipped by GitHub Pages: content-encoding gzip, 12,359,983 bytes (~12.4 MB) transfer, measured by Repo Keeper via curl -I after deploy 644affb, 2026-10-21.
 
 ## Verdict (for Erik / Chief)
 **Reuse libcascade 3.x via its toolchain (custom single-threaded build + our C++ as custom bindings) rather than building OCCT 8.0.1 ourselves.** It already ships OCCT 8.0.1, matches our config (single variant, wasm exceptions, SIMD), exposes all four classes we need, and has the right license. Fallback: the official OCCT Emscripten build [6] if the toolchain can't link our C++ core or Docker isn't allowed on Z13. Old opencascade.js (OCCT 7.4) and occt-import-js (import only) are not fits.

@@ -29,6 +29,17 @@
     --line-strong: #0a181c;
     --accent: #14756e;
     --accent-dim: color-mix(in srgb, var(--accent) 32%, transparent);
+    /* TBD placeholders. Not sampled from MODO. Not orange. Not Erik's teal.
+       --hover-color and --sel-color must stay visually different. Erik decides the hex. */
+    --hover-color: #c5d4ff;
+    --sel-color: #f7c1d9;
+    --axis-x: #d24b4b;
+    --axis-y: #3aaa55;
+    --axis-z: #3a78e0;
+    --handle-hover: #efe07a;
+    --centre-color: #d8dde6;
+    --active-fill: #3a3f46;
+    --active-border: #f4fbfb;
     --measure: #fff8e8;
     --pass: #c8f5df;
     --pass-bg: #0e3d2c;
@@ -139,11 +150,16 @@
     min-height: 44px;
     height: 44px;
     border-radius: 8px;
+    border: 1px solid transparent;
     color: var(--muted);
     padding: 0 10px;
     font-weight: 650;
   }
-  .units button.is-on { background: var(--accent); color: white; }
+  .units button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .top-tabs {
     display: flex;
     align-items: center;
@@ -157,11 +173,16 @@
     height: 44px;
     padding: 0 14px;
     color: var(--muted);
+    border: 1px solid transparent;
     border-bottom: 2px solid transparent;
     border-radius: 8px 8px 0 0;
     font-weight: 650;
   }
-  .tab.is-on { color: var(--ink); border-bottom-color: var(--accent); background: var(--tab-active); }
+  .tab.is-on {
+    color: var(--ink);
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
   .menu-wrap { position: relative; flex: none; }
   .menu {
     position: absolute;
@@ -223,10 +244,16 @@
     justify-content: center;
     gap: 3px;
     color: var(--ink);
+    border: 1px solid transparent;
   }
   .tool-btn span { font-size: 10.5px; line-height: 1.15; text-align: center; }
   .tool-btn:hover { background: rgba(255, 255, 255, 0.06); }
-  .tool-btn.is-on { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); color: var(--ink); }
+  .tool-btn.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+    box-shadow: none;
+  }
   .tool-btn.wide { width: 92px; }
   .finish-bar {
     display: flex;
@@ -298,7 +325,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .node.is-on { background: var(--accent-dim); }
+  .node { border: 1px solid transparent; }
+  .node.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .mini {
     width: 44px;
     height: 44px;
@@ -311,7 +343,12 @@
   }
   .mini:hover, .node:hover { background: rgba(255, 255, 255, 0.06); }
   .mini.on-word { width: auto; min-width: 44px; padding: 0 10px; font-size: 11px; letter-spacing: 0.04em; }
-  .mini.is-on { color: var(--accent); }
+  .mini { border: 1px solid transparent; }
+  .mini.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .eye .off { display: none; }
   .eye.is-off .on { display: none; }
   .eye.is-off .off { display: block; }
@@ -392,9 +429,13 @@
     align-items: center;
     justify-content: center;
     touch-action: manipulation;
+    border: 1px solid transparent;
   }
   .vp-bar button:hover { background: rgba(255, 255, 255, 0.08); }
-  .vp-bar button.is-on { background: var(--accent-dim); }
+  .vp-bar button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
   .vp-bar .ico { width: 20px; height: 20px; }
   .measure-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
   .measure-layer .ext { stroke: #d5deea; stroke-width: 1; }
@@ -423,6 +464,38 @@
   }
   .swatch.is-on { border-color: white; }
   .fine { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
+  .move-fields, .prim-fields { margin-top: 12px; display: grid; gap: 6px; }
+  .move-fields label, .prim-fields label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    color: var(--muted);
+  }
+  .move-fields input, .prim-fields input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    background: var(--field);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 8px;
+  }
+  .axis-row { display: flex; gap: 4px; }
+  .axis-row button {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--tab-bg);
+    color: var(--ink);
+  }
+  .axis-row button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
   .statusbar {
     min-height: var(--status-h);
     height: auto;
@@ -697,14 +770,16 @@
     height: 44px;
     padding: 0 12px;
     border-radius: 8px;
+    border: 1px solid transparent;
     color: var(--tab-ink);
     background: var(--tab-bg);
     font-weight: 650;
   }
   .side-tab.is-on {
     color: var(--ink);
-    background: var(--tab-active);
-    box-shadow: inset 0 0 0 1px var(--accent);
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    box-shadow: none;
   }
   .preview-btn {
     min-width: 44px;
@@ -716,8 +791,13 @@
     color: var(--ink);
     font-weight: 650;
     align-self: flex-start;
+    border: 1px solid transparent;
   }
-  .preview-btn.is-on { background: var(--accent); color: #ffffff; }
+  .preview-btn.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .side-note { margin: 8px 12px 16px; }
   @media (max-width: 820px), (max-height: 520px) {
     .show-narrow { display: inline-flex; }
@@ -793,7 +873,11 @@
       height: auto;
       padding: 4px 2px 0;
     }
-    .phone-tabbar .tab.is-on { border-top-color: var(--accent); background: rgba(255, 255, 255, 0.03); }
+    .phone-tabbar .tab.is-on {
+      background: var(--active-fill);
+      border-color: var(--active-border);
+      color: var(--ink);
+    }
     .phone-tabbar .ico { width: 20px; height: 20px; }
     #toasts { bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px); }
     .statusbar { gap: 10px; padding: 0 8px; font-size: 11px; }
@@ -912,6 +996,8 @@
   <symbol id="i-edge" viewBox="0 0 24 24"><path d="M5 17 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
   <symbol id="i-face" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-body" viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21 4 16.5v-9zM12 12l8-4.5M12 12 4 7.5M12 12v9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM12 12l8-4M12 12v8M12 12 4 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cyl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="6" ry="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6 7v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V7" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-line" viewBox="0 0 24 24"><path d="M5 18 19 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-rect" viewBox="0 0 24 24"><path d="M6 7h12v10H6z" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
@@ -1007,9 +1093,9 @@
   <div class="workspace">
     <aside class="toolbox" id="toolbox">
       <nav class="tool-tabs" role="tablist" aria-label="Toolbox">
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (1)">Sketch</button>
-        <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (2)">Model</button>
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (3)">Repair</button>
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (Alt+1)">Sketch</button>
+        <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (Alt+2)">Model</button>
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (Alt+3)">Repair</button>
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (4)">Export</button>
       </nav>
       <div class="ribbon">
@@ -1044,6 +1130,8 @@
     <div class="tools panel" data-panel="model">
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
+        <button type="button" class="tool-btn" data-action="primitive" data-kind="box" data-tool="Box" title="Box"><svg class="ico"><use href="#i-box"></use></svg><span>Box</span></button>
+        <button type="button" class="tool-btn" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder"><svg class="ico"><use href="#i-cyl"></use></svg><span>Cylinder</span></button>
         <button type="button" class="tool-btn" data-tool="Extrude (Push/Pull)" title="Extrude (Push/Pull)"><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
@@ -1151,10 +1239,10 @@
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View">
         <div class="vp-cluster" role="group" aria-label="Select">
-          <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex"><svg class="ico"><use href="#i-vertex"></use></svg></button>
-          <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge"><svg class="ico"><use href="#i-edge"></use></svg></button>
-          <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face"><svg class="ico"><use href="#i-face"></use></svg></button>
-          <button type="button" class="is-on" data-action="select" data-mode="body" data-tool="Selection: Body" title="Body" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
+          <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex (1)"><svg class="ico"><use href="#i-vertex"></use></svg></button>
+          <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
+          <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
+          <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (5)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
         </div>
         <div class="vp-cluster" role="group" aria-label="Analyze">
           <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
@@ -1216,6 +1304,36 @@
           </div>
         </div>
         <p class="fine" id="inspFine">Labels only. This cube is not editable geometry.</p>
+        <div id="moveFields" class="move-fields">
+          <div class="muted">Position (mm)</div>
+          <label>X <input id="posX" type="number" step="0.001" inputmode="decimal" aria-label="Position X mm"></label>
+          <label>Y <input id="posY" type="number" step="0.001" inputmode="decimal" aria-label="Position Y mm"></label>
+          <label>Z <input id="posZ" type="number" step="0.001" inputmode="decimal" aria-label="Position Z mm"></label>
+        </div>
+        <div id="primFields" class="prim-fields" hidden>
+          <div class="muted" id="primTitle">Primitive</div>
+          <div class="muted">Centre (mm)</div>
+          <label>X <input id="primCx" type="number" step="0.001" inputmode="decimal" aria-label="Centre X mm"></label>
+          <label>Y <input id="primCy" type="number" step="0.001" inputmode="decimal" aria-label="Centre Y mm"></label>
+          <label>Z <input id="primCz" type="number" step="0.001" inputmode="decimal" aria-label="Centre Z mm"></label>
+          <div id="primBox">
+            <div class="muted">Size (mm)</div>
+            <label>X <input id="boxSx" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size X mm"></label>
+            <label>Y <input id="boxSy" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size Y mm"></label>
+            <label>Z <input id="boxSz" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size Z mm"></label>
+          </div>
+          <div id="primCyl" hidden>
+            <label>Radius <input id="cylR" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Cylinder radius mm"></label>
+            <label>Height <input id="cylH" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Cylinder height mm"></label>
+            <div class="muted">Axis</div>
+            <div class="axis-row" role="group" aria-label="Cylinder axis">
+              <button type="button" data-action="cylAxis" data-axis="X" data-tool="Axis X">X</button>
+              <button type="button" data-action="cylAxis" data-axis="Y" data-tool="Axis Y">Y</button>
+              <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Axis Z">Z</button>
+            </div>
+          </div>
+          <p class="fine">TBD placeholder sizes, in millimetres. Each edit rebuilds the solid. No Sides control.</p>
+        </div>
       </div>
       <div data-side-panel="channels" hidden>
         <h2 class="panel-h">Channels</h2>
@@ -1321,16 +1439,29 @@ async function boot() {
       console.error('occt-gate failed', err);
       return null;
     });
+    const primPromise = import('./occt-primitives.mjs').catch(function (err) {
+      console.error('occt-primitives failed', err);
+      return null;
+    });
+    const selPromise = import('./selection.mjs').catch(function (err) {
+      console.error('selection failed', err);
+      return null;
+    });
+    const viewPromise = import('./viewport-selection.mjs').catch(function (err) {
+      console.error('viewport-selection failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise]);
-    main(Module, occtLoaded[0], occtLoaded[1]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4]);
   } catch (err) {
-    showError(err && err.message ? err.message : String(err));
+    window.__cadcamBootNote = err && err.message ? err.message : String(err);
+    showError(window.__cadcamBootNote);
   }
 }
 boot();
 
-function main(Module, oc, gateApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -1368,6 +1499,8 @@ function main(Module, oc, gateApi) {
     { name: 'Fixed', tab: 'sketch' },
     { name: 'Finish Sketch', tab: 'sketch', action: 'finishSketch' },
     { name: 'New Sketch', tab: 'model', action: 'newSketch' },
+    { name: 'Box', tab: 'model', action: 'primitive', kind: 'box' },
+    { name: 'Cylinder', tab: 'model', action: 'primitive', kind: 'cylinder' },
     { name: 'Extrude (Push/Pull)', tab: 'model' },
     { name: 'Inset', tab: 'model' },
     { name: 'Fillet', tab: 'model' },
@@ -1434,7 +1567,17 @@ function main(Module, oc, gateApi) {
   const state = {
     tab: 'model',
     unit: 'mm',
-    selection: 'body',
+    selection: 'item',
+    selectedIds: [],
+    hoverId: null,
+    topology: null,
+    topologySource: 'mesh',
+    meshCad: { vertices: [], triangles: [] },
+    primitive: null,
+    shapeGate: null,
+    anchor: { x: 0, y: 0, z: 0 },
+    boundsCad: { cx: 0, cy: 0, cz: 0 },
+    writingFields: false,
     snap: false,
     section: false,
     measure: false,
@@ -1540,28 +1683,13 @@ function main(Module, oc, gateApi) {
   mesh.add(corners);
   scene.add(mesh);
 
-  const handles = new THREE.Group();
+  const gizmo = viewApi.makeGizmo(THREE);
+  const handles = gizmo.group;
   handles.visible = false;
-  function addAxis(dir, color) {
-    const end = dir.clone().multiplyScalar(18);
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), end]),
-      new THREE.LineBasicMaterial({ color: color, depthTest: false })
-    );
-    line.renderOrder = 3;
-    handles.add(line);
-    const tip = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 2.2, 2.2),
-      new THREE.MeshBasicMaterial({ color: color, depthTest: false })
-    );
-    tip.position.copy(end);
-    tip.renderOrder = 3;
-    handles.add(tip);
-  }
-  addAxis(new THREE.Vector3(1, 0, 0), 0xe15b4a);
-  addAxis(new THREE.Vector3(0, 1, 0), 0x3cba6a);
-  addAxis(new THREE.Vector3(0, 0, 1), 0x4c8dff);
   scene.add(handles);
+  const overlays = viewApi.makeOverlays(THREE);
+  for (let oi = 0; oi < overlays.nodes.length; oi += 1) scene.add(overlays.nodes[oi]);
+  let gizmoDrag = null;
 
   const sketchPts = [
     new THREE.Vector3(-10, 20.08, -10),
@@ -1742,11 +1870,494 @@ function main(Module, oc, gateApi) {
     updateGate();
   }
 
+  function gizmoShouldShow() {
+    if (state.preview) return true;
+    if (state.selection === 'item') return state.selectedIds.length > 0;
+    return true;
+  }
+
   function placeHandles() {
-    handles.position.copy(target);
+    viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, handles.position);
+    if (gizmoDrag && gizmoDrag.cad) {
+      handles.position.x += gizmoDrag.cad.x;
+      handles.position.y += gizmoDrag.cad.z;
+      handles.position.z += gizmoDrag.cad.y;
+    }
     const len = Math.max(fitRadius * 0.9, 8);
     handles.scale.setScalar(len / 18);
-    handles.visible = !!state.preview;
+    handles.visible = gizmoShouldShow();
+  }
+
+  function writePosFields() {
+    const x = document.getElementById('posX');
+    const y = document.getElementById('posY');
+    const z = document.getElementById('posZ');
+    if (!x || !y || !z) return;
+    state.writingFields = true;
+    const show = gizmoDrag && gizmoDrag.cad
+      ? {
+        x: state.anchor.x + gizmoDrag.cad.x,
+        y: state.anchor.y + gizmoDrag.cad.y,
+        z: state.anchor.z + gizmoDrag.cad.z
+      }
+      : state.anchor;
+    x.value = String(Math.round(show.x * 1000) / 1000);
+    y.value = String(Math.round(show.y * 1000) / 1000);
+    z.value = String(Math.round(show.z * 1000) / 1000);
+    const on = gizmoShouldShow();
+    x.disabled = !on;
+    y.disabled = !on;
+    z.disabled = !on;
+    state.writingFields = false;
+  }
+
+  function refreshAnchor() {
+    const ids = state.selectedIds;
+    const topo = state.topology;
+    const itemish = ids.length === 0 || (ids.length === 1 && ids[0] === 'item');
+    if (itemish) {
+      if (state.primitive) {
+        state.anchor = {
+          x: state.primitive.params.cx,
+          y: state.primitive.params.cy,
+          z: state.primitive.params.cz
+        };
+      } else {
+        state.anchor = {
+          x: state.boundsCad.cx,
+          y: state.boundsCad.cy,
+          z: state.boundsCad.cz
+        };
+      }
+    } else if (topo) {
+      let sx = 0;
+      let sy = 0;
+      let sz = 0;
+      let n = 0;
+      function add(p) {
+        if (!p) return;
+        sx += p[0];
+        sy += p[1];
+        sz += p[2];
+        n += 1;
+      }
+      for (let i = 0; i < ids.length; i += 1) {
+        const id = ids[i];
+        if (id.charAt(0) === 'v') {
+          for (let k = 0; k < topo.vertices.length; k += 1) {
+            if (topo.vertices[k].id === id) add(topo.vertices[k].p);
+          }
+        } else if (id.charAt(0) === 'e') {
+          for (let k = 0; k < topo.edges.length; k += 1) {
+            if (topo.edges[k].id === id && topo.edges[k].pts.length) {
+              add(topo.edges[k].pts[Math.floor(topo.edges[k].pts.length / 2)]);
+            }
+          }
+        } else if (id.charAt(0) === 'f') {
+          for (let k = 0; k < topo.faces.length; k += 1) {
+            if (topo.faces[k].id === id) add(topo.faces[k].centroid);
+          }
+        }
+      }
+      if (n) state.anchor = { x: sx / n, y: sy / n, z: sz / n };
+    }
+    writePosFields();
+  }
+
+  function paintPrimFields() {
+    const host = document.getElementById('primFields');
+    const box = document.getElementById('primBox');
+    const cyl = document.getElementById('primCyl');
+    if (!host || !box || !cyl) return;
+    const prim = state.primitive;
+    host.hidden = !prim;
+    box.hidden = !prim || prim.kind !== 'box';
+    cyl.hidden = !prim || prim.kind !== 'cylinder';
+    if (!prim) return;
+    state.writingFields = true;
+    document.getElementById('primTitle').textContent = prim.kind === 'cylinder' ? 'Cylinder (TBD defaults)' : 'Box (TBD defaults)';
+    document.getElementById('primCx').value = String(prim.params.cx);
+    document.getElementById('primCy').value = String(prim.params.cy);
+    document.getElementById('primCz').value = String(prim.params.cz);
+    if (prim.kind === 'box') {
+      document.getElementById('boxSx').value = String(prim.params.sx);
+      document.getElementById('boxSy').value = String(prim.params.sy);
+      document.getElementById('boxSz').value = String(prim.params.sz);
+    } else {
+      document.getElementById('cylR').value = String(prim.params.radius);
+      document.getElementById('cylH').value = String(prim.params.height);
+      const axes = document.querySelectorAll('[data-action="cylAxis"]');
+      for (let i = 0; i < axes.length; i += 1) {
+        const on = axes[i].getAttribute('data-axis') === prim.params.axis;
+        axes[i].classList.toggle('is-on', on);
+        axes[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+    }
+    state.writingFields = false;
+  }
+
+  function captureMeshCad() {
+    const pos = Module.meshPositions();
+    const idx = Module.meshIndices();
+    const vertices = [];
+    for (let i = 0; i + 2 < pos.length; i += 3) vertices.push([pos[i], pos[i + 1], pos[i + 2]]);
+    const triangles = [];
+    for (let i = 0; i + 2 < idx.length; i += 3) triangles.push([idx[i], idx[i + 1], idx[i + 2]]);
+    state.meshCad = { vertices: vertices, triangles: triangles };
+    if (state.topologySource !== 'occt' && selApi) {
+      state.topology = selApi.groupMeshFaces(vertices, triangles);
+    }
+  }
+
+  function updateHighlights() {
+    if (!overlays) return;
+    overlays.syncColors();
+    const meshCad = state.meshCad;
+    const topo = state.topology;
+    const empty = new Float32Array(0);
+    function facesOf(ids) {
+      const tris = [];
+      if (!topo) return tris;
+      for (let i = 0; i < ids.length; i += 1) {
+        for (let k = 0; k < topo.faces.length; k += 1) {
+          if (topo.faces[k].id === ids[i]) {
+            for (let t = 0; t < topo.faces[k].tris.length; t += 1) tris.push(topo.faces[k].tris[t]);
+          }
+        }
+      }
+      return tris;
+    }
+    function allTris() {
+      const tris = [];
+      if (!meshCad) return tris;
+      for (let i = 0; i < meshCad.triangles.length; i += 1) tris.push(i);
+      return tris;
+    }
+    let selPos = empty;
+    let hoverPos = empty;
+    let selLine = empty;
+    let hoverLine = empty;
+    let selPt = empty;
+    let hoverPt = empty;
+    const mode = state.selection;
+    const selected = state.selectedIds;
+    const hover = state.hoverId && selected.indexOf(state.hoverId) < 0 ? state.hoverId : null;
+    if (meshCad && topo && mode === 'item') {
+      if (selected.indexOf('item') >= 0) selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, allTris());
+      else if (hover === 'item') hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, allTris());
+    } else if (meshCad && topo && mode === 'face') {
+      selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf(selected));
+      if (hover) hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf([hover]));
+    } else if (topo && mode === 'edge') {
+      const selPts = [];
+      const hoverPts = [];
+      for (let i = 0; i < topo.edges.length; i += 1) {
+        if (selected.indexOf(topo.edges[i].id) >= 0) selPts.push(topo.edges[i].pts);
+        else if (hover === topo.edges[i].id) hoverPts.push(topo.edges[i].pts);
+      }
+      selLine = viewApi.polylineArray(selPts);
+      hoverLine = viewApi.polylineArray(hoverPts);
+    } else if (topo && mode === 'vertex') {
+      const selPts = [];
+      const hoverPts = [];
+      for (let i = 0; i < topo.vertices.length; i += 1) {
+        if (selected.indexOf(topo.vertices[i].id) >= 0) selPts.push(topo.vertices[i].p);
+        else if (hover === topo.vertices[i].id) hoverPts.push(topo.vertices[i].p);
+      }
+      selPt = viewApi.pointArray(selPts);
+      hoverPt = viewApi.pointArray(hoverPts);
+    }
+    overlays.setBuffer(overlays.selFace, selPos, 3);
+    overlays.setBuffer(overlays.hoverFace, hoverPos, 3);
+    overlays.setBuffer(overlays.selLines, selLine, 3);
+    overlays.setBuffer(overlays.hoverLines, hoverLine, 3);
+    overlays.setBuffer(overlays.selPoints, selPt, 3);
+    overlays.setBuffer(overlays.hoverPoints, hoverPt, 3);
+  }
+
+  function setSelectionMode(mode) {
+    if (mode !== 'vertex' && mode !== 'edge' && mode !== 'face' && mode !== 'item') return;
+    state.selection = mode;
+    state.selectedIds = [];
+    state.hoverId = null;
+    refreshAnchor();
+    applyLook();
+  }
+
+  function selectFromQuery(selectMode, topology) {
+    if (selectMode !== 'vertex' && selectMode !== 'edge' && selectMode !== 'face' && selectMode !== 'item') return;
+    state.selection = selectMode;
+    state.selectedIds = [];
+    if (selectMode === 'face' && topology.faces[0]) state.selectedIds = [topology.faces[0].id];
+    else if (selectMode === 'edge' && topology.edges[0]) state.selectedIds = [topology.edges[0].id];
+    else if (selectMode === 'vertex' && topology.vertices[0]) state.selectedIds = [topology.vertices[0].id];
+    else if (selectMode === 'item') state.selectedIds = ['item'];
+  }
+
+  function createPrimitive(kind, params, selectMode, keepSelection) {
+    try {
+    if (!oc || !primApi) {
+      window.__cadcamBootNote = 'primitives unavailable';
+      publishGateState();
+      setHint('OCCT primitives need libcascade.');
+      return false;
+    }
+    if (typeof Module.replaceMesh !== 'function') {
+      window.__cadcamBootNote = 'replaceMesh missing';
+      publishGateState();
+      setHint('Mesh replace is not in this wasm build.');
+      return false;
+    }
+    const built = kind === 'cylinder' ? primApi.buildCylinder(oc, params) : primApi.buildBox(oc, params);
+    const flat = primApi.flattenMesh(built.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, kind)) {
+      state.shapeGate = built.gate;
+      setHint(built.gate.message || 'Primitive mesh was rejected.');
+      paintExport();
+      return false;
+    }
+    const kept = keepSelection ? state.selectedIds.slice() : null;
+    state.primitive = { kind: built.kind, params: built.params };
+    state.shapeGate = built.gate;
+    state.topology = built.topology;
+    state.topologySource = 'occt';
+    state.hoverId = null;
+    if (kept) state.selectedIds = kept;
+    else selectFromQuery(selectMode, built.topology);
+    state.activeTool = kind === 'cylinder' ? 'Cylinder' : 'Box';
+    syncFromKernel();
+    refreshAnchor();
+    paintPrimFields();
+    applyLook();
+    setHint(built.gate.pass ? (built.watertight.pass ? built.gate.message : built.watertight.message) : built.gate.message);
+    return built.gate.pass === true && built.watertight.pass === true;
+    } catch (err) {
+      window.__cadcamBootNote = err && err.message ? err.message : String(err);
+      publishGateState();
+      setHint(window.__cadcamBootNote);
+      return false;
+    }
+  }
+
+  function translateBody(dx, dy, dz) {
+    if (!dx && !dy && !dz) return;
+    if (state.primitive) {
+      const next = Object.assign({}, state.primitive.params);
+      next.cx += dx;
+      next.cy += dy;
+      next.cz += dz;
+      createPrimitive(state.primitive.kind, next, null, true);
+      return;
+    }
+    if (typeof Module.replaceMesh !== 'function') {
+      setHint('Mesh replace is not in this wasm build.');
+      return;
+    }
+    const pos = Module.meshPositions();
+    const next = new Float64Array(pos.length);
+    for (let i = 0; i < pos.length; i += 3) {
+      next[i] = pos[i] + dx;
+      next[i + 1] = pos[i + 1] + dy;
+      next[i + 2] = pos[i + 2] + dz;
+    }
+    if (!Module.replaceMesh(next, Module.meshIndices(), Module.fixtureName())) {
+      setHint('Mesh replace failed.');
+      return;
+    }
+    state.shapeGate = null;
+    state.topologySource = 'mesh';
+    syncFromKernel();
+    refreshAnchor();
+    applyLook();
+  }
+
+  function pointerNdc(clientX, clientY) {
+    const bounds = canvas.getBoundingClientRect();
+    raycaster.setFromCamera(new THREE.Vector2(
+      ((clientX - bounds.left) / Math.max(bounds.width, 1)) * 2 - 1,
+      -((clientY - bounds.top) / Math.max(bounds.height, 1)) * 2 + 1
+    ), camera);
+    return bounds;
+  }
+
+  function pickHandle(clientX, clientY) {
+    if (!handles.visible || !gizmo) return '';
+    pointerNdc(clientX, clientY);
+    const hits = raycaster.intersectObjects(gizmo.pickables, false);
+    if (!hits.length) return '';
+    return hits[0].object.userData.handle || '';
+  }
+
+  function screenOfCad(p) {
+    proj.set(p[0], p[2], p[1]).project(camera);
+    return {
+      x: (proj.x * 0.5 + 0.5) * (viewport.clientWidth || 1),
+      y: (-proj.y * 0.5 + 0.5) * (viewport.clientHeight || 1)
+    };
+  }
+
+  function inFront(p) {
+    tmpA.set(p[0], p[2], p[1]);
+    camera.getWorldDirection(tmpB);
+    return tmpA.sub(camera.position).dot(tmpB) > 0;
+  }
+
+  function distToSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy || 1;
+    let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+  }
+
+  function pickElement(clientX, clientY) {
+    const mode = state.selection;
+    const topo = state.topology;
+    pointerNdc(clientX, clientY);
+    const meshHits = raycaster.intersectObject(mesh, false);
+    const hit = meshHits.length ? meshHits[0] : null;
+    if (mode === 'item') return hit ? 'item' : null;
+    if (!topo || !selApi) return null;
+    const bounds = canvas.getBoundingClientRect();
+    const px = clientX - bounds.left;
+    const py = clientY - bounds.top;
+    const limit = selApi.PICK_TOLERANCE_PX;
+    if (mode === 'vertex') {
+      let best = null;
+      let bestD = limit;
+      for (let i = 0; i < topo.vertices.length; i += 1) {
+        const v = topo.vertices[i];
+        if (!inFront(v.p)) continue;
+        const s = screenOfCad(v.p);
+        const d = Math.hypot(s.x - px, s.y - py);
+        if (d <= bestD) {
+          bestD = d;
+          best = v.id;
+        }
+      }
+      return best;
+    }
+    if (mode === 'edge') {
+      let best = null;
+      let bestD = limit;
+      for (let i = 0; i < topo.edges.length; i += 1) {
+        const pts = topo.edges[i].pts;
+        for (let k = 0; k + 1 < pts.length; k += 1) {
+          if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
+          const a = screenOfCad(pts[k]);
+          const b = screenOfCad(pts[k + 1]);
+          const d = distToSeg(px, py, a.x, a.y, b.x, b.y);
+          if (d <= bestD) {
+            bestD = d;
+            best = topo.edges[i].id;
+          }
+        }
+      }
+      return best;
+    }
+    if (!hit || hit.faceIndex == null || !topo.triFace) return null;
+    return topo.triFace[hit.faceIndex] || null;
+  }
+
+  function updateHover(ev) {
+    if (!selApi || gesture) return;
+    const handle = pickHandle(ev.clientX, ev.clientY);
+    gizmo.setHover(handle || null);
+    const next = handle ? null : pickElement(ev.clientX, ev.clientY);
+    if (next !== state.hoverId) {
+      state.hoverId = next;
+      updateHighlights();
+    }
+  }
+
+  function beginGizmoDrag(handle, clientX, clientY) {
+    const origin = new THREE.Vector3();
+    viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, origin);
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    const n = viewApi.dragPlaneNormal(handle, [camDir.x, camDir.y, camDir.z]);
+    const plane = new THREE.Plane();
+    plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(n[0], n[1], n[2]), origin);
+    pointerNdc(clientX, clientY);
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+    return { handle: handle, plane: plane, startHit: hit, origin: origin, cad: { x: 0, y: 0, z: 0 } };
+  }
+
+  function dragGizmo(clientX, clientY) {
+    if (!gizmoDrag) return;
+    pointerNdc(clientX, clientY);
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(gizmoDrag.plane, hit)) return;
+    const delta = hit.clone().sub(gizmoDrag.startHit);
+    const axis = viewApi.axisVector(gizmoDrag.handle);
+    if (axis) {
+      const ax = new THREE.Vector3(axis[0], axis[1], axis[2]);
+      delta.copy(ax.multiplyScalar(delta.dot(ax)));
+    }
+    gizmoDrag.cad = viewApi.threeDeltaToCad(delta.x, delta.y, delta.z);
+    shiftPreview(gizmoDrag.cad);
+    placeHandles();
+    writePosFields();
+  }
+
+  function shiftPreview(cad) {
+    const x = cad ? cad.x : 0;
+    const y = cad ? cad.z : 0;
+    const z = cad ? cad.y : 0;
+    mesh.position.set(x, y, z);
+    for (let i = 0; i < overlays.nodes.length; i += 1) overlays.nodes[i].position.set(x, y, z);
+  }
+
+  function commitGizmoDrag() {
+    const cad = gizmoDrag && gizmoDrag.cad ? gizmoDrag.cad : null;
+    gizmoDrag = null;
+    shiftPreview(null);
+    if (!cad) return;
+    translateBody(cad.x, cad.y, cad.z);
+  }
+
+  function readField(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function onPositionCommit() {
+    if (state.writingFields) return;
+    const x = readField('posX');
+    const y = readField('posY');
+    const z = readField('posZ');
+    if (x == null || y == null || z == null) return;
+    translateBody(x - state.anchor.x, y - state.anchor.y, z - state.anchor.z);
+  }
+
+  function onPrimitiveCommit() {
+    if (state.writingFields || !state.primitive) return;
+    const cx = readField('primCx');
+    const cy = readField('primCy');
+    const cz = readField('primCz');
+    if (cx == null || cy == null || cz == null) return;
+    const next = Object.assign({}, state.primitive.params, { cx: cx, cy: cy, cz: cz });
+    if (state.primitive.kind === 'box') {
+      const sx = readField('boxSx');
+      const sy = readField('boxSy');
+      const sz = readField('boxSz');
+      if (sx == null || sy == null || sz == null) return;
+      next.sx = sx;
+      next.sy = sy;
+      next.sz = sz;
+    } else {
+      const radius = readField('cylR');
+      const height = readField('cylH');
+      if (radius == null || height == null) return;
+      next.radius = radius;
+      next.height = height;
+    }
+    createPrimitive(state.primitive.kind, next, null, true);
   }
 
   function layoutChrome() {
@@ -2049,6 +2660,12 @@ function main(Module, oc, gateApi) {
     ]);
     shadow.position.set(cx, 0.03, cz);
     shadow.scale.set(Math.max(dx, 1) / 20, 1, Math.max(dz, 1) / 20);
+    state.boundsCad = {
+      cx: (minX + maxX) / 2,
+      cy: (minZ + maxZ) / 2,
+      cz: (minY + maxY) / 2
+    };
+    captureMeshCad();
     document.getElementById('hudName').textContent = Module.fixtureName();
     placeHandles();
   }
@@ -2073,11 +2690,23 @@ function main(Module, oc, gateApi) {
       exportAllowed: state.exportAllowed === true,
       bannerHidden: !!(banner && banner.hidden),
       exportDisabled: !!(btn && btn.disabled),
-      gateOcct: occtEl ? occtEl.textContent : ''
+      gateOcct: occtEl ? occtEl.textContent : '',
+      selectionMode: state.selection,
+      selectionCount: state.selectedIds.length,
+      selectionAll: state.selection !== 'item' && state.selectedIds.length === 0,
+      bootNote: window.__cadcamBootNote || ''
     };
   }
 
   function runOcctGate() {
+    if (state.shapeGate) {
+      state.occtReady = true;
+      state.occtGate = state.shapeGate.pass === true;
+      state.occtMessage = state.shapeGate.message || '';
+      paintExport();
+      setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+      return;
+    }
     if (!oc || !gateApi || typeof gateApi.checkOcctGate !== 'function') {
       state.occtReady = false;
       state.occtGate = false;
@@ -2114,7 +2743,7 @@ function main(Module, oc, gateApi) {
     const showBody = vis.body;
     mesh.visible = showBody && mode !== 'wire';
     edges.visible = showBody && mode !== 'shaded';
-    corners.visible = showBody && state.selection === 'vertex';
+    corners.visible = false;
     bodyMat.wireframe = false;
     if (mode === 'xray') {
       bodyMat.transparent = true;
@@ -2125,7 +2754,7 @@ function main(Module, oc, gateApi) {
       bodyMat.transparent = false;
       bodyMat.opacity = 1;
       bodyMat.depthWrite = true;
-      edgeMat.color.set(state.selection === 'edge' ? 0xf0c14e : 0x10283a);
+      edgeMat.color.set(0x10283a);
     }
     bodyMat.clippingPlanes = state.section ? [clip] : [];
     edgeMat.clippingPlanes = state.section ? [clip] : [];
@@ -2138,7 +2767,10 @@ function main(Module, oc, gateApi) {
     planeXY.visible = vis.xy && extras;
     planeYZ.visible = vis.yz && extras;
     measureSvg.hidden = !state.measure;
-    handles.visible = !!state.preview;
+    handles.visible = gizmoShouldShow();
+    updateHighlights();
+    paintPrimFields();
+    writePosFields();
     const readout = document.getElementById('displayReadout');
     if (readout) {
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
@@ -2310,6 +2942,7 @@ function main(Module, oc, gateApi) {
     if (item.action) fake.setAttribute('data-action', item.action);
     if (item.hint) fake.setAttribute('data-hint', item.hint);
     if (item.fmt) fake.setAttribute('data-fmt', item.fmt);
+    if (item.kind) fake.setAttribute('data-kind', item.kind);
     runAction(fake);
   }
 
@@ -2386,6 +3019,11 @@ function main(Module, oc, gateApi) {
       message = state.unit === 'mm' ? 'Units: mm' : 'Units: inch';
     } else if (action === 'loadFixture') {
       const name = btn.getAttribute('data-fixture') || '';
+      state.primitive = null;
+      state.shapeGate = null;
+      state.topologySource = 'mesh';
+      state.selectedIds = [];
+      state.hoverId = null;
       if (!Module.loadFixture(name)) {
         message = 'Unknown fixture';
         setHint(message);
@@ -2403,10 +3041,22 @@ function main(Module, oc, gateApi) {
       message = state.snap ? 'Snapping: On' : 'Snapping: Off';
       applyLook();
     } else if (action === 'select') {
-      state.selection = btn.getAttribute('data-mode') || 'body';
+      const mode = btn.getAttribute('data-mode') || 'item';
+      const normalized = mode === 'body' ? 'item' : mode;
+      setSelectionMode(normalized);
       message = 'Selection: ' + cap(state.selection);
-      applyLook();
       setHint(message);
+    } else if (action === 'primitive') {
+      const kind = btn.getAttribute('data-kind') === 'cylinder' ? 'cylinder' : 'box';
+      createPrimitive(kind, null, state.selection === 'item' ? 'item' : state.selection, false);
+      message = kind === 'cylinder' ? 'Cylinder' : 'Box';
+    } else if (action === 'cylAxis') {
+      const axis = btn.getAttribute('data-axis') || 'Z';
+      if (state.primitive && state.primitive.kind === 'cylinder') {
+        const next = Object.assign({}, state.primitive.params, { axis: axis });
+        createPrimitive('cylinder', next, null, true);
+      }
+      message = 'Axis ' + axis;
     } else if (action === 'display') {
       state.display = btn.getAttribute('data-mode') || 'edges';
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
@@ -2656,6 +3306,12 @@ function main(Module, oc, gateApi) {
     try { viewport.setPointerCapture(ev.pointerId); } catch (err) { /* already captured */ }
     ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, button: ev.button });
     if (ptrs.size >= 2) {
+      if (gizmoDrag) {
+        gizmoDrag = null;
+        shiftPreview(null);
+        placeHandles();
+        writePosFields();
+      }
       gesture = { type: 'pinch', moved: false, sx: ev.clientX, sy: ev.clientY, button: 0, pid: ev.pointerId };
       pinch = currentPinch();
       return;
@@ -2663,8 +3319,19 @@ function main(Module, oc, gateApi) {
     const bounds = canvas.getBoundingClientRect();
     const onCube = inCube(ev.clientX - bounds.left, ev.clientY - bounds.top);
     const panBtn = ev.button === 1 || ev.button === 2;
+    let pointerType = onCube ? 'cube' : (panBtn ? 'pan' : 'orbit');
+    if (!onCube && ev.button === 0 && gizmoShouldShow()) {
+      const handle = pickHandle(ev.clientX, ev.clientY);
+      if (handle) {
+        const drag = beginGizmoDrag(handle, ev.clientX, ev.clientY);
+        if (drag) {
+          gizmoDrag = drag;
+          pointerType = 'gizmo';
+        }
+      }
+    }
     gesture = {
-      type: onCube ? 'cube' : (panBtn ? 'pan' : 'orbit'),
+      type: pointerType,
       moved: false,
       sx: ev.clientX,
       sy: ev.clientY,
@@ -2675,12 +3342,19 @@ function main(Module, oc, gateApi) {
 
   viewport.addEventListener('pointermove', function (ev) {
     const rec = ptrs.get(ev.pointerId);
-    if (!rec || !gesture) return;
+    if (!rec || !gesture) {
+      updateHover(ev);
+      return;
+    }
     const dx = ev.clientX - rec.x;
     const dy = ev.clientY - rec.y;
     rec.x = ev.clientX;
     rec.y = ev.clientY;
     if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) > 7) gesture.moved = true;
+    if (gesture.type === 'gizmo' && gesture.pid === ev.pointerId) {
+      dragGizmo(ev.clientX, ev.clientY);
+      return;
+    }
     if (gesture.type === 'pinch' && ptrs.size >= 2) {
       const next = currentPinch();
       if (pinch && pinch.d > 0 && next.d > 0) {
@@ -2733,10 +3407,22 @@ function main(Module, oc, gateApi) {
       return;
     }
     if (g && g.pid === ev.pointerId) {
-      if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
-      else if (g.type === 'orbit' && !g.moved) {
-        selectNode('body');
-        toast('Select ' + cap(state.selection) + ': Body1');
+      if (g.type === 'gizmo') commitGizmoDrag();
+      else if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
+      else if (g.type === 'orbit' && !g.moved && ev.button === 0) {
+        const hitId = pickElement(ev.clientX, ev.clientY);
+        const next = selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
+          shift: ev.shiftKey,
+          ctrl: ev.ctrlKey
+        });
+        state.selectedIds = next.ids;
+        state.hoverId = null;
+        refreshAnchor();
+        applyLook();
+        const label = state.selection === 'item' ? 'Item' : cap(state.selection);
+        if (next.all) toast(label + ': all');
+        else if (next.ids.length) toast('Select ' + label + ' ' + next.ids.join(', '));
+        else toast(label + ': none');
       }
     }
     gesture = null;
@@ -2796,16 +3482,25 @@ function main(Module, oc, gateApi) {
     toast(docName.value);
   });
 
+  const positionIds = ['posX', 'posY', 'posZ'];
+  for (let pi = 0; pi < positionIds.length; pi += 1) {
+    document.getElementById(positionIds[pi]).addEventListener('change', onPositionCommit);
+  }
+  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH'];
+  for (let pi = 0; pi < primIds.length; pi += 1) {
+    document.getElementById(primIds[pi]).addEventListener('change', onPrimitiveCommit);
+  }
+
   document.addEventListener('keydown', function (ev) {
-    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
-    const typing = isTypingTarget(document.activeElement);
     if (ev.key === 'Escape') {
       closePopups();
       closeDrawers();
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return;
     }
-    if (!searchDlg.hidden && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter')) {
+    if (ev.ctrlKey || ev.metaKey) return;
+    const typing = isTypingTarget(document.activeElement);
+    if (!searchDlg.hidden && !ev.altKey && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter')) {
       const items = searchList._items || [];
       if (ev.key === 'ArrowDown') state.searchIndex = Math.min(items.length - 1, state.searchIndex + 1);
       if (ev.key === 'ArrowUp') state.searchIndex = Math.max(0, state.searchIndex - 1);
@@ -2819,10 +3514,26 @@ function main(Module, oc, gateApi) {
       return;
     }
     if (typing) return;
-    if (TAB_KEYS[ev.key]) {
+    if (ev.altKey && TAB_KEYS[ev.key]) {
       setTab(TAB_KEYS[ev.key]);
       toast(TAB_LABELS[state.tab]);
       setHint(TAB_LABELS[state.tab]);
+      ev.preventDefault();
+      return;
+    }
+    if (ev.altKey) return;
+    const selectionMode = selApi.modeFromHotkey(ev.key);
+    if (selectionMode) {
+      setSelectionMode(selectionMode);
+      toast('Selection: ' + cap(state.selection));
+      setHint('Selection: ' + cap(state.selection));
+      ev.preventDefault();
+      return;
+    }
+    if (ev.key === '4') {
+      setTab('export');
+      toast(TAB_LABELS.export);
+      setHint(TAB_LABELS.export);
       ev.preventDefault();
       return;
     }
@@ -2857,6 +3568,13 @@ function main(Module, oc, gateApi) {
   const wanted = params.get('fixture');
   if (wanted && Module.loadFixture(wanted)) {
     syncFromKernel();
+    spherical.radius = fitDistance();
+    updateCamera();
+  }
+  const primKind = params.get('primitive');
+  if (primKind === 'box' || primKind === 'cylinder') {
+    const asked = params.get('select') || 'item';
+    createPrimitive(primKind, null, asked, false);
     spherical.radius = fitDistance();
     updateCamera();
   }

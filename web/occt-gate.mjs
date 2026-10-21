@@ -71,6 +71,57 @@ function failResult(message, extra) {
   }, extra || {});
 }
 
+// BRepCheck_Analyzer + ShapeAnalysis_FreeBounds on a B-rep (a primitive solid).
+// The mesh sew path in checkOcctGate stays the gate for fixtures that have no solid.
+export function checkOcctShape(oc, shape) {
+  if (!oc) {
+    return failResult('FAIL: OCCT module is not loaded.');
+  }
+  if (!shape || (typeof shape.IsNull === 'function' && shape.IsNull())) {
+    return failResult('FAIL: OCCT gate has no shape to check.');
+  }
+  const trash = [];
+  const track = (obj) => {
+    if (obj && typeof obj.delete === 'function') {
+      trash.push(obj);
+    }
+    return obj;
+  };
+  try {
+    const analyzer = track(new oc.BRepCheck_Analyzer(shape));
+    const valid = !!analyzer.IsValid();
+    const bounds = track(new oc.ShapeAnalysis_FreeBounds(shape, false, true, false));
+    const closedWires = track(bounds.GetClosedWires());
+    const openWires = track(bounds.GetOpenWires());
+    const edgeType = oc.TopAbs_ShapeEnum.TopAbs_EDGE;
+    const freeEdges = countShapes(oc, closedWires, edgeType) + countShapes(oc, openWires, edgeType);
+    const closed = freeEdges === 0;
+    const pass = valid && closed;
+    let message;
+    if (pass) {
+      message = 'PASS: OCCT BRepCheck_Analyzer is valid and ShapeAnalysis_FreeBounds found 0 free edges.';
+    } else if (!valid && !closed) {
+      message = 'FAIL: OCCT BRepCheck_Analyzer is not valid and ShapeAnalysis_FreeBounds found '
+        + freeEdges + ' free edges.';
+    } else if (!valid) {
+      message = 'FAIL: OCCT BRepCheck_Analyzer is not valid.';
+    } else {
+      message = 'FAIL: OCCT ShapeAnalysis_FreeBounds found ' + freeEdges + ' free edges.';
+    }
+    return { pass, valid, freeEdges, message };
+  } catch (err) {
+    return failResult('FAIL: OCCT gate error: ' + (err && err.message ? err.message : String(err)));
+  } finally {
+    for (let i = trash.length - 1; i >= 0; i -= 1) {
+      try {
+        trash[i].delete();
+      } catch (_err) {
+        // already released
+      }
+    }
+  }
+}
+
 export function checkOcctGate(oc, mesh) {
   if (!oc) {
     return failResult('FAIL: OCCT module is not loaded.');
