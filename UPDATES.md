@@ -107,3 +107,12 @@ Newest entries at the top.
 - 2026-10-21 17:07 MT: Phase 2 closed. Live open_box (headless Chromium) shows banner up, OCCT FAIL (4 free edges), watertight FAIL, units PASS, Export disabled; shot cadmvp-shots\openbox-live.png. UI checkpoint shots from 5:06 were stale (old wasm); Pilot rebuilding and re-shooting before commit/push.
 
 - 2026-10-21 17:08 MT: Selection + primitives checkpoint done (Pilot, session 01a16088, 4:15-4:42 PM MT, $2.11; hung after done marker, killed 5:06). CTest 6/6, uncommitted, +964/-62 on 10aaac8. Fresh 5:07 shots (cache off): wasm-desktop, wasm-portrait, wasm-landscape, wasm-cylinder-desktop. Box and cylinder pass OCCT/watertight/units (Export on); open_box still locked. Live R3 PASS in headless browser. Erik to review web/bindings.cpp (new replaceMesh C++ glue, no kernel change). Open/TBD: colours, default primitive sizes, 8 px pick tolerance, tessellation settings; hotkey 4 -> Export tab is unspecced (spec only defines 1/2/3/5), needs Erik's call; gizmo hidden inside cylinder; real-phone R2/R3 pending. Next: CI occt_gate session.
+
+## 2026-10-21 17:20 MT - UI checkpoint pushed and live
+- a03e1d1: UI checkpoint (selection + primitives) plus 17:08 UPDATES entry and research size edit, on top of 10aaac8.
+- 2f6b458: prompts/gui-wire-app.md queued items, plus pages.yml fix to copy all web/*.mjs (first deploy crashed with makeGizmo of null because three new modules 404'd).
+- Live shots (headless, cache busted): box face select with gizmo, OCCT and watertight PASS; cylinder Item mode with gizmo hidden inside solid (fix queued); portrait and landscape watertight PASS.
+- Secrets scan clean, no .wasm committed. Next: Pilot CI session (occt_gate CI fail, gizmo depth, hotkey 4 TBD, watcher fix); Research Digest MODO Booleans + OCCT fillet/chamfer digest feeds the next Grok Build prompt.
+
+## 2026-10-21 17:23 MT - L-bracket prompt drafted
+- prompts/l-bracket-fillet-chamfer.md from research/gui/booleans-fillet-chamfer.md; gate after every op, TBDs listed for Erik. Queued after the CI session.
