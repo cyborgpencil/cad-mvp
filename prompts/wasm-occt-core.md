@@ -1,4 +1,4 @@
-﻿# Grok Build task: OCCT core to WASM (browser MVP)
+# Grok Build task: OCCT core to WASM (browser MVP)
 
 Status: ready for Grok Build Pilot. Decisions from Erik, 2026-10-20 10:59-11:04 PM MT.
 
@@ -31,7 +31,8 @@ Build the MVP core on OpenCASCADE (OCCT), compiled to WebAssembly with Emscripte
 3. Chrome on Windows: page loads and exports in current desktop Chrome. Record wasm size, load time, and memory.
 4. Chrome on iPhone (WebKit, iOS 16.4+): page loads and exports; record load time and memory if possible. Grok cannot test this from Z13, so mark it unverified for Erik to run.
 5. Chrome on Android: page loads and exports (file save works); record load time and memory if possible. Grok cannot test this from Z13, so mark it unverified for Erik to run.
-6. Report anything you could not verify as unverifiable; never fake a pass.
+6. Open pocket via OCCT boolean cut: on a 40 x 30 x 20 mm box, cut an 8 x 8 x 6 mm pocket at X 16, Y 12 that breaks through the top face (pocket spans Z 14 to 20), using `BRepAlgoAPI_Cut`, not mesh code. The export must be one closed shell (no interior void), pass the watertight checker and read-back, keep 40 x 30 x 20 mm in STL and 3MF, and have volume 24000 - 384 = 23616 mm3 within tessellation tolerance. Record the measured volume and shell count.
+7. Report anything you could not verify as unverifiable; never fake a pass.
 
 ## Git
 - Grok must not run git commit or git push.
