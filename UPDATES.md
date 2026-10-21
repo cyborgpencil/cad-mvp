@@ -123,3 +123,10 @@ Newest entries at the top.
 - Negative check: leaving out selection.mjs makes the test exit 1 with HTTP 404. Favicon is now a data URI so /favicon.ico no longer 404s.
 - Not yet proven: first CI run on the Linux runner. Erik to review the pages.yml diff.
 - Still open: occt_gate CI fail, gizmo drawn on top, hotkey 4 removal (Pilot follow-up).
+
+## 2026-10-21 17:50 MT - Smoke test live; CI follow-up green locally
+- 6945311 pushed 5:36 PM MT (carried 96ebafd): smoke-test files, favicon lines only in index.html, L-bracket prompt, UPDATES 17:23/17:35. Pages run 39694451250 passed the smoke test on Linux and deployed. Pushed before the Chief's hold, but verified: no half-done gizmo or hotkey edits went live.
+- Follow-up session 01a160d2 (5:37-5:47 PM MT, $0.72, +62/-26 on 6945311, uncommitted). CTest 7/7. occt_gate is always registered: exit 1 in CI (CI or GITHUB_ACTIONS) when libcascade is missing, skip 77 locally, verified both ways. Gizmo drawn with depth test and writes off, above the selection overlays; the cylinder shot shows it on top. Hotkey 4 unbound and TBD; Alt+1 to Alt+4 still switch tabs.
+- Grok hung after its done marker again; the watcher killed it within about a minute.
+- Fresh shots at 5:49 PM MT in cadmvp-shots: wasm-desktop, wasm-portrait, wasm-landscape, wasm-cylinder-desktop.
+- Erik to review the pages.yml and CMakeLists.txt diffs. Next: Repo Keeper push and confirm occt_gate runs on Linux (not skipped); then Pilot runs the L-bracket prompt with TBD constants.
