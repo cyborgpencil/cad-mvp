@@ -7,6 +7,7 @@ Thresholds: WCAG 2.2 SC 2.5.8 (AA) sets at least 24x24 CSS px, with exceptions f
 Measuring: in Chrome DevTools, open the device toolbar, choose Responsive and enter 390 x 844, with Device type Mobile so touch events fire [5]. Inspect each control and read its width and height in Elements > Computed (box model), or run `getBoundingClientRect()` in the Console.
 - **T1:** At 390x844, measure every tab, toolbar button, view-bar button, drawer handle, ViewCube face, mm/in toggle and the Export button. Expected: each is at least 44 x 44 CSS px. Source: D9 [2].
   - **Result: PASS** (Pilot re-test 2026-10-21 1:52 AM MT, mockup): all 64 controls >= 44x44 at 390x844, with the Part name button and mm/in toggle fixed. T2 63/63 at 1440x900. CTest 4/4.
+  - **Result (WASM build): PASS** in portrait 390x844 and landscape 844x390 (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
 - **T2:** At 1440x900, measure the same controls. Expected: at least 44 px (D9 applies everywhere). Anything under 44 but at least 24 is noted as a fail of the team rule, not of WCAG AA. Source: D9 [1][2].
 - **T3:** Any visual icon smaller than 44 px. Expected: its hit area (padding included) is still at least 44 x 44, and neighboring hit areas don't overlap. Source: [1][4].
 - **T4:** Tap each control on a real Android phone (Chrome) and an iPhone (Safari). Expected: no accidental neighbor activation in 10 taps per control. Device mode is only an approximation [5].
@@ -44,10 +45,15 @@ Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+
 ## 6. Rotation (portrait and landscape)
 Erik, 2026-10-21: one responsive WASM app for desktop and phone, in both orientations. Rotate in Chrome DevTools device mode with the Rotate button in the device toolbar [12]. In app code, `matchMedia('(orientation: portrait)')` [10] and `screen.orientation` `change` [9] are the hooks to test. WCAG 2.1 SC 1.3.4 (AA) says content must not be restricted to one orientation unless that is essential [11].
 - **R1:** At 390x844 (portrait) and 844x390 (landscape), visit Sketch, Model, Repair and Export. Expected: all 4 tabs reachable in both, and the Export button reachable without horizontal scroll. Source: D1, [12].
+  - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png). Known cosmetic issue at 844x390: the gate panel squeezes the 3D view and the ViewCube overlaps the view bar; fix pending in the restyle.
 - **R2:** Open a sketch with one entity selected, then rotate; repeat with a dialog or drawer open. Expected: same tab, sketch still open, selection kept, dialog still open with its input values. No reload. Source: [9][10].
+  - **Result: PROVISIONAL** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png). Code read only; needs a live rotation test.
 - **R3:** Rotate on every tab, and on a real phone with the OS rotation lock off. Expected: no "rotate your device" block, no `screen.orientation.lock()`, and all content works in both. Source: [11].
+  - **Result: PROVISIONAL** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png). Code read only.
 - **R4:** At 844x390, measure the same controls as T1. Expected: each is at least 44 x 44 CSS px. Source: D9 [2].
+  - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
 - **R5:** In both orientations on every tab. Expected: the status bar shows units, watertight PASS/FAIL and volume, not hidden or clipped. Source: D6, E4.
+  - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
 
 ## Sources
 1. W3C, Understanding SC 2.5.8 Target Size (Minimum): https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
