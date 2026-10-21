@@ -548,7 +548,16 @@
     .show-narrow { display: inline-flex; }
     .hide-narrow { display: none !important; }
     .brand { display: none; }
-    .doc { max-width: 64px; min-width: 44px; }
+    .doc {
+      flex: 0 1 auto;
+      width: 46px;
+      min-width: 0;
+      max-width: 46px;
+      padding: 0 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .menu-btn span { display: none; }
     .menu-btn { padding: 0; width: 44px; }
     .top-tabs { display: none; }
@@ -707,7 +716,7 @@
       <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (4)">Export</button>
     </nav>
     <span class="spacer"></span>
-    <input class="doc" id="docName" value="Part1" aria-label="Part name" spellcheck="false" autocomplete="off">
+    <input class="doc" id="docName" value="Part1" title="Part1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">Mockup</span>
     <button type="button" class="icon-btn hide-narrow" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search"><svg class="ico"><use href="#i-search"></use></svg></button>
     <div class="units" role="group" aria-label="Units">
@@ -2151,6 +2160,17 @@ function main() {
   }
   searchInput.addEventListener('input', onSearchType);
   sheetSearch.addEventListener('input', onSearchType);
+
+  const docName = document.getElementById('docName');
+  function syncDocTitle() {
+    docName.title = docName.value;
+  }
+  docName.addEventListener('input', syncDocTitle);
+  docName.addEventListener('click', function () {
+    syncDocTitle();
+    if (!isNarrow()) return;
+    toast(docName.value);
+  });
 
   document.addEventListener('keydown', function (ev) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
