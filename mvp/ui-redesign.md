@@ -7,7 +7,7 @@ Erik asked for a friendlier, less plain UI built around process tabs. This secti
 | [Logo] File v | Undo Redo | Sketch | Model | Mesh/Repair | Export | mm|in |  <- top bar
 +--------------------------------------------------------------------------------+
 | Tab toolbar: big icon+label buttons for the active tab only, grouped           |
-|  e.g. Model:  [Extrude] [Push/Pull] [Fillet] [Chamfer] | [Union][Cut] | ...    |
+|  e.g. Model:  [Extrude] [Push/Pull] [Fillet]           | [Union][Cut] | ...    |
 +-----------+----------------------------------------------------+---------------+
 | Browser   |                                                    | Properties /  |
 | (parts,   |                 3D viewport                        | Inspector     |
@@ -69,7 +69,7 @@ Phone (narrow) layout: tabs become a bottom tab bar, the tab toolbar becomes a h
 | Proposed tab | Mockup tab | Mockup controls |
 |---|---|---|
 | Sketch | Sketch | Line, Rectangle, Circle, Arc, Polygon, Sketch Fillet, Trim, Offset, Dimension; constraints Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent, Fixed |
-| Model | Solid | Extrude (Push/Pull), Inset, Fillet (Chamfer is test-only, per Chief), Loop Cut, Knife, Grab, Rotate, Scale, Snapping |
+| Model | Solid | Extrude (Push/Pull), Inset, Fillet (Chamfer test-only), Loop Cut, Knife, Grab, Rotate, Scale, Snapping |
 | Mesh/Repair | Inspect | Section, Measure, display modes (Shaded, Shaded + Edges, Wireframe, X-Ray), Isolate, Hide |
 | Export | Export | Export STL, Export 3MF |
 | Shared (all tabs) | top bar, view bar, radial menu | Undo/Redo, mm/in, selection (Vertex, Edge, Face, Body), navigation (Orbit, Pan, Zoom, Fit, Front, Top, Right, Iso/Home), ViewCube, browser tree (Bodies, Sketches, Construction planes) |
