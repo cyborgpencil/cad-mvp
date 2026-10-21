@@ -1098,7 +1098,7 @@
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (Alt+1)">Sketch</button>
         <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (Alt+2)">Model</button>
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (Alt+3)">Repair</button>
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (4)">Export</button>
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (Alt+4)">Export</button>
       </nav>
       <div class="ribbon">
     <button type="button" class="tool-btn show-narrow tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools and search">
@@ -2069,6 +2069,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
       selPt = viewApi.pointArray(selPts);
       hoverPt = viewApi.pointArray(hoverPts);
     }
+    const itemFill = mode === 'item';
+    overlays.selFace.material.opacity = itemFill
+      ? overlays.selFace.userData.itemOpacity
+      : overlays.selFace.userData.faceOpacity;
     overlays.setBuffer(overlays.selFace, selPos, 3);
     overlays.setBuffer(overlays.hoverFace, hoverPos, 3);
     overlays.setBuffer(overlays.selLines, selLine, 3);
@@ -3532,13 +3536,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
       ev.preventDefault();
       return;
     }
-    if (ev.key === '4') {
-      setTab('export');
-      toast(TAB_LABELS.export);
-      setHint(TAB_LABELS.export);
-      ev.preventDefault();
-      return;
-    }
+    // Digit 4 is reserved (MODO Materials, TBD) and does nothing. Alt+4 still switches tabs.
     if (ev.key === 'x' || ev.key === 'X') {
       openSearch();
       toast(isNarrow() ? 'Tools menu' : 'Tool search');

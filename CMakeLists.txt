@@ -51,22 +51,31 @@ target_link_libraries(test_gate PRIVATE export_mesh)
 add_test(NAME gate COMMAND test_gate)
 
 # OCCT gate is JS-side libcascade (BRepCheck_Analyzer + ShapeAnalysis_FreeBounds).
-# The prebuilt wasm lives under gitignored builds/libcascade; skip if it is absent.
-set(_occt_wasm "${CMAKE_SOURCE_DIR}/builds/libcascade/dist/opencascade_single.wasm")
-if(EXISTS "${_occt_wasm}")
-    find_program(CADCAM_NODE node
-        PATHS
-            "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit"
-            "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit/bin"
-        NO_DEFAULT_PATH
+# Always register it when Node exists. tests/test_occt_gate.mjs exits 1 when
+# libcascade is missing and CI or GITHUB_ACTIONS is set, and exits 77 otherwise.
+# CTest treats 77 as a skip. Missing Node fails configure in CI and is a local skip.
+find_program(CADCAM_NODE node
+    PATHS
+        "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit"
+        "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit/bin"
+    NO_DEFAULT_PATH
+)
+if(NOT CADCAM_NODE)
+    find_program(CADCAM_NODE node)
+endif()
+if(CADCAM_NODE)
+    add_test(NAME occt_gate COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_occt_gate.mjs")
+    set_tests_properties(occt_gate PROPERTIES
+        TIMEOUT 180
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
-    if(NOT CADCAM_NODE)
-        find_program(CADCAM_NODE node)
-    endif()
-    if(CADCAM_NODE)
-        add_test(NAME occt_gate COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_occt_gate.mjs")
-        set_tests_properties(occt_gate PROPERTIES TIMEOUT 180)
-    endif()
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "occt_gate requires Node. CI must not skip this test when libcascade or Node is missing.")
+else()
+    message(STATUS
+        "occt_gate skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
 endif()
 
 # Pages file set in headless Edge/Chromium. The script exits 77 only when

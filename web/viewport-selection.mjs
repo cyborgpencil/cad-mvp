@@ -32,12 +32,14 @@ function addMesh(THREE, group, pickables, geometry, colorName, handle, position)
   const material = new THREE.MeshBasicMaterial({
     color: cssThreeColor(THREE, colorName),
     depthTest: false,
+    depthWrite: false,
     transparent: true,
     opacity: 0.95,
   });
   const mesh = new THREE.Mesh(geometry, material);
   if (position) mesh.position.copy(position);
-  mesh.renderOrder = 4;
+  // Overlays use renderOrder 5. The gizmo draws after every overlay and the solid.
+  mesh.renderOrder = 6;
   mesh.userData.handle = handle;
   mesh.userData.colorName = colorName;
   group.add(mesh);
@@ -126,6 +128,9 @@ export function makeOverlays(THREE) {
   }
   const selFace = new THREE.Mesh(new THREE.BufferGeometry(), mat(0.72));
   const hoverFace = new THREE.Mesh(new THREE.BufferGeometry(), mat(0.4));
+  // Whole-item fill sits under the gizmo. 0.72 washes the cylinder arrows out.
+  selFace.userData.faceOpacity = 0.72;
+  selFace.userData.itemOpacity = 0.35;
   const selLines = new THREE.LineSegments(
     new THREE.BufferGeometry(),
     new THREE.LineBasicMaterial({ depthTest: false, transparent: true, opacity: 1 })

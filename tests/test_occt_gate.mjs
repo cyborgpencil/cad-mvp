@@ -1,8 +1,32 @@
+import { existsSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const initUrl = pathToFileURL(path.join(root, 'builds', 'libcascade', 'dist', 'init.single.js')).href;
+const libDir = path.join(root, 'builds', 'libcascade', 'dist');
+const libFiles = ['init.single.js', 'opencascade_single.js', 'opencascade_single.wasm'];
+const missingLib = libFiles.filter((name) => !existsSync(path.join(libDir, name)));
+
+function envSet(name) {
+  const value = process.env[name];
+  return value !== undefined && String(value).trim() !== '';
+}
+
+if (missingLib.length) {
+  const message =
+    'occt_gate: libcascade is missing (' +
+    missingLib.join(', ') +
+    ') under builds/libcascade/dist. Run: python web/fetch-libcascade.py';
+  if (envSet('CI') || envSet('GITHUB_ACTIONS')) {
+    console.error('FAIL ' + message);
+    console.error('CI must not skip occt_gate when libcascade is missing.');
+    process.exit(1);
+  }
+  console.error('SKIP ' + message);
+  process.exit(77);
+}
+
+const initUrl = pathToFileURL(path.join(libDir, 'init.single.js')).href;
 const gateUrl = pathToFileURL(path.join(root, 'web', 'occt-gate.mjs')).href;
 
 const primUrl = pathToFileURL(path.join(root, 'web', 'occt-primitives.mjs')).href;
