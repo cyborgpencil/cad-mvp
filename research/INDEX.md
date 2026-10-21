@@ -34,3 +34,5 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [gui/usability-checks.md](gui/usability-checks.md): pass/fail GUI checklist for touch targets, shortcuts, the Export gate, layout, the Repair tab and rotation (2026-10-21).
 - [gui/wire-target.md](gui/wire-target.md): Qt app in src/ vs WASM browser page as the GUI wiring target, for Erik's choice (2026-10-21).
 - [occt-wasm/pages-hosting.md](occt-wasm/pages-hosting.md): does the single-threaded OCCT WASM build fit GitHub Pages (limits, MIME, headers) (2026-10-21).
+- [occt-wasm/prebuilt-options.md](occt-wasm/prebuilt-options.md): prebuilt OCCT WASM options (libcascade, opencascade.js, occt-import-js, official build) and reuse-vs-build verdict (2026-10-21).
+- [projects/blink-mount.md](projects/blink-mount.md): Blink XT/XT2/Indoor/Outdoor mount specs (official vs measured), US door casing sizes, wood screw pilot/clearance holes for the L-bracket (2026-10-21).
