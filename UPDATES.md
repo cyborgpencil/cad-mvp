@@ -60,3 +60,4 @@ Newest entries at the top.
 - 2026-10-21 00:55 MT (Doc Steward): moved the redesign proposal into mvp/ui-redesign.md (per Chief), left a pointer in gui-plan.md section 8, and added Research Digest's takeaways plus TBDs for units/export placement and Sketch as a mode.
 - 2026-10-21 00:54 MT (Doc Steward): AGENTS.md gains Erik's flexibility/takeover and research-first rules. ui-redesign.md gains the mockup control map from Repo Keeper's inventory, flags the missing export gate in the mockup, and adds TBDs for tab names and shortcut keys.
 - 2026-10-21 00:56 MT (Doc Steward): ui-redesign.md marks the export gate as a must-have and rules out Ctrl+PageUp/PageDown, which Chrome reserves.
+- 2026-10-21 00:58 MT (Doc Steward): ui-redesign.md records the team's UI decisions (tabs, Sketch mode, Repair tab, shared view bar, no radial menu, units, export gate, no timeline, style). Shortcut keys are still pending.

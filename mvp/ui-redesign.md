@@ -82,3 +82,16 @@ Findings:
 - The timeline (Origin, Sketch1, Extrude1, Fillet1) is visual only, which ties to the open timeline TBD.
 - Appearance swatches (Steel, Orange, Green, Slate): placement TBD.
 - Tab-switch keys and tool search keys are TBD. Research notes Blender uses Ctrl+PageUp/PageDown, which Chrome on Windows reserves for its own tabs (per 3T), so it is ruled out, and Onshape uses Alt+C for tool search. See research/gui/ui-layout-review.md.
+
+## Team decisions (2026-10-21, at Erik's request; Erik reviews afterward)
+These replace the TBDs above where they conflict.
+1. Tabs are Sketch, Model, Repair and Export/Print. Plain words beat Solid and Inspect, and short labels fit a phone's bottom tab bar.
+2. Sketch is a mode that shows as a tab. Model opens it, and a "Finish Sketch" bar returns you to Model, as in Fusion and FreeCAD.
+3. Repair is its own tab for hole fill, normals and the other healing tools. Healing is a core MVP job, and FreeCAD keeps Mesh as its own workbench. The exact tool list follows the mesh repair requirements.
+4. Measure, Section, display modes and navigation live in one shared floating view bar plus the ViewCube. The mockup repeated them in three places.
+5. There's no radial menu in the MVP, because it only duplicated the shared view bar.
+6. The mm/in toggle is in the top bar. The status bar shows units (read-only) and the watertight PASS/FAIL result at all times, because units are locked and the check is a hard gate.
+7. Export happens only on the Export/Print tab, behind the watertight and units check. Any quick-export shortcut opens that tab and never skips the check.
+8. The history timeline is out of the MVP, and only the browser tree ships. The mockup labels the timeline visual only, and nothing behind it supports history yet.
+9. The visual style is dark neutral with one accent color, based on the mockup's Slate theme, with no new style work in the MVP.
+10. Tab shortcut keys come from Research Digest's pick of keys not on Chrome's shortcut list, plus a tool search shortcut. Pending.
