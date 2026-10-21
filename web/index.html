@@ -4,23 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#262c36">
+<meta name="theme-color" content="#10262b">
 <title>CAD/CAM — Part1</title>
 <style>
   :root {
-    --bg: #1b2028;
-    --top: #262c36;
-    --panel: #232932;
-    --panel-2: #2d343f;
-    --ink: #e8edf5;
-    --muted: #9aa3b2;
-    --line: rgba(255, 255, 255, 0.08);
-    --accent: #4c9aff;
-    --accent-dim: rgba(76, 154, 255, 0.22);
-    --gold: #f0c14e;
-    --pass: #6fbf8b;
-    --fail: #e36d6d;
-    --shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    /* TBD placeholders. research/gui/modo-tools.md: Foundry publishes no Modo UI hex.
+       Not sampled from a screenshot. Not copied from Modo assets.
+       Erik asked for a teal tone. Docs show orange highlights. One accent: --accent. */
+    --bg: #0e2429;
+    --top: #10262b;
+    --panel: #123038;
+    --panel-2: #163840;
+    --ribbon: #14343c;
+    --field: #0e2429;
+    --status: #10262b;
+    --finish: #123830;
+    --ink: #f4fbfb;
+    --muted: #d5e4e2;
+    --tab-ink: #d5e4e2;
+    --tab-bg: #1a3036;
+    --tab-track: #0e2429;
+    --tab-active: #1b454c;
+    --line: rgba(244, 251, 251, 0.14);
+    --line-strong: #0a181c;
+    --accent: #14756e;
+    --accent-dim: color-mix(in srgb, var(--accent) 32%, transparent);
+    --measure: #fff8e8;
+    --pass: #c8f5df;
+    --pass-bg: #0e3d2c;
+    --fail: #ffd0d0;
+    --fail-bg: #3f1518;
+    --banner-bg: #12343a;
+    --banner-ink: #f4fbfb;
+    --disabled-bg: #2a454a;
+    --disabled-ink: #d5e4e2;
+    --shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     --top-h: calc(48px + env(safe-area-inset-top, 0px));
     --status-h: 44px;
     --phone-tabs-h: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -65,13 +83,13 @@
     align-items: center;
     gap: 4px;
     background: var(--top);
-    border-bottom: 1px solid #12161c;
+    border-bottom: 1px solid var(--line-strong);
     flex: none;
     min-height: 48px;
   }
   .brand { display: flex; align-items: center; gap: 8px; padding: 0 4px; flex: none; }
   .brand-name { font-weight: 650; letter-spacing: 0.02em; }
-  .logo { width: 22px; height: 22px; display: block; }
+  .logo { width: 22px; height: 22px; display: block; color: var(--accent); }
   .doc {
     border-radius: 8px;
     padding: 0 10px;
@@ -88,13 +106,14 @@
   }
   .doc:hover { background: rgba(255, 255, 255, 0.06); }
   .pill {
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--gold);
-    border: 1px solid rgba(240, 193, 78, 0.45);
+    color: var(--ink);
+    border: 1px solid var(--accent);
+    background: var(--tab-bg);
     border-radius: 999px;
-    padding: 2px 7px;
+    padding: 4px 8px;
     flex: none;
   }
   .spacer { flex: 1; min-width: 4px; }
@@ -114,7 +133,7 @@
   .drawer-btn { width: auto; background: var(--panel-2); }
   .icon-btn:hover, .drawer-btn:hover, .menu-btn:hover, .tab:hover { background: rgba(255, 255, 255, 0.06); }
   .show-narrow { display: none; }
-  .units { display: flex; background: #1a1f27; border-radius: 10px; padding: 2px; flex: none; }
+  .units { display: flex; background: var(--field); border-radius: 10px; padding: 2px; flex: none; }
   .units button {
     min-width: 44px;
     min-height: 44px;
@@ -142,7 +161,7 @@
     border-radius: 8px 8px 0 0;
     font-weight: 650;
   }
-  .tab.is-on { color: var(--ink); border-bottom-color: var(--accent); background: rgba(255, 255, 255, 0.03); }
+  .tab.is-on { color: var(--ink); border-bottom-color: var(--accent); background: var(--tab-active); }
   .menu-wrap { position: relative; flex: none; }
   .menu {
     position: absolute;
@@ -168,7 +187,7 @@
     text-align: left;
   }
   .menu button:hover { background: rgba(255, 255, 255, 0.06); }
-  .ribbon { flex: none; background: #2a303a; border-bottom: 1px solid #12161c; display: flex; align-items: stretch; }
+  .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; align-items: stretch; }
   .ribbon > .tools { flex: 1; min-width: 0; }
   .tools-menu-btn { align-self: center; margin: 4px 4px 4px 8px; }
   .tools {
@@ -207,7 +226,7 @@
   }
   .tool-btn span { font-size: 10.5px; line-height: 1.15; text-align: center; }
   .tool-btn:hover { background: rgba(255, 255, 255, 0.06); }
-  .tool-btn.is-on { background: var(--accent-dim); box-shadow: inset 0 0 0 1px rgba(76, 154, 255, 0.65); }
+  .tool-btn.is-on { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); color: var(--ink); }
   .tool-btn.wide { width: 92px; }
   .finish-bar {
     display: flex;
@@ -215,8 +234,8 @@
     gap: 12px;
     min-height: 52px;
     padding: 4px 12px;
-    background: #243044;
-    border-bottom: 1px solid #12161c;
+    background: var(--finish);
+    border-bottom: 1px solid var(--line-strong);
     flex: none;
   }
   .finish-btn {
@@ -230,7 +249,14 @@
     font-weight: 650;
   }
   .finish-btn:hover { filter: brightness(1.08); }
-  .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 272px minmax(160px, 1fr) 300px;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    position: relative;
+  }
   .browser, .inspector {
     width: 252px;
     flex: none;
@@ -238,8 +264,8 @@
     overflow: auto;
     min-height: 0;
   }
-  .browser { border-right: 1px solid #12161c; }
-  .inspector { width: 280px; border-left: 1px solid #12161c; }
+  .browser { border-right: 1px solid var(--line-strong); }
+  .inspector { width: 280px; border-left: 1px solid var(--line-strong); }
   .panel-h {
     margin: 0;
     padding: 12px 12px 6px;
@@ -294,7 +320,8 @@
     flex: 1;
     min-width: 0;
     position: relative;
-    background: radial-gradient(1200px 700px at 50% 42%, #243041 0%, #1b212c 55%, #151a22 100%);
+    background: radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%);
+    box-shadow: inset 0 0 0 2px var(--accent);
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
@@ -313,9 +340,11 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   .hud b { font-size: 14px; font-weight: 650; }
-  .hud div { color: #d5dce8; font-size: 12px; }
+  .hud div { color: var(--ink); font-size: 12px; }
   .vc-home {
     position: absolute;
+    top: 8px;
+    right: 148px;
     z-index: 6;
     min-width: 44px;
     min-height: 44px;
@@ -369,12 +398,12 @@
   .vp-bar .ico { width: 20px; height: 20px; }
   .measure-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
   .measure-layer .ext { stroke: #d5deea; stroke-width: 1; }
-  .measure-layer .dim { stroke: var(--gold); stroke-width: 1.6; }
+  .measure-layer .dim { stroke: var(--measure); stroke-width: 1.6; }
   .measure-layer text {
-    fill: #1b212c;
+    fill: #1a1408;
     font-size: 12px;
     font-weight: 700;
-    stroke: var(--gold);
+    stroke: var(--measure);
     stroke-width: 4px;
     paint-order: stroke;
   }
@@ -401,8 +430,8 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    background: #222833;
-    border-top: 1px solid #12161c;
+    background: var(--status);
+    border-top: 1px solid var(--line-strong);
     flex: none;
     font-size: 12px;
   }
@@ -418,8 +447,8 @@
     letter-spacing: 0.04em;
     font-size: 11px;
   }
-  .badge.pass { background: rgba(111, 191, 139, 0.18); color: var(--pass); }
-  .badge.fail { background: rgba(227, 109, 109, 0.18); color: var(--fail); }
+  .badge.pass { background: var(--pass-bg); color: var(--pass); }
+  .badge.fail { background: var(--fail-bg); color: var(--fail); }
   .gate-rows .badge { justify-self: start; width: auto; }
   .hint { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   .gate {
@@ -450,7 +479,7 @@
     justify-content: center;
     gap: 8px;
   }
-  .export-btn:disabled { opacity: 0.42; background: #4a5564; color: #c5ccd6; }
+  .export-btn:disabled { opacity: 1; background: var(--disabled-bg); color: var(--disabled-ink); box-shadow: inset 0 0 0 1px var(--line); }
   .export-btn .ico { width: 18px; height: 18px; }
   .export-wrap { position: relative; }
   .export-tools.tools { overflow: visible; }
@@ -507,7 +536,7 @@
     height: 44px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    background: #1a1f27;
+    background: var(--field);
     padding: 0 12px;
   }
   .search-list, .sheet-grid { list-style: none; margin: 8px 0 0; padding: 0; max-height: 46vh; overflow: auto; }
@@ -543,8 +572,153 @@
     display: none;
     flex: none;
     background: var(--top);
-    border-top: 1px solid #12161c;
+    border-top: 1px solid var(--line-strong);
   }
+  .interim-banner {
+    flex: none;
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 12px;
+    background: var(--banner-bg);
+    color: var(--banner-ink);
+    border-bottom: 3px solid var(--accent);
+    font-weight: 650;
+  }
+  .toolbox {
+    width: 272px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line-strong);
+  }
+  .tool-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    flex: none;
+    background: var(--tab-track);
+  }
+  .tool-tabs .tab {
+    width: 100%;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    text-align: left;
+    color: var(--tab-ink);
+    background: var(--tab-bg);
+    border-bottom: 0;
+    border-left: 3px solid transparent;
+    border-radius: 8px;
+  }
+  .tool-tabs .tab.is-on {
+    color: var(--ink);
+    background: var(--tab-active);
+    border-left-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .toolbox .ribbon {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    flex-direction: column;
+    border-bottom: 0;
+  }
+  .toolbox .tools {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    min-height: 0;
+    overflow: auto;
+  }
+  .toolbox .group {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    align-items: stretch;
+  }
+  .toolbox .group-btns {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .toolbox .tool-btn,
+  .toolbox .tool-btn.wide {
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .toolbox .tool-btn span { font-size: 13px; }
+  .toolbox .gate { flex-direction: column; align-items: stretch; }
+  .toolbox .gate-col,
+  .toolbox .gate-actions { min-width: 0; width: 100%; }
+  .toolbox .export-btn { width: 100%; }
+  .toolbox { grid-column: 1; grid-row: 1 / span 2; width: auto; }
+  .browser {
+    grid-column: 3;
+    grid-row: 1;
+    width: auto;
+    border-right: 0;
+    border-left: 1px solid var(--line-strong);
+  }
+  .inspector {
+    grid-column: 3;
+    grid-row: 2;
+    width: auto;
+    border-top: 1px solid var(--line-strong);
+  }
+  #viewport { grid-column: 2; grid-row: 1 / span 2; }
+  .side-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    flex: none;
+    background: var(--tab-track);
+  }
+  .side-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .side-tab {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: var(--tab-ink);
+    background: var(--tab-bg);
+    font-weight: 650;
+  }
+  .side-tab.is-on {
+    color: var(--ink);
+    background: var(--tab-active);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .preview-btn {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    color: var(--ink);
+    font-weight: 650;
+    align-self: flex-start;
+  }
+  .preview-btn.is-on { background: var(--accent); color: #ffffff; }
+  .side-note { margin: 8px 12px 16px; }
   @media (max-width: 820px), (max-height: 520px) {
     .show-narrow { display: inline-flex; }
     .hide-narrow { display: none !important; }
@@ -635,6 +809,92 @@
       padding-bottom: 4px;
     }
     .hint { flex: 1 1 120px; }
+    .tool-tabs { display: none; }
+    .toolbox { width: auto; display: block; border-right: 0; }
+    .toolbox .ribbon { flex-direction: row; overflow: visible; flex: none; }
+    .toolbox .tools {
+      flex-direction: row;
+      align-items: stretch;
+      min-height: 0;
+      overflow-x: auto;
+    }
+    .toolbox .tools:not(.export-tools) { height: 52px; }
+    .toolbox .group { width: auto; border-bottom: 0; align-items: center; }
+    .toolbox .group-btns { flex-direction: row; width: auto; align-items: flex-end; }
+    .toolbox .tool-btn,
+    .toolbox .tool-btn.wide {
+      width: 44px;
+      height: 44px;
+      min-height: 44px;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0;
+      gap: 0;
+    }
+    .workspace { display: flex; flex-direction: column; }
+    .toolbox, #viewport, .browser, .inspector { grid-column: auto; grid-row: auto; }
+  }
+  @media (max-height: 520px) {
+    .interim-banner { min-height: 28px; padding: 2px 8px; }
+    .toolbox .export-tools.tools,
+    .export-tools.tools {
+      flex-direction: row;
+      align-items: center;
+      height: 52px;
+      max-height: 52px;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .toolbox .gate,
+    .gate {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 8px;
+      height: 44px;
+      padding: 0 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .toolbox .gate-col,
+    .toolbox .gate-actions { width: auto; }
+    .toolbox .export-btn { width: auto; }
+    .gate-rows span:nth-child(n+7) { display: none; }
+    .gate-col {
+      min-width: 0;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+    .gate-title { display: none; }
+    .gate-rows {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .gate-reason {
+      margin: 0;
+      flex: 1 1 80px;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .gate-actions { flex-direction: row; align-items: center; min-width: 0; gap: 0; }
+    .gate-actions .fine { display: none; }
+    .export-btn { min-width: 44px; width: auto; padding: 0 12px; }
+    .statusbar {
+      flex-wrap: nowrap;
+      height: 44px;
+      min-height: 44px;
+      padding-top: 0;
+      padding-bottom: 0;
+      overflow: hidden;
+    }
+    #viewport { flex: 1 1 auto; min-height: 96px; }
   }
 </style>
 </head>
@@ -704,10 +964,11 @@
 </svg>
 
 <div id="app">
+  <div class="interim-banner" role="status">Interim build: OCCT check pending</div>
   <header class="topbar">
     <button type="button" class="drawer-btn show-narrow" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree">Tree</button>
     <div class="brand">
-      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9z" fill="#4c9aff"/><path d="M12 12 22 7.5M12 12 2 7.5M12 12v10" fill="none" stroke="#e8edf5" stroke-width="1.2"/></svg>
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9z" fill="currentColor"/><path d="M12 12 22 7.5M12 12 2 7.5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
       <span class="brand-name">CAD/CAM</span>
     </div>
     <div class="menu-wrap">
@@ -727,12 +988,6 @@
     </div>
     <button type="button" class="icon-btn" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
     <button type="button" class="icon-btn" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
-    <nav class="top-tabs" role="tablist" aria-label="Workbench">
-      <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (1)">Sketch</button>
-      <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (2)">Model</button>
-      <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (3)">Repair</button>
-      <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (4)">Export</button>
-    </nav>
     <span class="spacer"></span>
     <input class="doc" id="docName" value="Part1" title="Part1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
@@ -744,7 +999,20 @@
     <button type="button" class="drawer-btn show-narrow" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector">Info</button>
   </header>
 
-  <div class="ribbon">
+  <div class="finish-bar" id="finishBar" hidden>
+    <button type="button" class="finish-btn" data-action="finishSketch" data-tool="Finish Sketch">Finish Sketch</button>
+    <span class="muted">Sketch1 on XY Plane · returns to Model</span>
+  </div>
+
+  <div class="workspace">
+    <aside class="toolbox" id="toolbox">
+      <nav class="tool-tabs" role="tablist" aria-label="Toolbox">
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (1)">Sketch</button>
+        <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (2)">Model</button>
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (3)">Repair</button>
+        <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (4)">Export</button>
+      </nav>
+      <div class="ribbon">
     <button type="button" class="tool-btn show-narrow tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools and search">
       <svg class="ico"><use href="#i-search"></use></svg><span>Tools</span>
     </button>
@@ -812,33 +1080,28 @@
           <div class="gate-rows">
             <span>Watertight</span><span class="badge" id="gateTight">…</span>
             <span>Units</span><span class="badge" id="gateUnits">…</span>
+            <span>OCCT</span><span class="badge fail" id="gateOcct">PENDING</span>
             <span>Export unit</span><span id="gateUnitLocked">millimeter (locked for export)</span>
             <span>Volume</span><span id="gateVol" data-mm="0" data-kind="vol">…</span>
           </div>
-          <p class="gate-reason" id="gateReason">Loading the watertight and units checks.</p>
+          <p class="gate-reason" id="gateReason">Export blocked: the OCCT check is pending.</p>
         </div>
         <div class="gate-actions">
           <div class="export-wrap">
-            <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Export blocked: Open edge on Body1">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
+            <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Export blocked: the OCCT check is pending.">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
             <div class="menu" id="exportMenu" hidden>
               <button type="button" data-action="exportFmt" data-fmt="STL" data-tool="Export STL">STL</button>
               <button type="button" data-action="exportFmt" data-fmt="3MF" data-tool="Export 3MF">3MF</button>
             </div>
           </div>
-          <p class="fine">One export path. STL and 3MF download only when both checks pass.</p>
+          <p class="fine">One export path. STL and 3MF stay off until occtGate, watertight, and units all pass.</p>
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="finish-bar" id="finishBar" hidden>
-    <button type="button" class="finish-btn" data-action="finishSketch" data-tool="Finish Sketch">Finish Sketch</button>
-    <span class="muted">Sketch1 on XY Plane · returns to Model</span>
-  </div>
-
-  <div class="workspace">
+      </div>
+    </aside>
     <aside class="browser" id="browser">
-      <h2 class="panel-h">Browser</h2>
+      <h2 class="panel-h">Items</h2>
       <div class="branch">
         <button type="button" class="branch-name" data-tool="Bodies">Bodies</button>
         <div class="row">
@@ -877,8 +1140,8 @@
         <line id="mExt1" class="ext"></line>
         <line id="mExt2" class="ext"></line>
         <line id="mLine" class="dim"></line>
-        <polygon id="mArrow1" fill="#f0c14e"></polygon>
-        <polygon id="mArrow2" fill="#f0c14e"></polygon>
+        <polygon id="mArrow1" fill="#fff8e8"></polygon>
+        <polygon id="mArrow2" fill="#fff8e8"></polygon>
         <text id="mText" text-anchor="middle"></text>
       </svg>
       <div class="hud">
@@ -930,8 +1193,16 @@
     </main>
 
     <aside class="inspector" id="inspector">
-      <h2 class="panel-h">Inspector</h2>
-      <div class="prop" id="toolProp">
+      <div class="side-head">
+        <nav class="side-tabs" role="tablist" aria-label="Item panels">
+          <button type="button" class="side-tab is-on" data-action="sideTab" data-side="properties" data-tool="Properties" role="tab" aria-selected="true">Properties</button>
+          <button type="button" class="side-tab" data-action="sideTab" data-side="channels" data-tool="Channels" role="tab" aria-selected="false">Channels</button>
+          <button type="button" class="side-tab" data-action="sideTab" data-side="display" data-tool="Display" role="tab" aria-selected="false">Display</button>
+          <button type="button" class="side-tab" data-action="sideTab" data-side="lists" data-tool="Lists" role="tab" aria-selected="false">Lists</button>
+        </nav>
+        <button type="button" class="preview-btn" id="previewBtn" data-action="preview" data-tool="Preview" aria-pressed="false" title="Preview tool handles">Preview</button>
+      </div>
+      <div class="prop" id="toolProp" data-side-panel="properties">
         <h3 id="inspTitle">Body1</h3>
         <div class="muted" id="inspSub">Solid body · placeholder cube</div>
         <div class="kv" id="inspKv"></div>
@@ -945,6 +1216,18 @@
           </div>
         </div>
         <p class="fine" id="inspFine">Labels only. This cube is not editable geometry.</p>
+      </div>
+      <div data-side-panel="channels" hidden>
+        <h2 class="panel-h">Channels</h2>
+        <p class="fine side-note">TBD. No channel list until the kernel exposes one.</p>
+      </div>
+      <div data-side-panel="display" hidden>
+        <h2 class="panel-h">Display</h2>
+        <p class="fine side-note">Active display: <b id="displayReadout">Shaded + Edges</b>. Change it from the view bar.</p>
+      </div>
+      <div data-side-panel="lists" hidden>
+        <h2 class="panel-h">Lists</h2>
+        <p class="fine side-note">TBD. Vertex maps, the tool pipe, and statistics are not in this build. The Items list above is the part list.</p>
       </div>
     </aside>
     <div class="backdrop" id="backdrop" hidden></div>
@@ -1149,6 +1432,9 @@ function main(Module) {
     node: 'body',
     watertight: false,
     unitsPass: false,
+    occtGate: false,
+    preview: false,
+    side: 'properties',
     exportAllowed: false,
     exportUnit: 'millimeter',
     volumeMm3: 0,
@@ -1180,7 +1466,7 @@ function main(Module) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.localClippingEnabled = true;
   renderer.autoClear = false;
-  renderer.setClearColor(0x1b212c, 1);
+  renderer.setClearColor(0x0e2429, 1);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
@@ -1197,7 +1483,7 @@ function main(Module) {
   rim.position.set(-28, 18, -22);
   scene.add(rim);
 
-  const grid = new THREE.GridHelper(200, 20, 0x5d6d82, 0x314052);
+  const grid = new THREE.GridHelper(200, 20, 0x6e8f96, 0x1e4a52);
   scene.add(grid);
 
   function makePlane(rotation, color) {
@@ -1241,6 +1527,29 @@ function main(Module) {
   mesh.add(corners);
   scene.add(mesh);
 
+  const handles = new THREE.Group();
+  handles.visible = false;
+  function addAxis(dir, color) {
+    const end = dir.clone().multiplyScalar(18);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), end]),
+      new THREE.LineBasicMaterial({ color: color, depthTest: false })
+    );
+    line.renderOrder = 3;
+    handles.add(line);
+    const tip = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 2.2, 2.2),
+      new THREE.MeshBasicMaterial({ color: color, depthTest: false })
+    );
+    tip.position.copy(end);
+    tip.renderOrder = 3;
+    handles.add(tip);
+  }
+  addAxis(new THREE.Vector3(1, 0, 0), 0xe15b4a);
+  addAxis(new THREE.Vector3(0, 1, 0), 0x3cba6a);
+  addAxis(new THREE.Vector3(0, 0, 1), 0x4c8dff);
+  scene.add(handles);
+
   const sketchPts = [
     new THREE.Vector3(-10, 20.08, -10),
     new THREE.Vector3(10, 20.08, -10),
@@ -1273,7 +1582,7 @@ function main(Module) {
 
   const clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 10);
   const sectionMat = new THREE.MeshBasicMaterial({
-    color: 0x4c9aff,
+    color: 0x14756e,
     transparent: true,
     opacity: 0.18,
     side: THREE.DoubleSide,
@@ -1306,7 +1615,7 @@ function main(Module) {
     g.strokeStyle = '#d5deea';
     g.lineWidth = 14;
     g.strokeRect(8, 8, 240, 240);
-    g.fillStyle = '#f5f8fc';
+    g.fillStyle = '#f4fbfb';
     g.font = '700 40px Segoe UI, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -1317,12 +1626,12 @@ function main(Module) {
     return new THREE.MeshBasicMaterial({ map: tex });
   }
   const vcMesh = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.15, 1.15), [
-    faceMaterial('RIGHT', '#3e4b60'),
-    faceMaterial('LEFT', '#384252'),
-    faceMaterial('TOP', '#516078'),
-    faceMaterial('BOTTOM', '#2c3440'),
-    faceMaterial('FRONT', '#46556c'),
-    faceMaterial('BACK', '#323a48')
+    faceMaterial('RIGHT', '#1a454c'),
+    faceMaterial('LEFT', '#163840'),
+    faceMaterial('TOP', '#1f555c'),
+    faceMaterial('BOTTOM', '#10262b'),
+    faceMaterial('FRONT', '#1b4e56'),
+    faceMaterial('BACK', '#14343c')
   ]);
   vcScene.add(vcMesh);
 
@@ -1420,13 +1729,30 @@ function main(Module) {
     updateGate();
   }
 
+  function placeHandles() {
+    handles.position.copy(target);
+    const len = Math.max(fitRadius * 0.9, 8);
+    handles.scale.setScalar(len / 18);
+    handles.visible = !!state.preview;
+  }
+
   function layoutChrome() {
     const narrow = isNarrow();
-    cubeCss = narrow ? 140 : 160;
-    cubeMargin = narrow ? 10 : 14;
+    const h = viewport.clientHeight || 0;
+    const bar = viewport.querySelector('.vp-bar');
+    const barH = bar ? bar.offsetHeight : 56;
+    const barGap = narrow ? 8 : 10;
+    const margin = narrow ? 8 : 12;
+    let size = narrow ? 96 : 128;
+    if (h > 40) {
+      const room = h - barH - barGap - margin - 8;
+      if (size > room) size = room;
+    }
+    cubeCss = Math.round(Math.max(32, size));
+    cubeMargin = margin;
     const home = document.getElementById('vcHome');
-    home.style.top = (cubeMargin + cubeCss + 6) + 'px';
-    home.style.right = (cubeMargin + (cubeCss - 64) / 2) + 'px';
+    home.style.top = margin + 'px';
+    home.style.right = (margin + cubeCss + 8) + 'px';
   }
 
   function resize() {
@@ -1463,6 +1789,7 @@ function main(Module) {
     camera.lookAt(target);
     camera.updateMatrixWorld(true);
     syncViewCube();
+    placeHandles();
   }
 
   function cancelTween() {
@@ -1581,10 +1908,54 @@ function main(Module) {
     el.classList.toggle('fail', !pass);
   }
 
+  function meshAndUnitsPass() {
+    return state.watertight === true && state.unitsPass === true;
+  }
+
+  function recomputeExport() {
+    state.exportAllowed = state.occtGate === true && meshAndUnitsPass();
+  }
+
+  function exportBlockText() {
+    if (state.occtGate !== true) return 'Export blocked: the OCCT check is pending.';
+    return (state.failReason || 'Checks have not passed') + ' Export stays blocked until watertight and units both pass.';
+  }
+
+  function paintExport() {
+    recomputeExport();
+    setBadge('statusTight', state.watertight);
+    setBadge('gateTight', state.watertight);
+    setBadge('gateUnits', state.unitsPass);
+    const occtEl = document.getElementById('gateOcct');
+    if (occtEl) {
+      occtEl.textContent = state.occtGate ? 'PASS' : 'PENDING';
+      occtEl.classList.toggle('pass', !!state.occtGate);
+      occtEl.classList.toggle('fail', !state.occtGate);
+    }
+    const blocked = exportBlockText();
+    const reason = document.getElementById('gateReason');
+    if (reason) {
+      if (state.exportAllowed) {
+        reason.textContent = (state.watertightMessage + ' ' + state.unitsMessage).trim();
+        reason.classList.add('ok');
+      } else {
+        reason.textContent = blocked;
+        reason.classList.remove('ok');
+      }
+    }
+    const btn = document.getElementById('exportBtn');
+    if (btn) {
+      btn.disabled = !state.exportAllowed;
+      btn.setAttribute('aria-disabled', state.exportAllowed ? 'false' : 'true');
+      btn.title = state.exportAllowed ? 'Export STL or 3MF' : blocked;
+    }
+    if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
+  }
+
   function applyReport(report) {
     state.watertight = !!report.watertightPass;
     state.unitsPass = !!report.unitsPass;
-    state.exportAllowed = !!report.exportAllowed;
+    state.exportAllowed = false;
     state.exportUnit = report.exportUnit || 'millimeter';
     state.failReason = report.blockReason || '';
     state.volumeMm3 = Number(report.volumeMm3) || 0;
@@ -1598,27 +1969,8 @@ function main(Module) {
     for (let i = 0; i < volNodes.length; i++) {
       volNodes[i].setAttribute('data-mm', String(state.volumeMm3));
     }
-    setBadge('statusTight', state.watertight);
-    setBadge('gateTight', state.watertight);
-    setBadge('gateUnits', state.unitsPass);
-    const reason = document.getElementById('gateReason');
-    if (reason) {
-      if (state.exportAllowed) {
-        reason.textContent = state.watertightMessage + ' ' + state.unitsMessage;
-        reason.classList.add('ok');
-      } else {
-        reason.textContent = state.failReason + ' Export stays blocked until watertight and units both pass.';
-        reason.classList.remove('ok');
-      }
-    }
-    const btn = document.getElementById('exportBtn');
-    if (btn) {
-      btn.disabled = !state.exportAllowed;
-      btn.setAttribute('aria-disabled', state.exportAllowed ? 'false' : 'true');
-      btn.title = state.exportAllowed ? 'Export STL or 3MF' : ('Export blocked: ' + state.failReason);
-    }
-    if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
-    setHint(state.exportAllowed ? state.watertightMessage : state.failReason);
+    paintExport();
+    setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
   }
 
   function replaceBody() {
@@ -1681,6 +2033,7 @@ function main(Module) {
     shadow.position.set(cx, 0.03, cz);
     shadow.scale.set(Math.max(dx, 1) / 20, 1, Math.max(dz, 1) / 20);
     document.getElementById('hudName').textContent = Module.fixtureName();
+    placeHandles();
   }
 
   function syncFromKernel() {
@@ -1690,26 +2043,7 @@ function main(Module) {
   }
 
   function updateGate() {
-    setBadge('statusTight', state.watertight);
-    setBadge('gateTight', state.watertight);
-    setBadge('gateUnits', state.unitsPass);
-    const reason = document.getElementById('gateReason');
-    if (reason) {
-      if (state.exportAllowed) {
-        reason.textContent = state.watertightMessage + ' ' + state.unitsMessage;
-        reason.classList.add('ok');
-      } else {
-        reason.textContent = (state.failReason || 'Checks have not passed') + ' Export stays blocked until watertight and units both pass.';
-        reason.classList.remove('ok');
-      }
-    }
-    const btn = document.getElementById('exportBtn');
-    if (btn) {
-      btn.disabled = !state.exportAllowed;
-      btn.setAttribute('aria-disabled', state.exportAllowed ? 'false' : 'true');
-      btn.title = state.exportAllowed ? 'Export STL or 3MF' : ('Export blocked: ' + state.failReason);
-    }
-    if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
+    paintExport();
     const vol = document.getElementById('gateVol');
     if (vol) vol.textContent = formatVolume(state.volumeMm3);
     const statusVol = document.getElementById('statusVol');
@@ -1745,6 +2079,12 @@ function main(Module) {
     planeXY.visible = vis.xy && extras;
     planeYZ.visible = vis.yz && extras;
     measureSvg.hidden = !state.measure;
+    handles.visible = !!state.preview;
+    const readout = document.getElementById('displayReadout');
+    if (readout) {
+      const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
+      readout.textContent = names[state.display] || state.display;
+    }
     document.getElementById('hudName').textContent = state.node === 'body'
       ? Module.fixtureName()
       : (NODE_LABELS[state.node] || 'Body1');
@@ -1931,8 +2271,8 @@ function main(Module) {
     const report = Module.gate();
     applyReport(report);
     refreshUnits();
-    if (!report.exportAllowed) {
-      const why = report.blockReason || 'checks failed';
+    if (!state.exportAllowed) {
+      const why = state.occtGate ? (state.failReason || 'checks failed') : 'the OCCT check is pending';
       toast('Export blocked: ' + why);
       setHint('Export blocked: ' + why);
       if (exportMenu) exportMenu.hidden = true;
@@ -1995,7 +2335,7 @@ function main(Module) {
         spherical.radius = fitDistance();
         updateCamera();
         message = 'Loaded ' + Module.fixtureName();
-        setHint(state.exportAllowed ? state.watertightMessage : state.failReason);
+        setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
       }
     } else if (action === 'undo') setHint('Undo');
     else if (action === 'redo') setHint('Redo');
@@ -2077,12 +2417,33 @@ function main(Module) {
       syncFromKernel();
       setHint(message);
       updateInspector();
+    } else if (action === 'preview') {
+      state.preview = !state.preview;
+      const previewBtn = document.getElementById('previewBtn');
+      previewBtn.classList.toggle('is-on', state.preview);
+      previewBtn.setAttribute('aria-pressed', state.preview ? 'true' : 'false');
+      placeHandles();
+      message = state.preview ? 'Preview: On' : 'Preview: Off';
+    } else if (action === 'sideTab') {
+      const side = btn.getAttribute('data-side') || 'properties';
+      state.side = side;
+      const sideTabs = document.querySelectorAll('.side-tab');
+      for (let i = 0; i < sideTabs.length; i++) {
+        const on = sideTabs[i].getAttribute('data-side') === side;
+        sideTabs[i].classList.toggle('is-on', on);
+        sideTabs[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      }
+      const panels = document.querySelectorAll('[data-side-panel]');
+      for (let i = 0; i < panels.length; i++) {
+        panels[i].hidden = panels[i].getAttribute('data-side-panel') !== side;
+      }
+      message = side.charAt(0).toUpperCase() + side.slice(1);
     } else if (action === 'exportMenu') {
       const report = Module.gate();
       applyReport(report);
       refreshUnits();
-      if (!report.exportAllowed) {
-        message = 'Export blocked: ' + (report.blockReason || 'checks failed');
+      if (!state.exportAllowed) {
+        message = state.occtGate ? ('Export blocked: ' + (state.failReason || 'checks failed')) : exportBlockText();
         setHint(message);
       } else if (exportMenu) {
         exportMenu.hidden = !exportMenu.hidden;

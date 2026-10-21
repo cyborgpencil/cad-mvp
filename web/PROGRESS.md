@@ -52,3 +52,15 @@ Not done: a physical phone pass (T4, K5–K8). The export tab at 844×390 leaves
 - Chamfer control, once Erik places it and there is a function to call.
 - Sketch solver and the rest of Model. TBD.
 - No commit and no push this session.
+
+## Checkpoint 6 — OCCT gate, landscape, MODO restyle
+
+Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
+
+- Banner text is `Interim build: OCCT check pending`.
+- `occtGate` stays `false`. Export enables only when `occtGate && watertight && units`. Mesh PASS/FAIL still shows on the status bar and the gate panel. The disabled reason is `Export blocked: the OCCT check is pending.`
+- Short landscape (including 844×390): the Export gate is one 52px row, so it does not take the viewport. The view cube is sized to sit above the view bar. Home sits beside the cube.
+- Desktop layout: toolbox tabs and tool settings on the left, viewport in the center, Items on the top right, Properties / Channels / Display / Lists under that. Preview toggles axis handles. Accent is the single CSS variable `--accent`.
+- Palette values are TBD placeholders in `:root`. Listed in `mockup/PROGRESS.md`. No Modo assets.
+- CTest in `builds/solid-check`: 5/5 passed (`watertight`, `units`, `export`, `gate`, `create`).
+- Screenshots were not taken. This session does not start an http server.
