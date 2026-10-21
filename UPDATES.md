@@ -1,4 +1,4 @@
-﻿# Project Updates Log
+# Project Updates Log
 
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
@@ -51,3 +51,4 @@ Newest entries at the top.
 - Added `prompts/gui-mockup.md` for the clickable GUI mockup (Erik via 3T: pipeline first, C1-C9 deferred, team picks the options). Includes the Chief's no-CDN, touch and mockup-only rules.
 - `prompts/gui-mockup.md`: three.js must be inlined and pinned (Chrome blocks module files over file://), per Research Digest and Repo Keeper.
 - `AGENTS.md`: added Erik's keep-finished-work rule (no rewrites or deletions, reason posted first, tests keep passing, OCCT next to the mesh path). `mvp/gui-plan.md` C9 reworded to match.
+- `mvp/gui-plan.md` section 6: changed 'move to OCCT' to 'add OCCT alongside the mesh code', matching AGENTS.md and research/gui/README.md.

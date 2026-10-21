@@ -57,7 +57,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 ## 6. Feasibility on OpenCASCADE in WASM
 - B-rep operations (extrude, booleans, fillet, transforms, selection by topology) fit the current core.
 - Mesh-style operations (loop cut, knife, freeform) have no clean B-rep equivalent. This is C2. Rule: every Blender-style tool gets a version on real faces and edges (push/pull, face inset, bevel as fillet or chamfer). Raw-mesh-only tools go to C2.
-- Current state (Pilot, 2026-10-21): the Qt GUI does fillet and cut with project mesh code, not OCCT. Proposed: move fillet, chamfer, booleans and extrude to OCCT B-rep. Loop cut and knife stay mesh-style only if Erik opens C2.
+- Current state (Pilot, 2026-10-21): the Qt GUI does fillet and cut with project mesh code, not OCCT. Proposed: add OCCT B-rep fillet, chamfer, booleans and extrude alongside the existing mesh code (keep-finished-work rule, AGENTS.md); existing tests stay as they are and OCCT gets its own rows. Loop cut and knife stay mesh-style only if Erik opens C2.
 - Proposed browser stack (MIT): three.js (TransformControls for gizmos, clipping planes for sections), camera-controls, three-mesh-bvh for picking. **Research Digest proposal, needs Erik's sign-off:** three.js on WebGL2, all MIT and actively maintained, covers gizmos, sections and fast picking; the labeled ViewCube is custom work. Sources: research/gui/README.md [O1]-[O6].
 - WASM is single-threaded, so long OCCT operations run in a Web Worker to keep the UI responsive.
 - Open risks: picking B-rep sub-elements from a tessellated view, WASM memory and thread limits on iPhone Safari-engine Chrome, and boolean speed.
