@@ -1,4 +1,4 @@
-# GUI plan (Fusion-style layout, Blender-style operations)
+﻿# GUI plan (Fusion-style layout, Blender-style operations)
 
 Status: a draft plan only, with no code yet. Owner: Doc Steward. References: Research Digest (open-source first). Coordinator: Chief.
 Watertight and units checks stay a release gate on every export. They are no longer the main test focus.
@@ -26,7 +26,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 | Operation | B-rep route (OCCT) | Mesh-only? | Notes |
 |---|---|---|---|
 | Extrude (face/sketch) | BRepPrimAPI_MakePrism (sketch) or BRepFeat_MakePrism (face push/pull) | No | Press-pull style |
-| Inset | Offset face outline, then split | Partly | Exact behavior TBD |
+| Inset | Offset face outline, then split | Partly | Exact behavior TBD. **Research Digest proposal, needs Erik's sign-off:** feasible as `BRepOffsetAPI_MakeOffset` on the face's outer wire (class present in the OCCT 8.0.1 reference) + `BRepAlgoAPI_Splitter` to split the face, then optional push/pull; edge cases: self-intersecting offsets, faces with holes. Sources: research/gui/README.md [C3], https://dev.opencascade.org/doc/refman/html/class_b_rep_offset_a_p_i___make_offset.html |
 | Bevel | BRepFilletAPI_MakeFillet / MakeChamfer | No | Chamfer is test-only (C4) |
 | Loop cut | Split by plane (BRepAlgoAPI_Splitter) | Mostly mesh | C2 |
 | Knife | Split by a sketch curve (BRepAlgoAPI_Splitter) | Mostly mesh | C2 |
@@ -44,7 +44,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 
 ## 4. Sketch tools and constraints
 - Tools: line, rectangle, circle, arc, polygon, fillet, trim, offset, and dimension.
-- Constraints: coincident, horizontal, vertical, parallel, perpendicular, equal, tangent, fixed, and dimensional. Proposed solver: PlaneGCS WASM (see C7).
+- Constraints: coincident, horizontal, vertical, parallel, perpendicular, equal, tangent, fixed, and dimensional. Proposed solver: PlaneGCS WASM (see C7). **Research Digest proposal, needs Erik's sign-off:** `@salusoft89/planegcs` 1.3.0 is FreeCAD's solver as WASM under LGPL, matching our LICENSE; risk: one small maintainer; SolveSpace is out (GPL-3.0). Sources: research/gui/README.md [S3][S4][S1].
 - The mm/inch toggle shows values in the chosen unit. Internally everything stays mm, and export always writes unit="millimeter".
 
 ## 5. Input on Chrome (Windows, Android, iPhone)
@@ -58,7 +58,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 - B-rep operations (extrude, booleans, fillet, transforms, selection by topology) fit the current core.
 - Mesh-style operations (loop cut, knife, freeform) have no clean B-rep equivalent. This is C2. Rule: every Blender-style tool gets a version on real faces and edges (push/pull, face inset, bevel as fillet or chamfer). Raw-mesh-only tools go to C2.
 - Current state (Pilot, 2026-10-21): the Qt GUI does fillet and cut with project mesh code, not OCCT. Proposed: move fillet, chamfer, booleans and extrude to OCCT B-rep. Loop cut and knife stay mesh-style only if Erik opens C2.
-- Proposed browser stack (MIT): three.js (TransformControls for gizmos, clipping planes for sections), camera-controls, three-mesh-bvh for picking.
+- Proposed browser stack (MIT): three.js (TransformControls for gizmos, clipping planes for sections), camera-controls, three-mesh-bvh for picking. **Research Digest proposal, needs Erik's sign-off:** three.js on WebGL2, all MIT and actively maintained, covers gizmos, sections and fast picking; the labeled ViewCube is custom work. Sources: research/gui/README.md [O1]-[O6].
 - WASM is single-threaded, so long OCCT operations run in a Web Worker to keep the UI responsive.
 - Open risks: picking B-rep sub-elements from a tessellated view, WASM memory and thread limits on iPhone Safari-engine Chrome, and boolean speed.
 - Sourced references: `research/gui/README.md` (Research Digest).
@@ -71,7 +71,7 @@ Each phase still passes the watertight and units gate on export.
 - P4 Modify: gizmos with numeric entry, snapping, fillet, booleans, undo/redo. Tests: test matrix O-cases driven through the GUI.
 - P5 (blocked on C1 and C2): timeline, inset, loop cut, knife.
 
-GUI test conventions: captures go to builds\screenshots\gui-<phase>-<flow>-<step>.png (gitignored). Approved baselines go to tests/gui/baselines/ (tracked, PNG binary). Pilot runs the captures on Z13. Proposed tool: Playwright screenshots on Desktop Chrome, Pixel and iPhone 13 (WebKit). Baselines must be made in the same environment the tests run in. The pixel-diff tolerance is TBD.
+GUI test conventions: captures go to builds\screenshots\gui-<phase>-<flow>-<step>.png (gitignored). Approved baselines go to tests/gui/baselines/ (tracked, PNG binary). Pilot runs the captures on Z13. Proposed tool: Playwright screenshots on Desktop Chrome, Pixel and iPhone 13 (WebKit). Baselines must be made in the same environment the tests run in. The pixel-diff tolerance is TBD. **Research Digest proposal, needs Erik's sign-off:** Playwright `toHaveScreenshot()` with Desktop Chrome, Pixel and iPhone 13 (WebKit) projects, since it builds and compares baselines natively and emulates all three targets. Sources: research/gui/README.md [T1][T2].
 
 ## Handoff
 Grok Build plans and implements each phase once Erik approves its scope. Cursor does the interactive refinement. Erik reviews core diffs.
