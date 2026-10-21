@@ -35,4 +35,5 @@ Stop at 60 minutes, or at any checkpoint failure, and report what was done, what
 ## Target: WASM
 - The watertight and units checks run in the OCCT WASM build in the browser, not in mockup JS.
 - **Responsive:** the layout adapts to desktop width with breakpoints, and to phone rotation (portrait and landscape) using an orientation listener (`matchMedia('(orientation: ...)')` or `screen.orientation` change) plus a resize re-layout. Units stay visible and touch targets stay at 44 px or larger in all three layouts.
-- **Hosted link:** it must run from GitHub Pages (static files, no custom headers). If OCCT threads need COOP/COEP headers, use a single-threaded build or flag it. Don't add a server. (Repo Keeper owns the Pages workflow; only green builds deploy.)
+- **Hosted link:** it must run from GitHub Pages (static files, no custom headers). Build **single-threaded**: no `-pthread`, so the page needs no COOP/COEP headers (see `research/occt-wasm/pages-hosting.md`). Never commit the `.wasm`, because Actions builds and deploys it. Don't add a server. (Repo Keeper owns the Pages workflow; only green builds deploy.)
+- Check against rotation checks R1–R5 in `research/gui/usability-checks.md` before reporting done.
