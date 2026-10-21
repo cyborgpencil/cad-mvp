@@ -1,4 +1,4 @@
-# GUI usability checks (pass/fail)
+﻿# GUI usability checks (pass/fail)
 
 Research Digest, 2026-10-21. Test prep only, no app code. These checks verify the built GUI against `mvp/ui-redesign.md` "Team decisions (final)" (D1-D10), `prompts/gui-mockup.md` and `research/gui/ui-layout-review.md` (R). Mark each check PASS or FAIL and note the browser, OS and device.
 
@@ -40,6 +40,14 @@ Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+
 - **P2:** Expected: there is no small-gaps fix, and no Remove small features or Merge coplanar faces (all later or TBD). Source: D3, R (Repair section).
 - **P3 (built app, not mockup):** After Auto-heal or Mesh repair, the status-bar PASS/FAIL updates, and the result reports what changed or "cannot repair". Source: R [Repair tool list, items 3 and 7].
 
+## 6. Rotation (portrait and landscape)
+Erik, 2026-10-21: one responsive WASM app for desktop and phone, in both orientations. Rotate in Chrome DevTools device mode with the Rotate button in the device toolbar [12]. In app code, `matchMedia('(orientation: portrait)')` [10] and `screen.orientation` `change` [9] are the hooks to test. WCAG 2.1 SC 1.3.4 (AA) says content must not be restricted to one orientation unless that is essential [11].
+- **R1:** At 390x844 (portrait) and 844x390 (landscape), visit Sketch, Model, Repair and Export. Expected: all 4 tabs reachable in both, and the Export button reachable without horizontal scroll. Source: D1, [12].
+- **R2:** Open a sketch with one entity selected, then rotate; repeat with a dialog or drawer open. Expected: same tab, sketch still open, selection kept, dialog still open with its input values. No reload. Source: [9][10].
+- **R3:** Rotate on every tab, and on a real phone with the OS rotation lock off. Expected: no "rotate your device" block, no `screen.orientation.lock()`, and all content works in both. Source: [11].
+- **R4:** At 844x390, measure the same controls as T1. Expected: each is at least 44 x 44 CSS px. Source: D9 [2].
+- **R5:** In both orientations on every tab. Expected: the status bar shows units, watertight PASS/FAIL and volume, not hidden or clipped. Source: D6, E4.
+
 ## Sources
 1. W3C, Understanding SC 2.5.8 Target Size (Minimum): https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
 2. W3C, Understanding SC 2.5.5 Target Size (Enhanced): https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html
@@ -49,3 +57,7 @@ Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+
 6. Google Chrome Help, Chrome keyboard shortcuts: https://support.google.com/chrome/answer/157179
 7. Apple Support, Use shortcuts on an Apple external keyboard with iPad: https://support.apple.com/guide/ipad/use-shortcuts-ipaddf61a0c2/ipados
 8. Repo: mvp/ui-redesign.md (Team decisions (final)), prompts/gui-mockup.md, research/gui/ui-layout-review.md
+9. MDN, ScreenOrientation: change event: https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/change_event
+10. MDN, Window.matchMedia() and the orientation media feature: https://developer.mozilla.org/en-US/docs/Web/API/Window/matchMedia ; https://developer.mozilla.org/en-US/docs/Web/CSS/@media/orientation
+11. W3C, Understanding SC 1.3.4 Orientation: https://www.w3.org/WAI/WCAG21/Understanding/orientation.html
+12. Chrome DevTools, device mode (Rotate): https://developer.chrome.com/docs/devtools/device-mode#orientation
