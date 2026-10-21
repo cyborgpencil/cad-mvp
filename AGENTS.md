@@ -37,3 +37,7 @@ All project work runs through Shell aimed directly at ErmoZ13 (Z13). Nothing run
 ## Handoff folder for files going to Erik (2026-10-21)
 The app's file copy only reads under `C:\Users\cybor`, so it can't copy anything out of `C:\Dev\cadcam-mvp`. Files meant for Erik, such as screenshots or the mockup HTML, get one extra copy in `C:\Users\cybor\Pictures\cadmvp-shots\` on Z13. The working copy stays in `builds\`. This folder holds handoff copies only, never project work. It's an exception to the Z13-dev-folder-only rule, set by 3T; Erik can confirm or change it. Don't delete anything in this folder unless Erik says to (3T, 2026-10-21).
 The shared skill `pull-files-from-user-pc` covers this method: stage with Shell, leave the originals untouched, then copy from the staging folder.
+
+## Team rules (Erik, 2026-10-21)
+- Flexibility: roles are defaults, not walls. If an owner is busy, stalled or offline, the next best-fit bot takes over. Say so in the room, read the owner's latest status and files first, and hand the work back cleanly when the owner returns. Safety rules still apply.
+- Research first: before any task, check the repo, docs, earlier work, skills and memory, plus sourced best practices. Post a short plan with sources, then start.

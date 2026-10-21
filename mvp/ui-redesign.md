@@ -64,3 +64,21 @@ Phone (narrow) layout: tabs become a bottom tab bar, the tab toolbar becomes a h
 - Shared tools stay fixed across tabs, like FreeCAD's Std commands and Onshape's fixed controls.
 - Tool search (like Onshape Alt+C) and panels that collapse into dropdowns on phones.
 - The watertight and units check is shown inside the Export/Print tab, right before every export, and also in the status bar.
+
+## Current mockup controls mapped to tabs (from Repo Keeper's read-only inventory of mockup/index.html, 2026-10-21)
+| Proposed tab | Mockup tab | Mockup controls |
+|---|---|---|
+| Sketch | Sketch | Line, Rectangle, Circle, Arc, Polygon, Sketch Fillet, Trim, Offset, Dimension; constraints Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent, Fixed |
+| Model | Solid | Extrude (Push/Pull), Inset, Bevel (Fillet/Chamfer), Loop Cut, Knife, Grab, Rotate, Scale, Snapping |
+| Mesh/Repair | Inspect | Section, Measure, display modes (Shaded, Shaded + Edges, Wireframe, X-Ray), Isolate, Hide |
+| Export/Print | Export | Export STL, Export 3MF |
+| Shared (all tabs) | top bar, view bar, radial menu | Undo/Redo, mm/in, selection (Vertex, Edge, Face, Body), navigation (Orbit, Pan, Zoom, Fit, Front, Top, Right, Iso/Home), ViewCube, browser tree (Bodies, Sketches, Construction planes) |
+
+Findings:
+- Tab names differ: the mockup says Solid and Inspect, the proposal says Model and Mesh/Repair. TBD for Erik.
+- MUST-HAVE gap: the mockup has no watertight or units check before Export STL/3MF. Export/Print must show and enforce it before every export.
+- Navigation and view controls appear in three places (toolbar, floating view bar, radial menu). Proposal: keep one shared spot. The radial menu's fate is TBD.
+- The mockup has no mesh repair tools yet, so the Mesh/Repair tool list is TBD.
+- The timeline (Origin, Sketch1, Extrude1, Fillet1) is visual only, which ties to the open timeline TBD.
+- Appearance swatches (Steel, Orange, Green, Slate): placement TBD.
+- Tab-switch keys and tool search keys are TBD. Research notes Blender uses Ctrl+PageUp/PageDown, which Chrome on Windows reserves for its own tabs (per 3T), so it is ruled out, and Onshape uses Alt+C for tool search. See research/gui/ui-layout-review.md.
