@@ -14,3 +14,8 @@ Status: READY for Pilot (Doc Steward, 2026-10-21). Erik's direction (2:05 AM MT)
 
 ## Cap
 30 minutes. Edit files in place, use incremental commits, and leave no versioned copies.
+## Layout notes (research/gui/modo-tools.md, 2026-10-21)
+- Left: toolbox tabs with tool settings underneath. Center: viewport. Right: Items list on top, with Properties, Channels, Display and Lists tabs below.
+- One CSS variable for the accent color. Tool handles get a Preview toggle.
+- Foundry's docs show orange highlights, not teal, and give no teal hex. The accent and all other hex values stay TBD until Erik names the Modo version or a screenshot to sample from.
+- 44 px targets and the Export gate are unchanged.

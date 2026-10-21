@@ -39,3 +39,8 @@ Stop at 60 minutes, or at any checkpoint failure, and report what was done, what
 - Check against rotation checks R1–R5 in `research/gui/usability-checks.md` before reporting done.
 - **OCCT source (Chief, 2026-10-21):** first choice is prebuilt libcascade 3.1.0 (OCCT 8.0.1, single-threaded), loaded as-is, calling `BRepCheck_Analyzer` and `ShapeAnalysis_FreeBounds` from JS. Our core stays its own small WASM. No Docker without Erik's OK. Fallback is OCCT `adm/scripts/wasm_build.bat`. The .wasm is fetched by Actions and never committed.
 - **Interim deploy (Chief and 3T, 2026-10-21):** the first Pages build may go live with our own mesh checker, provided the page shows an 'Interim build: OCCT check pending' banner and Export stays disabled until the real OCCT watertight and units gate is green. It still needs Erik's push go-ahead.
+
+## Folded specs (2026-10-21)
+- Restyle: follow prompts/modo-restyle.md (visual only; hex values TBD).
+- Interactive Booleans: follow mvp/booleans.md. Ghost preview while dragging, exact OCCT Boolean on release, then the OCCT check and repair, then the watertight and units gate; roll back on failure. Test case: the off-center disc on the Blink bracket leg (mvp/projects/blink-l-bracket.md).
+- Do not add manifold-3d unless Erik approves it.

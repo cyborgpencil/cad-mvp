@@ -22,3 +22,11 @@ Preview frame rate and the max commit time on phones are TBD.
 
 ## Open TBDs for Erik
 Fuzzy tolerance value; whether Intersect stays test-only (per `ui-redesign.md` it is test-only today); preview fidelity targets.
+## Research findings (research/occt-wasm/booleans.md, 2026-10-21)
+- Coplanar faces are the known failure case, and the bracket disc sits flush on the leg top.
+- OCCT settings: SetFuzzyValue (mm value TBD); SetGlue(BOPAlgo_GlueShift) only for the flush disc on leg, never for the holes or any real intersection; SetNonDestructive so undo and re-drag work; SimplifyResult after the operation.
+- Checks: BOPAlgo_ArgumentAnalyzer before the operation; BRepCheck_Analyzer plus ShapeFix_Shape after; then our watertight and units gate.
+- Live drag: a see-through ghost of the tool body, updated once per frame. A live cut or union preview with manifold-3d (Apache-2.0, single-threaded WASM build) is optional and needs Erik's yes. three-bvh-csg is rejected.
+- On failure: keep the last good shape, show the error, snap the tool body back, and keep Export disabled.
+- Pilot to confirm the API names in a libcascade 3.1.0 test build.
+- Still TBD: fuzzy tolerance, preview mesh coarseness, WASM Boolean timing, manifold-3d download size, Push/Pull scope.
