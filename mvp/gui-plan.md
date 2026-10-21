@@ -73,5 +73,8 @@ Each phase still passes the watertight and units gate on export.
 
 GUI test conventions: captures go to builds\screenshots\gui-<phase>-<flow>-<step>.png (gitignored). Approved baselines go to tests/gui/baselines/ (tracked, PNG binary). Pilot runs the captures on Z13. Proposed tool: Playwright screenshots on Desktop Chrome, Pixel and iPhone 13 (WebKit). Baselines must be made in the same environment the tests run in. The pixel-diff tolerance is TBD. **Research Digest proposal, needs Erik's sign-off:** Playwright `toHaveScreenshot()` with Desktop Chrome, Pixel and iPhone 13 (WebKit) projects, since it builds and compares baselines natively and emulates all three targets. Sources: research/gui/README.md [T1][T2].
 
+## 8. Workbench tab redesign
+Moved to mvp/ui-redesign.md (design only, 2026-10-21).
+
 ## Handoff
 Grok Build plans and implements each phase once Erik approves its scope. Cursor does the interactive refinement. Erik reviews core diffs.

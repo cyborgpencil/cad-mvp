@@ -56,3 +56,5 @@ Newest entries at the top.
 - 2026-10-21 00:33 MT (Doc Steward): AGENTS.md has a new Z13-only execution rule (direct Shell on Z13, no Ally or WinRM route), per Erik via 3T.
 - 2026-10-21 00:42 MT (Doc Steward): AGENTS.md now documents the handoff folder C:\Users\cybor\Pictures\cadmvp-shots\ (handoff copies only, because the app's file copy only reads under the user profile).
 - 2026-10-21 00:43 MT (Doc Steward): AGENTS.md handoff section now says to delete nothing in the staging folder without Erik's go, and it points to the shared skill pull-files-from-user-pc.
+- 2026-10-21 00:50 MT (Doc Steward): mvp/gui-plan.md section 8 adds the workbench tab redesign proposal (layout sketch, shared tools, tab-by-tool map, open questions). Design only, no code changes.
+- 2026-10-21 00:55 MT (Doc Steward): moved the redesign proposal into mvp/ui-redesign.md (per Chief), left a pointer in gui-plan.md section 8, and added Research Digest's takeaways plus TBDs for units/export placement and Sketch as a mode.
