@@ -68,7 +68,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 ## 6. Feasibility on OpenCASCADE (WASM)
 
 - Every row in section 2's B-rep column is a documented OCCT algorithm [C2][C3]. These are B-rep ops, so the watertight gate runs on the tessellated result.
-- **Move to OCCT B-rep**: today's Qt fillet (`fillet_box_edge`) and cut are the team's own mesh code. Recommend fillet/chamfer -> `BRepFilletAPI_*`, cut/union -> `BRepAlgoAPI_*`, extrude -> `BRepPrimAPI_MakePrism`, then tessellate for display and STL/3MF.
+- **Add OCCT B-rep alongside existing code**: today's Qt fillet (`fillet_box_edge`) and cut are the team's own mesh code, and per Erik's rule they stay as-is (no rewrites or deletions). Proposal: add OCCT versions next to them (fillet/chamfer -> `BRepFilletAPI_*`, cut/union -> `BRepAlgoAPI_*`, extrude -> `BRepPrimAPI_MakePrism`, tessellated for display and STL/3MF). Current tests and expected values, including O5b, stay unchanged. Any change to existing code needs a reason posted in the room first.
 - **History**: OCCT has OCAF; `TNaming_NamedShape` stores old/new shape pairs (shape evolution) and supports topological naming, plus transaction undo/redo [C1]. This is the building block for a timeline but is not a ready Fusion-style timeline.
 - WASM: single-threaded build means long fillets/booleans block the UI unless run in a Worker (Worker use is TBD; not measured).
 
@@ -79,7 +79,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 3. Full Fusion suite (workspaces, Form, Sheet Metal, CAM, Simulation) far exceeds design-to-print.
 4. SolveSpace solver is GPL-3.0 vs repo LGPL-2.1.
 5. OCAF/TNaming adoption is an architecture change for undo and naming.
-6. Moving fillet/cut from mesh code to OCCT changes the existing test-matrix expectations (e.g. O5b).
+6. Adding OCCT fillet/cut alongside the mesh code must not change existing test-matrix rows or expected values (e.g. O5b); OCCT results would get their own new rows. Changing existing code needs a reason posted in the room first.
 7. Touch gesture map and long-press marking menu are new UX specs only Erik can set.
 
 ## 8. GUI screenshot and UX test tools
@@ -127,7 +127,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 
 ## Next steps for Grok Build
 
-1. Plan-mode spike: replace mesh fillet/cut with `BRepFilletAPI_MakeFillet` + `BRepAlgoAPI_Cut` in the WASM core; rerun the test matrix and watertight/units gate.
+1. Plan-mode spike: add `BRepFilletAPI_MakeFillet` + `BRepAlgoAPI_Cut` paths in the WASM core alongside (not replacing) the mesh fillet/cut; keep existing tests and values, including O5b; run the watertight/units gate on the new path. Post a reason in the room before touching existing code.
 2. Prototype a three.js viewer shell (OrbitControls or camera-controls, ViewHelper, TransformControls, three-mesh-bvh face/edge picking) that maps picks to B-rep face/edge IDs.
 3. Build a PlaneGCS (`@salusoft89/planegcs`) sketch spike reproducing the current 8 sketch tools/constraints.
 4. Add a Playwright harness with Desktop Chrome, Pixel, and iPhone 13 projects; baselines to `tests/gui/baselines/`, captures to `builds/screenshots/`.

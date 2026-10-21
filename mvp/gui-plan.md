@@ -1,4 +1,4 @@
-﻿# GUI plan (Fusion-style layout, Blender-style operations)
+# GUI plan (Fusion-style layout, Blender-style operations)
 
 Status: a draft plan only, with no code yet. Owner: Doc Steward. References: Research Digest (open-source first). Coordinator: Chief.
 Watertight and units checks stay a release gate on every export. They are no longer the main test focus.
@@ -11,7 +11,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 - C5. Is iPhone/Android touch MVP or post-MVP? TBD.
 - C7. Sketch solver license: PlaneGCS WASM (@salusoft89/planegcs, LGPL, single maintainer) fits. SolveSpace (GPL-3.0) clashes with our LGPL-2.1 and is out unless Erik says otherwise.
 - C8. Timeline via OCAF/TNaming would be an architecture change (ties to C1).
-- C9. Moving fillet and cut from mesh code to OCCT changes test-matrix expectations (O5b is computed from an exact fillet and should match closer than the Qt mesh run). The touch gesture map in section 5 is a proposal; Erik sets the UX spec.
+- C9. OCCT fillet and cut are added next to the existing mesh code, not replacing it (Erik's keep-finished-work rule in AGENTS.md). Current tests keep passing as they are; OCCT cases get their own expectations. The touch gesture map in section 5 is a proposal; Erik sets the UX spec.
 - C6. Platform: the GUI targets the browser app (WebGL2 on Chrome for Windows, Android, iPhone). The Qt app is a native test harness only. Should Qt stay a real product? Erik decides.
 
 ## 1. Fusion-style layout

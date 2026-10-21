@@ -23,3 +23,10 @@ Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns
 - Never: push a failing build or test, force-push, amend or rebase pushed commits, or push while a Grok Build session is still editing the tree.
 - A rejected push, conflict, or login prompt means stop and report in the group.
 - After each push, post the commit links and the changed core files so Erik can review them.
+
+## Keep finished work (Erik's rule, 2026-10-21)
+- Keep everything Grok Build has already finished (the Qt app, export, units, tests in dfb46b7, and the rest) unless something actually needs to change.
+- No rewrites or deletions of finished code. Any change to existing code needs a reason posted in the CAD CAM MVP group first, and the current tests must keep passing.
+- The mockup lives only in mockup/. Stack work builds on what is there.
+- OpenCASCADE fillet and cut are added next to the existing mesh code, not in place of it. Changing or removing the mesh path later needs a posted reason first.
+- Repo Keeper runs git diff --stat before every commit and holds any commit that changes code outside mockup/ or the docs without a posted reason.
