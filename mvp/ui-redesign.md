@@ -87,7 +87,7 @@ Findings:
 These replace the TBDs above where they conflict.
 1. Tabs are Sketch, Model, Repair and Export (settled by Chief). Plain words beat Solid and Inspect, and short labels fit a phone's bottom tab bar.
 2. Sketch is a mode that shows as a tab. Model opens it, and a "Finish Sketch" bar returns you to Model, as in Fusion and FreeCAD.
-3. Repair is its own tab for hole fill, normals and the other healing tools. Healing is a core MVP job, and FreeCAD keeps Mesh as its own workbench. The exact tool list follows the mesh repair requirements.
+3. Repair is its own tab for hole fill, normals and the other healing tools. Healing is a core MVP job, and FreeCAD keeps Mesh as its own workbench. Proposed MVP tools (Research Digest, research/gui/ui-layout-review.md sources 18 to 23): Check shape, Find open edges, Auto-heal and Mesh repair. Remove small features and Merge coplanar faces come later. The small-gaps fix is TBD for Erik, because OCCT FixGaps can change geometry.
 4. Measure, Section, display modes and navigation live in one shared floating view bar plus the ViewCube. The mockup repeated them in three places.
 5. There's no radial menu in the MVP, because it only duplicated the shared view bar.
 6. The mm/in toggle is in the top bar. The status bar shows units (read-only) and the watertight PASS/FAIL result and volume at all times, because units are locked and the check is a hard gate.
