@@ -1,3 +1,7 @@
+# Z13-only GUI capture script, not a portable tool.
+# Assumes a maximized solid_view window on a 2560px-wide display (fillet edge click at 1057,713),
+# Qt at C:\Qt\6.8.3\msvc2022_64\bin (override with QT_BIN), and a built builds\solid-check\solid_view.exe.
+# Other helpers (montage, orcafront, prev, show3mf) are standalone capture aids, not needed by this script.
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
 Add-Type @"
 using System;using System.Runtime.InteropServices;
