@@ -3,16 +3,19 @@
 
 export const SELECTION_MODES = ['vertex', 'edge', 'face', 'item'];
 
-// Hotkeys: Vertex 1, Edge 2, Face 3, Item 5. Keys 4, 6 and 7 are out of scope.
+// Hotkeys: Vertex 1, Edge 2, Face 3, Item 4 (whole body). Key 5 also selects Item.
+// Keys 6 and 7 stay out of scope. Alt+4 still switches to the Export tab.
+// Team choice (Erik 7:00 PM MT), not a sourced spec.
 export const SELECTION_HOTKEYS = {
   '1': 'vertex',
   '2': 'edge',
   '3': 'face',
+  '4': 'item',
   '5': 'item',
 };
 
 // Screen-space radius for vertex and edge picking when the hit is a mesh.
-// TBD placeholder. The spec leaves the WASM pick tolerance undocumented.
+// App default. Team choice (Erik 7:00 PM MT), not a sourced spec.
 export const PICK_TOLERANCE_PX = 8;
 
 // Coplanar test for mesh-face grouping when no OCCT solid is loaded.
@@ -32,7 +35,7 @@ export function occtShapeType(mode) {
 
 // Click replaces. Shift+click adds. Ctrl+click removes.
 // Empty Vertex/Edge/Face means the operation applies to all, with no highlight.
-// Item mode stays empty until something is selected.
+// Item mode selects the whole body. Hotkey 4 enters Item and selects that body.
 export function applyPointerSelection(mode, selectedIds, hitId, modifiers) {
   const shift = !!(modifiers && modifiers.shift);
   const ctrl = !!(modifiers && modifiers.ctrl);

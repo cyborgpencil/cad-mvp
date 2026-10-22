@@ -22,3 +22,10 @@ MeshFusion-style live Booleans, preview modes, kernel changes beyond the wrapper
 
 ## Review
 Erik reviews core diffs (bindings.cpp). Incremental commits; Repo Keeper scans and pushes.
+
+## Guardrail: test fixtures vs app constants (Chief, 2026-10-21)
+- Concrete numbers needed to build the bracket in tests live only in test files, as clearly named test-fixture constants (e.g. kFixtureBracketLengthMm).
+- App-side constants stay named TBD until Erik answers. Fixture values must never become app defaults.
+
+## Update 2026-10-21 19:00 MT: Erik's rule replaces the TBD guardrail
+Erik has delegated the open values to the team: L-bracket sizes, fillet and chamfer values, hotkey 4, selection colours, primitive defaults and pick tolerance. The app uses team-chosen defaults, each recorded in the PROGRESS.md decisions table. Thickness is 4 mm (Erik's spec). The TBD-constant guardrail above no longer applies. Test fixtures still stay in tests/ and must not be served by the site (the smoke test checks they return 404). The bare ?demo=lbracket must build the default bracket and pass the watertight and mm checks.

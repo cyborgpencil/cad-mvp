@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -30,13 +30,15 @@ const initUrl = pathToFileURL(path.join(libDir, 'init.single.js')).href;
 const gateUrl = pathToFileURL(path.join(root, 'web', 'occt-gate.mjs')).href;
 
 const primUrl = pathToFileURL(path.join(root, 'web', 'occt-primitives.mjs')).href;
+const opsUrl = pathToFileURL(path.join(root, 'web', 'occt-ops.mjs')).href;
 const selUrl = pathToFileURL(path.join(root, 'web', 'selection.mjs')).href;
 const viewUrl = pathToFileURL(path.join(root, 'web', 'viewport-selection.mjs')).href;
 
 const { createInstance } = await import(initUrl);
 const { checkOcctGate, closedBoxMesh, openBoxMesh, box20Mesh } = await import(gateUrl);
-const { buildBox, buildCylinder, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM } = await import(primUrl);
-const { applyPointerSelection, groupMeshFaces, modeFromHotkey } = await import(selUrl);
+const { buildBox, buildCylinder, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight } = await import(primUrl);
+const ops = await import(opsUrl);
+const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX } = await import(selUrl);
 const { threeDeltaToCad, GIZMO_AXIS_THREE } = await import(viewUrl);
 
 let failures = 0;
@@ -76,7 +78,7 @@ expect('box units mm', box.units === 'mm');
 expect('box faces ' + box.topology.faces.length, box.topology.faces.length === 6);
 expect('box vertices ' + box.topology.vertices.length, box.topology.vertices.length === 8);
 expect('box edges ' + box.topology.edges.length, box.topology.edges.length === 12);
-expect('box tbd defaults', PLACEHOLDER_BOX_MM.tbd === true && box.params.sx === 20 && box.params.sz === 20);
+expect('box defaults', BOX_EDGE_MM === 20 && PLACEHOLDER_BOX_MM.sx === 20 && PLACEHOLDER_BOX_MM.sy === 20 && PLACEHOLDER_BOX_MM.sz === 20 && box.params.sx === 20 && box.params.sy === 20 && box.params.sz === 20 && PLACEHOLDER_BOX_MM.tbd === undefined);
 
 const cyl = buildCylinder(oc, null);
 expect('cylinder gate', cyl.gate.pass === true && cyl.gate.freeEdges === 0);
@@ -85,7 +87,8 @@ expect('cylinder units mm', cyl.units === 'mm');
 expect('cylinder faces ' + cyl.topology.faces.length, cyl.topology.faces.length === 3);
 expect('cylinder vertices ' + cyl.topology.vertices.length, cyl.topology.vertices.length === 2);
 expect('cylinder edges ' + cyl.topology.edges.length, cyl.topology.edges.length === 3);
-expect('cylinder tbd defaults', PLACEHOLDER_CYLINDER_MM.tbd === true && cyl.params.axis === 'Z');
+expect('cylinder defaults', CYLINDER_DIAMETER_MM === 20 && CYLINDER_HEIGHT_MM === 20 && PLACEHOLDER_CYLINDER_MM.radius === 10 && PLACEHOLDER_CYLINDER_MM.height === 20 && cyl.params.radius === 10 && cyl.params.height === 20 && cyl.params.axis === 'Z' && PLACEHOLDER_CYLINDER_MM.tbd === undefined);
+expect('sphere default only', SPHERE_DIAMETER_MM === 20);
 
 const cylX = buildCylinder(oc, { axis: 'X' });
 expect('cylinder X gate', cylX.gate.pass === true && cylX.watertight.pass === true && cylX.units === 'mm');
@@ -112,14 +115,147 @@ expect('empty item is not all', clearedItem.ids.length === 0 && clearedItem.all 
 expect('hotkey 1', modeFromHotkey('1') === 'vertex');
 expect('hotkey 2', modeFromHotkey('2') === 'edge');
 expect('hotkey 3', modeFromHotkey('3') === 'face');
+expect('hotkey 4 item', modeFromHotkey('4') === 'item');
 expect('hotkey 5', modeFromHotkey('5') === 'item');
-expect('hotkey 4 unused', modeFromHotkey('4') === '');
+expect('pick tolerance 8', PICK_TOLERANCE_PX === 8);
 
 const cad = threeDeltaToCad(1, 2, 3);
 expect('three Y is cad Z', cad.x === 1 && cad.y === 3 && cad.z === 2);
 expect('gizmo X', GIZMO_AXIS_THREE.x[0] === 1 && GIZMO_AXIS_THREE.x[1] === 0 && GIZMO_AXIS_THREE.x[2] === 0);
 expect('gizmo Y', GIZMO_AXIS_THREE.y[0] === 0 && GIZMO_AXIS_THREE.y[1] === 0 && GIZMO_AXIS_THREE.y[2] === 1);
 expect('gizmo Z up', GIZMO_AXIS_THREE.z[0] === 0 && GIZMO_AXIS_THREE.z[1] === 1 && GIZMO_AXIS_THREE.z[2] === 0);
+
+const fixture = JSON.parse(readFileSync(path.join(root, 'tests', 'fixtures', 'lbracket.json'), 'utf8'));
+const defaults = ops.lbracketSpec(null);
+const specFields = [
+  'legLengthMm', 'legWidthMm', 'thicknessMm', 'uprightHeightMm',
+  'cornerXMm', 'cornerYMm', 'cornerZMm', 'overlapMm',
+  'filletRadiusMm', 'chamferDistanceMm', 'innerEdgeMode',
+  'chamferEdgeRule', 'filletLivePreview',
+];
+expect('fixture thickness 4', fixture.thicknessMm === 4);
+expect('no tbd constant', ops.LBRACKET_TBD_THICKNESS_MM === undefined && ops.LBRACKET_THICKNESS_MM === 4);
+for (let fi = 0; fi < specFields.length; fi += 1) {
+  const field = specFields[fi];
+  expect('default ' + field, defaults[field] === fixture[field] && defaults[field] === ops.LBRACKET_DEFAULTS[field]);
+}
+expect('defaults bbox size', fixture.bboxMm[0] === 40 && fixture.bboxMm[1] === 20 && fixture.bboxMm[2] === 40);
+
+const bracket = ops.buildLBracket(oc, null);
+expect('lbracket pass', bracket.pass === true);
+expect('lbracket units mm', bracket.units === 'mm');
+expect('lbracket gate', bracket.gate.pass === true && bracket.gate.freeEdges === 0);
+expect('lbracket watertight', bracket.watertight.pass === true);
+expect('lbracket last error empty', bracket.lastError === '');
+expect('lbracket steps', bracket.log.filter(function (item) { return item.pass; }).map(function (item) { return item.step; }).join(',') === 'fuse,fillet,chamfer');
+expect('lbracket from defaults', bracket.params.thicknessMm === defaults.thicknessMm && bracket.params.filletRadiusMm === ops.LBRACKET_INNER_FILLET_RADIUS_MM && bracket.params.chamferDistanceMm === 0.5 && bracket.params.filletLivePreview === false && bracket.params.innerEdgeMode === 'auto');
+const bounds = ops.meshBounds(bracket.mesh);
+const want = ops.expectedLBracketBounds(bracket.params);
+const boundTol = 1e-3;
+expect('lbracket xmin ' + bounds.xmin, Math.abs(bounds.xmin - want.xmin) <= boundTol);
+expect('lbracket ymin ' + bounds.ymin, Math.abs(bounds.ymin - want.ymin) <= boundTol);
+expect('lbracket zmin ' + bounds.zmin, Math.abs(bounds.zmin - want.zmin) <= boundTol);
+expect('lbracket xmax ' + bounds.xmax, Math.abs(bounds.xmax - want.xmax) <= boundTol);
+expect('lbracket ymax ' + bounds.ymax, Math.abs(bounds.ymax - want.ymax) <= boundTol);
+expect('lbracket zmax ' + bounds.zmax, Math.abs(bounds.zmax - want.zmax) <= boundTol);
+expect('lbracket bbox 40', Math.abs((bounds.xmax - bounds.xmin) - fixture.bboxMm[0]) <= boundTol);
+expect('lbracket bbox 20', Math.abs((bounds.ymax - bounds.ymin) - fixture.bboxMm[1]) <= boundTol);
+expect('lbracket bbox 40z', Math.abs((bounds.zmax - bounds.zmin) - fixture.bboxMm[2]) <= boundTol);
+
+const fuseOnly = ops.buildLBracket(oc, { stopAfter: 'fuse' });
+expect('fuse-only pass', fuseOnly.pass === true && fuseOnly.lastGoodStep === 'fuse' && fuseOnly.watertight.pass === true);
+
+const tooLarge = ops.buildLBracket(oc, { filletRadiusMm: 100 });
+expect('fillet too large fails', tooLarge.pass === false);
+expect('fillet too large keeps fuse', tooLarge.lastGoodStep === 'fuse');
+expect('fillet too large caught', typeof tooLarge.lastError === 'string'
+  && tooLarge.lastError.indexOf('IsDone is false') !== -1
+  && tooLarge.lastError.indexOf('Shape() was not called') !== -1);
+expect('fillet too large still watertight', tooLarge.gate.pass === true && tooLarge.watertight.pass === true);
+expect('fillet too large mesh kept', tooLarge.mesh.triangles.length === fuseOnly.mesh.triangles.length && tooLarge.mesh.triangles.length > 0);
+
+const boxA = ops.makeBoxSolid(oc, 40, 20, 10, [0, 0, 0]);
+const boxB = ops.makeBoxSolid(oc, 10, 20, 40, [0, 0, 0]);
+const fused = ops.fuseShapes(oc, boxA, boxB);
+expect('fuse wrapper', fused.ok === true && fused.shape);
+const edgeExp = new oc.TopExp_Explorer(fused.shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE);
+const oneEdge = oc.TopoDS.Edge(edgeExp.Current());
+const bigFillet = ops.filletEdges(oc, fused.shape, 100, [oneEdge]);
+expect('filletEdges too large', bigFillet.ok === false && bigFillet.shape === null
+  && bigFillet.error.indexOf('Shape() was not called') !== -1);
+const kept = inspectSolid(oc, fused.shape);
+expect('caller shape kept after failed fillet', kept.gate.pass === true && kept.watertight.pass === true && kept.units === 'mm');
+oneEdge.delete();
+edgeExp.delete();
+const cut = ops.cutShapes(oc, boxA, boxB);
+expect('cut wrapper', cut.ok === true && cut.shape);
+const cutView = inspectSolid(oc, cut.shape);
+expect('cut gate', cutView.gate.pass === true && cutView.watertight.pass === true && cutView.units === 'mm');
+const common = ops.commonShapes(oc, boxA, boxB);
+expect('common wrapper', common.ok === true && common.shape);
+const commonView = inspectSolid(oc, common.shape);
+expect('common gate', commonView.gate.pass === true && commonView.watertight.pass === true && commonView.units === 'mm');
+fused.shape.delete();
+cut.shape.delete();
+common.shape.delete();
+boxA.delete();
+boxB.delete();
+
+const stlDir = path.join(root, 'builds', 'export');
+mkdirSync(stlDir, { recursive: true });
+const stlPath = path.join(stlDir, 'lbracket.stl');
+writeFileSync(stlPath, ops.binaryStlBytes(bracket.mesh));
+const stlBytes = readFileSync(stlPath);
+const stlHeader = stlBytes.subarray(0, 80).toString('latin1');
+expect('stl header millimeters', stlHeader.indexOf('millimeter') !== -1 && stlHeader.indexOf('solid') !== 0);
+const stlCount = stlBytes.readUInt32LE(80);
+expect('stl size', stlBytes.length === 84 + stlCount * 50 && stlCount === bracket.mesh.triangles.length);
+const stlVertices = [];
+const stlTriangles = [];
+let stlOffset = 84;
+for (let tri = 0; tri < stlCount; tri += 1) {
+  stlOffset += 12;
+  const corners = [];
+  for (let k = 0; k < 3; k += 1) {
+    corners.push(stlVertices.length);
+    stlVertices.push([
+      stlBytes.readFloatLE(stlOffset),
+      stlBytes.readFloatLE(stlOffset + 4),
+      stlBytes.readFloatLE(stlOffset + 8),
+    ]);
+    stlOffset += 12;
+  }
+  stlOffset += 2;
+  stlTriangles.push(corners);
+}
+const weldScale = 1e4;
+const weldMap = new Map();
+const weldedVertices = [];
+function weldId(p) {
+  const key = Math.round(p[0] * weldScale) + '|' + Math.round(p[1] * weldScale) + '|' + Math.round(p[2] * weldScale);
+  const found = weldMap.get(key);
+  if (found !== undefined) return found;
+  const id = weldedVertices.length;
+  weldedVertices.push(p);
+  weldMap.set(key, id);
+  return id;
+}
+const weldedTriangles = stlTriangles.map(function (tri) {
+  return [weldId(stlVertices[tri[0]]), weldId(stlVertices[tri[1]]), weldId(stlVertices[tri[2]])];
+});
+const stlMesh = { vertices: weldedVertices, triangles: weldedTriangles };
+const stlTight = checkMeshWatertight(stlMesh);
+expect('stl closed mesh', stlTight.pass === true);
+const stlBounds = ops.meshBounds(stlMesh);
+expect('stl xmin', Math.abs(stlBounds.xmin - want.xmin) <= boundTol);
+expect('stl ymin', Math.abs(stlBounds.ymin - want.ymin) <= boundTol);
+expect('stl zmin', Math.abs(stlBounds.zmin - want.zmin) <= boundTol);
+expect('stl xmax', Math.abs(stlBounds.xmax - want.xmax) <= boundTol);
+expect('stl ymax', Math.abs(stlBounds.ymax - want.ymax) <= boundTol);
+expect('stl zmax', Math.abs(stlBounds.zmax - want.zmax) <= boundTol);
+expect('stl bbox 40x20x40', Math.abs((stlBounds.xmax - stlBounds.xmin) - 40) <= boundTol
+  && Math.abs((stlBounds.ymax - stlBounds.ymin) - 20) <= boundTol
+  && Math.abs((stlBounds.zmax - stlBounds.zmin) - 40) <= boundTol);
 
 if (failures !== 0) {
   console.error(failures + ' failed');

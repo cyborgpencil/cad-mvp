@@ -7,26 +7,31 @@
 
 import { checkOcctShape } from './occt-gate.mjs';
 
-// TBD placeholders. MODO's metre defaults are not adopted.
-// research/gui/modo-selection-primitives.md open TBD "Default sizes".
+// App defaults. Team choice (Erik 7:00 PM MT), not a sourced spec.
+// Box edge is 20 mm. Cylinder diameter is 20 mm (radius 10) and height is 20 mm.
+// Centre (0, 0, 10) places that 20 mm solid from z = 0 to z = 20.
+// SPHERE_DIAMETER_MM is recorded only. There is no sphere primitive.
+export const BOX_EDGE_MM = 20;
+export const CYLINDER_DIAMETER_MM = 20;
+export const CYLINDER_HEIGHT_MM = 20;
+export const SPHERE_DIAMETER_MM = 20;
+
 export const PLACEHOLDER_BOX_MM = Object.freeze({
   cx: 0,
   cy: 0,
   cz: 10,
-  sx: 20,
-  sy: 20,
-  sz: 20,
-  tbd: true,
+  sx: BOX_EDGE_MM,
+  sy: BOX_EDGE_MM,
+  sz: BOX_EDGE_MM,
 });
 
 export const PLACEHOLDER_CYLINDER_MM = Object.freeze({
   cx: 0,
   cy: 0,
   cz: 10,
-  radius: 10,
-  height: 20,
+  radius: CYLINDER_DIAMETER_MM / 2,
+  height: CYLINDER_HEIGHT_MM,
   axis: 'Z',
-  tbd: true,
 });
 
 // TBD. Linear deflection passed to BRepMesh_IncrementalMesh so the solid
@@ -400,6 +405,26 @@ function topologyFromShape(oc, shape, mesh, trash) {
     faces: faces,
     triFace: triFace,
   };
+}
+
+// Gate plus mesh for a shape the caller still owns. Does not delete `shape`.
+export function inspectSolid(oc, shape) {
+  const trash = [];
+  try {
+    const gate = checkOcctShape(oc, shape);
+    const mesh = tessellate(oc, shape, trash);
+    const topology = topologyFromShape(oc, shape, mesh, trash);
+    const watertight = checkMeshWatertight(mesh);
+    return {
+      units: 'mm',
+      gate: gate,
+      watertight: watertight,
+      mesh: { vertices: mesh.vertices, triangles: mesh.triangles },
+      topology: topology,
+    };
+  } finally {
+    dispose(trash);
+  }
 }
 
 function finish(oc, shape, trash, kind, params) {

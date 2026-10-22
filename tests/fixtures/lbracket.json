@@ -1,0 +1,17 @@
+{
+  "legLengthMm": 40,
+  "legWidthMm": 20,
+  "thicknessMm": 4,
+  "uprightHeightMm": 40,
+  "cornerXMm": 0,
+  "cornerYMm": 0,
+  "cornerZMm": 0,
+  "overlapMm": 4,
+  "filletRadiusMm": 2,
+  "chamferDistanceMm": 0.5,
+  "innerEdgeMode": "auto",
+  "chamferEdgeRule": "outer-leg-end-edges-along-width",
+  "filletLivePreview": false,
+  "bboxMm": [40, 20, 40],
+  "overlapNote": "Overlap equals the 4 mm thickness so the upright is the same stock, the boxes share the corner, and the inner edge is one line. Corner is the origin. Team choice (Erik 7:00 PM MT), not a sourced spec."
+}

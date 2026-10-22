@@ -1,0 +1,681 @@
+// Fuse, cut, common, fillet, and chamfer through libcascade 3.1.0.
+// Signatures checked in builds/libcascade/pkg/package/dist/types.d.ts, then
+// called from Node (2026-10-21):
+//   BRepAlgoAPI_Fuse / Cut / Common constructor(S1, S2)
+//   BRepAlgoAPI_BuilderAlgo.SimplifyResult(unifyEdges?, unifyFaces?, angularTol?)
+//   BRepAlgoAPI_Algo.IsDone(), HasErrors(), Shape()
+//   BRepFilletAPI_MakeFillet constructor(S) and Add(radius, edge), Build()
+//   BRepFilletAPI_MakeChamfer constructor(S) and Add(distance, edge), Build()
+//   BRepBuilderAPI_Copy constructor(S, copyGeom?, copyMesh?)
+// Shape() throws StdFail_NotDone when IsDone() is false. This module never
+// calls Shape() unless IsDone() is true and HasErrors() is not true.
+// delete() in 3.1.0 frees the wrapper. Inputs and the kept shape are not
+// deleted while an algorithm still holds them. The copy (copyGeom true) is
+// what later steps keep.
+
+import { inspectSolid } from './occt-primitives.mjs';
+
+// App defaults. Team choice (Erik 7:00 PM MT), not a sourced spec.
+// Overlap equals the 4 mm thickness so the upright is the same stock, the
+// two boxes share the corner block, and the inner edge is one line at
+// x = corner + overlap, z = corner + thickness. The corner is the origin,
+// so the fused solid spans 40 x 20 x 40 mm. The 2 mm fillet stays inside
+// that box (radius is below the 4 mm stock). The 0.5 mm chamfer is only
+// the two outer edges that run along the width: the base tip's top edge
+// and the upright's outer top edge. Those cuts do not move the silhouette
+// corners, so the bounding box stays 40 x 20 x 40 mm. Live preview is off:
+// the fillet is applied once, when the build runs.
+export const LBRACKET_LEG_LENGTH_MM = 40;
+export const LBRACKET_LEG_WIDTH_MM = 20;
+export const LBRACKET_THICKNESS_MM = 4;
+export const LBRACKET_UPRIGHT_HEIGHT_MM = 40;
+export const LBRACKET_CORNER_X_MM = 0;
+export const LBRACKET_CORNER_Y_MM = 0;
+export const LBRACKET_CORNER_Z_MM = 0;
+export const LBRACKET_OVERLAP_MM = 4;
+export const LBRACKET_INNER_FILLET_RADIUS_MM = 2;
+export const LBRACKET_CHAMFER_DISTANCE_MM = 0.5;
+export const LBRACKET_INNER_EDGE_MODE = 'auto';
+export const LBRACKET_CHAMFER_EDGE_RULE = 'outer-leg-end-edges-along-width';
+export const LBRACKET_FILLET_LIVE_PREVIEW = false;
+
+export const LBRACKET_DEFAULTS = Object.freeze({
+  legLengthMm: LBRACKET_LEG_LENGTH_MM,
+  legWidthMm: LBRACKET_LEG_WIDTH_MM,
+  thicknessMm: LBRACKET_THICKNESS_MM,
+  uprightHeightMm: LBRACKET_UPRIGHT_HEIGHT_MM,
+  cornerXMm: LBRACKET_CORNER_X_MM,
+  cornerYMm: LBRACKET_CORNER_Y_MM,
+  cornerZMm: LBRACKET_CORNER_Z_MM,
+  overlapMm: LBRACKET_OVERLAP_MM,
+  filletRadiusMm: LBRACKET_INNER_FILLET_RADIUS_MM,
+  chamferDistanceMm: LBRACKET_CHAMFER_DISTANCE_MM,
+  innerEdgeMode: LBRACKET_INNER_EDGE_MODE,
+  chamferEdgeRule: LBRACKET_CHAMFER_EDGE_RULE,
+  filletLivePreview: LBRACKET_FILLET_LIVE_PREVIEW,
+});
+
+const EDGE_TOL_MM = 1e-4;
+const STL_HEADER = 'cadcam-mvp binary stl, coordinates in millimeters';
+
+function track(trash, obj) {
+  if (obj && typeof obj.delete === 'function') trash.push(obj);
+  return obj;
+}
+
+function dispose(trash) {
+  for (let i = trash.length - 1; i >= 0; i -= 1) {
+    try {
+      trash[i].delete();
+    } catch (_err) {
+      // already released
+    }
+  }
+  trash.length = 0;
+}
+
+function explain(oc, err) {
+  try {
+    if (oc && typeof oc.getExceptionMessage === 'function' && err) {
+      const pair = oc.getExceptionMessage(err);
+      if (Array.isArray(pair) && (pair[0] || pair[1])) {
+        return pair.filter(function (part) { return part; }).join(': ');
+      }
+    }
+  } catch (_err) {
+    // not a wasm exception
+  }
+  if (err && err.message) return err.message;
+  return String(err);
+}
+
+function num(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+export function lbracketSpec(overrides) {
+  const src = overrides || {};
+  return {
+    legLengthMm: num(src.legLengthMm, LBRACKET_LEG_LENGTH_MM),
+    legWidthMm: num(src.legWidthMm, LBRACKET_LEG_WIDTH_MM),
+    thicknessMm: num(src.thicknessMm, LBRACKET_THICKNESS_MM),
+    uprightHeightMm: num(src.uprightHeightMm, LBRACKET_UPRIGHT_HEIGHT_MM),
+    cornerXMm: num(src.cornerXMm, LBRACKET_CORNER_X_MM),
+    cornerYMm: num(src.cornerYMm, LBRACKET_CORNER_Y_MM),
+    cornerZMm: num(src.cornerZMm, LBRACKET_CORNER_Z_MM),
+    overlapMm: num(src.overlapMm, LBRACKET_OVERLAP_MM),
+    filletRadiusMm: num(src.filletRadiusMm, LBRACKET_INNER_FILLET_RADIUS_MM),
+    chamferDistanceMm: num(src.chamferDistanceMm, LBRACKET_CHAMFER_DISTANCE_MM),
+    innerEdgeMode: src.innerEdgeMode ? String(src.innerEdgeMode) : LBRACKET_INNER_EDGE_MODE,
+    chamferEdgeRule: src.chamferEdgeRule ? String(src.chamferEdgeRule) : LBRACKET_CHAMFER_EDGE_RULE,
+    filletLivePreview: src.filletLivePreview === undefined
+      ? LBRACKET_FILLET_LIVE_PREVIEW
+      : src.filletLivePreview === true,
+    stopAfter: src.stopAfter ? String(src.stopAfter) : 'chamfer',
+  };
+}
+
+export function expectedLBracketBounds(spec) {
+  const box = spec || lbracketSpec(null);
+  return {
+    xmin: box.cornerXMm,
+    ymin: box.cornerYMm,
+    zmin: box.cornerZMm,
+    xmax: box.cornerXMm + box.legLengthMm,
+    ymax: box.cornerYMm + box.legWidthMm,
+    zmax: box.cornerZMm + box.uprightHeightMm,
+  };
+}
+
+export function unitsLockGate() {
+  return {
+    pass: true,
+    unit: 'mm',
+    message: 'PASS: export unit is millimeter.',
+  };
+}
+
+function takeDoneShape(oc, algo, label) {
+  let done = false;
+  try {
+    done = algo.IsDone() === true;
+  } catch (err) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: ' + label + ' IsDone threw ' + explain(oc, err) + '; Shape() was not called.',
+    };
+  }
+  if (!done) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: ' + label + ' IsDone is false; Shape() was not called.',
+    };
+  }
+  if (typeof algo.HasErrors === 'function') {
+    let errors = false;
+    try {
+      errors = algo.HasErrors() === true;
+    } catch (err) {
+      return {
+        ok: false,
+        shape: null,
+        error: 'FAIL: ' + label + ' HasErrors threw ' + explain(oc, err) + '; Shape() was not called.',
+      };
+    }
+    if (errors) {
+      return {
+        ok: false,
+        shape: null,
+        error: 'FAIL: ' + label + ' HasErrors is true; Shape() was not called.',
+      };
+    }
+  }
+  try {
+    return { ok: true, shape: algo.Shape(), error: '' };
+  } catch (err) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: ' + label + ' Shape() threw ' + explain(oc, err),
+    };
+  }
+}
+
+function copyOwned(oc, source, trash) {
+  const copier = track(trash, new oc.BRepBuilderAPI_Copy(source, true, false));
+  try {
+    copier.Build();
+  } catch (err) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: BRepBuilderAPI_Copy Build threw ' + explain(oc, err) + '; Shape() was not called.',
+    };
+  }
+  return takeDoneShape(oc, copier, 'BRepBuilderAPI_Copy');
+}
+
+function booleanOp(oc, kind, shapeA, shapeB) {
+  if (!shapeA || !shapeB) {
+    return { ok: false, shape: null, error: 'FAIL: ' + kind + ' needs two shapes.' };
+  }
+  const Ctor = kind === 'cut'
+    ? oc.BRepAlgoAPI_Cut
+    : kind === 'common'
+      ? oc.BRepAlgoAPI_Common
+      : oc.BRepAlgoAPI_Fuse;
+  const label = kind === 'cut' ? 'BRepAlgoAPI_Cut' : kind === 'common' ? 'BRepAlgoAPI_Common' : 'BRepAlgoAPI_Fuse';
+  const trash = [];
+  let owned = null;
+  try {
+    const algo = track(trash, new Ctor(shapeA, shapeB));
+    if (kind === 'fuse') {
+      try {
+        algo.SimplifyResult(true, true);
+      } catch (err) {
+        return {
+          ok: false,
+          shape: null,
+          error: 'FAIL: fuse SimplifyResult threw ' + explain(oc, err) + '; Shape() was not called.',
+        };
+      }
+    }
+    const taken = takeDoneShape(oc, algo, label);
+    if (!taken.ok) return taken;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return copied;
+    owned = copied.shape;
+    return { ok: true, shape: owned, error: '' };
+  } catch (err) {
+    if (owned) {
+      try { owned.delete(); } catch (_drop) { /* already released */ }
+    }
+    return { ok: false, shape: null, error: 'FAIL: ' + label + ' threw ' + explain(oc, err) };
+  } finally {
+    dispose(trash);
+  }
+}
+
+export function fuseShapes(oc, shapeA, shapeB) {
+  return booleanOp(oc, 'fuse', shapeA, shapeB);
+}
+
+export function cutShapes(oc, shapeA, shapeB) {
+  return booleanOp(oc, 'cut', shapeA, shapeB);
+}
+
+export function commonShapes(oc, shapeA, shapeB) {
+  return booleanOp(oc, 'common', shapeA, shapeB);
+}
+
+function filletFaultText(fillet) {
+  try {
+    if (!fillet || typeof fillet.NbFaultyContours !== 'function') return '';
+    const count = fillet.NbFaultyContours();
+    if (!count) return '';
+    const index = fillet.FaultyContour(1);
+    const status = fillet.StripeStatus(index);
+    return ' FaultyContours ' + count + ' StripeStatus ' + status + '.';
+  } catch (_err) {
+    return '';
+  }
+}
+
+export function filletEdges(oc, shape, radius, edges) {
+  if (!(Number(radius) > 0)) {
+    return { ok: false, shape: null, error: 'FAIL: fillet radius must be a positive number of millimetres.' };
+  }
+  if (!shape || !edges || !edges.length) {
+    return { ok: false, shape: null, error: 'FAIL: fillet has no edge.' };
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    const fillet = track(trash, new oc.BRepFilletAPI_MakeFillet(shape));
+    for (let i = 0; i < edges.length; i += 1) fillet.Add(Number(radius), edges[i]);
+    try {
+      fillet.Build();
+    } catch (err) {
+      return {
+        ok: false,
+        shape: null,
+        error: 'FAIL: fillet Build threw ' + explain(oc, err) + '; Shape() was not called.',
+      };
+    }
+    const taken = takeDoneShape(oc, fillet, 'fillet');
+    if (!taken.ok) {
+      taken.error += filletFaultText(fillet);
+      return taken;
+    }
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return copied;
+    owned = copied.shape;
+    return { ok: true, shape: owned, error: '' };
+  } catch (err) {
+    if (owned) {
+      try { owned.delete(); } catch (_drop) { /* already released */ }
+    }
+    return { ok: false, shape: null, error: 'FAIL: fillet threw ' + explain(oc, err) };
+  } finally {
+    dispose(trash);
+  }
+}
+
+export function chamferEdges(oc, shape, distance, edges) {
+  if (!(Number(distance) > 0)) {
+    return { ok: false, shape: null, error: 'FAIL: chamfer distance must be a positive number of millimetres.' };
+  }
+  if (!shape || !edges || !edges.length) {
+    return { ok: false, shape: null, error: 'FAIL: chamfer has no edge.' };
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    const chamfer = track(trash, new oc.BRepFilletAPI_MakeChamfer(shape));
+    for (let i = 0; i < edges.length; i += 1) chamfer.Add(Number(distance), edges[i]);
+    try {
+      chamfer.Build();
+    } catch (err) {
+      return {
+        ok: false,
+        shape: null,
+        error: 'FAIL: chamfer Build threw ' + explain(oc, err) + '; Shape() was not called.',
+      };
+    }
+    const taken = takeDoneShape(oc, chamfer, 'chamfer');
+    if (!taken.ok) return taken;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return copied;
+    owned = copied.shape;
+    return { ok: true, shape: owned, error: '' };
+  } catch (err) {
+    if (owned) {
+      try { owned.delete(); } catch (_drop) { /* already released */ }
+    }
+    return { ok: false, shape: null, error: 'FAIL: chamfer threw ' + explain(oc, err) };
+  } finally {
+    dispose(trash);
+  }
+}
+
+function releaseShape(shape) {
+  if (!shape || typeof shape.delete !== 'function') return;
+  try { shape.delete(); } catch (_err) { /* already released */ }
+}
+
+export function makeBoxSolid(oc, dx, dy, dz, origin) {
+  if (!(dx > 0) || !(dy > 0) || !(dz > 0)) return null;
+  const trash = [];
+  let owned = null;
+  try {
+    const at = origin || [0, 0, 0];
+    const corner = track(trash, new oc.gp_Pnt(at[0], at[1], at[2]));
+    const maker = track(trash, new oc.BRepPrimAPI_MakeBox(corner, dx, dy, dz));
+    try {
+      maker.Build();
+    } catch (err) {
+      return null;
+    }
+    const taken = takeDoneShape(oc, maker, 'BRepPrimAPI_MakeBox');
+    if (!taken.ok) return null;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return null;
+    owned = copied.shape;
+    return owned;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+function near(p, x, y, z) {
+  return Math.abs(p[0] - x) <= EDGE_TOL_MM
+    && Math.abs(p[1] - y) <= EDGE_TOL_MM
+    && Math.abs(p[2] - z) <= EDGE_TOL_MM;
+}
+
+function segmentMatch(a, b, x1, y1, z1, x2, y2, z2) {
+  return (near(a, x1, y1, z1) && near(b, x2, y2, z2))
+    || (near(a, x2, y2, z2) && near(b, x1, y1, z1));
+}
+
+function edgeEnds(oc, edge, trash) {
+  const first = track(trash, oc.TopExp.FirstVertex(edge, true));
+  const last = track(trash, oc.TopExp.LastVertex(edge, true));
+  if (!first || !last) return null;
+  if (typeof first.IsNull === 'function' && first.IsNull()) return null;
+  if (typeof last.IsNull === 'function' && last.IsNull()) return null;
+  const p1 = track(trash, oc.BRep_Tool.Pnt(first));
+  const p2 = track(trash, oc.BRep_Tool.Pnt(last));
+  return {
+    a: [p1.X(), p1.Y(), p1.Z()],
+    b: [p2.X(), p2.Y(), p2.Z()],
+  };
+}
+
+function collectEdges(oc, shape, trash) {
+  const found = [];
+  const seen = new Set();
+  const explorer = track(trash, new oc.TopExp_Explorer(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE));
+  while (explorer.More()) {
+    const edge = track(trash, oc.TopoDS.Edge(explorer.Current()));
+    const ends = edgeEnds(oc, edge, trash);
+    if (ends) {
+      const ka = ends.a.map(function (n) { return Math.round(n * 1e4); }).join(',');
+      const kb = ends.b.map(function (n) { return Math.round(n * 1e4); }).join(',');
+      const key = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+      if (!seen.has(key)) {
+        seen.add(key);
+        found.push({ edge: edge, a: ends.a, b: ends.b });
+      }
+    }
+    explorer.Next();
+  }
+  return found;
+}
+
+function emptySolid() {
+  return {
+    units: 'mm',
+    gate: { pass: false, valid: false, freeEdges: -1, message: 'FAIL: no shape.' },
+    watertight: { pass: false, message: 'FAIL: mesh has no triangles.' },
+    mesh: { vertices: [], triangles: [] },
+    topology: { source: 'occt', vertices: [], edges: [], faces: [], triFace: [] },
+  };
+}
+
+export function buildLBracket(oc, overrides) {
+  const spec = lbracketSpec(overrides);
+  const log = [];
+  let lastError = '';
+  let good = null;
+
+  function push(step, fields) {
+    const units = unitsLockGate();
+    log.push(Object.assign({
+      step: step,
+      pass: false,
+      occt: false,
+      occtMessage: '',
+      watertight: false,
+      watertightMessage: '',
+      units: units.unit,
+      unitsPass: units.pass === true,
+      unitsMessage: units.message,
+      error: '',
+    }, fields));
+  }
+
+  function failStep(step, error) {
+    lastError = error;
+    push(step, { error: error });
+  }
+
+  function remember(step, shape) {
+    let inspected;
+    try {
+      inspected = inspectSolid(oc, shape);
+    } catch (err) {
+      releaseShape(shape);
+      failStep(step, 'FAIL: ' + step + ' gate threw ' + explain(oc, err));
+      return false;
+    }
+    const units = unitsLockGate();
+    const occtPass = inspected.gate.pass === true;
+    const tightPass = inspected.watertight.pass === true;
+    const pass = occtPass && tightPass && units.pass === true;
+    let error = '';
+    if (!pass) {
+      error = !occtPass ? inspected.gate.message : !tightPass ? inspected.watertight.message : units.message;
+      lastError = error;
+      push(step, {
+        pass: false,
+        occt: occtPass,
+        occtMessage: inspected.gate.message,
+        watertight: tightPass,
+        watertightMessage: inspected.watertight.message,
+        error: error,
+      });
+      releaseShape(shape);
+      return false;
+    }
+    if (good && good.shape && good.shape !== shape) releaseShape(good.shape);
+    good = { step: step, shape: shape, inspected: inspected };
+    push(step, {
+      pass: true,
+      occt: true,
+      occtMessage: inspected.gate.message,
+      watertight: true,
+      watertightMessage: inspected.watertight.message,
+      error: '',
+    });
+    return true;
+  }
+
+  const boxTrash = [];
+  try {
+    const corner = [spec.cornerXMm, spec.cornerYMm, spec.cornerZMm];
+    const base = makeBoxSolid(oc, spec.legLengthMm, spec.legWidthMm, spec.thicknessMm, corner);
+    const upright = makeBoxSolid(oc, spec.overlapMm, spec.legWidthMm, spec.uprightHeightMm, corner);
+    if (!base || !upright) {
+      releaseShape(base);
+      releaseShape(upright);
+      failStep('fuse', 'FAIL: L-bracket box IsDone is false; Shape() was not called.');
+    } else {
+      const fused = fuseShapes(oc, base, upright);
+      releaseShape(base);
+      releaseShape(upright);
+      if (!fused.ok) {
+        failStep('fuse', fused.error);
+      } else if (remember('fuse', fused.shape) && spec.stopAfter !== 'fuse') {
+        if (spec.filletLivePreview) {
+          push('fillet-preview', {
+            pass: true,
+            error: '',
+            occtMessage: 'Live preview is out of scope. The fillet is applied once.',
+          });
+        }
+        if (spec.innerEdgeMode !== 'auto') {
+          failStep('fillet', 'FAIL: inner edge mode "' + spec.innerEdgeMode
+            + '" is not implemented. App default is ' + LBRACKET_INNER_EDGE_MODE + '.');
+        } else if (!(spec.filletRadiusMm > 0)) {
+          failStep('fillet', 'FAIL: fillet radius must be a positive number of millimetres.');
+        } else {
+          const edgeTrash = [];
+          let filleted = null;
+          try {
+            const edges = collectEdges(oc, good.shape, edgeTrash);
+            const x = spec.cornerXMm + spec.overlapMm;
+            const z = spec.cornerZMm + spec.thicknessMm;
+            const y0 = spec.cornerYMm;
+            const y1 = spec.cornerYMm + spec.legWidthMm;
+            const inner = edges.find(function (edge) {
+              return segmentMatch(edge.a, edge.b, x, y0, z, x, y1, z);
+            });
+            if (!inner) {
+              failStep('fillet', 'FAIL: auto-detect found no inner edge at the concave corner.');
+            } else {
+              filleted = filletEdges(oc, good.shape, spec.filletRadiusMm, [inner.edge]);
+            }
+          } finally {
+            dispose(edgeTrash);
+          }
+          if (filleted && !filleted.ok) {
+            failStep('fillet', filleted.error);
+          } else if (filleted && filleted.ok && remember('fillet', filleted.shape) && spec.stopAfter !== 'fillet') {
+            if (spec.chamferEdgeRule !== LBRACKET_CHAMFER_EDGE_RULE) {
+              failStep('chamfer', 'FAIL: chamfer edge rule "' + spec.chamferEdgeRule
+                + '" is not implemented. App default is ' + LBRACKET_CHAMFER_EDGE_RULE + '.');
+            } else if (!(spec.chamferDistanceMm > 0)) {
+              failStep('chamfer', 'FAIL: chamfer distance must be a positive number of millimetres.');
+            } else {
+              const edgeTrash = [];
+              let chamfered = null;
+              try {
+                const edges = collectEdges(oc, good.shape, edgeTrash);
+                const y0 = spec.cornerYMm;
+                const y1 = spec.cornerYMm + spec.legWidthMm;
+                const baseTip = edges.find(function (edge) {
+                  const xTip = spec.cornerXMm + spec.legLengthMm;
+                  const zTip = spec.cornerZMm + spec.thicknessMm;
+                  return segmentMatch(edge.a, edge.b, xTip, y0, zTip, xTip, y1, zTip);
+                });
+                const uprightTop = edges.find(function (edge) {
+                  const zTop = spec.cornerZMm + spec.uprightHeightMm;
+                  return segmentMatch(edge.a, edge.b, spec.cornerXMm, y0, zTop, spec.cornerXMm, y1, zTop);
+                });
+                if (!baseTip || !uprightTop) {
+                  failStep('chamfer', 'FAIL: chamfer edge rule found '
+                    + (baseTip ? 1 : 0) + ' of the base tip and '
+                    + (uprightTop ? 1 : 0) + ' of the upright top.');
+                } else {
+                  chamfered = chamferEdges(oc, good.shape, spec.chamferDistanceMm, [baseTip.edge, uprightTop.edge]);
+                }
+              } finally {
+                dispose(edgeTrash);
+              }
+              if (chamfered && !chamfered.ok) failStep('chamfer', chamfered.error);
+              else if (chamfered && chamfered.ok) remember('chamfer', chamfered.shape);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    failStep(log.length ? log[log.length - 1].step : 'build', 'FAIL: L-bracket threw ' + explain(oc, err));
+  } finally {
+    dispose(boxTrash);
+  }
+
+  const inspected = good ? good.inspected : emptySolid();
+  const lastGoodStep = good ? good.step : '';
+  if (good && good.shape) releaseShape(good.shape);
+  const finished = spec.stopAfter === 'fuse' || spec.stopAfter === 'fillet' || spec.stopAfter === 'chamfer'
+    ? spec.stopAfter
+    : 'chamfer';
+  const finishedEntry = log.filter(function (item) { return item.step === finished; }).pop();
+  return {
+    pass: !!(finishedEntry && finishedEntry.pass === true) && lastError === '',
+    units: 'mm',
+    lastGoodStep: lastGoodStep,
+    lastError: lastError,
+    log: log,
+    gate: inspected.gate,
+    watertight: inspected.watertight,
+    mesh: inspected.mesh,
+    topology: inspected.topology,
+    params: spec,
+    bounds: expectedLBracketBounds(spec),
+  };
+}
+
+export function binaryStlBytes(mesh) {
+  const triangles = mesh && mesh.triangles ? mesh.triangles : [];
+  const vertices = mesh && mesh.vertices ? mesh.vertices : [];
+  const bytes = new ArrayBuffer(84 + triangles.length * 50);
+  const view = new DataView(bytes);
+  for (let i = 0; i < 80; i += 1) {
+    view.setUint8(i, i < STL_HEADER.length ? STL_HEADER.charCodeAt(i) : 0);
+  }
+  view.setUint32(80, triangles.length, true);
+  let offset = 84;
+  for (let t = 0; t < triangles.length; t += 1) {
+    const tri = triangles[t];
+    const a = vertices[tri[0]];
+    const b = vertices[tri[1]];
+    const c = vertices[tri[2]];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz) || 1;
+    view.setFloat32(offset, nx / length, true);
+    view.setFloat32(offset + 4, ny / length, true);
+    view.setFloat32(offset + 8, nz / length, true);
+    offset += 12;
+    const corners = [a, b, c];
+    for (let k = 0; k < 3; k += 1) {
+      view.setFloat32(offset, corners[k][0], true);
+      view.setFloat32(offset + 4, corners[k][1], true);
+      view.setFloat32(offset + 8, corners[k][2], true);
+      offset += 12;
+    }
+    view.setUint16(offset, 0, true);
+    offset += 2;
+  }
+  return new Uint8Array(bytes);
+}
+
+export function meshBounds(mesh) {
+  let xmin = Infinity;
+  let ymin = Infinity;
+  let zmin = Infinity;
+  let xmax = -Infinity;
+  let ymax = -Infinity;
+  let zmax = -Infinity;
+  const vertices = mesh && mesh.vertices ? mesh.vertices : [];
+  for (let i = 0; i < vertices.length; i += 1) {
+    const p = vertices[i];
+    if (p[0] < xmin) xmin = p[0];
+    if (p[1] < ymin) ymin = p[1];
+    if (p[2] < zmin) zmin = p[2];
+    if (p[0] > xmax) xmax = p[0];
+    if (p[1] > ymax) ymax = p[1];
+    if (p[2] > zmax) zmax = p[2];
+  }
+  return { xmin: xmin, ymin: ymin, zmin: zmin, xmax: xmax, ymax: ymax, zmax: zmax };
+}

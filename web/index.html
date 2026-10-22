@@ -31,17 +31,18 @@
     --line-strong: #0a181c;
     --accent: #14756e;
     --accent-dim: color-mix(in srgb, var(--accent) 32%, transparent);
-    /* TBD placeholders. Not sampled from MODO. Not orange. Not Erik's teal.
-       --hover-color and --sel-color must stay visually different. Erik decides the hex. */
-    --hover-color: #c5d4ff;
-    --sel-color: #f7c1d9;
-    --axis-x: #d24b4b;
-    --axis-y: #3aaa55;
-    --axis-z: #3a78e0;
+    /* App defaults. Team choice (Erik 7:00 PM MT), not a sourced spec.
+       Light hover, strong selection, clear axis red/green/blue, active fill and border.
+       Each of these differs from the others and from the dark teal panels. */
+    --hover-color: #d7f4ff;
+    --sel-color: #ff4fd8;
+    --axis-x: #ff2d2d;
+    --axis-y: #2ee66b;
+    --axis-z: #3d7eff;
     --handle-hover: #efe07a;
     --centre-color: #d8dde6;
-    --active-fill: #3a3f46;
-    --active-border: #f4fbfb;
+    --active-fill: #5b3cc4;
+    --active-border: #ffffff;
     --measure: #fff8e8;
     --pass: #c8f5df;
     --pass-bg: #0e3d2c;
@@ -1244,7 +1245,7 @@
           <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex (1)"><svg class="ico"><use href="#i-vertex"></use></svg></button>
           <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
           <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
-          <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (5)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
+          <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (4)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
         </div>
         <div class="vp-cluster" role="group" aria-label="Analyze">
           <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
@@ -1334,7 +1335,7 @@
               <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Axis Z">Z</button>
             </div>
           </div>
-          <p class="fine">TBD placeholder sizes, in millimetres. Each edit rebuilds the solid. No Sides control.</p>
+          <p class="fine">App defaults: box edge 20 mm, cylinder diameter 20 mm and height 20 mm. Each edit rebuilds the solid. No Sides control.</p>
         </div>
       </div>
       <div data-side-panel="channels" hidden>
@@ -1453,9 +1454,13 @@ async function boot() {
       console.error('viewport-selection failed', err);
       return null;
     });
+    const opsPromise = import('./occt-ops.mjs').catch(function (err) {
+      console.error('occt-ops failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -1463,7 +1468,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -1577,6 +1582,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
     meshCad: { vertices: [], triangles: [] },
     primitive: null,
     shapeGate: null,
+    opLog: [],
+    lastError: '',
+    demo: '',
     anchor: { x: 0, y: 0, z: 0 },
     boundsCad: { cx: 0, cy: 0, cz: 0 },
     writingFields: false,
@@ -1977,7 +1985,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     if (!prim) return;
     state.writingFields = true;
-    document.getElementById('primTitle').textContent = prim.kind === 'cylinder' ? 'Cylinder (TBD defaults)' : 'Box (TBD defaults)';
+    document.getElementById('primTitle').textContent = prim.kind === 'cylinder' ? 'Cylinder' : 'Box';
     document.getElementById('primCx').value = String(prim.params.cx);
     document.getElementById('primCy').value = String(prim.params.cy);
     document.getElementById('primCz').value = String(prim.params.cz);
@@ -2084,7 +2092,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
   function setSelectionMode(mode) {
     if (mode !== 'vertex' && mode !== 'edge' && mode !== 'face' && mode !== 'item') return;
     state.selection = mode;
-    state.selectedIds = [];
+    state.selectedIds = mode === 'item' ? ['item'] : [];
     state.hoverId = null;
     refreshAnchor();
     applyLook();
@@ -2141,6 +2149,89 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
       window.__cadcamBootNote = err && err.message ? err.message : String(err);
       publishGateState();
       setHint(window.__cadcamBootNote);
+      return false;
+    }
+  }
+
+  function lbracketQueryOverrides() {
+    const query = new URLSearchParams(window.location.search);
+    const numeric = [
+      'legLengthMm', 'legWidthMm', 'thicknessMm', 'uprightHeightMm',
+      'cornerXMm', 'cornerYMm', 'cornerZMm', 'overlapMm',
+      'filletRadiusMm', 'chamferDistanceMm'
+    ];
+    const text = ['innerEdgeMode', 'chamferEdgeRule', 'stopAfter'];
+    const overrides = {};
+    let any = false;
+    for (let i = 0; i < numeric.length; i += 1) {
+      const key = numeric[i];
+      if (!query.has(key) || query.get(key) === '') continue;
+      overrides[key] = Number(query.get(key));
+      any = true;
+    }
+    for (let i = 0; i < text.length; i += 1) {
+      const key = text[i];
+      if (!query.has(key) || query.get(key) === '') continue;
+      overrides[key] = query.get(key);
+      any = true;
+    }
+    if (query.has('filletLivePreview') && query.get('filletLivePreview') !== '') {
+      const raw = query.get('filletLivePreview');
+      overrides.filletLivePreview = raw === '1' || raw === 'true';
+      any = true;
+    }
+    return any ? overrides : null;
+  }
+
+  function showLBracket() {
+    try {
+      state.demo = 'lbracket';
+      state.opLog = [];
+      state.lastError = '';
+      if (!oc || !opsApi || typeof opsApi.buildLBracket !== 'function') {
+        state.lastError = 'FAIL: L-bracket ops are not loaded.';
+        window.__cadcamBootNote = state.lastError;
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      if (typeof Module.replaceMesh !== 'function') {
+        state.lastError = 'FAIL: mesh replace is not in this wasm build.';
+        window.__cadcamBootNote = state.lastError;
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      const built = opsApi.buildLBracket(oc, lbracketQueryOverrides());
+      state.opLog = built.log || [];
+      state.lastError = built.lastError || '';
+      state.primitive = null;
+      state.shapeGate = built.gate;
+      state.topology = built.topology;
+      state.topologySource = 'occt';
+      state.hoverId = null;
+      state.selectedIds = [];
+      const flat = primApi.flattenMesh(built.mesh);
+      if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, 'lbracket')) {
+        if (!state.lastError) state.lastError = built.gate && built.gate.message ? built.gate.message : 'FAIL: L-bracket mesh was rejected.';
+        publishGateState();
+        setHint(state.lastError);
+        toast(state.lastError);
+        return false;
+      }
+      syncFromKernel();
+      refreshAnchor();
+      applyLook();
+      const shown = state.lastError
+        || (!built.watertight.pass ? built.watertight.message : (built.gate.message || ''));
+      setHint(shown);
+      if (state.lastError) toast(state.lastError);
+      return built.pass === true && built.watertight.pass === true && built.gate.pass === true;
+    } catch (err) {
+      state.lastError = err && err.message ? err.message : String(err);
+      window.__cadcamBootNote = state.lastError;
+      publishGateState();
+      setHint(state.lastError);
       return false;
     }
   }
@@ -2700,7 +2791,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
       selectionMode: state.selection,
       selectionCount: state.selectedIds.length,
       selectionAll: state.selection !== 'item' && state.selectedIds.length === 0,
-      bootNote: window.__cadcamBootNote || ''
+      bootNote: window.__cadcamBootNote || '',
+      demo: state.demo || '',
+      lastError: state.lastError || '',
+      opLog: state.opLog || []
     };
   }
 
@@ -3536,7 +3630,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
       ev.preventDefault();
       return;
     }
-    // Digit 4 is reserved (MODO Materials, TBD) and does nothing. Alt+4 still switches tabs.
+    // Plain 4 selects the whole body (Item). Plain 5 does the same. Alt+4 still opens Export.
     if (ev.key === 'x' || ev.key === 'X') {
       openSearch();
       toast(isNarrow() ? 'Tools menu' : 'Tool search');
@@ -3575,6 +3669,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi) {
   if (primKind === 'box' || primKind === 'cylinder') {
     const asked = params.get('select') || 'item';
     createPrimitive(primKind, null, asked, false);
+    spherical.radius = fitDistance();
+    updateCamera();
+  }
+  if (params.get('demo') === 'lbracket') {
+    showLBracket();
     spherical.radius = fitDistance();
     updateCamera();
   }

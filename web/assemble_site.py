@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Site root. `*.mjs` is every module the page loads, including
-# occt-gate.mjs, occt-primitives.mjs, selection.mjs, and viewport-selection.mjs.
+# occt-gate.mjs, occt-primitives.mjs, occt-ops.mjs, selection.mjs, and viewport-selection.mjs.
 ROOT_GLOBS = ("index.html", "cadcam.js", "cadcam.wasm", "*.mjs")
 
 # Staged by web/fetch-libcascade.py. The page imports these paths.
@@ -30,6 +30,7 @@ REQUIRED = (
     "cadcam.wasm",
     "occt-gate.mjs",
     "occt-primitives.mjs",
+    "occt-ops.mjs",
     "selection.mjs",
     "viewport-selection.mjs",
     "dist/init.single.js",
@@ -43,6 +44,18 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def reject_off_site(rel: str) -> None:
+    """The site is web/ only. tests/ and fixtures/ are never published."""
+    norm = rel.replace("\\", "/").lstrip("./")
+    if (
+        norm == "tests"
+        or norm.startswith("tests/")
+        or norm == "fixtures"
+        or norm.startswith("fixtures/")
+    ):
+        raise SystemExit("refuse to copy tests/ or fixtures/ into the site: " + norm)
+
+
 def manifest(web: Path | None = None) -> list[str]:
     """Site-relative paths, in copy order. Globs are sorted."""
     web = web or (repo_root() / "web")
@@ -52,6 +65,7 @@ def manifest(web: Path | None = None) -> list[str]:
     def add(rel: str, path: Path) -> None:
         if not path.is_file():
             raise SystemExit(f"missing {path}")
+        reject_off_site(rel)
         if rel not in seen:
             seen.add(rel)
             names.append(rel)
@@ -93,11 +107,19 @@ def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
     for rel in planned:
         if rel in skipped:
             continue
+        reject_off_site(rel)
         target = dest / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(web / rel, target)
         copied.append(rel)
     (dest / ".nojekyll").write_bytes(b"")
+    leaked = (
+        dest / "tests" / "fixtures" / "lbracket.json",
+        dest / "fixtures" / "lbracket.json",
+    )
+    for path in leaked:
+        if path.exists():
+            raise SystemExit(f"refuse to publish {path}")
 
     present = set(copied)
     present.add(".nojekyll")

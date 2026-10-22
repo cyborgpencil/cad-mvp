@@ -13,6 +13,8 @@ Asserts window.__cadcamExportState.occtReady for:
   ?fixture=closed_box   OCCT gate PASS, Export enabled
   ?fixture=open_box     OCCT gate FAIL, Export locked
   ?primitive=box&select=face   OCCT ready, one face selected
+  ?demo=lbracket        final L-bracket OCCT gate PASS (app defaults)
+  /tests/fixtures/lbracket.json and /fixtures/lbracket.json return 404
 
 Exit 77 (CTest skip) only when the browser or libcascade is missing and
 CI is not set. In CI those gaps fail the run.
@@ -457,6 +459,11 @@ CASES = (
         "query": "/?primitive=box&select=face",
         "expect": "occtReady, face selected",
     },
+    {
+        "name": "lbracket",
+        "query": "/?demo=lbracket",
+        "expect": "occtReady, gate PASS on the final bracket",
+    },
 )
 
 
@@ -488,6 +495,20 @@ def check_case(name: str, state: dict[str, Any]) -> list[str]:
             )
         if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
             problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
+    elif name == "lbracket":
+        if state.get("demo") != "lbracket":
+            problems.append(f"{name}: demo {state.get('demo')!r}")
+        if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
+            problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
+        if state.get("watertight") is not True:
+            problems.append(f"{name}: watertight is not true")
+        if state.get("unitsPass") is not True:
+            problems.append(f"{name}: units are not locked")
+        if state.get("lastError"):
+            problems.append(f"{name}: lastError {state.get('lastError')!r}")
+        steps = [item.get("step") for item in (state.get("opLog") or []) if item.get("pass")]
+        if steps != ["fuse", "fillet", "chamfer"]:
+            problems.append(f"{name}: op log {steps!r}")
     return problems
 
 
@@ -618,6 +639,33 @@ def response_count(events: list[dict[str, Any]], origin: str) -> int:
     return count
 
 
+def assert_fixture_urls_404(origin: str) -> list[str]:
+    """The test fixture stays in tests/ and is not part of the served site."""
+    paths = ("/tests/fixtures/lbracket.json", "/fixtures/lbracket.json")
+    problems: list[str] = []
+    for path in paths:
+        url = origin + path
+        deadline = time.time() + 5
+        while True:
+            try:
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    problems.append(f"{path} returned {response.status}, expected 404")
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code != 404:
+                    problems.append(f"{path} returned {exc.code}, expected 404")
+                else:
+                    print(f"404 {path}", flush=True)
+                break
+            except urllib.error.URLError as exc:
+                if time.time() < deadline:
+                    time.sleep(0.1)
+                    continue
+                problems.append(f"{path} request failed: {exc}")
+                break
+    return problems
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -644,9 +692,27 @@ def run(omit: list[str]) -> int:
     def handler(*args: Any, **kwargs: Any) -> SiteHandler:
         return SiteHandler(*args, directory=str(site), **kwargs)
 
+    banned = (
+        site / "tests" / "fixtures" / "lbracket.json",
+        site / "fixtures" / "lbracket.json",
+    )
+    for banned_path in banned:
+        if banned_path.exists():
+            print(f"FAIL site contains {banned_path}", flush=True)
+            return 1
+
     server = ThreadingHTTPServer(("127.0.0.1", http_port), handler)
     thread = threading.Thread(target=server.serve_forever, name="deploy-smoke-http", daemon=True)
     thread.start()
+    missing = assert_fixture_urls_404(origin)
+    if missing:
+        print("FAIL deploy_smoke", flush=True)
+        for line in missing:
+            print(line, flush=True)
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+        return 1
 
     cdp_port = free_port()
     if profile.exists():

@@ -61,7 +61,7 @@ Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
 - `occtGate` stays `false`. Export enables only when `occtGate && watertight && units`. Mesh PASS/FAIL still shows on the status bar and the gate panel. The disabled reason is `Export blocked: the OCCT check is pending.`
 - Short landscape (including 844×390): the Export gate is one 52px row, so it does not take the viewport. The view cube is sized to sit above the view bar. Home sits beside the cube.
 - Desktop layout: toolbox tabs and tool settings on the left, viewport in the center, Items on the top right, Properties / Channels / Display / Lists under that. Preview toggles axis handles. Accent is the single CSS variable `--accent`.
-- Palette values are TBD placeholders in `:root`. Listed in `mockup/PROGRESS.md`. No Modo assets.
+- Teal panel colours in `:root` are the earlier stand-ins listed in `mockup/PROGRESS.md`. Hover, selection, axis, and active-button hex values are the team choice below. No Modo assets.
 - CTest in `builds/solid-check`: 5/5 passed (`watertight`, `units`, `export`, `gate`, `create`).
 - Screenshots were not taken. This session does not start an http server.
 
@@ -69,12 +69,12 @@ Done in `web/index.html` only. No `src/` or kernel edits. No commit and no push.
 - Reference video: https://youtu.be/HhuccQ20YVM. The GUI should feel similar, not match exactly, with clearly contrasting buttons when selected or active.
 - A selection gizmo showing which faces, edges or vertices are selected.
 - Primitives (box, cylinder, etc.) with editable parameters, which can then be modified.
-- Keep the Export gate and the interim banner. Palette hex values stay TBD until Research Digest samples them.
+- Keep the Export gate and the interim banner. Selection, axis, and active-button hex values are the team choice recorded below.
 - Phase 2 (libcascade OCCT gate) is in progress with Pilot.
 - R3 is still provisional (code read only); a live R3 check is due at the next checkpoint.
 - Correction (3:46 PM MT): phase 2 never launched after the 3:15 AM plan. Order of work per Chief: the OCCT gate session first, then the selection and primitives session following Research Digest's spec (research/gui/modo-selection-primitives.md, in progress).
 - Live: the restyle build is deployed as 6a04ad5 at https://cyborgpencil.github.io/cad-mvp/ (banner on, Export locked). Each push to main now deploys through Actions.
-- Chief ruling (3:48 PM MT): selection and hover colours are named CSS variables marked TBD. Don't hardcode orange (MODO docs) or teal (Erik) until Erik decides.
+- Chief ruling (3:48 PM MT): selection and hover colours are named CSS variables. Superseded the same day: the team set the hex values below.
 
 - 15:50 MT: UI spec ready: research/gui/modo-selection-primitives.md. Use for selection/gizmo/primitives session after OCCT gate.
 
@@ -95,8 +95,8 @@ Acceptance (headless Edge + CTest `occt_gate`):
 
 Done in `web/` plus `tests/test_occt_gate.mjs` and `tests/test_occt_page.ps1`. No `src/` edits. No commit and no push. `web/cadcam.js` and `web/cadcam.wasm` were rebuilt so `replaceMesh` exists; both stay gitignored.
 
-- Selection: Vertex (1), Edge (2), Face (3), Item (5). Digit 4: reserved/unbound (TBD, Erik decides). Alt+1..4 still switch tabs. Click replaces, Shift+click adds, Ctrl+click removes. Empty Vertex/Edge/Face means all, with no highlight. Item stays empty until it is selected.
-- Hover uses `--hover-color`. Selection uses `--sel-color`. Active buttons use `--active-fill` and `--active-border`. Axis arrows use `--axis-x`, `--axis-y`, `--axis-z`. All of those hex values are TBD placeholders.
+- Selection: Vertex (1), Edge (2), Face (3), Item (4) selects the whole body. Key 5 also selects Item. Alt+1..4 still switch tabs (Alt+4 is Export). Click replaces, Shift+click adds, Ctrl+click removes. Empty Vertex/Edge/Face means all, with no highlight. Hotkey 4 enters Item mode and selects the whole object.
+- Hover uses `--hover-color`. Selection uses `--sel-color`. Active buttons use `--active-fill` and `--active-border`. Axis arrows use `--axis-x`, `--axis-y`, `--axis-z`. The hex values are the team choice below.
 - Move gizmo only: X/Y/Z arrows, three planar handles, centre view-plane handle, Position XYZ in millimetres. No scale or rotate handles. Dragging a sub-element translates the whole solid and rebuilds once on pointer-up.
 - Box: `BRepPrimAPI_MakeBox(gp_Pnt(cx-sx/2, cy-sy/2, cz-sz/2), sx, sy, sz)` after `Build()`. Cylinder: `BRepPrimAPI_MakeCylinder(gp_Ax2(base, dir), R, H)` after `Build()`, base = centre - dir*H/2. Signatures match libcascade 3.1.0. No partial angle. No Sides control.
 - Each solid goes through `BRepCheck_Analyzer`, `ShapeAnalysis_FreeBounds`, the mesh watertight check, and the locked millimetre unit. Export stays off unless all three pass. The banner hides only when the OCCT gate is green.
@@ -106,7 +106,7 @@ Node `tests/test_occt_gate.mjs`: ok. `closed_box` PASS. `open_box` FAIL, 4 free 
 
 Headless Edge `tests/test_occt_page.ps1`: ok. `closed_box` green, Export on, banner hidden. `open_box` locked, banner stays. `?primitive=box&select=face` green, Export on, banner hidden, face mode, count 1. `?primitive=cylinder&select=item` green, Export on, banner hidden, item count 1. The script stops only Edge processes whose command line contains the test profile.
 
-TBD placeholders, not decided values: hover/selection/axis/active hex, box 20×20×20 mm at centre (0, 0, 10), cylinder radius 10 mm and height 20 mm on Z at the same centre, pick tolerance 8 px, coplanar dot 0.999, tessellation deflection 0.5 mm and 0.5 rad, Sides/Segments, and the reference video frames. Mesh picking is the fallback when no OCCT solid is loaded.
+Still open, and not part of the team choice below: coplanar dot 0.999, tessellation deflection 0.5 mm and 0.5 rad, Sides/Segments, and the reference video frames. Mesh picking is the fallback when no OCCT solid is loaded. Box, cylinder, sphere diameter, pick tolerance, and the colour hex values are app defaults in the decisions table.
 
 ## Deploy smoke test (2026-10-21)
 
@@ -117,4 +117,44 @@ The smoke test copies that same tree into gitignored `builds/deploy-smoke/_site`
 ## Native CTest before Pages upload (2026-10-21)
 
 `pages.yml` installs Node 22, Ninja, g++, and CMake, fetches libcascade with `web/fetch-libcascade.py`, then configures and builds the native project at `builds/native` before `upload-pages-artifact`. The gate is `ctest --test-dir builds/native --output-on-failure` with `CI=true`, so `occt_gate` cannot skip when `builds/libcascade/dist` or Node is missing. `deploy_smoke` stays inside that CTest. Chrome is still installed first, and the old standalone smoke step is gone so the browser run happens once and still blocks upload. No `src/` or `CMakeLists.txt` edits: the native targets are C++17 and Qt stays optional. Banner and Export gate unchanged. No commit.
+
+## L-bracket fuse, fillet, chamfer (2026-10-21)
+
+Done in `web/occt-ops.mjs`, `web/index.html` (`?demo=lbracket`), `web/occt-primitives.mjs` (`inspectSolid` only), `tests/test_occt_gate.mjs`, `tests/fixtures/lbracket.json`, and `tests/deploy_smoke.py`. No `src/` edit. No `web/bindings.cpp` edit. No commit and no push. Banner text and the Export enable rule are unchanged.
+
+libcascade 3.1.0 signatures used as declared in `builds/libcascade/pkg/package/dist/types.d.ts`: `BRepAlgoAPI_Fuse` / `Cut` / `Common` `constructor(S1, S2)`, fuse `SimplifyResult(true, true)`, `IsDone`, `HasErrors`, `Shape`; `BRepFilletAPI_MakeFillet` `constructor(S)` and `Add(radius, edge)`; `BRepFilletAPI_MakeChamfer` `constructor(S)` and `Add(distance, edge)`. `Shape()` is not called when `IsDone()` is false. A copy (`BRepBuilderAPI_Copy`, copyGeom true) is what the next step keeps. `delete()` runs only on wrappers that step has finished with.
+
+`?demo=lbracket` builds the bracket from the app defaults. No query parameters are required. Optional query overrides (`legLengthMm`, `thicknessMm`, and the other spec fields) may be passed; absent fields stay on the defaults. `window.__cadcamExportState` gains `demo`, `opLog`, and `lastError`.
+
+## App defaults
+
+Every value in this table is a team choice (Erik 7:00 PM MT), not a sourced spec.
+
+| What | Value |
+| --- | --- |
+| `LBRACKET_LEG_LENGTH_MM` | 40 mm |
+| `LBRACKET_LEG_WIDTH_MM` | 20 mm |
+| `LBRACKET_UPRIGHT_HEIGHT_MM` | 40 mm |
+| `LBRACKET_THICKNESS_MM` | 4 mm |
+| `LBRACKET_OVERLAP_MM` | 4 mm |
+| `LBRACKET_CORNER_X_MM`, `LBRACKET_CORNER_Y_MM`, `LBRACKET_CORNER_Z_MM` | 0, 0, 0 |
+| `LBRACKET_INNER_FILLET_RADIUS_MM` | 2 mm |
+| `LBRACKET_CHAMFER_DISTANCE_MM` | 0.5 mm on the outer edges |
+| `LBRACKET_INNER_EDGE_MODE` | `auto` |
+| `LBRACKET_CHAMFER_EDGE_RULE` | `outer-leg-end-edges-along-width` |
+| `LBRACKET_FILLET_LIVE_PREVIEW` | off (preview updates on apply) |
+| Final bounding box | 40 × 20 × 40 mm |
+| Hotkey 4 | Item mode, select the whole body. Key 5 also selects Item. Alt+4 still opens Export. |
+| `PICK_TOLERANCE_PX` | 8 px |
+| `--hover-color` | `#d7f4ff` (light highlight) |
+| `--sel-color` | `#ff4fd8` (strong accent) |
+| `--axis-x`, `--axis-y`, `--axis-z` | `#ff2d2d`, `#2ee66b`, `#3d7eff` |
+| `--active-fill`, `--active-border` | `#5b3cc4`, `#ffffff` |
+| `BOX_EDGE_MM` | 20 mm (20×20×20) |
+| `CYLINDER_DIAMETER_MM`, `CYLINDER_HEIGHT_MM` | 20 mm, 20 mm (radius 10 mm) |
+| `SPHERE_DIAMETER_MM` | 20 mm. Constant only. No sphere primitive. |
+
+Overlap is 4 mm, the same as the thickness, so the upright is 4 mm stock, the two boxes share the corner block, and the inner edge is one line. The corner is the origin, so the fused solid is 40 × 20 × 40 mm. The chamfer is 0.5 mm on the two outer edges that run along the width (the base tip's top edge and the upright's outer top edge). Those cuts stay inside the silhouette, so the bounding box stays 40 × 20 × 40 mm. `auto` finds the concave corner edge. Live preview is off: the fillet is applied once, when the build runs.
+
+`tests/fixtures/lbracket.json` matches these values (thickness 4). The node test builds `builds/export/lbracket.stl` from the app defaults and checks that STL for a 40×20×40 mm watertight box. `web/assemble_site.py` does not copy `tests/` or `tests/fixtures/` into the site. The deploy smoke test requires `/tests/fixtures/lbracket.json` and `/fixtures/lbracket.json` to return 404, and requires `?demo=lbracket` to pass the gate with op log `fuse,fillet,chamfer`.
 
