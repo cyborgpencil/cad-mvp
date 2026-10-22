@@ -18,12 +18,12 @@ Failures/rework: post-DONE "hang" - background tasks it started kept re-triggeri
 - PR #1 nav cube: +717/-32, 5 files, no C++; CI green first try; needed 3 overrides mid-run because the prompt file had stale lines; then a rebase onto fbd0947 (UPDATES 04:33/04:49; room).
 - PR #2 save/load: CI green; deviated from prompt - libcascade 3.1.0 exports only file-path BRepTools::Write/Read, so a temp file in the Emscripten FS replaces streams (b2f43b1, flagged for Erik) (PROGRESS 05:25).
 - Resize and delete agents launched 07:03 MT (room); no result yet.
-- Cost: **unknown** - no repo file states Cursor spend.
+- Cost: **$0 extra** - Erik's Cursor dashboard (read 2026-10-22 8:23 AM MT, via 3T): 104M tokens on Oct 22, 100% grok-4.7-high-fast, all within plan Included; On-demand $0.
 
 ## Comparison
 | | Grok Build | Cursor cloud |
 |---|---|---|
-| Cost | ~$18.30 for 5 runs (avg ~$3.66) | unknown |
+| Cost | ~$18.30 for 5 runs (avg ~$3.66) | $0 beyond subscription (104M tokens, all Included) |
 | Runs tonight | 5 (all landed) | 2 PRs green + 2 in flight |
 | Rework | process hang/watchdog; no code rework logged | 3 mid-run overrides (stale prompt); 1 spec deviation; rebases |
 | Strengths | local Z13 builds, WebKit/Playwright phone harness, deep root-cause debugging (gizmo translateBody) | parallel isolated PRs, CI-gated, no Z13 file conflicts |
@@ -37,5 +37,5 @@ Failures/rework: post-DONE "hang" - background tasks it started kept re-triggeri
 ## Recommendation
 - Keep Grok Build first for Z13-bound, debugging-heavy or kernel/WASM work (tooling priority).
 - Use Cursor second for self-contained, CI-testable features that can run in parallel while Z13 is busy.
-- Cheaper-path rule cannot be applied yet: get Cursor's per-agent cost (dashboard, Erik) before choosing on price.
+- Cheaper-path rule: while Cursor stays within plan Included, Cursor runs cost $0 extra vs ~$18.30 for Grok Build overnight, so Cursor is the cheaper path when the two are otherwise equal.
 - One Z13 writer at a time; Cursor PRs rebase after it lands.
