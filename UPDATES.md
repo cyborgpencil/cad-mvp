@@ -170,3 +170,5 @@ Newest entries at the top.
 - Open: only two-body Booleans (Chief to decide); op buttons are low-contrast and no gizmo shows in Item mode; Erik to review index.html and occt-ops.mjs. Commit and push are with Repo Keeper.
 
 ## 2026-10-21 19:59 MT - Chief rulings folded into prompts/blink-holes-disc.md (#8 wood-screw leg holes, M3 disc only, two-body Booleans, UI fixes).
+
+## 2026-10-21 20:05 MT - prompts/blink-holes-disc.md now uses Research Digest's revised values: 4.5 mm holes with a 9.5 mm countersink, and an 18 mm disc in place of the 30 mm one.

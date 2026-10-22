@@ -31,3 +31,9 @@ Don't commit. Flag any src/ change for Erik's review. Strict MVP scope. Print BL
 - Booleans stay two-body for the MVP.
 - Two UI fixes are part of this session: make the op buttons easier to see, and show the gizmo when a body is selected in Item mode.
 - Start only after CI is green on the Booleans push.
+
+## Update 2026-10-21 20:05 MT - Hole and disc values (team choices, all "unverified fit")
+- Leg holes for #8 wood screws: 4.5 mm through (the free fit per the UVA clearance chart), 90 degree countersink 9.5 mm across (Engineering ToolBox), on the leg centreline at 10, 20 and 30 mm from the corner. This replaces the earlier 8.5 mm countersink.
+- Disc: 18 mm across and 4 mm thick, fused flush on top of the vertical leg so it stays inside the 20 mm leg width. It sits between two leg holes; Pilot's clearance check sets the final offset. This replaces the earlier 30 mm disc, which would hang over the leg.
+- If the disc still covers a leg hole, drop that hole rather than move the disc, and log it (Chief ruling).
+- M3 disc screw holes only. The hole pattern is a team choice and stays marked "unverified fit".
