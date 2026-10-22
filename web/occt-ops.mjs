@@ -6,6 +6,11 @@
 //   BRepAlgoAPI_Algo.IsDone(), HasErrors(), Shape()
 //   BRepFilletAPI_MakeFillet constructor(S) and Add(radius, edge), Build()
 //   BRepFilletAPI_MakeChamfer constructor(S) and Add(distance, edge), Build()
+//   BRepAlgoAPI_Defeaturing SetShape, AddFaceToRemove, SetToFillHistory, Build
+//   BOPAlgo_AlertUnableToRemoveTheFeature.get_type_descriptor / HasWarning
+//   TopExp.MapShapes into NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher
+//     (the libcascade name for TopTools_IndexedMapOfShape)
+//   BRepFilletAPI Generated(edge) -> NCollection_List_TopoDS_Shape
 //   BRepBuilderAPI_Copy constructor(S, copyGeom?, copyMesh?)
 // Shape() throws StdFail_NotDone when IsDone() is false. This module never
 // calls Shape() unless IsDone() is true and HasErrors() is not true.
@@ -369,10 +374,11 @@ export function filletEdges(oc, shape, radius, edges) {
       return taken;
     }
     track(trash, taken.shape);
+    const featureFaces = generatedFacePrints(oc, fillet, edges, trash);
     const copied = copyOwned(oc, taken.shape, trash);
     if (!copied.ok) return copied;
     owned = copied.shape;
-    return { ok: true, shape: owned, error: '' };
+    return { ok: true, shape: owned, error: '', featureFaces: featureFaces };
   } catch (err) {
     if (owned) {
       try { owned.delete(); } catch (_drop) { /* already released */ }
@@ -407,10 +413,11 @@ export function chamferEdges(oc, shape, distance, edges) {
     const taken = takeDoneShape(oc, chamfer, 'chamfer');
     if (!taken.ok) return taken;
     track(trash, taken.shape);
+    const featureFaces = generatedFacePrints(oc, chamfer, edges, trash);
     const copied = copyOwned(oc, taken.shape, trash);
     if (!copied.ok) return copied;
     owned = copied.shape;
-    return { ok: true, shape: owned, error: '' };
+    return { ok: true, shape: owned, error: '', featureFaces: featureFaces };
   } catch (err) {
     if (owned) {
       try { owned.delete(); } catch (_drop) { /* already released */ }
@@ -1820,6 +1827,370 @@ export function applyPickedEdgeOp(oc, shape, segments, kind, size) {
     meshTimeMs: gated.view.meshTimeMs || 0,
     meshSettings: gated.view.meshSettings || null,
     meshPath: gated.view.meshPath || '',
+    featureFaces: made.featureFaces || [],
+  };
+}
+
+// Delete. Symbols checked against libcascade 3.1.0 types and a Node probe
+// (2026-10-22): BRepAlgoAPI_Defeaturing is exported. TopTools_IndexedMapOfShape
+// is the type alias of NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher.
+// A plain box face comes back IsDone with AlertUnableToRemoveTheFeature.
+// Removing the cylindrical wall of a through hole restores the box volume.
+export const DELETE_EDGE_ALONE = "Can't delete this edge on its own.";
+export const DELETE_FACE_KEPT = "Can't remove this face. The model was not changed.";
+export const DELETE_DONE = 'DELETE_DONE';
+export const DELETE_VOLUME_TOL_MM3 = 0.01;
+export const DELETE_HOLE_BOX_MM = Object.freeze({ x: 40, y: 20, z: 10, holeDiameter: 6 });
+
+const FEATURE_POINT_TOL_MM = 1e-3;
+
+function shapeMapCtor(oc) {
+  return oc.TopTools_IndexedMapOfShape
+    || oc.NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher
+    || null;
+}
+
+function mapShapes(oc, shape, type, trash) {
+  const Ctor = shapeMapCtor(oc);
+  if (!Ctor || !oc.TopExp || typeof oc.TopExp.MapShapes !== 'function') return null;
+  const map = track(trash, new Ctor());
+  oc.TopExp.MapShapes(shape, type, map);
+  return map;
+}
+
+function listFaces(oc, list, trash) {
+  const faces = [];
+  if (!list || typeof list.Extent !== 'function' || list.Extent() < 1) return faces;
+  const Ctor = oc.NCollection_List_TopoDS_Shape || oc.TopTools_ListOfShape;
+  if (!Ctor) return faces;
+  const copy = track(trash, new Ctor(list));
+  while (copy.Extent() > 0) {
+    const item = copy.First();
+    if (item && typeof item.ShapeType === 'function' && item.ShapeType() === 'TopAbs_FACE') {
+      faces.push(track(trash, oc.TopoDS.Face(item)));
+    }
+    copy.RemoveFirst();
+  }
+  return faces;
+}
+
+function facePrint(oc, face, trash) {
+  const bounds = oc.BRepTools.UVBounds(face);
+  const adapt = track(trash, new oc.BRepAdaptor_Surface(face, true));
+  const u = (Number(bounds.UMin) + Number(bounds.UMax)) / 2;
+  const v = (Number(bounds.VMin) + Number(bounds.VMax)) / 2;
+  const point = track(trash, adapt.Value(u, v));
+  return {
+    point: [point.X(), point.Y(), point.Z()],
+    surface: String(adapt.GetType()),
+  };
+}
+
+function generatedFacePrints(oc, algo, seeds, trash) {
+  const prints = [];
+  const seen = [];
+  if (!algo || !seeds) return prints;
+  for (let i = 0; i < seeds.length; i += 1) {
+    const seed = seeds[i];
+    const lists = [];
+    if (typeof algo.Generated === 'function') lists.push(algo.Generated(seed));
+    if (typeof algo.Modified === 'function') lists.push(algo.Modified(seed));
+    for (let k = 0; k < lists.length; k += 1) {
+      const faces = listFaces(oc, lists[k], trash);
+      for (let f = 0; f < faces.length; f += 1) {
+        const print = facePrint(oc, faces[f], trash);
+        const key = print.surface + '|'
+          + print.point.map(function (n) { return Math.round(n * 1e4); }).join(',');
+        if (seen.indexOf(key) >= 0) continue;
+        seen.push(key);
+        prints.push(print);
+      }
+    }
+  }
+  return prints;
+}
+
+function shapeValid(oc, shape) {
+  const analyzer = new oc.BRepCheck_Analyzer(shape);
+  let valid = false;
+  try {
+    valid = analyzer.IsValid() === true;
+  } finally {
+    try { analyzer.delete(); } catch (_err) { /* already released */ }
+  }
+  return valid;
+}
+
+function unableToRemove(oc, algo) {
+  if (!algo || typeof algo.HasWarnings !== 'function' || algo.HasWarnings() !== true) return false;
+  const Alert = oc.BOPAlgo_AlertUnableToRemoveTheFeature;
+  if (!Alert || typeof Alert.get_type_descriptor !== 'function' || typeof algo.HasWarning !== 'function') {
+    return true;
+  }
+  try {
+    return algo.HasWarning(Alert.get_type_descriptor()) === true;
+  } catch (_err) {
+    return true;
+  }
+}
+
+function keptDelete(error) {
+  return { ok: false, shape: null, error: error, kept: true, featureIndexes: [] };
+}
+
+// Faces are sub-shapes of `shape`. The caller's shape is not deleted.
+// Failure (IsDone, HasErrors, AlertUnableToRemoveTheFeature, or an invalid
+// result) returns no shape.
+export function defeatureFaces(oc, shape, faces) {
+  if (!shape || !faces || !faces.length) return keptDelete(DELETE_FACE_KEPT);
+  if (!oc.BRepAlgoAPI_Defeaturing) {
+    return keptDelete('FAIL: BRepAlgoAPI_Defeaturing is missing from this libcascade build. The model was not changed.');
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    const algo = track(trash, new oc.BRepAlgoAPI_Defeaturing());
+    algo.SetShape(shape);
+    for (let i = 0; i < faces.length; i += 1) algo.AddFaceToRemove(faces[i]);
+    algo.SetToFillHistory(true);
+    if (typeof algo.SetRunParallel === 'function') algo.SetRunParallel(false);
+    try {
+      algo.Build();
+    } catch (err) {
+      return keptDelete('FAIL: BRepAlgoAPI_Defeaturing Build threw ' + explain(oc, err) + ' The model was not changed.');
+    }
+    let done = false;
+    try {
+      done = algo.IsDone() === true;
+    } catch (err) {
+      return keptDelete('FAIL: BRepAlgoAPI_Defeaturing IsDone threw ' + explain(oc, err) + ' The model was not changed.');
+    }
+    if (!done) return keptDelete(DELETE_FACE_KEPT);
+    if (typeof algo.HasErrors === 'function' && algo.HasErrors() === true) return keptDelete(DELETE_FACE_KEPT);
+    if (unableToRemove(oc, algo)) return keptDelete(DELETE_FACE_KEPT);
+    const taken = takeDoneShape(oc, algo, 'BRepAlgoAPI_Defeaturing');
+    if (!taken.ok || !taken.shape) return keptDelete(taken.error || DELETE_FACE_KEPT);
+    track(trash, taken.shape);
+    if (!shapeValid(oc, taken.shape)) return keptDelete(DELETE_FACE_KEPT);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok || !copied.shape) return keptDelete(copied.error || DELETE_FACE_KEPT);
+    if (!shapeValid(oc, copied.shape)) {
+      releaseShape(copied.shape);
+      return keptDelete(DELETE_FACE_KEPT);
+    }
+    owned = copied.shape;
+    return { ok: true, shape: owned, error: '', kept: false, featureIndexes: [] };
+  } catch (err) {
+    if (owned) releaseShape(owned);
+    return keptDelete('FAIL: BRepAlgoAPI_Defeaturing threw ' + explain(oc, err) + ' The model was not changed.');
+  } finally {
+    dispose(trash);
+  }
+}
+
+function faceAt(oc, shape, ordinal, trash) {
+  const map = mapShapes(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, trash);
+  if (!map || ordinal < 0 || ordinal >= map.Extent()) return null;
+  return track(trash, oc.TopoDS.Face(map.FindKey(ordinal + 1)));
+}
+
+function pointVertexDistance(oc, point, face, trash) {
+  const at = track(trash, new oc.gp_Pnt(point[0], point[1], point[2]));
+  const maker = track(trash, new oc.BRepBuilderAPI_MakeVertex(at));
+  try {
+    maker.Build();
+  } catch (_err) {
+    return Infinity;
+  }
+  if (maker.IsDone() !== true) return Infinity;
+  const dist = track(trash, new oc.BRepExtrema_DistShapeShape(maker.Shape(), face));
+  if (typeof dist.IsDone === 'function' && dist.IsDone() !== true) return Infinity;
+  return Number(dist.Value());
+}
+
+function liveFeatureFaces(oc, shape, features, trash) {
+  const map = mapShapes(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, trash);
+  const groups = [];
+  if (!map) return groups;
+  const faces = [];
+  for (let i = 1; i <= map.Extent(); i += 1) {
+    const face = track(trash, oc.TopoDS.Face(map.FindKey(i)));
+    let surface = '';
+    try {
+      const adapt = track(trash, new oc.BRepAdaptor_Surface(face, true));
+      surface = String(adapt.GetType());
+    } catch (_err) {
+      surface = '';
+    }
+    faces.push({ face: face, surface: surface });
+  }
+  const list = Array.isArray(features) ? features : [];
+  for (let f = 0; f < list.length; f += 1) {
+    const prints = list[f] && list[f].faces ? list[f].faces : [];
+    const matched = [];
+    for (let p = 0; p < prints.length; p += 1) {
+      const print = prints[p];
+      if (!print || !print.point) continue;
+      for (let i = 0; i < faces.length; i += 1) {
+        if (print.surface && faces[i].surface !== print.surface) continue;
+        const gap = pointVertexDistance(oc, print.point, faces[i].face, trash);
+        if (gap <= FEATURE_POINT_TOL_MM) matched.push(faces[i].face);
+      }
+    }
+    groups.push(matched);
+  }
+  return groups;
+}
+
+function edgeMidpoint(oc, edge, trash) {
+  try {
+    const env = oc.BRep_Tool.Curve(edge);
+    const curve = env && env.returnValue;
+    if (curve && typeof curve.Value === 'function') {
+      const u = (Number(env.First) + Number(env.Last)) / 2;
+      const point = track(trash, curve.Value(u));
+      const at = [point.X(), point.Y(), point.Z()];
+      if (env && typeof env[Symbol.dispose] === 'function') env[Symbol.dispose]();
+      return at;
+    }
+    if (env && typeof env[Symbol.dispose] === 'function') env[Symbol.dispose]();
+  } catch (_err) {
+    // Fall through to the edge vertices.
+  }
+  const ends = edgeEnds(oc, edge, trash);
+  if (!ends) return null;
+  return [
+    (ends.a[0] + ends.b[0]) / 2,
+    (ends.a[1] + ends.b[1]) / 2,
+    (ends.a[2] + ends.b[2]) / 2,
+  ];
+}
+
+function subshapeFromPick(oc, shape, pick, trash) {
+  if (!pick) return null;
+  if (pick.kind === 'vertex' && pick.p) {
+    const map = mapShapes(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_VERTEX, trash);
+    if (!map) return null;
+    for (let i = 1; i <= map.Extent(); i += 1) {
+      const vertex = track(trash, oc.TopoDS.Vertex(map.FindKey(i)));
+      const point = track(trash, oc.BRep_Tool.Pnt(vertex));
+      const gap = Math.hypot(point.X() - pick.p[0], point.Y() - pick.p[1], point.Z() - pick.p[2]);
+      if (gap <= FEATURE_POINT_TOL_MM) return { kind: 'vertex', shape: vertex, point: [point.X(), point.Y(), point.Z()] };
+    }
+    return null;
+  }
+  if (!pick.a || !pick.b) return null;
+  const edges = matchEdges(oc, shape, [{ a: pick.a, b: pick.b }], trash);
+  if (!edges.length) return null;
+  const edge = edges[0];
+  return { kind: 'edge', shape: edge, point: edgeMidpoint(oc, edge, trash) };
+}
+
+// A picked edge or vertex deletes every recorded fillet/chamfer whose generated
+// face contains that sub-shape. A vertex shared by several features removes
+// all of them in this one result (the chief left that case open). No owner
+// returns DELETE_EDGE_ALONE and no shape. The caller's shape is not an input
+// of Defeaturing; a copy is.
+export function deleteOwningFeature(oc, shape, features, pick) {
+  const trash = [];
+  let source = null;
+  try {
+    const copied = copyOwned(oc, shape, trash);
+    if (!copied.ok || !copied.shape) return keptDelete(copied.error || DELETE_FACE_KEPT);
+    source = copied.shape;
+    const target = subshapeFromPick(oc, source, pick, trash);
+    if (!target || !target.point) return keptDelete(DELETE_EDGE_ALONE);
+    const groups = liveFeatureFaces(oc, source, features, trash);
+    const indexes = [];
+    const faces = [];
+    for (let i = 0; i < groups.length; i += 1) {
+      let hit = false;
+      for (let f = 0; f < groups[i].length; f += 1) {
+        const gap = pointVertexDistance(oc, target.point, groups[i][f], trash);
+        if (gap <= FEATURE_POINT_TOL_MM) {
+          hit = true;
+          faces.push(groups[i][f]);
+        }
+      }
+      if (hit) indexes.push(i);
+    }
+    if (!faces.length) return keptDelete(DELETE_EDGE_ALONE);
+    const removed = defeatureFaces(oc, source, faces);
+    if (!removed.ok) return keptDelete(removed.error || DELETE_FACE_KEPT);
+    removed.featureIndexes = indexes;
+    return removed;
+  } catch (err) {
+    return keptDelete('FAIL: delete threw ' + explain(oc, err) + ' The model was not changed.');
+  } finally {
+    releaseShape(source);
+    dispose(trash);
+  }
+}
+
+export function defeatureFaceOrdinals(oc, shape, ordinals) {
+  const trash = [];
+  let source = null;
+  try {
+    const copied = copyOwned(oc, shape, trash);
+    if (!copied.ok || !copied.shape) return keptDelete(copied.error || DELETE_FACE_KEPT);
+    source = copied.shape;
+    const faces = [];
+    const list = Array.isArray(ordinals) ? ordinals : [];
+    for (let i = 0; i < list.length; i += 1) {
+      const face = faceAt(oc, source, Number(list[i]), trash);
+      if (!face) return keptDelete(DELETE_FACE_KEPT);
+      faces.push(face);
+    }
+    return defeatureFaces(oc, source, faces);
+  } catch (err) {
+    return keptDelete('FAIL: delete threw ' + explain(oc, err) + ' The model was not changed.');
+  } finally {
+    releaseShape(source);
+    dispose(trash);
+  }
+}
+
+// 40 x 20 x 10 mm box with a 6 mm through-hole along Z. Built here, not loaded.
+export function buildHoleDeleteFixture(oc) {
+  const sx = DELETE_HOLE_BOX_MM.x;
+  const sy = DELETE_HOLE_BOX_MM.y;
+  const sz = DELETE_HOLE_BOX_MM.z;
+  const diameter = DELETE_HOLE_BOX_MM.holeDiameter;
+  const box = makeBoxSolid(oc, sx, sy, sz, [0, 0, 0]);
+  if (!box) return keptDelete('FAIL: the 40x20x10 mm box was not built.');
+  let plain = 0;
+  try {
+    plain = solidVolumeMm3(oc, box);
+  } catch (err) {
+    releaseShape(box);
+    return keptDelete('FAIL: box volume threw ' + explain(oc, err));
+  }
+  const cutter = makeCylinderSolid(oc, diameter / 2, sz + 2, [sx / 2, sy / 2, -1], [0, 0, 1]);
+  if (!cutter) {
+    releaseShape(box);
+    return keptDelete('FAIL: the 6 mm hole cutter was not built.');
+  }
+  const cut = cutShapes(oc, box, cutter);
+  releaseShape(box);
+  releaseShape(cutter);
+  if (!cut.ok || !cut.shape) return keptDelete(cut.error || 'FAIL: the 6 mm hole was not cut.');
+  let volume = 0;
+  try {
+    volume = solidVolumeMm3(oc, cut.shape);
+  } catch (err) {
+    releaseShape(cut.shape);
+    return keptDelete('FAIL: hole volume threw ' + explain(oc, err));
+  }
+  return {
+    ok: true,
+    shape: cut.shape,
+    error: '',
+    kept: false,
+    units: 'mm',
+    plainVolumeMm3: plain,
+    volumeMm3: volume,
+    sizeMm: { x: sx, y: sy, z: sz },
+    holeDiameterMm: diameter,
   };
 }
 

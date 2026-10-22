@@ -78,6 +78,23 @@ else()
         "occt_gate skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
 endif()
 
+# Face and fillet delete. tests/test_delete.mjs builds its own 40x20x10 mm
+# box with a 6 mm hole. Exit 77 when libcascade is missing and CI is unset.
+if(CADCAM_NODE)
+    add_test(NAME delete_shape COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_delete.mjs")
+    set_tests_properties(delete_shape PROPERTIES
+        TIMEOUT 180
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "delete_shape requires Node. CI must not skip this test when libcascade or Node is missing.")
+else()
+    message(STATUS
+        "delete_shape skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
+endif()
+
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
 find_program(CADCAM_PYTHON NAMES python3 python py)

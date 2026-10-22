@@ -507,13 +507,77 @@ function topologyFromShape(oc, shape, mesh, trash) {
     const tris = faces[i].tris;
     for (let t = 0; t < tris.length; t += 1) triFace[tris[t]] = faces[i].id;
   }
-  return {
+  const topology = {
     source: 'occt',
     vertices: vertices,
     edges: edges,
     faces: faces,
     triFace: triFace,
   };
+  stampOcctIndexes(oc, shape, topology, trash);
+  return topology;
+}
+
+// Face ids stay in TopExp.MapShapes order (the same order as the mesh faces).
+// occtIndex is the 1-based map index. TopTools_IndexedMapOfShape is the
+// libcascade alias NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher.
+function stampOcctIndexes(oc, shape, topology, trash) {
+  const Ctor = oc.TopTools_IndexedMapOfShape
+    || oc.NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher;
+  if (!Ctor || !oc.TopExp || typeof oc.TopExp.MapShapes !== 'function' || !oc.TopoDS) return;
+  try {
+    const faces = track(trash, new Ctor());
+    oc.TopExp.MapShapes(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, faces);
+    if (faces.Extent() === topology.faces.length) {
+      for (let i = 0; i < topology.faces.length; i += 1) {
+        topology.faces[i].occtIndex = i + 1;
+        const face = track(trash, oc.TopoDS.Face(faces.FindKey(i + 1)));
+        try {
+          const adapt = track(trash, new oc.BRepAdaptor_Surface(face, true));
+          topology.faces[i].surface = String(adapt.GetType());
+        } catch (_err) {
+          topology.faces[i].surface = '';
+        }
+      }
+    }
+    const edges = track(trash, new Ctor());
+    oc.TopExp.MapShapes(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, edges);
+    for (let i = 1; i <= edges.Extent(); i += 1) {
+      const edge = track(trash, oc.TopoDS.Edge(edges.FindKey(i)));
+      const pts = sampleEdge(oc, edge, trash);
+      if (pts.length < 2) continue;
+      const a = pts[0];
+      const b = pts[pts.length - 1];
+      for (let k = 0; k < topology.edges.length; k += 1) {
+        const topo = topology.edges[k];
+        if (topo.occtIndex || !topo.pts || topo.pts.length < 2) continue;
+        const pa = topo.pts[0];
+        const pb = topo.pts[topo.pts.length - 1];
+        const same = (nearPoint(pa, a) && nearPoint(pb, b)) || (nearPoint(pa, b) && nearPoint(pb, a));
+        if (same) topo.occtIndex = i;
+      }
+    }
+    const vertices = track(trash, new Ctor());
+    oc.TopExp.MapShapes(shape, oc.TopAbs_ShapeEnum.TopAbs_VERTEX, vertices);
+    for (let i = 1; i <= vertices.Extent(); i += 1) {
+      const vertex = track(trash, oc.TopoDS.Vertex(vertices.FindKey(i)));
+      const point = track(trash, oc.BRep_Tool.Pnt(vertex));
+      const at = [point.X(), point.Y(), point.Z()];
+      for (let k = 0; k < topology.vertices.length; k += 1) {
+        const topo = topology.vertices[k];
+        if (!topo.occtIndex && nearPoint(topo.p, at)) topo.occtIndex = i;
+      }
+    }
+  } catch (_err) {
+    // The mesh ids still select a sub-shape when the map is unavailable.
+  }
+}
+
+function nearPoint(a, b) {
+  return !!a && !!b
+    && Math.abs(a[0] - b[0]) <= 1e-4
+    && Math.abs(a[1] - b[1]) <= 1e-4
+    && Math.abs(a[2] - b[2]) <= 1e-4;
 }
 
 // Gate plus mesh for a shape the caller still owns. Does not delete `shape`.

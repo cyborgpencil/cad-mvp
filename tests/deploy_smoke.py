@@ -3429,6 +3429,11 @@ def run(omit: list[str]) -> int:
                 failures.append("portrait_holes")
                 failures.extend(hole_problems[:40])
         if not failures:
+            delete_found = delete_problems(cdp, origin, desktop=True)
+            if delete_found:
+                failures.append("delete")
+                failures.extend(delete_found[:40])
+        if not failures:
             resize_problems = run_type_in_resize(cdp, origin)
             if resize_problems:
                 failures.append("type_in_resize")
@@ -3454,6 +3459,200 @@ def run(omit: list[str]) -> int:
         server.server_close()
         thread.join(timeout=5)
         shutil.rmtree(profile, ignore_errors=True)
+
+
+DELETE_KEY_EXPR = r"""
+(function(){
+  var el=document.activeElement;
+  if(el&&el.blur) el.blur();
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true,cancelable:true}));
+  var s=window.__cadcamExportState||{};
+  return JSON.stringify({body:s.bodyCount,undo:s.undoDepth,cleared:!!s.sceneCleared,w:window.innerWidth});
+})()
+"""
+
+UNDO_KEY_EXPR = r"""
+(function(){
+  var el=document.activeElement;
+  if(el&&el.blur) el.blur();
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true,cancelable:true}));
+  var s=window.__cadcamExportState||{};
+  return JSON.stringify({body:s.bodyCount,undo:s.undoDepth,cleared:!!s.sceneCleared});
+})()
+"""
+
+FOCUSED_DELETE_EXPR = r"""
+(function(){
+  var el=document.getElementById('docName');
+  if(!el) return 'missing';
+  el.focus();
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true,cancelable:true}));
+  var s=window.__cadcamExportState||{};
+  return JSON.stringify({body:s.bodyCount,undo:s.undoDepth,active:document.activeElement?document.activeElement.id:''});
+})()
+"""
+
+EDGE_ALONE = "Can't delete this edge on its own."
+FACE_KEPT = "Can't remove this face. The model was not changed."
+
+
+def _export_state(cdp: Cdp) -> dict[str, Any]:
+    payload = eval_state(cdp)
+    state = (payload or {}).get("state") if isinstance(payload, dict) else None
+    return state if isinstance(state, dict) else {}
+
+
+def _key_state(raw: Any, err: str) -> tuple[dict[str, Any] | None, str]:
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return None, err or str(raw)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, raw
+    return parsed if isinstance(parsed, dict) else None, ""
+
+
+def _trash_problems(state: dict[str, Any], want_hidden: bool) -> list[str]:
+    btn = state.get("deleteButton") if isinstance(state.get("deleteButton"), dict) else {}
+    hidden = btn.get("hidden") is True
+    if want_hidden:
+        return [] if hidden else ["trash visible with nothing selected"]
+    problems: list[str] = []
+    if hidden:
+        problems.append("trash hidden while something is selected")
+    width = float(btn.get("w") or 0)
+    height = float(btn.get("h") or 0)
+    if width < 44 or height < 44:
+        problems.append(f"trash {width:.1f}x{height:.1f}")
+    return problems
+
+
+def delete_problems(cdp: Cdp, origin: str, *, desktop: bool, probe: bool = True) -> list[str]:
+    """Trash deletes a selected box. Desktop Del does too, unless an input is focused."""
+    problems: list[str] = []
+    if desktop:
+        try:
+            set_desktop(cdp)
+        except (RuntimeError, TimeoutError, OSError) as exc:
+            return [f"delete desktop metrics {exc}"]
+        time.sleep(0.2)
+    state, load_problems = wait_for_case(cdp, origin, origin + "/?primitive=box", PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["delete load", *load_problems[:12]]
+    if not isinstance(state, dict):
+        return ["delete load returned no state"]
+    if int(state.get("bodyCount") or 0) != 1 or int(state.get("undoDepth") or 0) != 0:
+        problems.append(f"delete start body {state.get('bodyCount')!r} undo {state.get('undoDepth')!r}")
+    problems.extend(_trash_problems(state, False))
+    cleared, clear_err = eval_expr(cdp, "window.__cadcamClearSelection()")
+    if clear_err or cleared is not True:
+        problems.append(f"clear selection {cleared or clear_err}")
+    else:
+        time.sleep(0.1)
+        problems.extend(_trash_problems(_export_state(cdp), True))
+    selected, select_err = eval_expr(cdp, "window.__cadcamSelectItem()")
+    if select_err or selected is not True:
+        problems.append(f"select item {selected or select_err}")
+    else:
+        time.sleep(0.1)
+        problems.extend(_trash_problems(_export_state(cdp), False))
+    if not desktop:
+        raw, err = eval_expr(cdp, DELETE_KEY_EXPR)
+        parsed, perr = _key_state(raw, err)
+        if perr or not parsed or int(parsed.get("body") or 0) != 1 or int(parsed.get("undo") or 0) != 0:
+            problems.append(f"phone Del deleted the body {perr or parsed}")
+    if problems:
+        return problems
+    problems.extend(tap_selector(cdp, "#deleteBtn", "delete trash"))
+    if problems:
+        return problems
+    time.sleep(0.3)
+    state = _export_state(cdp)
+    if int(state.get("bodyCount") or 0) != 0 or int(state.get("undoDepth") or 0) != 1 or state.get("sceneCleared") is not True:
+        return [
+            "trash delete "
+            + json.dumps(
+                {
+                    "body": state.get("bodyCount"),
+                    "undo": state.get("undoDepth"),
+                    "cleared": state.get("sceneCleared"),
+                    "error": state.get("lastError"),
+                }
+            )
+        ]
+    raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+    parsed, perr = _key_state(raw, err)
+    if perr or not parsed or int(parsed.get("body") or 0) != 1 or int(parsed.get("undo") or 0) != 0 or parsed.get("cleared") is True:
+        return [f"undo trash {perr or parsed}"]
+    if desktop:
+        raw, err = eval_expr(cdp, DELETE_KEY_EXPR)
+        parsed, perr = _key_state(raw, err)
+        if perr or not parsed or int(parsed.get("body") or 0) != 0 or int(parsed.get("undo") or 0) != 1:
+            return [f"desktop Del {perr or parsed}"]
+        raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+        parsed, perr = _key_state(raw, err)
+        if perr or not parsed or int(parsed.get("body") or 0) != 1 or int(parsed.get("undo") or 0) != 0:
+            return [f"undo Del {perr or parsed}"]
+        raw, err = eval_expr(cdp, FOCUSED_DELETE_EXPR)
+        parsed, perr = _key_state(raw, err)
+        if perr or not parsed or int(parsed.get("body") or 0) != 1 or int(parsed.get("undo") or 0) != 0 or parsed.get("active") != "docName":
+            return [f"focused Del changed the model {perr or parsed}"]
+    if not probe:
+        return []
+    try:
+        result = cdp.call(
+            "Runtime.evaluate",
+            {
+                "expression": "window.__cadcamDeleteProbe()",
+                "returnByValue": True,
+                "timeout": 120000,
+            },
+            timeout=130,
+        )
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"delete probe {exc}"]
+    if result.get("exceptionDetails"):
+        detail = result.get("exceptionDetails") or {}
+        return [f"delete probe {detail.get('text') or detail}"]
+    value = (result.get("result") or {}).get("value")
+    if not isinstance(value, dict):
+        return [f"delete probe returned {value!r}"]
+    if value.get("error"):
+        problems.append(f"delete probe threw {value.get('error')}")
+    hole = value.get("hole") if isinstance(value.get("hole"), dict) else {}
+    try:
+        delta = abs(float(hole.get("delta")))
+    except (TypeError, ValueError):
+        delta = 999.0
+    if (
+        hole.get("ok") is not True
+        or delta > 0.01
+        or hole.get("valid") is not True
+        or hole.get("undoRestored") is not True
+        or hole.get("facesDropped") is not True
+        or hole.get("undoStep") is not True
+    ):
+        problems.append("hole face delete " + json.dumps(hole))
+    box = value.get("boxFace") if isinstance(value.get("boxFace"), dict) else {}
+    if (
+        box.get("unchanged") is not True
+        or box.get("undoSame") is not True
+        or box.get("error") != FACE_KEPT
+    ):
+        problems.append("box face delete " + json.dumps(box))
+    edge = value.get("edge") if isinstance(value.get("edge"), dict) else {}
+    if edge.get("error") != EDGE_ALONE or edge.get("unchanged") is not True:
+        problems.append("edge delete " + json.dumps(edge))
+    fillet = value.get("fillet") if isinstance(value.get("fillet"), dict) else {}
+    if (
+        fillet.get("ok") is not True
+        or fillet.get("valid") is not True
+        or fillet.get("cylinderFaces") != 0
+        or fillet.get("undoStep") is not True
+        or int(fillet.get("featureFaces") or 0) < 1
+    ):
+        problems.append("fillet delete " + json.dumps(fillet))
+    return problems
 
 
 def main(argv: list[str]) -> int:

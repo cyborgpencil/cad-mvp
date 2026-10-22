@@ -690,6 +690,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
             shots = shoot_plate(page, cdp)
             if shots:
                 return [f"{engine} screenshot", *shots]
+        deleted = deploy_smoke.delete_problems(cdp, origin, desktop=False)
+        if deleted:
+            return [f"{engine} delete", *deleted[:40]]
         saved = deploy_smoke.run_saveload(cdp, origin)
         if saved:
             return [f"{engine} saveload", *saved[:40]]
@@ -722,6 +725,9 @@ def run_create_desktop(playwright: Any, engine: str, origin: str) -> list[str]:
         found = deploy_smoke.create_menu_problems(cdp)
         if found:
             return [f"{engine} 1440 create", *found]
+        deleted = deploy_smoke.delete_problems(cdp, origin, desktop=True, probe=False)
+        if deleted:
+            return [f"{engine} 1440 delete", *deleted[:40]]
         print(f"PASS create popover {engine} 1440x900", flush=True)
         return []
     finally:
