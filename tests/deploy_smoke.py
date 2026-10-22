@@ -1575,7 +1575,7 @@ STAMP_EXPR = r"""
       problems.push('script url');
     }
   }
-  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'undo.mjs', 'selection.mjs', 'viewport-selection.mjs'];
+  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'undo.mjs', 'selection.mjs', 'viewport-selection.mjs', 'assemblies.mjs'];
   var found = {};
   var entries = performance.getEntriesByType('resource');
   for (var e = 0; e < entries.length; e++) {
