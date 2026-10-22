@@ -210,3 +210,5 @@ Newest entries at the top.
 ## 2026-10-21 22:47 MT - Step 2 overflow fix PASS (Grok 01a161d7, 10:21-10:40 PM): portrait rows wrap, targets >= 44 px, overflow checks pass collapsed and expanded, CTest 7/7, WASM 11/11, STLs unchanged and watertight in mm. Erik to OK: tool strip hidden in portrait (actions via Tools). mobile-3 prompt: countersink default 82 deg (#8 flat head) with editable angle, cone formula per Research Digest.
 
 ## 2026-10-21 22:49 MT - Chief accepted step 2. Hidden portrait tool strip recorded as a team choice in web/PROGRESS.md. mobile-3 prompt adds the closed-panel inert/hidden check.
+
+## 2026-10-21 23:03 MT - Step 2 pushed as 509bc60 (CI green, 7/7). mobile-3 prompt adds the test_occt_gate.mjs Blink-offset leak fix.
