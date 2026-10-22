@@ -17,9 +17,20 @@
 
 namespace {
 
-MeshSolid g_mesh = open_box();
+// Create > Box is centred on XY with z from 0 to 20. box_mm() stays
+// corner-at-origin in src/. This translation is the web default only.
+MeshSolid centred_box_20() {
+    MeshSolid mesh = box_mm(20.0, 20.0, 20.0);
+    for (Vec3& vertex : mesh.vertices) {
+        vertex.x -= 10.0;
+        vertex.y -= 10.0;
+    }
+    return mesh;
+}
+
+MeshSolid g_mesh = centred_box_20();
 UnitLock g_lock;
-std::string g_fixture = "open_box";
+std::string g_fixture = "default_box";
 
 emscripten::val copy_bytes(const std::string& bytes) {
     emscripten::val view(emscripten::typed_memory_view(bytes.size(), reinterpret_cast<const unsigned char*>(bytes.data())));
@@ -38,7 +49,9 @@ std::string read_bytes(const std::filesystem::path& path) {
 
 emscripten::val export_file(bool stl) {
     const GateReport report = evaluate_export_gate(g_mesh, g_lock);
-    if (!report.export_allowed) {
+    // Units are the only export gate. Watertight and the OCCT check do not
+    // block the file write. An empty mesh still does.
+    if (!report.units_pass || g_mesh.triangles.empty()) {
         return emscripten::val::null();
     }
     const char* path = stl ? "/cadcam_export.stl" : "/cadcam_export.3mf";
