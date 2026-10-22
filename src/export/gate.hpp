@@ -10,7 +10,7 @@
 // It does not block export.
 // Volume is the documented triple sum divided by 6 (mvp/solid-check.md).
 // Export is allowed when the export unit is millimeter (Erik, 2026-10-22)
-// and the mesh has at least one triangle and a signed volume above 1e-9 mm3.
+// and the mesh has at least one triangle and a signed volume above 1e-9 mm3 (below -1e-9 is reported as inside-out, otherwise zero volume).
 // An empty mesh or a non-positive volume (including an inside-out shell) blocks.
 
 struct GateReport {

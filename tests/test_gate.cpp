@@ -48,6 +48,7 @@ int main() {
     const std::string units_ok = "PASS: export unit is millimeter.";
     const std::string no_triangles = "FAIL: mesh has no triangles.";
     const std::string zero_volume = "FAIL: mesh has zero volume.";
+    const std::string inside_out_reason = "FAIL: mesh is inside-out (negative volume).";
     expect_text("units block ignores watertight fail",
                 export_block_reason(false, watertight_fail, false, units_fail), units_fail);
     expect_text("units block when solid passes",
@@ -139,7 +140,8 @@ int main() {
     expect("inside-out watertight fails", !inward.watertight_pass);
     expect("inside-out blocked", !inward.mesh_pass && !inward.export_allowed);
     expect_exact("inside-out volume", inward.volume_mm3, -1.0);
-    expect_text("inside-out block", inward.block_reason, zero_volume);
+    expect_text("inside-out block", inward.block_reason, inside_out_reason);
+    expect_text("inside-out sentence", inward.mesh_message, inside_out_reason);
 
     if (g_failures != 0) {
         std::cerr << g_failures << " failed\n";

@@ -94,6 +94,9 @@ GateReport evaluate_export_gate(const MeshSolid& mesh, const UnitLock& lock) {
     if (mesh.triangles.empty()) {
         report.mesh_pass = false;
         report.mesh_message = "FAIL: mesh has no triangles.";
+    } else if (report.volume_mm3 < -kMinExportVolumeMm3) {
+        report.mesh_pass = false;
+        report.mesh_message = "FAIL: mesh is inside-out (negative volume).";
     } else if (report.volume_mm3 <= kMinExportVolumeMm3) {
         report.mesh_pass = false;
         report.mesh_message = "FAIL: mesh has zero volume.";
