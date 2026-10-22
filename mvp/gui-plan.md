@@ -1,7 +1,7 @@
 # GUI plan (Fusion-style layout, Blender-style operations)
 
 Status: a draft plan only, with no code yet. Owner: Doc Steward. References: Research Digest (open-source first). Coordinator: Chief.
-Watertight and units checks stay a release gate on every export. They are no longer the main test focus.
+The units (mm) check stays a gate on every export. The OCCT shape-validity check runs after operations and does not block Export. Watertight checks and tests were dropped (Erik, 2026-10-22 02:17 MT).
 
 ## 0. Scope conflicts for Erik (unresolved, do not build until answered)
 - C1. A parametric timeline reopens parametric history, which was cut from the MVP. Options: (a) cut it, (b) undo history shown as a timeline with no replay, or (c) full parametric replay. Erik decides.
@@ -12,7 +12,7 @@ Watertight and units checks stay a release gate on every export. They are no lon
 - C7. Sketch solver license: PlaneGCS WASM (@salusoft89/planegcs, LGPL, single maintainer) fits. SolveSpace (GPL-3.0) clashes with our LGPL-2.1 and is out unless Erik says otherwise.
 - C8. Timeline via OCAF/TNaming would be an architecture change (ties to C1).
 - C9. OCCT fillet and cut are added next to the existing mesh code, not replacing it (Erik's keep-finished-work rule in AGENTS.md). Current tests keep passing as they are; OCCT cases get their own expectations. The touch gesture map in section 5 is a proposal; Erik sets the UX spec.
-- C6. Platform: the GUI targets the browser app (WebGL2 on Chrome for Windows, Android, iPhone). The Qt app is a native test harness only. Should Qt stay a real product? Erik decides.
+- C6. Platform: RESOLVED (Erik, 2026-10-21 01:45 MT): WASM only. One browser app (WebGL2 on Chrome for Windows, Android, iPhone) serves desktop and mobile. The Qt `solid_view` stays only as a native test harness under the keep-finished-work rule, not as a product.
 
 ## 1. Fusion-style layout
 - Ribbon/toolbar with tabs per workspace (Sketch, Solid, Inspect, Export). Exact tab list TBD.
@@ -57,14 +57,14 @@ Watertight and units checks stay a release gate on every export. They are no lon
 ## 6. Feasibility on OpenCASCADE in WASM
 - B-rep operations (extrude, booleans, fillet, transforms, selection by topology) fit the current core.
 - Mesh-style operations (loop cut, knife, freeform) have no clean B-rep equivalent. This is C2. Rule: every Blender-style tool gets a version on real faces and edges (push/pull, face inset, bevel as fillet or chamfer). Raw-mesh-only tools go to C2.
-- Current state (Pilot, 2026-10-21): the Qt GUI does fillet and cut with project mesh code, not OCCT. Proposed: add OCCT B-rep fillet, chamfer, booleans and extrude alongside the existing mesh code (keep-finished-work rule, AGENTS.md); existing tests stay as they are and OCCT gets its own rows. Loop cut and knife stay mesh-style only if Erik opens C2.
+- Current state: the product GUI is the WASM browser app, which runs OCCT B-rep ops through `web/occt-ops.mjs` (for example the L-bracket demo's fuse, fillet and chamfer; see web/PROGRESS.md). The older mesh fillet and cut code in the Qt test harness stays as-is (keep-finished-work rule, AGENTS.md); its tests stay and OCCT cases have their own rows. Loop cut and knife stay mesh-style only if Erik opens C2.
 - Proposed browser stack (MIT): three.js (TransformControls for gizmos, clipping planes for sections), camera-controls, three-mesh-bvh for picking. **Research Digest proposal, needs Erik's sign-off:** three.js on WebGL2, all MIT and actively maintained, covers gizmos, sections and fast picking; the labeled ViewCube is custom work. Sources: research/gui/README.md [O1]-[O6].
 - WASM is single-threaded, so long OCCT operations run in a Web Worker to keep the UI responsive.
 - Open risks: picking B-rep sub-elements from a tessellated view, WASM memory and thread limits on iPhone Safari-engine Chrome, and boolean speed.
 - Sourced references: `research/gui/README.md` (Research Digest).
 
 ## 7. Phased milestones (each with its own test matrix)
-Each phase still passes the watertight and units gate on export.
+Each phase still passes the units (mm) gate on export. The OCCT validity check runs after operations and does not block Export. No watertight gate (Erik, 2026-10-22).
 - P1 Viewer: layout shell, ViewCube, orbit/pan/zoom, display modes, browser tree, isolate/hide. Tests: UX flows such as open a part, orbit, isolate a body, and switch display modes; GUI screenshot tests against baselines.
 - P2 Select and inspect: selection modes, measure, section plane, units toggle. Tests: measure a known edge from the test matrix (S1 is 40 mm), with mm and inch readouts both right.
 - P3 Sketch: sketch tools and constraints, then extrude. Tests: draw a constrained rectangle, extrude it, export, and open it in Orca.

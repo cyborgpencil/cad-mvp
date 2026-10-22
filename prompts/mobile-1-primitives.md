@@ -1,4 +1,6 @@
 ﻿# Mobile step 1: Primitives
+
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
 Add box, cylinder and disc from a touch toolbar. Each one opens an editable dimension panel in mm (numeric keypad, inputmode=decimal) and can be edited after creation. Defaults: 20 mm (team choice already in PROGRESS.md); disc 18 mm across, 4 mm thick. Test: on a portrait viewport, tap-create each primitive, edit a dimension, check the result through the gate. Print MOBILE1_DONE.
 
 ## Rules for every session

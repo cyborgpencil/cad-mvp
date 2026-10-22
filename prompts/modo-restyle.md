@@ -1,5 +1,7 @@
 # Prompt: restyle the GUI in the MODO style
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Status: READY for Pilot (Doc Steward, 2026-10-21). Erik's direction (2:05 AM MT): visuals come first; the GUI should look like MODO 3D with its teal overall tone. Reference: [What is Modo](https://learn.foundry.com/modo/content/help/pages/getting_started/what_is_modo.html).
 
 ## Scope

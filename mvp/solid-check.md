@@ -1,4 +1,6 @@
-# In-memory watertight check
+# In-memory mesh check (legacy)
+
+> Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export. This file records the 2026-10-20 mesh checker as built; it is no longer a required check or an Export gate.
 
 **Status**: Built and tested with MSVC 19.51 on 2026-10-20
 **Date**: 2026-10-20
@@ -65,7 +67,7 @@ flipped_box: FAIL: edge (0,1) is wound the same way by two triangles.
 
 ## Assumptions
 
-- A watertight solid here is an edge-manifold triangle mesh with outward winding, as already required for meshes in `research/formats/validation.md`.
+- A closed solid here meant an edge-manifold triangle mesh with outward winding (the 2026-10-20 definition; no longer required).
 - The smallest index pair is the edge named when several edges fail the same rule.
 - Vertices that land on the same point under different indices are not welded.
 

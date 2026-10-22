@@ -1,4 +1,6 @@
 ﻿# Mobile step 2: Transforms
+
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
 Add a touch gizmo for move, rotate and resize (handles at least 44 px), with typed mm and degree values as an alternative. Parameters stay editable after creation. Use Research Digest's mobile touch digest for hit sizes and tap-versus-drag rules. Test: move, rotate and resize a box in portrait using taps and typed values. Print MOBILE2_DONE.
 
 ## Rules for every session

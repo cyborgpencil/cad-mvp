@@ -1,4 +1,6 @@
 # Mobile step 3: Hole tool
+
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
 Tap a face, then type the position (mm from the face edges), the diameter and the depth (through or blind). Optional countersink with a diameter and an editable angle, default 82 degrees (#8 flat-head wood screw; 90 degrees is the metric ISO angle). Defaults: 4.5 mm hole, 9.5 mm countersink (#8 wood screw, sourced, unverified fit). Build each hole as one parametric cut using the Boolean wrappers. Test: put 3 countersunk holes on a plate in portrait. Print MOBILE3_DONE.
 
 ## Rules for every session
