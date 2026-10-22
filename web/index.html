@@ -1457,7 +1457,20 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .part-row .part-tail {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+  }
   .part-row .part-mat { flex: none; font-size: 12px; }
+  .part-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex: none;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  }
   .assembly-material {
     display: flex;
     align-items: center;
@@ -1908,6 +1921,7 @@
           <div class="muted">Parts</div>
           <div id="partList" class="part-list" role="listbox" aria-label="Parts" aria-multiselectable="true"></div>
           <label class="assembly-material">Material
+            <span id="materialChip" class="part-chip" hidden></span>
             <select id="partMaterial" aria-label="Part material">
               <option value="PLA">PLA</option>
               <option value="PETG">PETG</option>
@@ -6506,6 +6520,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return { ok: true, mark: body.shape.__cadMoveMark == null ? '' : String(body.shape.__cadMoveMark) };
   };
 
+  window.__cadcamPartColor = function (id) {
+    const body = findBody(id);
+    const tag = body ? (assemblyApi ? assemblyApi.materialTag(body) : (body.material || 'PLA')) : '';
+    let mesh = '';
+    for (let i = 0; i < bodyRoot.children.length; i += 1) {
+      const child = bodyRoot.children[i];
+      if (String(child.userData.bodyId) !== String(id)) continue;
+      const color = child.material && child.material.color;
+      mesh = color && color.getHexString ? ('#' + color.getHexString()) : '';
+    }
+    return {
+      tag: tag,
+      color: materialColor(tag),
+      mesh: mesh,
+      selected: state.selectedIds.indexOf(String(id)) >= 0
+    };
+  };
+
   function resizeStatus() {
     const multi = state.bodies.length > 1;
     const body = multi ? activeEditBody() : singleBody();
@@ -7476,7 +7508,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const on = !!picked[child.userData.bodyId];
         child.visible = mode !== 'wire';
         if (child.material && child.material.color) {
-          child.material.color.set(on ? sel : 0x5aa4d6);
+          const owner = findBody(child.userData.bodyId);
+          const tag = owner
+            ? (assemblyApi ? assemblyApi.materialTag(owner) : (owner.material || 'PLA'))
+            : 'PLA';
+          child.material.color.set(on ? sel : materialColor(tag));
           if (child.material.emissive) {
             child.material.emissive.set(on ? sel : 0x000000);
             child.material.emissiveIntensity = on ? 0.25 : 0;
@@ -7901,8 +7937,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const mat = document.createElement('span');
         mat.className = 'part-mat';
         mat.textContent = tag;
+        const chip = document.createElement('span');
+        chip.className = 'part-chip';
+        chip.setAttribute('data-material', tag);
+        chip.title = tag;
+        const swatch = materialColor(tag);
+        chip.setAttribute('data-color', swatch);
+        chip.style.background = swatch;
+        const tail = document.createElement('span');
+        tail.className = 'part-tail';
+        tail.appendChild(chip);
+        tail.appendChild(mat);
         row.appendChild(name);
-        row.appendChild(mat);
+        row.appendChild(tail);
         host.appendChild(row);
       }
     }
@@ -7921,6 +7968,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         material.dataset.key = key;
         if (tags.length === 1) material.value = tags[0];
         else material.selectedIndex = -1;
+      }
+    }
+    const swatch = document.getElementById('materialChip');
+    if (swatch) {
+      const chipTags = [];
+      for (let i = 0; i < selected.length; i += 1) {
+        const tag = assemblyApi ? assemblyApi.materialTag(selected[i]) : (selected[i].material || 'PLA');
+        if (chipTags.indexOf(tag) < 0) chipTags.push(tag);
+      }
+      const one = chipTags.length === 1 ? chipTags[0] : '';
+      if (!one) {
+        swatch.hidden = true;
+        swatch.removeAttribute('data-material');
+      } else {
+        const color = materialColor(one);
+        swatch.hidden = false;
+        swatch.setAttribute('data-material', one);
+        swatch.setAttribute('data-color', color);
+        swatch.style.background = color;
+        swatch.title = one;
       }
     }
   }
@@ -8241,8 +8308,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.assemblyMessage = '';
       if (!state.projectApplying) state.projectDirty = true;
       paintAssembly();
+      applyLook();
       publishGateState();
     });
+  }
+
+  function materialColor(tag) {
+    if (assemblyApi && typeof assemblyApi.materialColor === 'function') return assemblyApi.materialColor(tag);
+    if (tag === 'PETG') return '#B9D6F2';
+    if (tag === 'TPU') return '#E7C36A';
+    if (tag === 'PLA') return '#F4F4F4';
+    return '#CCCCCC';
   }
 
   function exportFormat(fmt) {

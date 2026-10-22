@@ -4291,6 +4291,140 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+def _css_rgb(hex_color: str) -> str:
+    n = int(hex_color[1:], 16)
+    return f"rgb({(n >> 16) & 255}, {(n >> 8) & 255}, {n & 255})"
+
+
+PART_CHIPS_EXPR = (
+    "(function(){"
+    "function chip(name){"
+    "var rows=document.querySelectorAll('#partList .part-row');"
+    "for(var i=0;i<rows.length;i++){"
+    "var label=rows[i].querySelector('.part-name');"
+    "if(!label||label.textContent!==name) continue;"
+    "var el=rows[i].querySelector('.part-chip');"
+    "if(!el) return null;"
+    "return {material:el.getAttribute('data-material')||'',color:el.getAttribute('data-color')||'',"
+    "bg:getComputedStyle(el).backgroundColor||'',title:el.title||'',"
+    "h:rows[i].getBoundingClientRect().height};}"
+    "return null;}"
+    "var mat=document.getElementById('materialChip');"
+    "return JSON.stringify({box:chip('Box'),cyl:chip('Cylinder'),"
+    "swatch:mat?{hidden:mat.hidden===true,material:mat.getAttribute('data-material')||'',"
+    "color:mat.getAttribute('data-color')||'',bg:getComputedStyle(mat).backgroundColor||''}:null});"
+    "})()"
+)
+
+
+def _chip_ok(chip: Any, tag: str, hex_color: str) -> bool:
+    if not isinstance(chip, dict):
+        return False
+    bg = str(chip.get("bg") or "").replace(" ", "")
+    want = _css_rgb(hex_color).replace(" ", "")
+    return (
+        chip.get("material") == tag
+        and str(chip.get("color") or "").upper() == hex_color.upper()
+        and (bg == want or bg == want.replace("rgb(", "rgba(").replace(")", ",1)"))
+        and chip.get("title") == tag
+    )
+
+
+def multi_body_color_problems(cdp: Cdp, origin: str) -> list[str]:
+    """PETG and TPU use their own colours in the parts list and on unselected meshes.
+
+    Repro before the fix: the parts list showed the material name only, and every
+    unselected body used the same blue. PLA, PETG, and TPU already had canonical colours.
+    """
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"multi color desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load multi_body_color {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["multi color load", *load_problems[:20]]
+    chips, chip_err = _json_eval(cdp, PART_CHIPS_EXPR)
+    if chip_err or not chips:
+        return [f"multi color chips {chip_err}"]
+    if not _chip_ok(chips.get("box"), "PLA", "#F4F4F4"):
+        return [f"multi color pla {chips.get('box')}"]
+    if not _chip_ok(chips.get("cyl"), "PETG", "#B9D6F2"):
+        return [f"multi color petg {chips.get('cyl')}"]
+    if chips["box"].get("color") == chips["cyl"].get("color"):
+        return ["multi color pla and petg match"]
+    box_h = float((chips.get("box") or {}).get("h") or 0)
+    if abs(box_h - 44) > 1:
+        return [f"multi color row height {box_h}"]
+    swatch = chips.get("swatch") if isinstance(chips.get("swatch"), dict) else {}
+    if swatch.get("hidden") is not True:
+        return [f"multi color mixed swatch {swatch}"]
+
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    box_id, box_err = _part_row_id(cdp, "Box")
+    if cyl_err or box_err or not cyl_id or not box_id:
+        return [f"multi color ids {cyl_err or box_err}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked:
+        return [f"multi color pick {pick_err or picked}"]
+    changed, change_err = eval_expr(
+        cdp,
+        "(function(){var sel=document.getElementById('partMaterial');"
+        "if(!sel) return 'missing'; sel.value='TPU';"
+        "sel.dispatchEvent(new Event('change',{bubbles:true}));"
+        "return sel.value;})()",
+    )
+    if change_err or changed != "TPU":
+        return [f"multi color set tpu {changed or change_err}"]
+    painted, paint_err = _json_eval(cdp, PART_CHIPS_EXPR)
+    if paint_err or not painted:
+        return [f"multi color after {paint_err}"]
+    if not _chip_ok(painted.get("cyl"), "TPU", "#E7C36A"):
+        return [f"multi color tpu chip {painted.get('cyl')}"]
+    if not _chip_ok(painted.get("box"), "PLA", "#F4F4F4"):
+        return [f"multi color box changed {painted.get('box')}"]
+    one = painted.get("swatch") if isinstance(painted.get("swatch"), dict) else {}
+    if one.get("hidden") is not False or str(one.get("color") or "").upper() != "#E7C36A":
+        return [f"multi color material chip {one}"]
+
+    # Leave the cylinder unselected so its viewport colour is the material, not the selection.
+    picked_box, box_pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(box_id)}));"
+        "})()",
+    )
+    if box_pick_err or not picked_box:
+        return [f"multi color pick box {box_pick_err or picked_box}"]
+    colors, color_err = _json_eval(
+        cdp,
+        "(function(){"
+        "function one(id){return window.__cadcamPartColor?window.__cadcamPartColor(id):null;}"
+        f"return JSON.stringify({{cyl:one({json.dumps(cyl_id)}),box:one({json.dumps(box_id)})}});"
+        "})()",
+    )
+    if color_err or not colors:
+        return [f"multi color meshes {color_err}"]
+    cyl_color = colors.get("cyl") if isinstance(colors.get("cyl"), dict) else {}
+    box_color = colors.get("box") if isinstance(colors.get("box"), dict) else {}
+    if cyl_color.get("selected") is not False or str(cyl_color.get("mesh") or "").upper() != "#E7C36A":
+        return [f"multi color cylinder mesh {cyl_color}"]
+    if str(cyl_color.get("color") or "").upper() != "#E7C36A" or cyl_color.get("tag") != "TPU":
+        return [f"multi color cylinder tag {cyl_color}"]
+    if box_color.get("selected") is not True or str(box_color.get("mesh") or "").upper() != "#FF4FD8":
+        return [f"multi color selected box {box_color}"]
+    if str(box_color.get("color") or "").upper() != "#F4F4F4":
+        return [f"multi color box tag {box_color}"]
+    print("multi body color pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -4581,6 +4715,11 @@ def run(omit: list[str]) -> int:
             if move_found:
                 failures.append("multi_body_move")
                 failures.extend(move_found[:40])
+        if not failures:
+            color_found = multi_body_color_problems(cdp, origin)
+            if color_found:
+                failures.append("multi_body_color")
+                failures.extend(color_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:
