@@ -2,10 +2,14 @@
 
 #include "units.hpp"
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -132,10 +136,88 @@ std::string model_xml(const MeshSolid& mesh) {
 
 }  // namespace
 
-bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
+MeshSolid weld_mesh(const MeshSolid& mesh) {
+    constexpr double kQuantumMm = 1e-6;
+    MeshSolid out;
+    std::map<std::array<long long, 3>, std::uint32_t> index;
+    std::vector<std::uint32_t> remap(mesh.vertices.size(), 0);
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const Vec3& vertex = mesh.vertices[i];
+        const std::array<long long, 3> key = {
+            std::llround(vertex.x / kQuantumMm),
+            std::llround(vertex.y / kQuantumMm),
+            std::llround(vertex.z / kQuantumMm),
+        };
+        const auto found = index.find(key);
+        if (found == index.end()) {
+            const auto id = static_cast<std::uint32_t>(out.vertices.size());
+            index.emplace(key, id);
+            remap[i] = id;
+            out.vertices.push_back(vertex);
+        } else {
+            remap[i] = found->second;
+        }
+    }
+
+    using Directed = std::pair<std::uint32_t, std::uint32_t>;
+    std::map<Directed, int> directed;
     for (const auto& triangle : mesh.triangles) {
-        if (triangle[0] >= mesh.vertices.size() || triangle[1] >= mesh.vertices.size() ||
-            triangle[2] >= mesh.vertices.size()) {
+        if (triangle[0] >= remap.size() || triangle[1] >= remap.size() ||
+            triangle[2] >= remap.size()) {
+            continue;
+        }
+        std::uint32_t a = remap[triangle[0]];
+        std::uint32_t b = remap[triangle[1]];
+        std::uint32_t c = remap[triangle[2]];
+        if (a == b || b == c || a == c) {
+            continue;
+        }
+        if (exact_zero_area(out.vertices[a], out.vertices[b], out.vertices[c])) {
+            continue;
+        }
+        // Same swap as TopAbs_REVERSED faces: (v1, v3, v2) when this winding
+        // would traverse an edge that is already used in this direction.
+        if (directed[{a, b}] > 0 || directed[{b, c}] > 0 || directed[{c, a}] > 0) {
+            const std::uint32_t saved = b;
+            b = c;
+            c = saved;
+            if (a == b || b == c || a == c) {
+                continue;
+            }
+            if (exact_zero_area(out.vertices[a], out.vertices[b], out.vertices[c])) {
+                continue;
+            }
+        }
+        out.triangles.push_back({a, b, c});
+        directed[{a, b}] += 1;
+        directed[{b, c}] += 1;
+        directed[{c, a}] += 1;
+    }
+    double sum = 0.0;
+    for (const auto& triangle : out.triangles) {
+        const Vec3& p = out.vertices[triangle[0]];
+        const Vec3& q = out.vertices[triangle[1]];
+        const Vec3& r = out.vertices[triangle[2]];
+        const double cx = q.y * r.z - q.z * r.y;
+        const double cy = q.z * r.x - q.x * r.z;
+        const double cz = q.x * r.y - q.y * r.x;
+        sum += p.x * cx + p.y * cy + p.z * cz;
+    }
+    if (sum < 0.0) {
+        for (auto& triangle : out.triangles) {
+            const auto saved = triangle[1];
+            triangle[1] = triangle[2];
+            triangle[2] = saved;
+        }
+    }
+    return out;
+}
+
+bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
+    const MeshSolid welded = weld_mesh(mesh);
+    for (const auto& triangle : welded.triangles) {
+        if (triangle[0] >= welded.vertices.size() || triangle[1] >= welded.vertices.size() ||
+            triangle[2] >= welded.vertices.size()) {
             return false;
         }
     }
@@ -159,7 +241,7 @@ bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
     std::vector<ZipItem> items = {
         {"[Content_Types].xml", types, 0, 0},
         {"_rels/.rels", rels, 0, 0},
-        {"3D/3dmodel.model", model_xml(mesh), 0, 0},
+        {"3D/3dmodel.model", model_xml(welded), 0, 0},
     };
     const std::string package = zip_store(items);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
