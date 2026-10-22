@@ -1,0 +1,7 @@
+# Export check pins. A fresh venv of trimesh==5.1.1 installs numpy only.
+# Loading 3MF also imports networkx and lxml (trimesh/exchange/threemf.py).
+# numpy 2.5.4 and networkx 3.7 need Python 3.12 or newer.
+trimesh==5.1.1
+numpy==2.5.4
+lxml==6.1.3
+networkx==3.7
