@@ -32,15 +32,13 @@ Why: matches the definition+placement pattern of all three apps and XDE; maps 1:
 ## Implementation tips
 1. Data model: `Part {id, name, shape, placement(gp_Trsf, mm), material}`; parts panel (select, rename, hide).
 2. Move/rotate edits only `placement` (store as `TopLoc_Location(gp_Trsf)`); geometry untouched. Bake (`BRepBuilderAPI_Transform`) only at Combine and at export, so the stored solid stays unmoved and placement round-trips exactly in save/load.
-3. Combine: bake each selected part's placement, `BRepAlgoAPI_Fuse`, check `HasErrors()`, then `BRepCheck_Analyzer::IsValid()` + the watertight gate; on fail, roll back and keep originals. New part gets identity placement and the first-selected part's material (TBD: confirm with Erik). Mixed materials in one Combine: block or warn (TBD).
+3. Combine: bake each selected part's placement, `BRepAlgoAPI_Fuse`, check `HasErrors()`, then `BRepCheck_Analyzer::IsValid()`. Watertight is not a check (Erik, 2026-10-22). On fail, roll back and keep originals. The new part gets identity placement and the shared material tag. Mixed materials are refused (Chief 07:06).
 4. Combine is ONE undo step (remove N parts + add 1 part as a single snapshot in web/undo.mjs).
 5. Copies: deep copy (new independent solid) for MVP; no shared instances (App::Link/Onshape-style). Reason: simpler undo, save/load and Combine; 3MF components can be added later for size if needed.
 6. 3MF export: `unit="millimeter"`, one `<basematerials>` group (one `<base>` per material tag, name = tag e.g. "PLA"/"TPU"), one mesh object per part with `pid`/`pindex`, one build item each with the placement as the 12-value matrix (mm). Mesh objects are separate, not `<components>`, so per-object materials stay legal.
-7. Checks on export: units mm; every object watertight; volume compared via `BRepGProp::VolumeProperties` on the exact solid (not mesh) to 0.01 mm3 tolerance. https://dev.opencascade.org/doc/refman/html/class_b_rep_g_prop.html
+7. Checks on export: units mm. Volume of the exact solid is `BRepGProp::VolumeProperties` within 0.01 mm3. Placed mesh bounds within 0.01 mm. No watertight check. https://dev.opencascade.org/doc/refman/html/class_b_rep_g_prop.html
 8. Smoke test: 2 parts, 2 materials, non-identity placements; export, re-read, assert unit, object count, materials and translations.
 
-## Open TBDs (ask Erik via Chief)
-- Material tag list (PLA/TPU only, or free text?) and displaycolor per tag.
-- Combined part's material when inputs differ.
-- Whether export is one 3MF with all parts (assumed) or one file per part.
+## Open TBDs
+Settled 2026-10-22 (Chief 07:06, recorded in web/PROGRESS.md): tags are PLA, PETG, and TPU, default PLA. Mixed-material Combine is refused. Export is one 3MF with one mesh object per part. Display colors used by the writer are PLA #F4F4F4, PETG #B9D6F2, TPU #E7C36A.
 - Orca filament/plate mapping of basematerials (Acceptance B, Pilot).
