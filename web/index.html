@@ -4031,7 +4031,30 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishGateState();
       return;
     }
-    const result = opsApi.applyBooleanSolids(oc, which.ui, selected[0].shape, selected[1].shape);
+    function placedOperand(body) {
+      if (!body || !body.shape) return { shape: null, owned: false };
+      if (body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+        const placed = assemblyApi.placedCopy(oc, body.shape, body.placement || { x: 0, y: 0, z: 0 });
+        if (!placed.ok || !placed.shape) return { shape: null, owned: false };
+        return { shape: placed.shape, owned: true };
+      }
+      return { shape: body.shape, owned: false };
+    }
+    const operandA = placedOperand(selected[0]);
+    const operandB = placedOperand(selected[1]);
+    if (!operandA.shape || !operandB.shape) {
+      if (operandA.owned) dropShape(operandA.shape);
+      if (operandB.owned) dropShape(operandB.shape);
+      state.lastError = 'FAIL: Boolean failed. Both inputs were kept.';
+      state.booleanMessage = state.lastError;
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return;
+    }
+    const result = opsApi.applyBooleanSolids(oc, which.ui, operandA.shape, operandB.shape);
+    if (operandA.owned) dropShape(operandA.shape);
+    if (operandB.owned) dropShape(operandB.shape);
     if (!result.ok || !result.shape) {
       if (result.shape) dropShape(result.shape);
       state.lastError = result.error || 'FAIL: Boolean failed. Both inputs were kept.';
