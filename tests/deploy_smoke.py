@@ -3861,7 +3861,7 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     unlocked, unlock_err = resize_call(cdp, {"lock": False, "diameter": 30}, timeout=120)
     if unlock_err or not unlocked:
         return [f"multi size unlock resize {unlock_err}"]
-    if unlocked.get("method") != "gtransform" or unlocked.get("done") != "RESIZE_DONE" or unlocked.get("ellipse") is not True:
+    if unlocked.get("method") != "rebuild" or unlocked.get("done") != "RESIZE_DONE" or unlocked.get("ellipse") is not True:
         return [f"multi size unlock result {unlocked.get('method')!r} {unlocked.get('done')!r} ellipse {unlocked.get('ellipse')!r} {unlocked.get('error')!r}"]
     cyl = _named_part(unlocked, "Cylinder") or {}
     box = _named_part(unlocked, "Box") or {}
@@ -4189,7 +4189,7 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
         return [f"multi move union result {union_state}"]
     if union_state.get("gizmo") is not True or union_state.get("disabled") is not False:
         return [f"multi move union gizmo {union_state}"]
-    union_id, union_id_err = _part_row_id(cdp, "Union")
+    union_id, union_id_err = _part_row_id(cdp, "Union 1")
     if union_id_err or not union_id:
         return [f"multi move union id {union_id_err or union_id!r}"]
     planned, plan_err = _json_eval(
@@ -4422,6 +4422,222 @@ def multi_body_color_problems(cdp: Cdp, origin: str) -> list[str]:
     if str(box_color.get("color") or "").upper() != "#F4F4F4":
         return [f"multi color box tag {box_color}"]
     print("multi body color pass", flush=True)
+    return []
+
+
+def cylinder_live_volume_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Typed cylinder resize among other bodies must match the reloaded BRep volume."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"cyl volume desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load cyl_volume {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["cyl volume load", *load_problems[:20]]
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    if cyl_err or not cyl_id:
+        return [f"cyl volume id {cyl_err or cyl_id!r}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked:
+        return [f"cyl volume pick {pick_err or picked}"]
+    resized, resize_err = resize_call(
+        cdp, {"lock": False, "diameter": 14, "height": 22}, timeout=120
+    )
+    if resize_err or not resized:
+        return [f"cyl volume resize {resize_err}"]
+    if resized.get("done") != "RESIZE_DONE":
+        return [f"cyl volume result {resized.get('done')!r} {resized.get('error')!r}"]
+    want = math.pi * 7.0 * 7.0 * 22.0
+    live = resized.get("volumeMm3")
+    if not _near(live, want, 0.01):
+        return [f"cyl volume live {live!r} want {want}"]
+    hook, hook_err = _json_eval(
+        cdp,
+        "(function(){"
+        "var h=window.__cadcamProject;"
+        "if(!h||typeof h.saveText!=='function'||typeof h.loadText!=='function') return JSON.stringify({error:'missing'});"
+        "var saved=h.saveText();"
+        "if(!saved||saved.ok!==true) return JSON.stringify({error:saved&&saved.error||'save'});"
+        "var loaded=h.loadText(saved.text,true);"
+        "if(!loaded||loaded.ok!==true) return JSON.stringify({error:loaded&&loaded.error||'load'});"
+        "var rows=h.measures()||[];"
+        "var cyl=null;"
+        "for(var i=0;i<rows.length;i++){if(rows[i].name==='Cylinder') cyl=rows[i];}"
+        "return JSON.stringify({count:rows.length,volume:cyl&&cyl.volumeMm3});"
+        "})()",
+        timeout=180,
+    )
+    if hook_err or not hook or hook.get("error"):
+        return [f"cyl volume reload {hook_err or hook}"]
+    if not _near(hook.get("volume"), want, 0.01):
+        return [f"cyl volume reloaded {hook.get('volume')!r} want {want}"]
+    if not _near(hook.get("volume"), live, 0.01):
+        return [f"cyl volume live vs reload {live!r} {hook.get('volume')!r}"]
+    print("cyl live volume pass", flush=True)
+    return []
+
+
+def unlocked_centre_resize_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Unlocked single-body resize must keep the typed centre."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"centre resize desktop {exc}"]
+    url = origin + "/?primitive=box"
+    print(f"load centre_resize {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["centre resize load", *load_problems[:20]]
+    moved, move_err = resize_call(
+        cdp, {"lock": False, "field": "primCx", "text": "40"}, timeout=120
+    )
+    if move_err or not moved:
+        return [f"centre resize cx {move_err}"]
+    moved, move_err = resize_call(cdp, {"lock": False, "field": "primCy", "text": "15"}, timeout=120)
+    if move_err or not moved:
+        return [f"centre resize cy {move_err}"]
+    moved, move_err = resize_call(cdp, {"lock": False, "field": "primCz", "text": "3"}, timeout=120)
+    if move_err or not moved:
+        return [f"centre resize cz {move_err}"]
+    sized, size_err = resize_call(
+        cdp, {"lock": False, "sx": 80, "sy": 30, "sz": 6}, timeout=120
+    )
+    if size_err or not sized:
+        return [f"centre resize size {size_err}"]
+    if sized.get("done") != "RESIZE_DONE":
+        return [f"centre resize result {sized.get('done')!r} {sized.get('error')!r}"]
+    params = sized.get("params") or {}
+    place = sized.get("placement") or {}
+    if not _near(params.get("cx"), 40.0, 1e-6) or not _near(params.get("cy"), 15.0, 1e-6) or not _near(params.get("cz"), 3.0, 1e-6):
+        return [f"centre resize params {params}"]
+    if not _near(place.get("x"), 40.0, 1e-6) or not _near(place.get("y"), 15.0, 1e-6) or not _near(place.get("z"), 3.0, 1e-6):
+        return [f"centre resize placement {place}"]
+    if not _near(sized.get("dx"), 80.0, 1e-4) or not _near(sized.get("dy"), 30.0, 1e-4) or not _near(sized.get("dz"), 6.0, 1e-4):
+        return [f"centre resize size {sized.get('dx')!r} {sized.get('dy')!r} {sized.get('dz')!r}"]
+    if sized.get("shapeLocal") is True and (
+        not _near(sized.get("cx"), 0.0, 1e-3) or not _near(sized.get("cy"), 0.0, 1e-3) or not _near(sized.get("cz"), 0.0, 1e-3)
+    ):
+        return [f"centre resize local centre {sized.get('cx')!r} {sized.get('cy')!r} {sized.get('cz')!r}"]
+    print("unlocked centre resize pass", flush=True)
+    return []
+
+
+def combine_gizmo_x_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Combine must not cover the gizmo X handle; the handle point hits the canvas."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"gizmo x desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load combine_gizmo {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["combine gizmo load", *load_problems[:20]]
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    if cyl_err or not cyl_id:
+        return [f"combine gizmo id {cyl_err or cyl_id!r}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked:
+        return [f"combine gizmo pick {pick_err or picked}"]
+    hit, hit_err = _json_eval(
+        cdp,
+        "(function(){"
+        "var s=window.__cadcamExportState||{};"
+        "var g=s.gizmoHandles||{};"
+        "var plan=window.__cadcamGizmoDrag?window.__cadcamGizmoDrag('x',10):null;"
+        "var pt=plan&&plan.down?plan.down:g.xPage;"
+        "if(!pt) return JSON.stringify({error:'no-handle',gizmo:s.gizmoVisible===true,g:g});"
+        "var el=document.elementFromPoint(pt.x,pt.y);"
+        "var id=el?(el.id||el.getAttribute('data-action')||el.tagName):'none';"
+        "var canvas=document.getElementById('canvas');"
+        "var vp=document.getElementById('viewport');"
+        "var combine=document.getElementById('combineBtn');"
+        "var onCanvas=!!(el&&(el.id==='canvas'||el.id==='viewport'||(vp&&vp.contains(el)&&!(combine&&combine.contains(el)))));"
+        "return JSON.stringify({id:id,onCanvas:onCanvas,gizmo:s.gizmoVisible===true,xHits:g.xHitsCanvas===true,pt:pt});"
+        "})()",
+    )
+    if hit_err or not hit:
+        return [f"combine gizmo hit {hit_err}"]
+    if hit.get("gizmo") is not True:
+        return [f"combine gizmo hidden {hit}"]
+    if hit.get("id") == "combineBtn" or hit.get("onCanvas") is not True:
+        return [f"combine covers gizmo x {hit}"]
+    print("combine gizmo x pass", flush=True)
+    return []
+
+
+def boolean_unique_names_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Boolean results are Cut 1, Cut 2, ... and survive save/load."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"bool names desktop {exc}"]
+    url = origin + "/?pair=overlap"
+    print(f"load bool_names {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["bool names load", *load_problems[:20]]
+    named, named_err = _json_eval(
+        cdp,
+        "(function(){"
+        "function names(){return (window.__cadcamExportState||{}).projectNames||[];}"
+        "function rows(){return document.querySelectorAll('#partList .part-row');}"
+        "function clearSel(){var list=rows();for(var i=0;i<list.length;i++){if(list[i].classList.contains('is-on')) list[i].click();}}"
+        "function selectAll(){clearSel();var list=rows();for(var i=0;i<list.length;i++) list[i].click();}"
+        "function selectLastTwo(){clearSel();var list=rows();if(list.length<2) return;list[list.length-2].click();list[list.length-1].click();}"
+        "function clickCut(){"
+        "var b=document.querySelector('[data-action=\"boolean\"][data-op=\"cut\"]');"
+        "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click(); return 'cut';"
+        "}"
+        "selectAll();"
+        "var first=clickCut();"
+        "if(first!=='cut') return JSON.stringify({error:first,names:names()});"
+        "var afterFirst=names().slice();"
+        "var add=document.querySelector('[data-action=\"primitive\"][data-kind=\"box\"]');"
+        "if(!add) return JSON.stringify({error:'add missing',names:afterFirst});"
+        "add.click(); add.click();"
+        "if(rows().length<3) return JSON.stringify({error:'need three',names:names(),rows:rows().length});"
+        "selectLastTwo();"
+        "var second=clickCut();"
+        "if(second!=='cut') return JSON.stringify({error:second,names:names()});"
+        "var afterSecond=names().slice();"
+        "var h=window.__cadcamProject;"
+        "var saved=h&&h.saveText?h.saveText():null;"
+        "if(!saved||saved.ok!==true) return JSON.stringify({error:saved&&saved.error||'save',names:afterSecond});"
+        "var loaded=h.loadText(saved.text,true);"
+        "if(!loaded||loaded.ok!==true) return JSON.stringify({error:loaded&&loaded.error||'load',names:afterSecond});"
+        "return JSON.stringify({first:afterFirst,second:afterSecond,reloaded:(window.__cadcamExportState||{}).projectNames||[]});"
+        "})()",
+        timeout=180,
+    )
+    if named_err or not named:
+        return [f"bool names eval {named_err}"]
+    if named.get("error"):
+        return [f"bool names {named}"]
+    first = named.get("first") if isinstance(named.get("first"), list) else []
+    second = named.get("second") if isinstance(named.get("second"), list) else []
+    reloaded = named.get("reloaded") if isinstance(named.get("reloaded"), list) else []
+    if "Cut 1" not in first:
+        return [f"bool names first {first}"]
+    if "Cut 1" not in second or "Cut 2" not in second:
+        return [f"bool names second {second}"]
+    if second.count("Cut 1") != 1 or second.count("Cut 2") != 1:
+        return [f"bool names duplicate {second}"]
+    if reloaded != second:
+        return [f"bool names reload {reloaded} vs {second}"]
+    print("boolean unique names pass", flush=True)
     return []
 
 
@@ -4720,6 +4936,26 @@ def run(omit: list[str]) -> int:
             if color_found:
                 failures.append("multi_body_color")
                 failures.extend(color_found[:40])
+        if not failures:
+            vol_found = cylinder_live_volume_problems(cdp, origin)
+            if vol_found:
+                failures.append("cyl_volume")
+                failures.extend(vol_found[:40])
+        if not failures:
+            centre_found = unlocked_centre_resize_problems(cdp, origin)
+            if centre_found:
+                failures.append("centre_resize")
+                failures.extend(centre_found[:40])
+        if not failures:
+            gizmo_found = combine_gizmo_x_problems(cdp, origin)
+            if gizmo_found:
+                failures.append("combine_gizmo_x")
+                failures.extend(gizmo_found[:40])
+        if not failures:
+            names_found = boolean_unique_names_problems(cdp, origin)
+            if names_found:
+                failures.append("boolean_names")
+                failures.extend(names_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

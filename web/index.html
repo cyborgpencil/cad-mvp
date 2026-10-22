@@ -440,6 +440,7 @@
     flex: 1;
     min-width: 0;
     position: relative;
+    z-index: 2;
     background: radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%);
     box-shadow: inset 0 0 0 2px var(--accent);
     touch-action: none;
@@ -1094,6 +1095,7 @@
     grid-row: 2;
     width: auto;
     border-top: 1px solid var(--line-strong);
+    z-index: 1;
   }
   #viewport { grid-column: 2; grid-row: 1 / span 2; }
   .side-head {
@@ -1497,6 +1499,8 @@
     border: 1px solid var(--line-strong);
     background: var(--tab-bg);
     font-weight: 650;
+    position: relative;
+    z-index: 0;
   }
   #combineBtn:disabled { opacity: 0.38; }
 </style>
@@ -1919,6 +1923,7 @@
         <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
         <div id="assemblyPanel" class="assembly-panel">
           <div class="muted">Parts</div>
+          <button type="button" id="combineBtn" data-action="combine" data-tool="Combine" disabled aria-disabled="true">Combine</button>
           <div id="partList" class="part-list" role="listbox" aria-label="Parts" aria-multiselectable="true"></div>
           <label class="assembly-material">Material
             <span id="materialChip" class="part-chip" hidden></span>
@@ -1928,7 +1933,6 @@
               <option value="TPU">TPU</option>
             </select>
           </label>
-          <button type="button" id="combineBtn" data-action="combine" data-tool="Combine" disabled aria-disabled="true">Combine</button>
           <p class="fine" id="assemblyNote"></p>
         </div>
       </div>
@@ -2792,6 +2796,46 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (gizmo && gizmo.setMode) gizmo.setMode(state.gizmoMode || 'move');
     handles.visible = gizmoShouldShow();
     handles.updateMatrixWorld(true);
+    const bounds = canvas.getBoundingClientRect();
+    if (handles.visible && gizmo && gizmo.pickables && bounds.width > 16 && bounds.height > 16) {
+      const margin = 10;
+      const meshAncestryOn = function (mesh) {
+        let node = mesh;
+        while (node) {
+          if (node.visible === false) return false;
+          node = node.parent;
+        }
+        return true;
+      };
+      const tipsInside = function () {
+        for (let i = 0; i < gizmo.pickables.length; i += 1) {
+          const mesh = gizmo.pickables[i];
+          if (!meshAncestryOn(mesh)) continue;
+          const samples = mesh.userData.pickLocal && mesh.userData.pickLocal.length
+            ? mesh.userData.pickLocal
+            : [new THREE.Vector3(0, 0, 0)];
+          for (let s = 0; s < samples.length; s += 1) {
+            const local = samples[s];
+            const world = local.clone ? local.clone() : new THREE.Vector3(local.x, local.y, local.z);
+            mesh.localToWorld(world);
+            const clip = world.project(camera);
+            const sx = (clip.x * 0.5 + 0.5) * bounds.width;
+            const sy = (-clip.y * 0.5 + 0.5) * bounds.height;
+            if (clip.z < -1 || clip.z > 1) continue;
+            if (sx < margin || sy < margin || sx > bounds.width - margin || sy > bounds.height - margin) {
+              return false;
+            }
+          }
+        }
+        return true;
+      };
+      let shrink = 0;
+      while (!tipsInside() && shrink < 8) {
+        handles.scale.multiplyScalar(0.72);
+        handles.updateMatrixWorld(true);
+        shrink += 1;
+      }
+    }
   }
 
   function writePosFields() {
@@ -4011,7 +4055,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return false;
     }
     state.bodySeq += 1;
-    const name = which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut';
+    const name = uniqueOpName(which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut');
     state.bodies = [{
       id: 'b' + state.bodySeq,
       name: name,
@@ -4152,6 +4196,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (state.lastError) toast(state.lastError);
   }
 
+  function uniqueOpName(base) {
+    const taken = {};
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      taken[String(state.bodies[i].name || '')] = true;
+    }
+    let n = 1;
+    let name = base + ' ' + n;
+    while (taken[name]) {
+      n += 1;
+      name = base + ' ' + n;
+    }
+    return name;
+  }
+
   function applySceneBoolean(op) {
     if (!oc || !opsApi || typeof opsApi.applyBooleanSolids !== 'function') {
       state.lastError = 'FAIL: Boolean ops are not loaded.';
@@ -4221,7 +4279,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (!dropIds[state.bodies[i].id]) kept.push(state.bodies[i]);
     }
     state.bodySeq += 1;
-    const name = which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut';
+    const name = uniqueOpName(which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut');
     const resultBody = {
       id: 'b' + state.bodySeq,
       name: name,
@@ -5854,14 +5912,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     return performResize(function () {
       state.resizeMethod = 'gtransform';
+      // A shape-local solid lives at the origin. Scaling about the old world
+      // centre walks the solid off the typed centre.
+      const origin = body.shapeLocal === true
+        ? [0, 0, 0]
+        : [Number(old.cx) || 0, Number(old.cy) || 0, Number(old.cz) || 0];
+      const placeBefore = body.placement
+        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
+        : null;
+      if (body.shapeLocal === true) body.placement = { x: next.cx, y: next.cy, z: next.cz };
       const resized = opsApi.resizeShape(oc, body.shape, {
         factors: factors,
-        origin: [Number(old.cx) || 0, Number(old.cy) || 0, Number(old.cz) || 0],
+        origin: origin,
         euler: [Number(old.rx) || 0, Number(old.ry) || 0, Number(old.rz) || 0],
         uniform: false,
         forceInvalid: !!(spec && spec.forceInvalid === true)
       });
-      return installResized(body, resized, next);
+      const ok = installResized(body, resized, next);
+      if (!ok && placeBefore) body.placement = placeBefore;
+      return ok;
     });
   }
 
@@ -6020,38 +6089,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!sizesChanged) {
       return runUndoable(centreChanged ? 'Move' : 'Rotate', function () { return rebuildOwned() === true; });
     }
-    if (state.lockProportions !== false) {
-      return performResize(function () {
-        state.resizeMethod = 'rebuild';
-        return rebuildOwned();
-      });
-    }
-    if (typeof opsApi.resizeShape !== 'function') {
-      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
-    }
-    const factors = localFactors(kind, old, next);
-    if (!(factors[0] > 0) || !(factors[1] > 0) || !(factors[2] > 0)) {
-      return failResize('Size must be greater than zero. The last good shape was kept.');
-    }
+    // Rebuild from the typed parameters so live BRepGProp matches save/load.
+    // GTransform of a meshed cylinder kept a scaled triangulation and reported
+    // a stale volume until reload rebuilt the solid.
     return performResize(function () {
-      state.resizeMethod = 'gtransform';
-      const origin = body.shapeLocal === true
-        ? [0, 0, 0]
-        : [Number(old.cx) || 0, Number(old.cy) || 0, Number(old.cz) || 0];
-      const placeBefore = body.placement
-        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
-        : null;
-      if (body.shapeLocal === true) body.placement = { x: next.cx, y: next.cy, z: next.cz };
-      const resized = opsApi.resizeShape(oc, body.shape, {
-        factors: factors,
-        origin: origin,
-        euler: [Number(old.rx) || 0, Number(old.ry) || 0, Number(old.rz) || 0],
-        uniform: false,
-        forceInvalid: !!(spec && spec.forceInvalid === true)
-      });
-      const ok = installResized(body, resized, next);
-      if (!ok && placeBefore) body.placement = placeBefore;
-      return ok;
+      state.resizeMethod = 'rebuild';
+      return rebuildOwned();
     });
   }
 
@@ -6169,9 +6212,28 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       bounds.height,
       gizmoZonePx()
     );
+    let xPage = null;
+    let xHitsCanvas = false;
+    if (gizmo && gizmo.pickables) {
+      for (let i = 0; i < gizmo.pickables.length; i += 1) {
+        const mesh = gizmo.pickables[i];
+        if (!mesh.userData || mesh.userData.handle !== 'x') continue;
+        const world = mesh.localToWorld(new THREE.Vector3(0, 0, 0));
+        const clip = world.project(camera);
+        xPage = {
+          x: bounds.left + (clip.x * 0.5 + 0.5) * bounds.width,
+          y: bounds.top + (-clip.y * 0.5 + 0.5) * bounds.height
+        };
+        const hit = document.elementFromPoint(xPage.x, xPage.y);
+        xHitsCanvas = !!(hit && (hit.id === 'canvas' || hit.id === 'viewport' || (viewport.contains(hit) && !hit.closest('button, a, input, select, textarea, #combineBtn'))));
+        break;
+      }
+    }
     return {
       minPx: measured.minPx || 0,
-      count: measured.zones ? measured.zones.length : 0
+      count: measured.zones ? measured.zones.length : 0,
+      xPage: xPage,
+      xHitsCanvas: xHitsCanvas
     };
   }
 
@@ -6569,6 +6631,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       dx: sized ? sized.x : null,
       dy: sized ? sized.y : null,
       dz: sized ? sized.z : null,
+      cx: sized ? sized.cx : null,
+      cy: sized ? sized.cy : null,
+      cz: sized ? sized.cz : null,
+      shapeLocal: !!(body && body.shapeLocal === true),
+      placement: body && body.placement
+        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
+        : null,
+      volumeMm3: (function () {
+        if (!body || !body.shape || !oc || !opsApi || typeof opsApi.solidVolumeMm3 !== 'function') return null;
+        try { return opsApi.solidVolumeMm3(oc, body.shape); } catch (_err) { return null; }
+      })(),
       parts: state.bodies.map(function (item) {
         const p = item.params || {};
         return {
