@@ -2,6 +2,7 @@
 
 #include "mesh.hpp"
 
+#include <cstdint>
 #include <utility>
 
 // Unit box, corners 0..7:

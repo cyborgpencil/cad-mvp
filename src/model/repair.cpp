@@ -4,6 +4,8 @@
 #include "watertight.hpp"
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <tuple>
 

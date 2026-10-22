@@ -140,3 +140,9 @@ Newest entries at the top.
 - Session 01a160e1 (5:53-5:56 PM MT, $0.18). pages.yml now has a Native CTest step (Node 22, g++, cmake; builds builds/native, runs ctest --output-on-failure with CI=true; deploy_smoke runs inside the suite). It sits after the libcascade fetch and site assembly, before configure-pages and the upload, so a failing occt_gate blocks the release.
 - Files: pages.yml and web/PROGRESS.md. Z13 CTest 7/7.
 - Risk: first GCC build on Linux. Next: Repo Keeper pushes and confirms occt_gate ran and passed (not skipped) in the Linux log; then L-bracket. Erik to review the pages.yml diff.
+
+## 2026-10-21 18:04 MT - CTest gate blocked first Linux release
+- 9dfc0c8 pushed; Actions run 39696764181 failed in the Native CTest build step before CTest started: tests/test_create.cpp uses std::fabs without including <cmath> (GCC error, lines 109-110 and 184-186). The gate blocked the release as designed; the live site stays on 5c2918c.
+- Next: Pilot adds #include <cmath>; Repo Keeper pushes and confirms occt_gate shows Passed (no Skipped or Not Run line, since SKIP_RETURN_CODE 77 counts as skipped). L-bracket waits.
+
+- 2026-10-21 18:10 MT: GCC include fix ready, not yet committed (Grok session 01a160ed, 6:05-6:09 PM MT). Adds <cmath>/<cstddef> to tests/test_create.cpp, plus missing <cstddef>/<cstdint> includes in 8 src files (include lines only). Erik to review the src/ diffs as core. Z13 CTest with CI=1: 7/7 pass incl. occt_gate; deploy_smoke pass. Pending: Repo Keeper commit+push, Linux CI must show occt_gate Passed (not Skipped). L-bracket session starts after green.

@@ -1,5 +1,6 @@
 #include "watertight.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>
