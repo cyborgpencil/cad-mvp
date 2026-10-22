@@ -51,3 +51,6 @@ node_modules/
 *.wasm
 web/dist/
 tests/fixtures/blink.*
+
+# user project saves
+*.cadmvp
