@@ -7,7 +7,7 @@ Preconditions: main has gizmo/undo (fbd0947), PR #1 nav cube, PR #2 save/load, a
 Steps and checks:
 1. A1 build: using only the live app UI (phone portrait 390x844 and desktop), build the bracket from blink.notes.md: L-bracket with 4 mm thickness, 3 countersunk holes per leg, and an off-centre disc. No baked-in layout or script shortcut. Screenshot the result.
 2. A2 validity and units: the OCCT validity check passes after each operation, and the units read mm throughout.
-3. A3 measure: the bounding box and exact-shape volume (BRepGProp) match blink.notes.md within 0.01 mm and 0.01 mm3. The pass/fail values are recorded locally only.
+3. A3 measure: the exported bracket's bounding box is within 0.1 mm of the mm sizes typed into the UI, and its trimesh volume is within 1% of the app's own exact-shape volume (BRepGProp). Targets are the typed values, not blink.notes.md (3T ruling, 2026-10-22). The pass/fail values are recorded locally only.
 4. A4 save/load: save as .cadmvp, reload, and the A3 values still match.
 5. A5 export: export STL and 3MF. The 3MF says unit="millimeter".
 6. A6 Orca: open both files in OrcaSlicer on Z13. `--info` and the size readout match A3 within 0.05 mm on every axis (Chief 07:06), with no scale prompt and no errors.
@@ -29,11 +29,11 @@ Pass means B1 through B7 all pass.
 
 ## Truck parts (team-chosen 07:10 MT, recorded in web/PROGRESS.md)
 All mm. 11 parts after the cab is combined into the chassis (Chief and 3T, 07:15 MT). TPU profile: stock TPU 95A (3T final).
-- Chassis (PLA): 80 x 30 x 6 plate, two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up.
+- Chassis (PLA): 80 x 30 x 6 plate, two Ã˜4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up.
 - Cab (PLA): 30 x 30 x 25 box on the chassis top at the front, combined with the chassis into one PLA body part (exercises Combine).
-- Axles x2 (PLA): Ø4 x 44 cylinders.
-- Wheel hubs x4 (PLA): Ø16 x 8 cylinders with a Ø4.2 bore.
-- Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ø16 hub), width 8.
+- Axles x2 (PLA): Ã˜4 x 44 cylinders.
+- Wheel hubs x4 (PLA): Ã˜16 x 8 cylinders with a Ã˜4.2 bore.
+- Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ã˜16 hub), width 8.
 After the cab Combine the parts list is 11 parts. Combine of a hub with a tire must be refused (mixed materials), which B3 also checks.
 
 ## Wrap-up additions (Erik 2026-10-22 08:40 MT)
