@@ -1,14 +1,14 @@
 # Item 2: Nav cube visible on mobile
-Make the nav cube visible and usable on a ~390 px phone. Tap a face, edge or corner to snap the view; it stays at least 44 px per tap zone. It must not overlap the Create bottom bar, the property bottom sheet (open or closed), the top row, or the Home button, and it respects safe-area insets and 100dvh. The viewport-clear rule still holds (>=70% clear with panel collapsed, >=50% open). Print NAVCUBE_DONE.
+Make the nav cube visible and usable on a ~390 px phone. Tap a face or corner to snap the view (edge taps desktop-only); every tap zone is at least 44 px. It must not overlap the Create bottom bar, the property bottom sheet (open or closed), the top row, or the Home button, and it respects safe-area insets and 100dvh. The viewport-clear rule still holds (>=70% clear with panel collapsed, >=50% open). Print NAVCUBE_DONE.
 
 ## Rules for every session
 - Work in a fresh clone on a PR branch off main. Never push to main. Any C++ or bindings change goes in its own commit and is flagged for Erik review.
-- Touch first: targets at least 44x44 CSS px. Test in portrait at 390x844 in Chromium 390x844 in CI; WebKit per the phone-fix harness if present.
+- Touch first: targets at least 44x44 CSS px. Test in portrait at 390x844: Chromium in CI; WebKit via tests/phone_smoke.py (Playwright, iPhone 13 profile; exits 77 skip in CI when Playwright is missing, keep that). Add new checks to both deploy_smoke and phone_smoke.
 - Every default is a team choice recorded in web/PROGRESS.md. Invent no Erik specs.
 - The Blink bracket is a test fixture only: never shipped, never pushed.
-- Units stay mm. Done means CTest with CI=1 passes (occt_gate Passed), deploy_smoke passes including the new tests, and the secrets/Blink scan is clean. Don't commit; Repo Keeper merges via PR after CI is green.
+- Units stay mm. Done means CTest with CI=1 passes (occt_gate Passed), deploy_smoke and phone_smoke pass including the new tests, and the secrets/Blink scan is clean. Commit only on your PR branch and open a PR; Repo Keeper merges after CI is green.
 
-## Smoke tests (add to deploy_smoke, 390x844, Chromium in CI; WebKit per phone-fix harness if present)
+## Smoke tests (add to tests/deploy_smoke.py and tests/phone_smoke.py, 390x844)
 - Nav cube is visible and its bounding rect does not intersect the Create bottom bar, the bottom sheet, the top row or Home.
 - Tapping Top, Front and one corner changes the camera to that view.
 - Visible viewport fraction checks still pass. One screenshot per batch.
