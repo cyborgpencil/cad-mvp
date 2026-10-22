@@ -29,11 +29,11 @@ Pass means B1 through B7 all pass.
 
 ## Truck parts (team-chosen 07:10 MT, recorded in web/PROGRESS.md)
 All mm. 11 parts after the cab is combined into the chassis (Chief and 3T, 07:15 MT). TPU profile: stock TPU 95A (3T final).
-- Chassis (PLA): 80 x 30 x 6 plate, two Ã˜4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up.
+- Chassis (PLA): 80 x 30 x 6 plate, two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up.
 - Cab (PLA): 30 x 30 x 25 box on the chassis top at the front, combined with the chassis into one PLA body part (exercises Combine).
-- Axles x2 (PLA): Ã˜4 x 44 cylinders.
-- Wheel hubs x4 (PLA): Ã˜16 x 8 cylinders with a Ã˜4.2 bore.
-- Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ã˜16 hub), width 8.
+- Axles x2 (PLA): Ø4 x 44 cylinders.
+- Wheel hubs x4 (PLA): Ø16 x 8 cylinders with a Ø4.2 bore.
+- Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ø16 hub), width 8.
 After the cab Combine the parts list is 11 parts. Combine of a hub with a tire must be refused (mixed materials), which B3 also checks.
 
 ## Wrap-up additions (Erik 2026-10-22 08:40 MT)
