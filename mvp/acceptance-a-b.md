@@ -35,3 +35,7 @@ All mm. 11 parts after the cab is combined into the chassis (Chief and 3T, 07:15
 - Wheel hubs x4 (PLA): Ø16 x 8 cylinders with a Ø4.2 bore.
 - Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ø16 hub), width 8.
 After the cab Combine the parts list is 11 parts. Combine of a hub with a tire must be refused (mixed materials), which B3 also checks.
+
+## Wrap-up additions (Erik 2026-10-22 08:40 MT)
+- For A (Blink bracket) and B (11-part truck), take Orca screenshots of every sliced plate. Stage them in the Z13 staging folder (cadmvp-shots). Don't send anything to the printer.
+- Item 4 project file check: follow research/project-save-load.md (save as .cadmvp, reload in a fresh tab, compare). Fix any gaps before sign-off.

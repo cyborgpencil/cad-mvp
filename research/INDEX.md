@@ -45,3 +45,4 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [selection-and-delete.md](selection-and-delete.md): selection patterns, OCCT BRepAlgoAPI_Defeaturing limits/history/failure checks for delete, typed resize (params vs uniform/non-uniform scale) (2026-10-22).
 - [cursor-vs-grok-tonight.md](cursor-vs-grok-tonight.md): overnight Grok Build (5 runs, ~$18.30) vs Cursor cloud agents (PR #1/#2, cost unknown): runs, rework, strengths, lessons, recommendation (2026-10-22).
 - [cursor-and-tooling.md](cursor-and-tooling.md): Cursor vs Grok Build (cloud agents, Bugbot, rules/skills, MCP) plus tools to add (Playwright MCP, GitHub Actions + trimesh, OrcaSlicer CLI, lib3mf); top 3 recommended, sourced.
+- [project-save-load.md](project-save-load.md): wrap-up item 4, end-to-end .cadmvp save, fresh-tab reload and compare checklist (P1-P7); undo stops at the loaded state (team ruling).
