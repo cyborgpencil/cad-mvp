@@ -35,3 +35,13 @@ All mm. 11 parts after the cab is combined into the chassis (Chief and 3T, 07:15
 - Wheel hubs x4 (PLA): Ø16 x 8 cylinders with a Ø4.2 bore.
 - Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ø16 hub), width 8.
 After the cab Combine the parts list is 11 parts. Combine of a hub with a tire must be refused (mixed materials), which B3 also checks.
+## Item 4: project save and load, end to end (Research Digest 2026-10-22, from web/project-file.mjs on main)
+What the file stores, from the code: `PROJECT_VERSION` 1, `units` "mm", and per part a name, material tag, placement, the primitive kind and parameters when there are any, and the shape as OCCT BREP text written by `BRepTools.Write` and read back with `BRepTools.Read`. Load refuses empty, unreadable, non-mm, wrong-version and shape-check-failing files with "The model was not changed." The file stores no undo history.
+1. P1 build: on the live build, make three bodies: a 20 x 20 x 20 mm box, a cylinder, and a box combined with another box. Give one of them PETG. Resize one body by typing a new size and move another.
+2. P2 record: note each body's name, material, size and position, and its volume from the log (BRepGProp, mm3).
+3. P3 save: save the `.cadmvp` file. Open it as text and check it has `"units": "mm"`, version 1, and one entry per body.
+4. P4 reload: open the app in a fresh tab (new tab, not a refresh), then load the file.
+5. P5 compare: there are the same number of bodies with the same names and materials. Each size and position is within 0.05 mm, and each volume is within 0.01 mm3. The shape check passes on every body, and Units still shows mm.
+6. P6 edit after reload: resize, move and delete one body each, then undo and redo all three. Undo has to stop at the loaded state.
+7. P7 bad files: loading an empty file, a file with `"units": "in"`, and a file with version 2 each shows the matching message and leaves the model untouched.
+Pass means P1 through P7 all pass. TBD for Erik: should Undo go back past a load? The file has no history, so this plan expects it not to.
