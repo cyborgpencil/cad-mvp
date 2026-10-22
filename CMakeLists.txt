@@ -95,6 +95,23 @@ else()
         "delete_shape skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
 endif()
 
+# Flat parts list, Combine, and one 3MF object per part.
+# tests/test_assemblies.mjs exits 77 when libcascade is missing and CI is unset.
+if(CADCAM_NODE)
+    add_test(NAME assemblies COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_assemblies.mjs")
+    set_tests_properties(assemblies PROPERTIES
+        TIMEOUT 180
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "assemblies requires Node. CI must not skip this test when libcascade or Node is missing.")
+else()
+    message(STATUS
+        "assemblies skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
+endif()
+
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
 find_program(CADCAM_PYTHON NAMES python3 python py)
