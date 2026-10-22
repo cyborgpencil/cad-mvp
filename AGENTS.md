@@ -13,7 +13,7 @@
 5. Note any remaining assumptions and the next required inputs.
 
 ## Output Standards
-Prefer updates to existing project documents over one-off explanations. Explicitly list assumptions and open questions. Log significant changes in UPDATES.md.
+Prefer updates to existing project documents over one-off explanations. Explicitly list assumptions and open questions. Repo Keeper logs each merged PR in UPDATES.md.
 
 ## Push cadence (cyborgpencil/cad-mvp)
 Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns pushes.
@@ -43,3 +43,15 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 - Research first: before any task, check the repo, docs, earlier work, skills and memory, plus sourced best practices. Post a short plan with sources, then start.
 ## Coding tools (Erik, 2026-10-22)
 - Order: Grok Build, then Cursor, then Google Antigravity (third, end of queue, trial). Gemini Code Assist GitHub review app approved; install pending Erik's sign-in. Details: mvp/tooling-priority.md.
+
+## Process speed-ups (3T and Chief, 2026-10-22)
+- CI: push builds run only on `main`. Docs-only PRs skip the C++ build through a paths filter, and a small docs job still gives a green check. Pilot writes this; Repo Keeper owns it.
+- Docs ride inside the code PR that changes the behavior. With no code PR to ride, docs go into one shared docs PR per wave.
+- `UPDATES.md`: only Repo Keeper edits it, one line per PR at merge time. Code and docs PRs leave it alone.
+- Docs describe `main` only. No "pending" notes for code that hasn't merged.
+- TBDs go out as one list per PR, and 3T or the Chief rules on them before anyone writes a file.
+- Green docs PRs merge right away, with no merge-order queue.
+- Each bot posts one status line per milestone; Repo Keeper posts the single post-merge line. No "waiting" posts.
+- When Z13 is down, docs edits go to a Cursor cloud agent that 3T launches. No new GitHub access.
+- Erik's C++ review commits stay separate.
+- Small direct C++ edits that skip Grok Build: waiting on Erik's answer. Until then, all C++ goes through Grok Build or Cursor.
