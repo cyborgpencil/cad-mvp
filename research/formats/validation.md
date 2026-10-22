@@ -10,7 +10,7 @@ Checked 2026-10-20. Updated 2026-10-22 for Erik's 02:17 MT rule (2026-10-22, see
 ## Export gate (units only)
 Export is gated on units. Watertight is not a gate (02:17 rule); `check_watertight` may still report, but it never blocks. Checks that stay:
 - the B-Rep source passed BRepCheck after each op (see ../healing/README.md); a failure rolls the op back, it does not gate Export
-- export refuses an empty or zero-triangle / zero-volume mesh with a clear log error (3T call, 2026-10-22, PR #11); that is a sanity check, not a watertight check
+- export refuses an empty or zero-triangle / zero-volume mesh, or an inside-out one (negative volume, logged as `FAIL: mesh is inside-out (negative volume).`), with a clear log error (3T calls, 2026-10-22, PR #11); that is a sanity check, not a watertight check
 - for 3MF: the file re-reads cleanly through lib3mf and `unit` matches the locked unit
 - for STL: a re-read bounding box matches the expected size in the locked unit
 
