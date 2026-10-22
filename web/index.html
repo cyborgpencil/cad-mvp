@@ -1873,9 +1873,13 @@ async function boot() {
       console.error('occt-ops failed', err);
       return null;
     });
+    const undoPromise = import('./undo.mjs').catch(function (err) {
+      console.error('undo failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, undoPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -1883,7 +1887,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -3635,23 +3639,251 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     setHint(state.booleanMessage);
   }
 
+  const commandStack = undoApi && typeof undoApi.createCommandStack === 'function'
+    ? undoApi.createCommandStack()
+    : {
+      push: function () { return []; },
+      undo: function () { return null; },
+      redo: function () { return null; },
+      clear: function () { return []; },
+      depth: function () { return 0; },
+      redoDepth: function () { return 0; }
+    };
+
+  function cloneData(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function copyKernelMesh() {
+    try {
+      const pos = Module.meshPositions();
+      const idx = Module.meshIndices();
+      return {
+        positions: new pos.constructor(pos),
+        indices: new idx.constructor(idx),
+        fixture: Module.fixtureName()
+      };
+    } catch (_err) {
+      return { positions: null, indices: null, fixture: '' };
+    }
+  }
+
+  function captureSnapshot() {
+    const bodies = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      bodies.push({
+        id: body.id,
+        name: body.name,
+        kind: body.kind,
+        params: cloneData(body.params),
+        shape: body.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, body.shape) : null,
+        mesh: body.mesh || null,
+        topology: body.topology || null,
+        gate: body.gate || null,
+        watertight: body.watertight || null
+      });
+    }
+    const kernel = copyKernelMesh();
+    return {
+      bodies: bodies,
+      primitive: state.primitive ? { kind: state.primitive.kind, params: cloneData(state.primitive.params) } : null,
+      holeLog: cloneData(state.holeLog) || [],
+      selection: state.selection,
+      selectedIds: state.selectedIds.slice(),
+      topology: state.topology,
+      topologySource: state.topologySource,
+      shapeGate: state.shapeGate,
+      booleanOp: state.booleanOp || '',
+      booleanMessage: state.booleanMessage || '',
+      demo: state.demo || '',
+      positions: kernel.positions,
+      indices: kernel.indices,
+      fixture: kernel.fixture
+    };
+  }
+
+  function releaseSnapshot(snap) {
+    if (!snap || !snap.bodies) return;
+    for (let i = 0; i < snap.bodies.length; i += 1) dropShape(snap.bodies[i].shape);
+    snap.bodies = [];
+  }
+
+  function releaseCommands(cmds) {
+    if (!cmds) return;
+    for (let i = 0; i < cmds.length; i += 1) {
+      releaseSnapshot(cmds[i].before);
+      releaseSnapshot(cmds[i].after);
+    }
+  }
+
+  // Save/load (PR #2) calls this on file load: commandStack.clear() from web/undo.mjs, snapshots freed.
+  window.__cadcamClearUndo = function () { releaseCommands(commandStack.clear()); return true; };
+
+  function installSnapshot(snap) {
+    for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
+    const next = [];
+    for (let i = 0; i < snap.bodies.length; i += 1) {
+      const src = snap.bodies[i];
+      next.push({
+        id: src.id,
+        name: src.name,
+        kind: src.kind,
+        params: cloneData(src.params),
+        shape: src.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, src.shape) : null,
+        mesh: src.mesh,
+        topology: src.topology,
+        gate: src.gate,
+        watertight: src.watertight
+      });
+    }
+    state.bodies = next;
+    state.primitive = snap.primitive ? { kind: snap.primitive.kind, params: cloneData(snap.primitive.params) } : null;
+    state.holeLog = cloneData(snap.holeLog) || [];
+    state.selection = snap.selection;
+    state.selectedIds = snap.selectedIds.slice();
+    state.hoverId = null;
+    state.topology = snap.topology;
+    state.topologySource = snap.topologySource;
+    state.shapeGate = snap.shapeGate;
+    state.booleanOp = snap.booleanOp || '';
+    state.booleanMessage = snap.booleanMessage || '';
+    state.demo = snap.demo || '';
+    if (snap.positions && snap.indices && typeof Module.replaceMesh === 'function') {
+      const positions = new snap.positions.constructor(snap.positions);
+      const indices = new snap.indices.constructor(snap.indices);
+      Module.replaceMesh(positions, indices, snap.fixture || Module.fixtureName());
+    }
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    publishGateState();
+  }
+
+  function runUndoable(label, apply) {
+    const before = captureSnapshot();
+    let ok = false;
+    try {
+      ok = apply() === true;
+    } catch (err) {
+      ok = false;
+      setHint(err && err.message ? err.message : String(err));
+    }
+    if (!ok) {
+      releaseSnapshot(before);
+      publishGateState();
+      return false;
+    }
+    const after = captureSnapshot();
+    releaseCommands(commandStack.push({ label: label, before: before, after: after }));
+    publishGateState();
+    return true;
+  }
+
+  function doUndo() {
+    const cmd = commandStack.undo();
+    if (!cmd) {
+      setHint('Nothing to undo');
+      publishGateState();
+      return;
+    }
+    installSnapshot(cmd.before);
+    setHint('Undo ' + (cmd.label || ''));
+  }
+
+  function doRedo() {
+    const cmd = commandStack.redo();
+    if (!cmd) {
+      setHint('Nothing to redo');
+      publishGateState();
+      return;
+    }
+    installSnapshot(cmd.after);
+    setHint('Redo ' + (cmd.label || ''));
+  }
+
+  function shiftParams(params, dx, dy, dz) {
+    if (!params) return;
+    if (typeof params.cx === 'number') params.cx += dx;
+    if (typeof params.cy === 'number') params.cy += dy;
+    if (typeof params.cz === 'number') params.cz += dz;
+  }
+
+  function moveOwnedShape(dx, dy, dz) {
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (!body || !body.shape || !oc || !opsApi || typeof opsApi.transformShape !== 'function' || !primApi) return false;
+    const moved = opsApi.transformShape(oc, body.shape, { dx: dx, dy: dy, dz: dz });
+    if (!moved || !moved.ok || !moved.shape) {
+      if (moved && moved.shape) dropShape(moved.shape);
+      setHint((moved && moved.error) || 'FAIL: move was rejected. The solid was kept.');
+      writePosFields();
+      return false;
+    }
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, moved.shape);
+    } catch (_err) {
+      dropShape(moved.shape);
+      setHint('FAIL: move check threw. The solid was kept.');
+      writePosFields();
+      return false;
+    }
+    if (!view || !view.gate || view.gate.pass !== true) {
+      dropShape(moved.shape);
+      setHint((view && view.gate && view.gate.message) || 'FAIL: moved solid is not valid. The solid was kept.');
+      writePosFields();
+      return false;
+    }
+    const flat = primApi.flattenMesh(view.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'move')) {
+      dropShape(moved.shape);
+      setHint('FAIL: moved mesh was rejected. The solid was kept.');
+      writePosFields();
+      return false;
+    }
+    dropShape(body.shape);
+    body.shape = moved.shape;
+    body.mesh = view.mesh;
+    body.topology = view.topology;
+    body.gate = view.gate;
+    body.watertight = view.watertight;
+    shiftParams(body.params, dx, dy, dz);
+    if (state.primitive && state.primitive.params && state.primitive.params !== body.params) {
+      shiftParams(state.primitive.params, dx, dy, dz);
+    }
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    publishGateState();
+    return true;
+  }
+
   function translateBody(dx, dy, dz) {
-    if (!dx && !dy && !dz) return;
+    if (!dx && !dy && !dz) return false;
+    if (state.bodies.length === 1 && state.bodies[0].shape) {
+      return moveOwnedShape(dx, dy, dz);
+    }
     if (state.bodies.length && !state.primitive) {
       setHint('The Boolean result stays put in this build.');
-      return;
+      writePosFields();
+      return false;
     }
     if (state.primitive) {
       const next = Object.assign({}, state.primitive.params);
       next.cx += dx;
       next.cy += dy;
       next.cz += dz;
-      createPrimitive(state.primitive.kind, next, null, true);
-      return;
+      return createPrimitive(state.primitive.kind, next, null, true) === true;
     }
     if (typeof Module.replaceMesh !== 'function') {
       setHint('Mesh replace is not in this wasm build.');
-      return;
+      return false;
     }
     const pos = Module.meshPositions();
     const next = new Float64Array(pos.length);
@@ -3662,13 +3894,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     if (!Module.replaceMesh(next, Module.meshIndices(), Module.fixtureName())) {
       setHint('Mesh replace failed.');
-      return;
+      return false;
     }
     state.shapeGate = null;
     state.topologySource = 'mesh';
     syncFromKernel();
     refreshAnchor();
     applyLook();
+    return true;
   }
 
   function pointerNdc(clientX, clientY) {
@@ -3966,35 +4199,43 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     shiftPreview(null);
     if (!drag || !moved) {
       placeHandles();
+      writePosFields();
       return;
     }
     if (drag.kind === 'rotate') {
-      const prim = state.primitive;
-      if (!prim) {
-        setHint('Rotate needs a box, cylinder, or disc.');
-        return;
-      }
-      const next = Object.assign({}, prim.params);
-      next.rx = (Number(next.rx) || 0) + (drag.rot.rx || 0);
-      next.ry = (Number(next.ry) || 0) + (drag.rot.ry || 0);
-      next.rz = (Number(next.rz) || 0) + (drag.rot.rz || 0);
-      createPrimitive(prim.kind, next, null, true);
+      runUndoable('Rotate', function () {
+        const prim = state.primitive;
+        if (!prim) {
+          setHint('Rotate needs a box, cylinder, or disc.');
+          return false;
+        }
+        const next = Object.assign({}, prim.params);
+        next.rx = (Number(next.rx) || 0) + (drag.rot.rx || 0);
+        next.ry = (Number(next.ry) || 0) + (drag.rot.ry || 0);
+        next.rz = (Number(next.rz) || 0) + (drag.rot.rz || 0);
+        return createPrimitive(prim.kind, next, null, true) === true;
+      });
       return;
     }
     if (drag.kind === 'scale') {
-      applySizeDelta(viewApi.handleAxis ? viewApi.handleAxis(drag.handle) : 'x', drag.size || 0);
+      runUndoable('Scale', function () {
+        return applySizeDelta(viewApi.handleAxis ? viewApi.handleAxis(drag.handle) : 'x', drag.size || 0);
+      });
       return;
     }
     const cad = drag.cad;
-    if (!cad || (!cad.x && !cad.y && !cad.z)) return;
-    translateBody(cad.x, cad.y, cad.z);
+    if (!cad || (!cad.x && !cad.y && !cad.z)) {
+      writePosFields();
+      return;
+    }
+    runUndoable('Move', function () { return translateBody(cad.x, cad.y, cad.z); });
   }
 
   function applySizeDelta(axisName, delta) {
     const prim = state.primitive;
     if (!prim || !delta) {
       if (!prim) setHint('Resize needs a box, cylinder, or disc.');
-      return;
+      return false;
     }
     const next = Object.assign({}, prim.params);
     const floor = minSizeMm();
@@ -4013,7 +4254,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       if (axisName === along) next.height = Math.max(floor, next.height + delta);
       else next.radius = Math.max(floor, next.radius + delta / 2);
     }
-    createPrimitive(prim.kind, next, null, true);
+    return createPrimitive(prim.kind, next, null, true) === true;
   }
 
   function readField(id) {
@@ -4029,7 +4270,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const y = readField('posY');
     const z = readField('posZ');
     if (x == null || y == null || z == null) return;
-    translateBody(x - state.anchor.x, y - state.anchor.y, z - state.anchor.z);
+    const dx = x - state.anchor.x;
+    const dy = y - state.anchor.y;
+    const dz = z - state.anchor.z;
+    if (!dx && !dy && !dz) return;
+    runUndoable('Move', function () { return translateBody(dx, dy, dz); });
   }
 
   function onPrimitiveCommit() {
@@ -4319,30 +4564,106 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const rect = canvas.getBoundingClientRect();
     const projected = [];
     let allInside = true;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const world = new THREE.Vector3();
     if (pos && rect.width > 1 && rect.height > 1) {
       mesh.updateMatrixWorld(true);
       const v = new THREE.Vector3();
       for (let i = 0; i < pos.count; i += 1) {
         v.fromBufferAttribute(pos, i);
         mesh.localToWorld(v);
+        world.add(v);
         const clip = v.clone().project(camera);
         const x = (clip.x * 0.5 + 0.5) * rect.width;
         const y = (-clip.y * 0.5 + 0.5) * rect.height;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
         const inside = clip.z >= -1 && clip.z <= 1
           && x >= -0.5 && x <= rect.width + 0.5
           && y >= -0.5 && y <= rect.height + 0.5;
         if (!inside) allInside = false;
         projected.push(inside);
       }
+      if (pos.count) world.multiplyScalar(1 / pos.count);
     } else {
       allInside = false;
     }
+    const ndc = world.clone().project(camera);
     return {
       target: [target.x, target.y, target.z],
       corners: projected.length,
       allInside: allInside && projected.length === 8,
-      selectionCount: state.selectedIds.length
+      selectionCount: state.selectedIds.length,
+      plate: {
+        minX: minX, minY: minY, maxX: maxX, maxY: maxY,
+        canvasW: rect.width, canvasH: rect.height,
+        world: [world.x, world.y, world.z],
+        ndc: [ndc.x, ndc.y, ndc.z],
+        cam: [camera.position.x, camera.position.y, camera.position.z],
+        radius: spherical.radius,
+        buffer: [canvas.width, canvas.height],
+        css: [viewport.clientWidth, viewport.clientHeight],
+        meshPos: [mesh.position.x, mesh.position.y, mesh.position.z],
+        meshVisible: mesh.visible
+      }
     };
+  };
+
+  // Page points for a smoke drag. `down` is on the axis shaft. `up` is that
+  // same point plus `mm` along the CAD axis, so the drag plane delta is `mm`.
+  window.__cadcamGizmoDrag = function (axis, mm) {
+    placeHandles();
+    const name = axis === 'y' || axis === 'z' ? axis : 'x';
+    const dir = viewApi.GIZMO_AXIS_THREE ? viewApi.GIZMO_AXIS_THREE[name] : null;
+    if (!dir || !gizmo) return null;
+    let mesh = null;
+    for (let i = 0; i < gizmo.pickables.length; i += 1) {
+      const item = gizmo.pickables[i];
+      if (item.userData.handle !== name) continue;
+      if (!item.userData.pickLocal || item.userData.pickLocal.length < 2) continue;
+      let node = item;
+      let visible = true;
+      while (node) {
+        if (node.visible === false) { visible = false; break; }
+        node = node.parent;
+      }
+      if (!visible) continue;
+      mesh = item;
+      break;
+    }
+    if (!mesh) return null;
+    const step = Number(mm);
+    let world = mesh.localToWorld(new THREE.Vector3(0, 0, 0));
+    function pageOf(v) {
+      const rect = canvas.getBoundingClientRect();
+      const clip = v.clone().project(camera);
+      return {
+        x: rect.left + (clip.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-clip.y * 0.5 + 0.5) * rect.height,
+        clipZ: clip.z
+      };
+    }
+    function along(from, extra) {
+      const next = from.clone();
+      next.x += dir[0] * extra;
+      next.y += dir[1] * extra;
+      next.z += dir[2] * extra;
+      return next;
+    }
+    let down = pageOf(world);
+    let handle = pickHandle(down.x, down.y);
+    if (handle !== name) {
+      world = along(world, 4);
+      down = pageOf(world);
+      handle = pickHandle(down.x, down.y);
+    }
+    const shifted = along(world, step);
+    return { axis: name, mm: step, handle: handle, down: down, up: pageOf(shifted) };
   };
 
   function viewCaption() {
@@ -4610,6 +4931,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       holeDepthMode: state.holeDepthMode || 'through',
       holeCountersink: state.holeCountersink === true,
       holeCount: state.holeLog.length,
+      undoDepth: commandStack.depth(),
+      redoDepth: commandStack.redoDepth(),
       holeLog: state.holeLog.slice(),
       facePick: upwardFacePick(),
       holeDefaults: opsApi ? {
@@ -5121,6 +5444,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       message = state.unit === 'mm' ? 'Units: mm' : 'Units: inch';
     } else if (action === 'loadFixture') {
       const name = btn.getAttribute('data-fixture') || '';
+      releaseCommands(commandStack.clear());
       clearOwnedBodies();
       state.primitive = null;
       paintPrimFields();
@@ -5141,8 +5465,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
         message = 'Loaded ' + Module.fixtureName();
         setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
       }
-    } else if (action === 'undo') setHint('Undo');
-    else if (action === 'redo') setHint('Redo');
+    } else if (action === 'undo') {
+      doUndo();
+      message = 'Undo';
+    } else if (action === 'redo') {
+      doRedo();
+      message = 'Redo';
+    }
     else if (action === 'snap') {
       state.snap = !state.snap;
       message = state.snap ? 'Snapping: On' : 'Snapping: Off';
@@ -5449,22 +5778,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const cssW = viewport.clientWidth;
     const cssH = viewport.clientHeight;
     const pr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cssW < 2 || cssH < 2) return;
     if (canvas.width !== Math.floor(cssW * pr) || canvas.height !== Math.floor(cssH * pr)) resize();
-    const w = canvas.width;
-    const h = canvas.height;
+    // This three.js multiplies setViewport and setScissor by the pixel ratio.
+    // CSS pixels keep the plate and the view cube on the phone buffer.
     renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, w, h);
+    renderer.setViewport(0, 0, cssW, cssH);
     renderer.clear(true, true, true);
     renderer.render(scene, camera);
-    const s = Math.max(2, Math.round(cubeCss * pr));
-    const m = Math.round(cubeMargin * pr);
-    renderer.setViewport(w - s - m, h - s - m, s, s);
-    renderer.setScissor(w - s - m, h - s - m, s, s);
+    const cube = Math.max(2, cubeCss);
+    const margin = cubeMargin;
+    renderer.setViewport(cssW - cube - margin, cssH - cube - margin, cube, cube);
+    renderer.setScissor(cssW - cube - margin, cssH - cube - margin, cube, cube);
     renderer.setScissorTest(true);
     renderer.clearDepth();
     syncViewCube();
     renderer.render(vcScene, vcCam);
     renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, cssW, cssH);
     noteFrameSample();
     document.getElementById('viewLabel').textContent = viewCaption();
     paintOrderBadges();
@@ -5776,6 +6107,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       if (searchWasOpen && searchBtn) searchBtn.focus();
       else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return;
+    }
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !isTypingTarget(document.activeElement)) {
+      const key = ev.key.toLowerCase();
+      if (key === 'z' && !ev.shiftKey) {
+        ev.preventDefault();
+        doUndo();
+        return;
+      }
+      if (key === 'y') {
+        ev.preventDefault();
+        doRedo();
+        return;
+      }
     }
     if (ev.ctrlKey || ev.metaKey) return;
     const typing = isTypingTarget(document.activeElement);
