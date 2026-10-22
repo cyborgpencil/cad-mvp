@@ -6469,6 +6469,41 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   }
 
+  function placedSolid(body) {
+    if (!body || !body.shape) return { shape: null, owned: false };
+    if (body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+      const placed = assemblyApi.placedCopy(oc, body.shape, body.placement || { x: 0, y: 0, z: 0 });
+      if (placed && placed.ok && placed.shape) return { shape: placed.shape, owned: true };
+    }
+    return { shape: body.shape, owned: false };
+  }
+
+  function projectBodies() {
+    const views = [];
+    const owned = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      const held = placedSolid(body);
+      if (!held.shape || !held.owned) {
+        views.push(body);
+        continue;
+      }
+      owned.push(held.shape);
+      let features = body.features;
+      const place = body.placement || { x: 0, y: 0, z: 0 };
+      if (Array.isArray(body.features) && body.features.length && (place.x || place.y || place.z)) {
+        try {
+          features = JSON.parse(JSON.stringify(body.features));
+          shiftFeaturePoints(features, place.x || 0, place.y || 0, place.z || 0);
+        } catch (_err) {
+          features = body.features;
+        }
+      }
+      views.push(Object.assign({}, body, { shape: held.shape, features: features }));
+    }
+    return { views: views, owned: owned };
+  }
+
   function saveProject(download) {
     const fail = projectApi && projectApi.ERR_SAVE ? projectApi.ERR_SAVE : 'The project could not be saved.';
     if (!projectApi || !oc || typeof projectApi.documentFromBodies !== 'function') {
@@ -6479,7 +6514,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishProjectHook();
       return { ok: false, text: '', error: fail };
     }
-    const written = projectApi.documentFromBodies(oc, state.bodies);
+    const packed = projectBodies();
+    let written = null;
+    try {
+      written = projectApi.documentFromBodies(oc, packed.views);
+    } finally {
+      for (let i = 0; i < packed.owned.length; i += 1) dropShape(packed.owned[i]);
+    }
     if (!written.ok || typeof written.text !== 'string') {
       state.projectError = written.error || fail;
       toast(state.projectError);
@@ -6671,7 +6712,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < state.bodies.length; i += 1) {
       const body = state.bodies[i];
       if (!body || !body.shape) continue;
-      const measured = projectApi.measureShape(oc, body.shape);
+      const held = placedSolid(body);
+      if (!held.shape) continue;
+      const measured = projectApi.measureShape(oc, held.shape);
+      if (held.owned) dropShape(held.shape);
       rows.push({
         name: body.name,
         volumeMm3: measured.volumeMm3,
