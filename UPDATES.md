@@ -168,3 +168,5 @@ Newest entries at the top.
 - Union, Cut (first picked minus second) and Intersect on two bodies. A failed or empty result is thrown away and both inputs are kept. Mesh settings for display and export: Relative=false, Deflection 0.05 mm, Angle 0.2 rad, ControlSurfaceDeflection=true (team proposal, cites the OCCT guide).
 - CTest 7/7 with occt_gate Passed. Smoke test passed (hotkey 4, op clicks, fixture URLs 404). STLs are mm and watertight. Volumes: union 12000, cut 4000, intersect 4000, box minus cylinder 6431.8 (exact value 6429.2, the meshed hole is slightly undersized), L-bracket 6092.3 with 92 triangles (was 56).
 - Open: only two-body Booleans (Chief to decide); op buttons are low-contrast and no gizmo shows in Item mode; Erik to review index.html and occt-ops.mjs. Commit and push are with Repo Keeper.
+
+## 2026-10-21 19:59 MT - Chief rulings folded into prompts/blink-holes-disc.md (#8 wood-screw leg holes, M3 disc only, two-body Booleans, UI fixes).
