@@ -4,7 +4,7 @@ Source: Erik 2026-10-22 08:40 MT via 3T. Items 1-3 of the wrap-up list. The Chie
 
 ## Rules
 - Web layer only (`web/`). No kernel edits in `src/`. Erik reviews the `index.html` diff.
-- Units stay visible and keep gating Export. The OCCT shape-validity check after operations stays, routes to the log, and never blocks Export. Watertight checks are dropped (Erik 02:17 MT).
+- Units stay visible and keep gating Export. Export also refuses bad meshes with `FAIL: mesh has no triangles.`, `FAIL: mesh is inside-out (negative volume).` or `FAIL: mesh has zero volume.` (merged in #11). The OCCT shape-validity check after operations stays, routes to the log, and never blocks Export. Watertight checks are dropped (Erik 02:17 MT).
 - Keep the 390x844 phone layout rules: 44 px targets, the single-row tool shelf, and the viewport-clear check.
 - Commit incrementally on a branch and open a PR. Never push to main directly.
 

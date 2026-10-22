@@ -41,7 +41,7 @@ Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot toke
 - Never invent missing constraints, tolerances, or material data — stop and record the gap.  
 - Human review of all diffs that touch export, healing, or tessellation.  
 - Keep strict MVP scope; do not expand into full CAM or advanced simulation.  
-- Maintain living reference docs (`mvp/requirements.md`, research notes) and log changes in `UPDATES.md`.  
+- Maintain living reference docs (`mvp/requirements.md`, research notes) and let Repo Keeper log each merged PR in `UPDATES.md`.  
 - Prefer incremental, testable commits over large unreviewed dumps.
 
 ## Token / Time Optimization Rules
@@ -66,3 +66,8 @@ Confirm the above priority and any constraints on the local development machine 
 Three coding agents, in this order: 1. Grok Build, 2. Cursor, 3. Google Antigravity (end of queue).
 - Antigravity: installed on Z13 (v2.12.2), signed in with the cyborgpencil Google account, which has Google AI Ultra. Use it only after Grok Build and Cursor. First trial: one small wrap-up task in its own git worktree, compared against Grok Build on the same kind of task. Same rules as the others: every change lands through a PR, Repo Keeper merges, units check required, OCCT validity check after ops, no watertight gate, no printer send. Sources: research/cursor-and-tooling.md section 3.
 - Gemini Code Assist (GitHub review app): approved for cyborgpencil/cad-mvp as a second PR reviewer. Install is pending Erik's own sign-in. It does not replace CI or the units/size checks.
+
+## Process speed-ups (2026-10-22)
+- All C++ goes through Grok Build or Cursor. Whether small direct C++ edits may skip Grok Build is waiting on Erik's answer.
+- Docs-only and CI-only small edits may be made directly, through a PR as usual.
+- Full list of process rules: `AGENTS.md`, section "Process speed-ups".
