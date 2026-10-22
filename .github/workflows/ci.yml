@@ -1,0 +1,56 @@
+name: CI (build and test, no deploy)
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Ninja and the native C++ toolchain
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++ cmake
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+      - name: Build cadcam.js and cadcam.wasm (single-threaded, see web/BUILD.md)
+        run: |
+          emcmake cmake -S web -B builds/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build builds/wasm
+          test -f web/cadcam.js && test -f web/cadcam.wasm
+      - name: Fetch libcascade 3.1.0 single-threaded WASM
+        run: |
+          python3 web/fetch-libcascade.py
+          test -f web/dist/opencascade_single.wasm
+          test -f web/occt-gate.mjs
+      - name: Assemble site
+        # web/assemble_site.py is the only file list. tests/deploy_smoke.py calls it too.
+        run: python3 web/assemble_site.py _site
+      - name: Install Chrome for the deploy smoke test
+        run: |
+          curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get update
+          sudo apt-get install -y /tmp/chrome.deb
+          google-chrome --version
+      - name: Native CTest
+        # Before upload. occt_gate and deploy_smoke run here, once, and a
+        # failure blocks the Pages artifact. CI=true forbids those skips.
+        env:
+          CI: "true"
+        run: |
+          cmake -S . -B builds/native -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build builds/native
+          ctest --test-dir builds/native --output-on-failure

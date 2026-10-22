@@ -234,3 +234,19 @@ Newest entries at the top.
 - 2026-10-22 02:20 MT (Doc Steward): Chief 02:17 MT HYBRID tooling decision (tonight only) and final order recorded in web/PROGRESS.md; "Overnight override 2026-10-22" section added to mvp/tooling-priority.md, AGENTS.md and the tooling-priority skill; new prompts prompts/nav-cube-mobile.md and prompts/project-save-load.md.
 
 - 2026-10-22 02:22 MT: Overnight ground rules logged in web/PROGRESS.md. Grok Build running cost total (Pilot's reported figures): session 1 $3.17 + session 2 $2.31 = $5.48. Pilot posts each new session's cost and Doc Steward updates this total.
+
+## 2026-10-22 02:2x MT - Doc Steward
+- Applied Pilot's review fixes to prompts/nav-cube-mobile.md and prompts/project-save-load.md (PR-branch workflow, CI-green done rule, separate C++ commits, Chromium-only CI note, #viewCube reuse, BREP binding, units test, test hook). Open for Chief: cube size/hit areas, undo stack on load.
+- 02:23 MT: Chief rulings folded in (88 px cube, corner hit areas 44 px, double-tap home, 250 ms snaps, no ViewHelper; load clears undo with unsaved-changes prompt; stringstream BREP binding; save/load routing depends on CI WASM build). Launches wait for phone fix + ci.yml on main.
+- 02:24 MT: PARKED list renamed to DECISIONS log in web/PROGRESS.md per Erik (via 3T); save/load prompt routing set to Cursor (CI builds WASM from source).
+- 02:25 MT: Research Digest snap-animation note added to nav-cube prompt.
+
+## 2026-10-22 02:49 MT - Doc Steward
+- Phone fix (UI session 2, Grok session 01a1629d) done on Z13, push held: WebKit 3D view renders blank (geometry fine, 80x40x6 mm). Passing: viewport clear 77.4%/56.8% phone, 84.1%/65.7% desktop; Create menu; Part 1 at 390 px; build stamp; CTest 7/7; deploy_smoke; new phone_smoke (WebKit + Chromium iPhone 13); Blink grep; ci.yml written (untracked). Open: blank WebKit view, sticky tooltips, no desktop popover vs phone sheet test. Session hung after done marker, watchdog stopped it 02:43.
+- Cost: session 01a1629d unknown. Running total stays $5.48 + unknown.
+- Next: Grok fix session (WebKit blank root cause, canvas pixel check in phone_smoke, clear tooltips on tap end; no src/ changes). ViewHelper snap note is already in prompts/nav-cube-mobile.md.
+
+## 2026-10-22 03:38 MT - Doc Steward
+- WebKit blank view fixed (our bug, web/index.html only, no src/): hiding #occtBanner resized #viewport, ResizeObserver re-ran setSize and headless WebKit stopped compositing. Banner is now an overlay, setSize only on real size change, tooltips clear on pointerup/touchend/blur. Pixel check fails before (var 9.7) and passes after (WebKit 1565.7, Chromium 1567.6), kept as a hard failure. Sheet at 390 px, popover on desktop verified. CTest 7/7, phone_smoke WebKit + Chromium pass, Blink clean.
+- Cosmetic gaps for next batch: screenshot shows Hole 3 close-up (select before capture), stray Dimensions box unconfirmed.
+- Cost: fix session unknown (watchdog stop 03:29). Running total $5.48 + 2 unknown.

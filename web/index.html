@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#10262b">
-<title>CAD/CAM — Part1</title>
+<title>CAD/CAM — Part 1</title>
 <style>
   :root {
     /* TBD placeholders. research/gui/modo-tools.md: Foundry publishes no Modo UI hex.
@@ -61,7 +61,8 @@
   [hidden] { display: none !important; }
   html, body {
     margin: 0;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     background: var(--bg);
     color: var(--ink);
     font: 13px/1.35 "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -89,10 +90,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    position: relative;
   }
   .topbar {
     height: var(--top-h);
-    padding: env(safe-area-inset-top, 0px) 8px 0;
+    padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
     display: flex;
     align-items: center;
     gap: 4px;
@@ -109,7 +111,7 @@
     padding: 0 10px;
     font-weight: 650;
     max-width: 18vw;
-    min-width: 72px;
+    min-width: 96px;
     min-height: 44px;
     height: 44px;
     background: transparent;
@@ -435,6 +437,11 @@
   }
   #viewport.is-drag { cursor: grabbing; }
   #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .view-cube {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+  }
   .hud {
     position: absolute;
     top: 12px;
@@ -572,22 +579,33 @@
     background: var(--active-fill);
     border-color: var(--active-border);
   }
-  .touch-toolbar {
-    display: none;
-    gap: 8px;
+  .create-menu {
+    position: fixed;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 180px;
+    padding: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
   }
-  .touch-tool {
-    flex: 1;
+  .create-menu button {
     min-width: 44px;
     min-height: 44px;
     height: 44px;
-    border-radius: 10px;
-    background: var(--panel);
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--tab-bg);
     color: var(--ink);
-    border: 1px solid var(--line);
+    text-align: left;
+    padding: 0 12px;
     font-weight: 650;
   }
-  .touch-tool.is-on {
+  .create-menu button.is-on {
     background: var(--active-fill);
     border-color: var(--active-border);
   }
@@ -608,7 +626,7 @@
     left: 8px;
     top: 52px;
     width: min(336px, calc(100% - 16px));
-    max-height: calc(100% - 150px);
+    max-height: min(42vh, calc(100% - 120px));
     overflow: auto;
     display: grid;
     gap: 4px;
@@ -714,7 +732,23 @@
     border-color: var(--active-border);
   }
   .dim-body { display: grid; gap: 4px; }
+  .dim-panel:not(.is-open) .dim-body,
+  .dim-panel:not(.is-open) .gizmo-switch { display: none; }
+  .build-stamp {
+    position: absolute;
+    right: 6px;
+    top: 2px;
+    z-index: 2;
+    padding: 0 4px;
+    background: var(--status);
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 14px;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
   .statusbar {
+    position: relative;
     min-height: var(--status-h);
     height: auto;
     padding: 0 12px;
@@ -858,7 +892,7 @@
     background: var(--panel);
     z-index: 28;
     border-radius: 16px 16px 0 0;
-    padding: 12px;
+    padding: 12px max(12px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
     overflow: auto;
     box-shadow: var(--shadow);
   }
@@ -870,8 +904,16 @@
     background: var(--top);
     border-top: 1px solid var(--line-strong);
   }
+  .phone-tabs { display: flex; flex: 1; min-width: 0; }
+  /* Stay out of the flex column. Hiding the banner on a passing OCCT gate
+     must not change #viewport, or WebKit drops the presented WebGL layer. */
   .interim-banner {
-    flex: none;
+    position: absolute;
+    top: var(--top-h);
+    left: 0;
+    right: 0;
+    z-index: 35;
+    pointer-events: none;
     display: flex;
     align-items: center;
     min-height: 32px;
@@ -1036,12 +1078,12 @@
       max-height: 70vh;
       z-index: 40;
     }
-    .spacer { min-width: 0; }
+    .spacer { display: none; }
     .doc {
-      flex: 1 1 72px;
+      flex: 1 1 auto;
       width: auto;
-      min-width: 72px;
-      max-width: 96px;
+      min-width: 96px;
+      max-width: none;
       min-height: 44px;
       height: 44px;
       padding: 0 8px;
@@ -1087,19 +1129,21 @@
     }
     .vp-bar::-webkit-scrollbar { display: none; }
     .hud { top: 8px; left: 8px; }
-    .touch-toolbar {
-      display: flex;
-      position: absolute;
-      left: 8px;
-      right: 8px;
-      bottom: 76px;
-      z-index: 6;
+    .create-menu {
+      left: 0;
+      right: 0;
+      top: auto;
+      bottom: var(--phone-tabs-h);
+      width: auto;
+      border-radius: 16px 16px 0 0;
+      padding-left: max(8px, env(safe-area-inset-left, 0px));
+      padding-right: max(8px, env(safe-area-inset-right, 0px));
     }
-    .dim-panel { top: 8px; max-height: calc(100% - 150px); }
+    .dim-panel { top: 8px; max-height: min(42vh, calc(100% - 120px)); }
     .phone-tabbar {
       display: flex;
       height: var(--phone-tabs-h);
-      padding: 0 4px env(safe-area-inset-bottom, 0px);
+      padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
       align-items: stretch;
     }
     .phone-tabbar .tab {
@@ -1186,15 +1230,20 @@
       min-height: 48px;
     }
     .hint {
-      flex: 1 1 100%;
-      white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .statusbar {
+      flex-wrap: nowrap;
+      height: 44px;
+      min-height: 44px;
+      overflow: hidden;
     }
     /* The scrolling strip runs past the screen. The Tools sheet has the same actions. */
     .toolbox .tools:not(.export-tools) { display: none; }
-    .touch-toolbar { flex-wrap: wrap; }
-    .touch-tool { flex: 1 1 72px; }
     .gizmo-switch { flex-wrap: wrap; min-width: 0; max-width: 100%; }
     .gizmo-switch button { flex: 1 1 72px; }
     .dim-panel {
@@ -1209,7 +1258,6 @@
       z-index: 7;
     }
     .dim-row { min-width: 0; }
-    .dim-panel:not(.is-open) .dim-body { display: none; }
     .dim-panel.is-open {
       bottom: 8px;
       max-height: 40%;
@@ -1345,6 +1393,7 @@
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 15l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-tools" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-union" viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-cut" viewBox="0 0 24 24"><rect x="4" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14 6h6v12h-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.4 2"/></symbol>
   <symbol id="i-intersect" viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="10" width="10" height="10" fill="currentColor" opacity=".45" stroke="currentColor" stroke-width="1.7"/></symbol>
@@ -1387,7 +1436,7 @@
     <button type="button" class="icon-btn hide-tight" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
     <span class="spacer"></span>
     <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector">Info</button>
-    <input class="doc" id="docName" value="Part1" title="Part1" aria-label="Part name" spellcheck="false" autocomplete="off">
+    <input class="doc" id="docName" value="Part 1" title="Part 1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
     <button type="button" class="icon-btn" id="searchBtn" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search" aria-expanded="false" aria-controls="searchDlg"><svg class="ico"><use href="#i-search"></use></svg></button>
     <div class="units" role="group" aria-label="Units">
@@ -1441,10 +1490,7 @@
     <div class="tools panel" data-panel="model">
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
-        <button type="button" class="tool-btn" data-action="primitive" data-kind="box" data-tool="Box" title="Box"><svg class="ico"><use href="#i-box"></use></svg><span>Box</span></button>
-        <button type="button" class="tool-btn" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder"><svg class="ico"><use href="#i-cyl"></use></svg><span>Cylinder</span></button>
-        <button type="button" class="tool-btn" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc"><svg class="ico"><use href="#i-circle"></use></svg><span>Disc</span></button>
-        <button type="button" class="tool-btn" data-action="holeTool" data-tool="Hole" title="Hole. Tap a face, then set the position, diameter, and depth."><svg class="ico"><use href="#i-hole"></use></svg><span>Hole</span></button>
+        <button type="button" class="tool-btn wide" id="createDesktop" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
         <button type="button" class="tool-btn" data-tool="Extrude (Push/Pull)" title="Extrude (Push/Pull)"><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
@@ -1541,6 +1587,7 @@
 
     <main id="viewport">
       <canvas id="canvas"></canvas>
+      <div id="viewCube" class="view-cube" aria-hidden="true"></div>
       <svg class="measure-layer" id="measureSvg" hidden>
         <line id="mExt1" class="ext"></line>
         <line id="mExt2" class="ext"></line>
@@ -1553,12 +1600,6 @@
         <div><b id="hudName">Body1</b></div>
         <div><span id="hudSize">…</span> · <span id="viewLabel">Iso</span></div>
       </div>
-      <nav id="touchToolbar" class="touch-toolbar" aria-label="Primitives">
-        <button type="button" class="touch-tool" data-action="primitive" data-kind="box" data-tool="Box" title="Box">Box</button>
-        <button type="button" class="touch-tool" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder">Cylinder</button>
-        <button type="button" class="touch-tool" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
-        <button type="button" class="touch-tool" data-action="holeTool" data-tool="Hole" title="Hole">Hole</button>
-      </nav>
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
           <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
@@ -1723,16 +1764,26 @@
     <span class="stat">Watertight <span class="badge" id="statusTight">…</span></span>
     <span class="stat">Volume <b id="statusVol" data-mm="0" data-kind="vol">…</b></span>
     <span class="hint" id="statusHint">Loading checks…</span>
+    <span id="buildStamp" class="build-stamp"></span>
   </footer>
 
-  <nav class="phone-tabbar" role="tablist" aria-label="Workbench">
-    <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false"><svg class="ico"><use href="#i-tab-sketch"></use></svg>Sketch</button>
+  <nav class="phone-tabbar" aria-label="Workbench">
+    <button type="button" class="tab" id="createBtn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg>Create</button>
+    <div class="phone-tabs" role="tablist">
     <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
+    </div>
   </nav>
 </div>
 
+<div id="createMenu" class="create-menu" hidden role="menu" aria-label="Create">
+  <button type="button" role="menuitem" data-action="primitive" data-kind="box" data-tool="Box" title="Box">Box</button>
+  <button type="button" role="menuitem" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder">Cylinder</button>
+  <button type="button" role="menuitem" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
+  <button type="button" role="menuitem" data-action="holeTool" data-tool="Hole" title="Hole">Hole</button>
+  <button type="button" role="menuitem" data-action="newSketch" data-tool="Sketch" title="Sketch">Sketch</button>
+</div>
 <div class="search-dlg" id="searchDlg" hidden>
   <input id="searchInput" placeholder="Search tools" aria-label="Search tools" autocomplete="off" spellcheck="false" autocapitalize="off">
   <ul class="search-list" id="searchList"></ul>
@@ -2019,6 +2070,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   renderer.localClippingEnabled = true;
   renderer.autoClear = false;
   renderer.setClearColor(0x0e2429, 1);
+  window.__cadcamContextLost = 0;
+  window.__cadcamGlInfo = {
+    isWebGL2: !!(renderer.capabilities && renderer.capabilities.isWebGL2),
+    contextLost: 0
+  };
+  canvas.addEventListener('webglcontextlost', function (ev) {
+    window.__cadcamContextLost = (window.__cadcamContextLost || 0) + 1;
+    window.__cadcamGlInfo = window.__cadcamGlInfo || {};
+    window.__cadcamGlInfo.contextLost = window.__cadcamContextLost;
+    window.__cadcamGlInfo.lostType = ev.type;
+    window.__cadcamGlInfo.isWebGL2 = !!(renderer.capabilities && renderer.capabilities.isWebGL2);
+  }, false);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
@@ -2492,7 +2555,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       state.writingFields = false;
     }
     paintHoleChrome();
-    host.classList.toggle('is-open', !isPortraitSheet() || state.dimSheetOpen === true);
+    host.classList.toggle('is-open', state.dimSheetOpen === true);
     const toggle = document.getElementById('dimToggle');
     if (toggle) toggle.setAttribute('aria-expanded', host.classList.contains('is-open') ? 'true' : 'false');
     layoutDimSheet();
@@ -4034,13 +4097,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function layoutPortraitStack() {
     const bar = viewport.querySelector('.vp-bar');
-    const toolbar = document.getElementById('touchToolbar');
-    const portrait = isPortraitSheet();
     const gap = 8;
     const barH = bar ? bar.offsetHeight : 56;
-    if (toolbar) toolbar.style.bottom = portrait ? (gap + barH + gap) + 'px' : '';
-    const toolbarH = toolbar ? toolbar.offsetHeight : 44;
-    return gap + barH + gap + toolbarH + gap;
+    if (!isPortraitSheet()) return gap;
+    return gap + barH + gap;
   }
 
   function layoutDimSheet() {
@@ -4133,8 +4193,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const home = document.getElementById('vcHome');
     home.style.top = margin + 'px';
     home.style.right = (margin + cubeCss + 8) + 'px';
+    placeViewCube();
     layoutDimSheet();
+    placeCreateMenu();
     syncClosedPanels();
+  }
+
+  function placeViewCube() {
+    const el = document.getElementById('viewCube');
+    if (!el) return;
+    const rect = cubeRect();
+    el.style.left = rect.x + 'px';
+    el.style.top = rect.y + 'px';
+    el.style.width = rect.s + 'px';
+    el.style.height = rect.s + 'px';
   }
 
   function resize() {
@@ -4142,11 +4214,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const h = viewport.clientHeight;
     if (w < 2 || h < 2) return;
     const pr = Math.min(window.devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(pr);
-    renderer.setSize(w, h, false);
+    const bw = Math.floor(w * pr);
+    const bh = Math.floor(h * pr);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     layoutChrome();
+    if (canvas.width === bw && canvas.height === bh) return;
+    renderer.setPixelRatio(pr);
+    renderer.setSize(w, h, false);
   }
 
   function fitDistance(radius) {
@@ -4744,6 +4819,67 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     syncClosedPanels();
   }
 
+  function closeCreateMenu() {
+    const menu = document.getElementById('createMenu');
+    if (menu) menu.hidden = true;
+    const openers = document.querySelectorAll('[data-action="createMenu"]');
+    for (let i = 0; i < openers.length; i += 1) openers[i].setAttribute('aria-expanded', 'false');
+  }
+
+  function visibleCreateOpener() {
+    const openers = document.querySelectorAll('[data-action="createMenu"]');
+    for (let i = 0; i < openers.length; i += 1) {
+      const opener = openers[i];
+      const style = getComputedStyle(opener);
+      if (style.display === 'none' || style.visibility === 'hidden') continue;
+      const rect = opener.getBoundingClientRect();
+      if (rect.width >= 1 && rect.height >= 1) return opener;
+    }
+    return null;
+  }
+
+  function placeCreateMenu() {
+    const menu = document.getElementById('createMenu');
+    if (!menu || menu.hidden) return;
+    if (isNarrow()) {
+      menu.style.left = '';
+      menu.style.right = '';
+      menu.style.top = '';
+      menu.style.bottom = '';
+      menu.style.width = '';
+      return;
+    }
+    const opener = visibleCreateOpener();
+    if (!opener) return;
+    const rect = opener.getBoundingClientRect();
+    const width = Math.max(180, rect.width);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - 8 - width;
+    if (left < 8) left = 8;
+    let top = rect.bottom + 4;
+    const height = menu.offsetHeight || 240;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 4);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    menu.style.right = 'auto';
+    menu.style.bottom = 'auto';
+    menu.style.width = width + 'px';
+  }
+
+  function toggleCreateMenu(opener) {
+    const menu = document.getElementById('createMenu');
+    if (!menu) return;
+    const willOpen = menu.hidden === true;
+    closePopups();
+    if (!willOpen) return;
+    menu.hidden = false;
+    const openers = document.querySelectorAll('[data-action="createMenu"]');
+    for (let i = 0; i < openers.length; i += 1) {
+      openers[i].setAttribute('aria-expanded', openers[i] === opener ? 'true' : 'false');
+    }
+    placeCreateMenu();
+  }
+
   function closePopups() {
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
@@ -4751,6 +4887,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     searchDlg.hidden = true;
     if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
     toolsSheet.hidden = true;
+    closeCreateMenu();
   }
 
   function placeSearch() {
@@ -4781,6 +4918,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
     toolsSheet.hidden = true;
+    closeCreateMenu();
     closeDrawers();
     searchDlg.hidden = false;
     searchInput.value = '';
@@ -4809,6 +4947,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
+    closeCreateMenu();
     toolsSheet.hidden = false;
     fillSheet('');
     const firstTool = document.querySelector('#sheetTools button');
@@ -4945,7 +5084,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu') {
       closePopups();
     }
     if (action === 'tab') {
@@ -4967,6 +5106,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     } else if (action === 'toolsMenu') {
       openToolsMenu();
       message = 'Tools menu';
+    } else if (action === 'createMenu') {
+      toggleCreateMenu(btn);
+      message = 'Create';
     } else if (action === 'closeSheet') {
       toolsSheet.hidden = true;
       message = 'Close tools menu';
@@ -5323,8 +5465,65 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     syncViewCube();
     renderer.render(vcScene, vcCam);
     renderer.setScissorTest(false);
+    noteFrameSample();
     document.getElementById('viewLabel').textContent = viewCaption();
     paintOrderBadges();
+  }
+
+  function noteFrameSample() {
+    const gl = renderer.getContext();
+    window.__cadcamGlInfo = {
+      isWebGL2: !!(renderer.capabilities && renderer.capabilities.isWebGL2),
+      contextLost: window.__cadcamContextLost || 0,
+      lostType: window.__cadcamGlInfo && window.__cadcamGlInfo.lostType || ''
+    };
+    if (!gl) {
+      window.__cadcamFrameSample = { afterRender: false, error: 'no-context' };
+      return;
+    }
+    try {
+      if (gl.isContextLost && gl.isContextLost()) {
+        window.__cadcamFrameSample = { afterRender: false, error: 'context-lost' };
+        return;
+      }
+      const w = canvas.width;
+      const h = canvas.height;
+      if (w < 2 || h < 2) return;
+      const pts = [
+        [Math.floor(w * 0.50), Math.floor(h * 0.50)],
+        [Math.floor(w * 0.32), Math.floor(h * 0.40)],
+        [Math.floor(w * 0.68), Math.floor(h * 0.58)],
+        [Math.floor(w * 0.22), Math.floor(h * 0.72)],
+        [Math.max(0, w - 6), Math.max(0, h - 6)]
+      ];
+      const px = new Uint8Array(4);
+      const colors = [];
+      const seen = {};
+      let sum = 0;
+      let sum2 = 0;
+      for (let i = 0; i < pts.length; i += 1) {
+        gl.readPixels(pts[i][0], pts[i][1], 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        const r = px[0];
+        const g = px[1];
+        const b = px[2];
+        const a = px[3];
+        colors.push([r, g, b, a]);
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        sum += lum;
+        sum2 += lum * lum;
+        seen[(r >> 5) + ',' + (g >> 5) + ',' + (b >> 5)] = 1;
+      }
+      const n = colors.length;
+      const mean = sum / n;
+      window.__cadcamFrameSample = {
+        afterRender: true,
+        colors: colors,
+        distinct32: Object.keys(seen).length,
+        variance: (sum2 / n) - (mean * mean)
+      };
+    } catch (err) {
+      window.__cadcamFrameSample = { afterRender: false, error: String(err && err.message ? err.message : err) };
+    }
   }
 
   viewport.addEventListener('pointerdown', function (ev) {
@@ -5487,7 +5686,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     const btn = ev.target.closest('[data-tool]');
     if (!btn) {
-      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet')) {
+      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu')) {
         const searchWasOpen = !searchDlg.hidden;
         closePopups();
         if (searchWasOpen && searchBtn) searchBtn.focus();
@@ -5617,6 +5816,45 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       ev.preventDefault();
     }
   });
+
+  const parkedTitles = [];
+
+  function parkTitle(el) {
+    if (!el || el.nodeType !== 1 || !el.hasAttribute('title')) return;
+    if (el.hasAttribute('data-parked-title')) return;
+    el.setAttribute('data-parked-title', el.getAttribute('title') || '');
+    el.removeAttribute('title');
+    parkedTitles.push(el);
+  }
+
+  function dismissStuckTooltips(ev) {
+    let node = ev && ev.target && ev.target.nodeType === 1 ? ev.target : null;
+    while (node) {
+      parkTitle(node);
+      node = node.parentElement;
+    }
+    const hovered = document.querySelectorAll(':hover');
+    for (let i = 0; i < hovered.length; i += 1) parkTitle(hovered[i]);
+    if (document.activeElement) parkTitle(document.activeElement);
+  }
+
+  function restoreParkedTitles() {
+    for (let i = 0; i < parkedTitles.length; i += 1) {
+      const el = parkedTitles[i];
+      if (!el.hasAttribute('title') && el.hasAttribute('data-parked-title')) {
+        el.setAttribute('title', el.getAttribute('data-parked-title') || '');
+      }
+      el.removeAttribute('data-parked-title');
+    }
+    parkedTitles.length = 0;
+  }
+
+  document.addEventListener('pointerup', dismissStuckTooltips, true);
+  document.addEventListener('touchend', dismissStuckTooltips, true);
+  window.addEventListener('blur', dismissStuckTooltips);
+  document.addEventListener('pointermove', function () {
+    if (parkedTitles.length) restoreParkedTitles();
+  }, true);
 
   function onViewportChange() {
     const portrait = window.matchMedia('(orientation: portrait)').matches;

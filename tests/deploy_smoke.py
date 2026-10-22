@@ -18,12 +18,18 @@ Asserts window.__cadcamExportState.occtReady for:
   ?demo=booleans&op=    union, cut, and intersect each PASS
   ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
   /?fixture=closed_box  plain 4 key selects the whole body
-  portrait 390x844      touch-create box, cylinder, and disc; bottom sheet does not cover Home;
-                        move, rotate, and resize a box with taps and typed values;
-                        no page-level horizontal scroll; visible buttons and the status
-                        line stay inside the width; the sheet and toolbar do not scroll
-                        sideways unless marked data-hscroll
-  portrait holes        three countersunk holes on a plate; volumes logged; same overflow checks
+  portrait 390x844      Create menu (Box, Cylinder, Disc, Hole, Sketch; no primitive
+                        buttons left outside it), then box, cylinder, and disc;
+                        uncovered viewport >= 70% with the dimension panel collapsed
+                        and >= 50% with it open; the panel stays shut until a tap;
+                        build stamp is visible and matches the script ?v= param;
+                        bottom sheet does not cover Home; move, rotate, and resize
+                        a box with taps and typed values; no page-level horizontal
+                        scroll; visible buttons and the status line stay inside the
+                        width; the sheet and toolbar do not scroll sideways unless
+                        marked data-hscroll; Part 1 is fully visible, min-width 96px
+  portrait holes        three countersunk holes on a plate; volumes logged; same overflow
+                        and coverage checks
   portrait inspector    closed right panel is inert, not rendered, not tappable, and not focusable
   /tests/fixtures/lbracket.json, /fixtures/lbracket.json,
   /tests/fixtures/blink.json, and /fixtures/blink.json return 404
@@ -505,6 +511,8 @@ CASES = (
 
 def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[str]:
     problems: list[str] = []
+    if state.get("dimSheetOpen") is True:
+        problems.append(f"{name}: dimension panel opened without a tap")
     if state.get("occtReady") is not True:
         problems.append(f"{name}: occtReady is not true")
     if name == "closed_box":
@@ -759,10 +767,24 @@ def touch_tap(cdp: Cdp, x: float, y: float) -> None:
     cdp.call("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
 
 
-def toolbar_point_expr(kind: str) -> str:
+def create_point_expr(selector: str) -> str:
     return (
         "(function(){"
-        f"var b=document.querySelector('#touchToolbar [data-kind=\"{kind}\"]');"
+        "var menu=document.getElementById('createMenu');"
+        "if(!menu) return 'missing menu';"
+        "if(menu.hidden){"
+        "var openers=document.querySelectorAll('[data-action=\"createMenu\"]');"
+        "var opener=null;"
+        "for(var i=0;i<openers.length;i++){"
+        "var st=getComputedStyle(openers[i]);"
+        "var r=openers[i].getBoundingClientRect();"
+        "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
+        "opener=openers[i];break;"
+        "}"
+        "if(!opener) return 'missing create';"
+        "opener.click();"
+        "}"
+        f"var b=menu.querySelector('{selector}');"
         "if(!b) return 'missing';"
         "var st=getComputedStyle(b);"
         "if(st.display==='none'||st.visibility==='hidden') return 'hidden';"
@@ -771,6 +793,10 @@ def toolbar_point_expr(kind: str) -> str:
         "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height});"
         "})()"
     )
+
+
+def toolbar_point_expr(kind: str) -> str:
+    return create_point_expr(f'[data-kind="{kind}"]')
 
 
 TARGET_EXPR = (
@@ -886,6 +912,283 @@ def tap_selector(cdp: Cdp, selector: str, label: str) -> list[str]:
         return [f"{label} {box['w']}x{box['h']}"]
     touch_tap(cdp, float(box["x"]), float(box["y"]))
     return []
+
+
+def tap_point(cdp: Cdp, expression: str, label: str) -> list[str]:
+    raw, err = eval_expr(cdp, expression)
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return [f"{label} {raw or err}"]
+    box = json.loads(raw)
+    if float(box["w"]) < 44 or float(box["h"]) < 44:
+        return [f"{label} {box['w']}x{box['h']}"]
+    touch_tap(cdp, float(box["x"]), float(box["y"]))
+    return []
+
+
+CREATE_MENU_EXPR = r"""
+(function(){
+  var problems = [];
+  var menu = document.getElementById('createMenu');
+  if (!menu) return JSON.stringify(['missing create menu']);
+  var stray = document.querySelectorAll('[data-action="primitive"], [data-action="holeTool"]');
+  for (var i = 0; i < stray.length; i++) {
+    if (!menu.contains(stray[i])) {
+      var strayLabel = stray[i].getAttribute('data-tool') || stray[i].getAttribute('data-kind') || 'button';
+      problems.push('primitive outside menu ' + strayLabel);
+    }
+  }
+  function visibleOpener() {
+    var openers = document.querySelectorAll('[data-action="createMenu"]');
+    for (var n = 0; n < openers.length; n++) {
+      var st = getComputedStyle(openers[n]);
+      var r = openers[n].getBoundingClientRect();
+      if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
+      return openers[n];
+    }
+    return null;
+  }
+  var opener = visibleOpener();
+  if (!opener) problems.push('missing create opener');
+  else {
+    var openerBox = opener.getBoundingClientRect();
+    if (openerBox.width + 0.5 < 44 || openerBox.height + 0.5 < 44) {
+      problems.push('create opener ' + openerBox.width.toFixed(1) + 'x' + openerBox.height.toFixed(1));
+    }
+    if (menu.hidden) opener.click();
+  }
+  if (menu.hidden) problems.push('menu stayed hidden');
+  var want = ['Box', 'Cylinder', 'Disc', 'Hole', 'Sketch'];
+  var items = menu.querySelectorAll('button');
+  if (items.length !== want.length) problems.push('create items ' + items.length);
+  var iw = window.innerWidth;
+  var ih = window.innerHeight;
+  for (var j = 0; j < want.length; j++) {
+    var item = items[j];
+    if (!item) continue;
+    var text = (item.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text !== want[j]) problems.push('create item ' + j + ' ' + text);
+    var itemBox = item.getBoundingClientRect();
+    var itemStyle = getComputedStyle(item);
+    if (itemStyle.display === 'none' || itemStyle.visibility === 'hidden' || itemBox.width < 1 || itemBox.height < 1) {
+      problems.push(want[j] + ' hidden');
+      continue;
+    }
+    if (itemBox.width + 0.5 < 44 || itemBox.height + 0.5 < 44) {
+      problems.push(want[j] + ' ' + itemBox.width.toFixed(1) + 'x' + itemBox.height.toFixed(1));
+    }
+    if (itemBox.left < -1 || itemBox.top < -1 || itemBox.right > iw + 1 || itemBox.bottom > ih + 1) {
+      problems.push(want[j] + ' offscreen ' + itemBox.left.toFixed(0) + ',' + itemBox.top.toFixed(0));
+    }
+  }
+  var menuBox = menu.getBoundingClientRect();
+  var gapBelow = ih - menuBox.bottom;
+  var sheetWide = menuBox.width + 1 >= Math.min(iw - 4, Math.max(iw * 0.85, iw - 24));
+  var sheet = sheetWide && menuBox.left <= 4 && gapBelow >= 36 && gapBelow <= 140;
+  var popover = menuBox.width < Math.min(420, iw * 0.5) && menuBox.left > 2 && !sheet;
+  var shape = 'w=' + menuBox.width.toFixed(0) + ' left=' + menuBox.left.toFixed(0) + ' gap=' + gapBelow.toFixed(0);
+  if (iw >= 900) {
+    if (!popover) problems.push('create popover missing ' + shape);
+    if (sheet) problems.push('create sheet visible on desktop ' + shape);
+  } else if (iw <= 820) {
+    if (!sheet) problems.push('create sheet missing ' + shape);
+    if (popover) problems.push('create popover visible at ' + Math.round(iw) + ' ' + shape);
+  }
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
+  if (!menu.hidden) problems.push('esc did not close create');
+  var expanded = document.querySelectorAll('[data-action="createMenu"]');
+  for (var k = 0; k < expanded.length; k++) {
+    if (expanded[k].getAttribute('aria-expanded') !== 'false') problems.push('esc aria-expanded');
+  }
+  opener = visibleOpener();
+  if (opener) opener.click();
+  if (menu.hidden) problems.push('create did not reopen');
+  var canvas = document.getElementById('canvas');
+  if (canvas) canvas.click();
+  if (!menu.hidden) problems.push('outside did not close create');
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def create_menu_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, CREATE_MENU_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"create menu {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"create menu {raw}"]
+    if not isinstance(found, list):
+        return [f"create menu {raw}"]
+    return [str(item) for item in found]
+
+
+COVERAGE_EXPR = r"""
+(function(){
+  var wantOpen = __WANT_OPEN__;
+  var problems = [];
+  var canvas = document.getElementById('canvas');
+  var panel = document.getElementById('dimPanel');
+  var cube = document.getElementById('viewCube');
+  var menu = document.getElementById('createMenu');
+  if (!canvas) return JSON.stringify({ratio:0, problems:['missing canvas']});
+  var canvasBox = canvas.getBoundingClientRect();
+  if (canvasBox.width < 1 || canvasBox.height < 1) problems.push('canvas empty');
+  if (!panel || panel.hidden) problems.push('dimension panel hidden');
+  var open = !!(panel && panel.classList.contains('is-open'));
+  if (wantOpen && !open) problems.push('panel not open');
+  if (!wantOpen && open) problems.push('panel opened without a tap');
+  if (menu && !menu.hidden) problems.push('create menu open during coverage');
+  function shown(el) {
+    if (!el || el.hidden || (el.closest && el.closest('[hidden]'))) return null;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    return r;
+  }
+  var cubeBox = shown(cube);
+  if (!cube || !cubeBox) problems.push('view cube missing');
+  var selectors = ['.vp-bar', '#dimPanel', '#vcHome', '#viewCube', '.statusbar', '#searchDlg'];
+  var rects = [];
+  var cubeOnCanvas = false;
+  for (var s = 0; s < selectors.length; s++) {
+    var el = document.querySelector(selectors[s]);
+    var box = shown(el);
+    if (!box) continue;
+    var left = Math.max(canvasBox.left, box.left);
+    var top = Math.max(canvasBox.top, box.top);
+    var right = Math.min(canvasBox.right, box.right);
+    var bottom = Math.min(canvasBox.bottom, box.bottom);
+    if (right - left < 0.5 || bottom - top < 0.5) continue;
+    if (selectors[s] === '#viewCube') cubeOnCanvas = true;
+    rects.push({l:left, t:top, r:right, b:bottom});
+  }
+  if (cubeBox && !cubeOnCanvas) problems.push('view cube off the canvas');
+  var gridW = Math.ceil(canvasBox.width);
+  var gridH = Math.ceil(canvasBox.height);
+  var area = gridW * gridH;
+  var covered = 0;
+  if (area > 0 && area <= 4000000) {
+    var grid = new Uint8Array(area);
+    for (var i = 0; i < rects.length; i++) {
+      var rect = rects[i];
+      var x0 = Math.max(0, Math.floor(rect.l - canvasBox.left));
+      var y0 = Math.max(0, Math.floor(rect.t - canvasBox.top));
+      var x1 = Math.min(gridW, Math.ceil(rect.r - canvasBox.left));
+      var y1 = Math.min(gridH, Math.ceil(rect.b - canvasBox.top));
+      for (var y = y0; y < y1; y++) {
+        var row = y * gridW;
+        for (var x = x0; x < x1; x++) {
+          var idx = row + x;
+          if (!grid[idx]) { grid[idx] = 1; covered++; }
+        }
+      }
+    }
+  } else if (area > 4000000) {
+    problems.push('canvas grid ' + gridW + 'x' + gridH);
+  }
+  var ratio = area ? (area - covered) / area : 0;
+  var need = wantOpen ? 0.5 : 0.7;
+  if (ratio + 1e-9 < need) problems.push('uncovered ' + ratio.toFixed(3) + ' < ' + need.toFixed(2));
+  return JSON.stringify({ratio:ratio, need:need, covered:covered, area:area, problems:problems});
+})()
+"""
+
+
+def coverage_problems(cdp: Cdp, want_open: bool) -> list[str]:
+    expression = COVERAGE_EXPR.replace("__WANT_OPEN__", "true" if want_open else "false")
+    raw, err = eval_expr(cdp, expression)
+    label = "open" if want_open else "collapsed"
+    if err or not isinstance(raw, str):
+        return [f"coverage {label} {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"coverage {label} {raw}"]
+    if not isinstance(found, dict):
+        return [f"coverage {label} {raw}"]
+    ratio = found.get("ratio")
+    try:
+        ratio_text = f"{float(ratio):.1%}"
+    except (TypeError, ValueError):
+        ratio_text = str(ratio)
+    print(f"viewport uncovered {ratio_text} ({label})", flush=True)
+    problems = found.get("problems") if isinstance(found.get("problems"), list) else [raw]
+    return [f"coverage {label}: {item}" for item in problems]
+
+
+STAMP_EXPR = r"""
+(function(){
+  var problems = [];
+  var el = document.getElementById('buildStamp');
+  if (!el) return JSON.stringify({stamp:'', problems:['missing stamp']});
+  var text = (el.textContent || '').replace(/\s+/g, '');
+  var st = getComputedStyle(el);
+  var box = el.getBoundingClientRect();
+  if (!text) problems.push('empty stamp');
+  if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) problems.push('stamp hidden');
+  if (box.right <= 0 || box.bottom <= 0 || box.left >= window.innerWidth || box.top >= window.innerHeight) {
+    problems.push('stamp offscreen');
+  }
+  var scripts = document.querySelectorAll('script[src]');
+  if (!scripts.length) problems.push('no script src');
+  for (var i = 0; i < scripts.length; i++) {
+    try {
+      var srcUrl = new URL(scripts[i].src, location.href);
+      if (srcUrl.searchParams.get('v') !== text) problems.push('script v ' + scripts[i].getAttribute('src'));
+    } catch (err) {
+      problems.push('script url');
+    }
+  }
+  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'selection.mjs', 'viewport-selection.mjs'];
+  var found = {};
+  var entries = performance.getEntriesByType('resource');
+  for (var e = 0; e < entries.length; e++) {
+    var url = entries[e].name || '';
+    for (var n = 0; n < names.length; n++) {
+      if (url.indexOf('/' + names[n]) !== -1) found[names[n]] = url;
+    }
+  }
+  for (var m = 0; m < names.length; m++) {
+    if (!found[names[m]]) {
+      problems.push('missing module ' + names[m]);
+      continue;
+    }
+    try {
+      var modUrl = new URL(found[names[m]], location.href);
+      if (modUrl.searchParams.get('v') !== text) problems.push('module v ' + names[m]);
+    } catch (err2) {
+      problems.push('module url ' + names[m]);
+    }
+  }
+  return JSON.stringify({stamp:text, problems:problems});
+})()
+"""
+
+
+def stamp_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, STAMP_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"build stamp {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"build stamp {raw}"]
+    if not isinstance(found, dict):
+        return [f"build stamp {raw}"]
+    stamp = str(found.get("stamp") or "")
+    problems = found.get("problems") if isinstance(found.get("problems"), list) else [raw]
+    if problems:
+        return [f"build stamp: {item}" for item in problems]
+    print(f"build stamp {stamp} matches script urls", flush=True)
+    return []
+
+
+CLICK_DIM_EXPR = (
+    "(function(){var b=document.getElementById('dimToggle');"
+    "if(!b)return 'missing';b.click();return 'clicked';})()"
+)
 
 
 PORTRAIT_FIT_EXPR = r"""
@@ -1044,12 +1347,15 @@ CHROME_ROW_EXPR = r"""
   }
   var ns = getComputedStyle(name);
   var nameMin = parseFloat(ns.minWidth);
-  if (!(nameMin >= 64) || !(nameMin <= 96)) problems.push('part name min-width ' + ns.minWidth);
+  if (!(nameMin >= 96)) problems.push('part name min-width ' + ns.minWidth);
+  if (window.innerWidth <= 820 && !(parseFloat(ns.flexGrow) >= 1)) problems.push('part name flex ' + ns.flexGrow);
   if (ns.overflowX !== 'hidden' && ns.overflowX !== 'clip' && ns.overflow !== 'hidden' && ns.overflow !== 'clip') {
     problems.push('part name overflow ' + ns.overflowX);
   }
   if (ns.textOverflow !== 'ellipsis') problems.push('part name text-overflow ' + ns.textOverflow);
   var savedName = name.value;
+  if (savedName !== 'Part 1') problems.push('part name value ' + savedName);
+  if (name.scrollWidth > name.clientWidth + 1) problems.push('part name clipped ' + name.scrollWidth + '>' + name.clientWidth);
   name.value = 'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM';
   if (name.scrollWidth <= name.clientWidth + 1) problems.push('part name did not truncate');
   name.value = savedName;
@@ -1452,6 +1758,8 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
     problems: list[str] = []
     inspector_checked = False
     search_checked = False
+    stamp_checked = False
+    create_checked = False
     for spec in PORTRAIT:
         kind = str(spec["kind"])
         url = origin + "/"
@@ -1475,6 +1783,20 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
                 problems.append(f"portrait {kind} search")
                 problems.extend(search_found)
                 return problems
+        if not stamp_checked:
+            stamp_checked = True
+            stamp_found = stamp_problems(cdp)
+            if stamp_found:
+                problems.append(f"portrait {kind} stamp")
+                problems.extend(stamp_found)
+                return problems
+        if not create_checked:
+            create_checked = True
+            menu_found = create_menu_problems(cdp)
+            if menu_found:
+                problems.append(f"portrait {kind} create menu")
+                problems.extend(menu_found)
+                return problems
         raw, err = eval_expr(cdp, toolbar_point_expr(kind))
         if err or not isinstance(raw, str) or not raw.startswith("{"):
             problems.append(f"portrait {kind} toolbar {raw or err}")
@@ -1495,6 +1817,11 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if layout_problems:
             problems.append(f"portrait {kind} layout")
             problems.extend(layout_problems)
+            return problems
+        covered = coverage_problems(cdp, False)
+        if covered:
+            problems.append(f"portrait {kind} coverage")
+            problems.extend(covered)
             return problems
         fit_problems = portrait_fit_problems(cdp)
         if fit_problems:
@@ -1532,6 +1859,11 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if open_layout:
             problems.append(f"portrait {kind} expanded layout")
             problems.extend(open_layout)
+            return problems
+        open_covered = coverage_problems(cdp, True)
+        if open_covered:
+            problems.append(f"portrait {kind} open coverage")
+            problems.extend(open_covered)
             return problems
         open_fit = portrait_fit_problems(cdp)
         if open_fit:
@@ -1702,6 +2034,9 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     open_fit = portrait_fit_problems(cdp)
     if open_fit:
         return ["portrait holes expanded overflow", *open_fit]
+    open_covered = coverage_problems(cdp, True)
+    if open_covered:
+        return ["portrait holes open coverage", *open_covered]
     collapse = tap_selector(cdp, "#dimToggle", "portrait holes collapse")
     if collapse:
         return collapse
@@ -1718,6 +2053,9 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     shut_fit = portrait_fit_problems(cdp)
     if shut_fit:
         return ["portrait holes collapsed overflow", *shut_fit]
+    shut_covered = coverage_problems(cdp, False)
+    if shut_covered:
+        return ["portrait holes collapsed coverage", *shut_covered]
     topped, top_err = eval_expr(
         cdp,
         "(function(){var b=document.querySelector('[data-action=\"view\"][data-view=\"top\"]');"
@@ -1735,7 +2073,7 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
         if zoom_err or zoomed != "clicked":
             return [f"portrait holes zoom {zoomed or zoom_err}"]
     time.sleep(0.2)
-    hole_button = tap_selector(cdp, '#touchToolbar [data-action="holeTool"]', "portrait holes tool")
+    hole_button = tap_point(cdp, create_point_expr('[data-action="holeTool"]'), "portrait holes tool")
     if hole_button:
         return hole_button
     armed, arm_problems = wait_hole_state(
@@ -1918,6 +2256,9 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     hidden_fit = portrait_fit_problems(cdp)
     if hidden_fit:
         return ["portrait holes hidden overflow", *hidden_fit]
+    hidden_covered = coverage_problems(cdp, False)
+    if hidden_covered:
+        return ["portrait holes hidden coverage", *hidden_covered]
     closed = closed_inspector_problems(cdp)
     if closed:
         return ["portrait holes closed inspector", *closed]
@@ -2095,6 +2436,7 @@ def run(omit: list[str]) -> int:
         print(f"serving {origin} cacheDisabled=true", flush=True)
 
         failures: list[str] = []
+        stamped = False
         for case in CASES:
             url = origin + case["query"]
             print(f"load {case['name']} {url}", flush=True)
@@ -2137,6 +2479,13 @@ def run(omit: list[str]) -> int:
                 failures.extend(case_problems)
                 failures.append(shown)
                 break
+            if not stamped:
+                stamped = True
+                stamp_found = stamp_problems(cdp)
+                if stamp_found:
+                    failures.append(f"{case['name']} stamp")
+                    failures.extend(stamp_found)
+                    break
         if not failures:
             for op in ("union", "cut", "intersect"):
                 url = origin + "/?pair=overlap"
@@ -2204,6 +2553,7 @@ def run(omit: list[str]) -> int:
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
                 desktop_bar.extend(search_disclosure_problems(cdp))
+                desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")
                     failures.extend(desktop_bar[:40])
@@ -2221,10 +2571,27 @@ def run(omit: list[str]) -> int:
                     failures.append(f"home desktop metrics {exc}")
                 else:
                     time.sleep(0.3)
-                    home_found = home_aim_round(cdp, "desktop")
-                    if home_found:
-                        failures.append("desktop home")
-                        failures.extend(home_found[:40])
+                    cover_steps = coverage_problems(cdp, False)
+                    if not cover_steps:
+                        toggled, toggle_err = eval_expr(cdp, CLICK_DIM_EXPR)
+                        if toggle_err or toggled != "clicked":
+                            cover_steps = [f"desktop dim toggle {toggled or toggle_err}"]
+                    if not cover_steps:
+                        cover_steps = coverage_problems(cdp, True)
+                    if not cover_steps:
+                        toggled, toggle_err = eval_expr(cdp, CLICK_DIM_EXPR)
+                        if toggle_err or toggled != "clicked":
+                            cover_steps = [f"desktop dim close {toggled or toggle_err}"]
+                    if not cover_steps:
+                        cover_steps = coverage_problems(cdp, False)
+                    if cover_steps:
+                        failures.append("desktop coverage")
+                        failures.extend(cover_steps[:40])
+                    else:
+                        home_found = home_aim_round(cdp, "desktop")
+                        if home_found:
+                            failures.append("desktop home")
+                            failures.extend(home_found[:40])
         if not failures:
             portrait_problems = run_portrait(cdp, origin)
             if portrait_problems:

@@ -7,8 +7,11 @@ of these names in the workflow.
 """
 from __future__ import annotations
 
+import re
 import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 # Site root. `*.mjs` is every module the page loads, including
@@ -82,6 +85,84 @@ def manifest(web: Path | None = None) -> list[str]:
     return names
 
 
+_STAMP_RE = re.compile(r"^[A-Za-z0-9._-]{4,40}$")
+
+
+def build_stamp() -> str:
+    """Short git hash, or a UTC build id when git is not available."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=repo_root(),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        out = None
+    if out is not None and out.returncode == 0:
+        stamp = out.stdout.strip()
+        if _STAMP_RE.fullmatch(stamp):
+            return stamp
+    return "b" + time.strftime("%Y%m%d%H%M%S", time.gmtime())
+
+
+def _with_version(url: str, stamp: str) -> str:
+    base, sep, query = url.partition("?")
+    parts = [part for part in query.split("&") if part and not part.startswith("v=")]
+    parts.append("v=" + stamp)
+    return base + "?" + "&".join(parts)
+
+
+def stamp_static_imports(source: str, stamp: str) -> str:
+    """Cache-bust relative .mjs imports in an assembled module."""
+
+    def repl(match: re.Match[str]) -> str:
+        return match.group(1) + _with_version(match.group(2), stamp) + match.group(3)
+
+    return re.sub(
+        r"""(\bfrom\s+["'])(\./[^"']+\.mjs)(["'])""",
+        repl,
+        source,
+    )
+
+
+def stamp_page(html: str, stamp: str) -> str:
+    """Fill the visible stamp and cache-bust the page's script and module URLs."""
+    if not _STAMP_RE.fullmatch(stamp):
+        raise SystemExit("refuse to stamp the page with " + stamp)
+
+    def script_src(match: re.Match[str]) -> str:
+        return match.group(1) + _with_version(match.group(2), stamp) + match.group(3)
+
+    def module_spec(match: re.Match[str]) -> str:
+        return match.group(1) + _with_version(match.group(2), stamp) + match.group(3)
+
+    html = re.sub(
+        r'(<script\b[^>]*\bsrc=["\'])([^"\']+)(["\'])',
+        script_src,
+        html,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r"""(import\s*\(\s*["'])([^"']+)(["']\s*\))""",
+        module_spec,
+        html,
+    )
+    stamped, count = re.subn(
+        r'(<[^>]*\bid=["\']buildStamp["\'][^>]*>)([^<]*)(</)',
+        lambda match: match.group(1) + stamp + match.group(3),
+        html,
+        count=1,
+    )
+    if count != 1:
+        raise SystemExit("index.html has no build stamp element")
+    if f">{stamp}<" not in stamped:
+        raise SystemExit("build stamp was not written into the page")
+    return stamped
+
+
 def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
     """Copy the Pages tree into `dest` (a directory named `_site`).
 
@@ -112,6 +193,19 @@ def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(web / rel, target)
         copied.append(rel)
+    if "index.html" in copied:
+        stamp = build_stamp()
+        page = dest / "index.html"
+        page.write_text(stamp_page(page.read_text(encoding="utf-8"), stamp), encoding="utf-8")
+        for rel in ("occt-primitives.mjs", "occt-ops.mjs"):
+            if rel not in copied:
+                continue
+            module = dest / rel
+            module.write_text(
+                stamp_static_imports(module.read_text(encoding="utf-8"), stamp),
+                encoding="utf-8",
+            )
+        print(f"build stamp {stamp}")
     (dest / ".nojekyll").write_bytes(b"")
     leaked = (
         dest / "tests" / "fixtures" / "lbracket.json",

@@ -755,7 +755,7 @@ if (plateShape) plateShape.delete();
 const pageSrc = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
 expect('no bracket demo in the page', pageSrc.indexOf('demo=blink') === -1 && pageSrc.indexOf('buildBlink') === -1);
 expect('disc hook', pageSrc.indexOf("primKind === 'disc'") !== -1);
-expect('touch toolbar', pageSrc.indexOf('id="touchToolbar"') !== -1);
+expect('create menu', pageSrc.indexOf('id="createMenu"') !== -1 && pageSrc.indexOf('data-action="createMenu"') !== -1);
 expect('decimal keypad', pageSrc.indexOf('inputmode="decimal"') !== -1);
 expect('gizmo switch', pageSrc.indexOf('id="gizmoSwitch"') !== -1 && pageSrc.indexOf('data-mode="rotate"') !== -1 && pageSrc.indexOf('data-mode="scale"') !== -1);
 expect('portrait sheet', pageSrc.indexOf('id="dimToggle"') !== -1 && pageSrc.indexOf('id="dimBody"') !== -1 && pageSrc.indexOf('primRz') !== -1);
