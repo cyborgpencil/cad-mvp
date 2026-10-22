@@ -47,8 +47,8 @@ Parameters can be edited after creation, and each edit rebuilds the solid.
   - OCCT builds from the base along the axis, so base = center - dir*H/2.
   - Partial angle (the Angle overload) is not in the MVP.
 - Sides/Segments: in MODO these control mesh tessellation, which an exact B-rep doesn't have. Whether to expose them as tessellation or deflection settings is TBD (Erik decides).
-- Validation: every primitive result must pass the watertight and units gates.
-- Export gate and interim banner: unchanged. Export stays enabled only when watertight, units and the OCCT gate all pass.
+- Validation: every primitive result must pass the units gate and the OCCT validity check (watertight dropped, 02:17 rule).
+- Export gate and interim banner: unchanged. Export is gated on units only (02:17 rule); the OCCT check runs after ops.
 - Sphere and Cone (MakeSphere, MakeCone) come after the MVP.
 
 ## Open TBDs

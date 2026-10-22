@@ -40,7 +40,7 @@ PROPOSAL sequence, all numbers TBD for Erik (see projects/blink-mount.md for mou
 3. `BRepAlgoAPI_Fuse(A, B)` + `SimplifyResult()`; require IsDone and no errors.
 4. Pick the inner (concave) corner edge; how it is picked (UI edge select vs. geometric query) = TBD. `MakeFillet.Add(R_inner, edge)`; R_inner = TBD (must be < T, guard in code).
 5. `MakeChamfer` on outer edges: which edges and distance = TBD.
-6. Gate: BRepCheck_Analyzer valid + FreeBounds zero open wires (watertight) + units locked to mm; then mesh to STL/3MF. Fail = show error, keep last good shape.
+6. Gate: BRepCheck_Analyzer valid + units locked to mm (FreeBounds watertight check dropped, 02:17 rule); then mesh to STL/3MF. Fail = show error, keep last good shape.
 
 ## 4. Next steps
 

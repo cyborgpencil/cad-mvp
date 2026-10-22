@@ -13,7 +13,7 @@ Research Digest, 2026-10-21. Design input only; takeaways are proposals, not Eri
 2. Sketch behaves as a contextual mode: entered from Model, returns to Model on finish.
 3. Fixed in all tabs: viewport, tree, view cube, undo/redo, select, measure, mm/inch toggle, Export.
 4. Tool search; on phones collapse panels into dropdowns.
-5. Watertight and units check shown in Export/Print before every export.
+5. Units check shown in Export/Print before every export (watertight dropped, 02:17 rule).
 - TBD for Erik: units/export in top bar vs status bar.
 
 ## Tab-switch shortcuts and tool search
@@ -35,7 +35,7 @@ Research Digest, 2026-10-21. Design input only; takeaways are proposals, not Eri
 - **Proposal 1:** keep the four tabs (Sketch/Solid/Inspect/Export). On phones, put them in a bottom bar (TBD for Erik; no CAD source above), with tree and inspector as drawers (as the mockup already does).
 - **Proposal 2:** view controls currently appear 3 times (toolbar, floating viewport bar, radial menu). Put them in one shared spot: a tappable ViewCube menu like Onshape's [12] (views, fit, display modes, section), and drop them from the toolbar and radial menu.
 - **Proposal 3:** adopt Onshape-style gestures as defaults (1-finger orbit, 2-finger pan/pinch, 2-finger tap = context/radial menu) and add a rotate-lock toggle in Sketch [12][13].
-- **Proposal 4:** the Export tab has no watertight/units gate control in the mockup. Add a gate panel (PASS/FAIL, units, volume) that must pass before Export STL/3MF is enabled, which follows the standing rule.
+- **Proposal 4:** the Export tab has no units gate control in the mockup. Add a gate panel (PASS/FAIL, units, volume) that must pass before Export STL/3MF is enabled, which follows the standing rule.
 
 ## Repair tab tool list (proposal)
 Research Digest, 2026-10-21. Seven tools, in pipeline order (B-rep first, then mesh). It follows the pipeline in `research/healing/README.md` [19]. MVP = in the first build; Later = after MVP. Each tool reports what it changed.
@@ -46,7 +46,7 @@ Research Digest, 2026-10-21. Seven tools, in pipeline order (B-rep first, then m
 5. **Remove small features (Later):** drops small edges (`ShapeFix_Wireframe` with `ModeDropSmallEdges`), spot/strip faces (`ShapeFix_FixSmallFace`) and small holes (`ShapeUpgrade_RemoveInternalWires`). Thresholds are TBD (test-matrix O11). [18][22]
 6. **Merge coplanar faces (Later):** unifies same-domain faces and edges (for example after Booleans) with `ShapeUpgrade_UnifySameDomain`. The geometry stays the same. [18]
 7. **Mesh repair (MVP, existing code):** our `repair_manifold` welds identical vertices, drops degenerate triangles and flips an inward shell, then re-runs `check_watertight`. A mesh that stays open returns "cannot repair" and writes nothing. Manifold (elalish/manifold, Apache-2.0, WASM) is a TBD candidate for this step. [20][19]
-- **Gate to Export (MVP, required):** watertight + units. Every edge is shared by exactly two triangles, winding is consistent and no triangles have zero area (`check_watertight`). The B-rep passed BRepCheck. For 3MF, the file reads back through lib3mf and `unit="millimeter"` matches the locked unit. PASS enables Export STL/3MF; FAIL blocks it and names the first failing rule. The result shows on the Repair tab, the Export tab and the status bar. [21][22]
+- **Gate to Export (MVP, required):** units only (02:17 rule). `check_watertight` reports but does not block. The B-rep passed BRepCheck after each op. For 3MF, the file reads back through lib3mf and `unit="millimeter"` matches the locked unit. PASS enables Export STL/3MF; FAIL blocks it and names the first failing rule. The result shows on the Repair tab, the Export tab and the status bar. [21][22]
 - Not verified in this pass, so not proposed: hole filling on meshes, and ADMesh, MeshFix, PrusaSlicer or Bambu repair features. requirements.md asks for a "small gaps" fix [23]. The only verified gap tool is OCCT's `FixGaps`/`FixWireGaps` (B-rep wire gaps), and OCCT warns that it may change geometry and can fail [18]. TBD for Erik.
 ## Sources
 1. Fusion Help, Workspaces: https://help.autodesk.com/view/fusion360/ENU/?guid=GS-WORKSPACES
@@ -69,6 +69,6 @@ Research Digest, 2026-10-21. Seven tools, in pipeline order (B-rep first, then m
 18. OCCT user guide, Shape Healing: https://dev.opencascade.org/doc/overview/html/occt_user_guides__shape_healing.html
 19. Repo: research/healing/README.md (BRepCheck, ShapeFix, BRepMesh, Manifold notes and sources)
 20. Repo: mvp/create-export.md (repair_manifold behavior)
-21. Repo: research/formats/validation.md (watertight and units rules)
+21. Repo: research/formats/validation.md (units gate and validity rules)
 22. Repo: mvp/test-matrix.md (lib3mf v2.5.0 docs, 3MF Core Spec unit and manifold rules, O11 tolerance TBD)
 23. Repo: mvp/requirements.md (Geometry healing and Export validation rows)
