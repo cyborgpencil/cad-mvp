@@ -6,6 +6,7 @@
 #include "threemf.hpp"
 #include "watertight.hpp"
 
+#include <emscripten.h>
 #include <emscripten/bind.h>
 
 #include <cstdint>
@@ -17,9 +18,20 @@
 
 namespace {
 
-MeshSolid g_mesh = open_box();
+// Create > Box is centred on XY with z from 0 to 20. box_mm() stays
+// corner-at-origin in src/. This translation is the web default only.
+MeshSolid centred_box_20() {
+    MeshSolid mesh = box_mm(20.0, 20.0, 20.0);
+    for (Vec3& vertex : mesh.vertices) {
+        vertex.x -= 10.0;
+        vertex.y -= 10.0;
+    }
+    return mesh;
+}
+
+MeshSolid g_mesh = centred_box_20();
 UnitLock g_lock;
-std::string g_fixture = "open_box";
+std::string g_fixture = "default_box";
 
 emscripten::val copy_bytes(const std::string& bytes) {
     emscripten::val view(emscripten::typed_memory_view(bytes.size(), reinterpret_cast<const unsigned char*>(bytes.data())));
@@ -38,7 +50,10 @@ std::string read_bytes(const std::filesystem::path& path) {
 
 emscripten::val export_file(bool stl) {
     const GateReport report = evaluate_export_gate(g_mesh, g_lock);
+    // Units plus a non-empty, positive-volume mesh. Watertight stays informational.
+    // console.warn, not console.error: smoke tests treat console errors as failures.
     if (!report.export_allowed) {
+        EM_ASM({ console.warn(UTF8ToString($0)); }, report.block_reason.c_str());
         return emscripten::val::null();
     }
     const char* path = stl ? "/cadcam_export.stl" : "/cadcam_export.3mf";
@@ -179,6 +194,8 @@ EMSCRIPTEN_BINDINGS(cadcam) {
         .field("watertightMessage", &GateReport::watertight_message)
         .field("unitsPass", &GateReport::units_pass)
         .field("unitsMessage", &GateReport::units_message)
+        .field("meshPass", &GateReport::mesh_pass)
+        .field("meshMessage", &GateReport::mesh_message)
         .field("exportUnit", &GateReport::export_unit)
         .field("displayUnit", &GateReport::display_unit)
         .field("volumeMm3", &GateReport::volume_mm3)

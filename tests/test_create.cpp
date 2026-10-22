@@ -157,12 +157,21 @@ int main() {
 
     const RepairResult open = repair_manifold(open_box());
     expect("open cannot repair", !open.pass && open.message.find("cannot repair:") == 0);
-    const std::filesystem::path blocked =
-        std::filesystem::temp_directory_path() / "cadcam-mvp-create-blocked";
+    const std::filesystem::path unrepaired =
+        std::filesystem::temp_directory_path() / "cadcam-mvp-create-unrepaired";
     std::error_code error;
-    std::filesystem::remove_all(blocked, error);
-    const ExportAttempt blocked_export = export_mesh_if_closed(open.mesh, blocked);
-    expect("failed repair does not write", !blocked_export.wrote && !std::filesystem::exists(blocked));
+    std::filesystem::remove_all(unrepaired, error);
+    const ExportAttempt unrepaired_export = export_mesh_if_closed(open.mesh, unrepaired);
+    expect("failed repair still writes", unrepaired_export.wrote && !unrepaired_export.check.pass);
+    expect("failed repair stl exists", std::filesystem::is_regular_file(unrepaired_export.stl_path));
+    std::filesystem::remove_all(unrepaired, error);
+
+    const std::filesystem::path flipped_out =
+        std::filesystem::temp_directory_path() / "cadcam-mvp-create-flipped";
+    std::filesystem::remove_all(flipped_out, error);
+    const ExportAttempt flipped_export = export_mesh_if_closed(flipped_box(), flipped_out);
+    expect("flipped still writes", flipped_export.wrote && !flipped_export.check.pass);
+    std::filesystem::remove_all(flipped_out, error);
 
     MeshSolid inward = box;
     for (auto& triangle : inward.triangles) {

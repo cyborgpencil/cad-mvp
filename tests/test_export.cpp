@@ -81,15 +81,51 @@ int main() {
     }
     expect("3mf unit", contains_unit(wrote.threemf_path));
 
+    // box_mm rejects a non-positive size and returns no triangles.
     const std::filesystem::path bad_dir = fresh_dir("bad-size");
     const ExportAttempt bad_size = export_mesh_if_closed(box_mm(0.0, 20.0, 20.0), bad_dir);
-    expect("bad size does not write", !bad_size.wrote && !bad_size.check.pass);
-    expect("bad size leaves directory", !std::filesystem::exists(bad_dir));
+    expect("bad size check fails", !bad_size.check.pass);
+    expect("bad size does not write", !bad_size.wrote);
+    expect("bad size stl absent", !std::filesystem::is_regular_file(bad_size.stl_path));
+    expect("bad size 3mf absent", !std::filesystem::is_regular_file(bad_size.threemf_path));
+
+    MeshSolid flat;
+    flat.vertices = {{0, 0, 0}, {20, 0, 0}, {20, 20, 0}, {0, 20, 0}};
+    flat.triangles = {{0, 1, 2}, {0, 2, 3}};
+    const std::filesystem::path flat_dir = fresh_dir("flat");
+    const ExportAttempt flat_export = export_mesh_if_closed(flat, flat_dir);
+    expect("flat has triangles", flat.triangles.size() == 2);
+    expect("flat does not write", !flat_export.wrote);
+    expect("flat stl absent", !std::filesystem::is_regular_file(flat_export.stl_path));
+    expect("flat 3mf absent", !std::filesystem::is_regular_file(flat_export.threemf_path));
 
     const std::filesystem::path open_dir = fresh_dir("open");
     const ExportAttempt open = export_mesh_if_closed(open_box(), open_dir);
-    expect("open box does not write", !open.wrote && !open.check.pass);
-    expect("open box leaves directory", !std::filesystem::exists(open_dir));
+    expect("open box check fails", !open.check.pass);
+    expect("open box writes", open.wrote);
+    expect("open box stl exists", std::filesystem::is_regular_file(open.stl_path));
+    expect("open box 3mf exists", std::filesystem::is_regular_file(open.threemf_path));
+
+    // One reversed face on z = 0 keeps a positive volume, so the file is written.
+    const std::filesystem::path flipped_dir = fresh_dir("flipped");
+    const ExportAttempt flipped = export_mesh_if_closed(flipped_box(), flipped_dir);
+    expect("flipped box check fails", !flipped.check.pass);
+    expect("flipped box writes", flipped.wrote);
+    expect("flipped box stl exists", std::filesystem::is_regular_file(flipped.stl_path));
+    expect("flipped box 3mf exists", std::filesystem::is_regular_file(flipped.threemf_path));
+
+    MeshSolid inside_out = closed_box();
+    for (auto& triangle : inside_out.triangles) {
+        const auto saved = triangle[1];
+        triangle[1] = triangle[2];
+        triangle[2] = saved;
+    }
+    const std::filesystem::path inward_dir = fresh_dir("inside-out");
+    const ExportAttempt inward = export_mesh_if_closed(inside_out, inward_dir);
+    expect("inside-out check fails", !inward.check.pass);
+    expect("inside-out does not write", !inward.wrote);
+    expect("inside-out stl absent", !std::filesystem::is_regular_file(inward.stl_path));
+    expect("inside-out 3mf absent", !std::filesystem::is_regular_file(inward.threemf_path));
 
     std::error_code error;
     std::filesystem::remove_all(std::filesystem::temp_directory_path() / "cadcam-mvp-export", error);
