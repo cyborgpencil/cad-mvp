@@ -2865,6 +2865,58 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return !!singleBody() && !parametricBody();
   }
 
+  function findBody(id) {
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (state.bodies[i].id === id) return state.bodies[i];
+    }
+    return null;
+  }
+
+  // One selected part among several bodies. A single body keeps the old path.
+  function activeEditBody() {
+    if (state.bodies.length === 1) return state.bodies[0];
+    if (state.selection !== 'item') return null;
+    const picked = orderedBodies();
+    if (picked.length === 1) return picked[0];
+    return null;
+  }
+
+  function sheetPrimitive() {
+    if (state.bodies.length <= 1) return parametricBody() ? state.primitive : null;
+    const body = activeEditBody();
+    if (!body || !body.params) return null;
+    const kind = body.kind;
+    if (kind !== 'box' && kind !== 'cylinder' && kind !== 'disc') return null;
+    return { kind: kind, params: body.params, body: body };
+  }
+
+  function sheetBBoxBody() {
+    if (state.bodies.length <= 1) return bboxMode() ? singleBody() : null;
+    const body = activeEditBody();
+    if (!body || !body.shape || sheetPrimitive()) return null;
+    return body;
+  }
+
+  function syncAssemblySelection() {
+    if (state.bodies.length < 2 || state.selection !== 'item') return;
+    const ids = [];
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      if (findBody(state.selectedIds[i])) ids.push(state.selectedIds[i]);
+    }
+    state.assemblyIds = ids;
+    state.selectedIds = ids.slice();
+  }
+
+  // Parts-list clicks and viewport picks both land here when several bodies exist.
+  function applyPickedIds(ids) {
+    state.selectedIds = Array.isArray(ids) ? ids.slice() : [];
+    state.hoverId = null;
+    if (state.bodies.length > 1 && state.selection === 'item') syncAssemblySelection();
+    refreshAnchor();
+    applyLook();
+    paintAssembly();
+  }
+
   function paintLock() {
     const on = state.lockProportions !== false;
     const buttons = document.querySelectorAll('[data-action="lockProportions"]');
@@ -2878,7 +2930,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (side) side.hidden = on;
     const note = document.getElementById('primNote');
     if (note) {
-      note.textContent = bboxMode()
+      note.textContent = sheetBBoxBody()
         ? 'Bounding box X, Y, Z. Type a size, then press Enter.'
         : 'Dimensions for a box, cylinder, or disc open on the model.';
     }
@@ -2911,8 +2963,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const cyl = document.getElementById('primCyl');
     const disc = document.getElementById('primDisc');
     if (!host || !box || !cyl || !disc) return;
-    const prim = parametricBody() ? state.primitive : null;
-    const bbox = bboxMode();
+    const prim = sheetPrimitive();
+    const bboxBody = sheetBBoxBody();
+    const bbox = !!bboxBody;
     const holeFields = document.getElementById('holeFields');
     const selected = state.selectedIds.length > 0;
     const centres = document.getElementById('primCentres');
@@ -2933,8 +2986,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.writingFields = true;
       if (title) {
         if (state.holeTool) title.textContent = 'Hole';
-        else if (bbox) title.textContent = singleBody().name || 'Size';
-        else title.textContent = primitiveLabel(prim.kind);
+        else if (bbox) title.textContent = (bboxBody && bboxBody.name) || 'Size';
+        else title.textContent = (prim.body && prim.body.name) || primitiveLabel(prim.kind);
       }
     } else if (title && selected) {
       title.textContent = 'Selection';
@@ -2968,7 +3021,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.writingFields = false;
     } else if (bbox) {
       state.writingFields = true;
-      const sized = boundsSize(measureBodyBounds(singleBody()));
+      const sized = boundsSize(measureBodyBounds(bboxBody));
       if (sized) {
         state.bboxMm = { x: sized.x, y: sized.y, z: sized.z };
         writeLength('bboxX', sized.x);
@@ -3834,8 +3887,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.bodies.push(owned);
     state.selection = 'item';
     state.selectedIds = [];
+    state.assemblyIds = [];
     state.demo = state.demo === 'lbracket' ? '' : state.demo;
     const ok = installBodiesAndSync('bodies');
+    paintAssembly();
     setHint(ok
       ? 'Added ' + owned.name + '. 1 is the target and 2 is the tool.'
       : (state.lastError || 'FAIL: could not show both bodies.'));
@@ -4152,6 +4207,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.activeTool = name;
     state.selection = 'item';
     state.selectedIds = state.bodies.length === 1 ? ['item'] : [resultBody.id];
+    state.assemblyIds = [resultBody.id];
     state.shapeGate = sceneGate();
     state.topology = state.bodies.length === 1 ? result.topology : null;
     state.topologySource = 'occt';
@@ -4162,6 +4218,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     refreshAnchor();
     applyLook();
     paintPrimFields();
+    paintAssembly();
     toast(name);
     setHint(state.booleanMessage);
   }
@@ -4225,6 +4282,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       holeLog: cloneData(state.holeLog) || [],
       selection: state.selection,
       selectedIds: state.selectedIds.slice(),
+      assemblyIds: state.assemblyIds.slice(),
       topology: state.topology,
       topologySource: state.topologySource,
       shapeGate: state.shapeGate,
@@ -4283,6 +4341,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.holeLog = cloneData(snap.holeLog) || [];
     state.selection = snap.selection;
     state.selectedIds = snap.selectedIds.slice();
+    state.assemblyIds = Array.isArray(snap.assemblyIds)
+      ? snap.assemblyIds.slice()
+      : snap.selectedIds.filter(function (id) { return !!findBody(id); });
     state.hoverId = null;
     state.topology = snap.topology;
     state.topologySource = snap.topologySource;
@@ -4300,6 +4361,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     mountBodyMeshes();
     refreshAnchor();
     applyLook();
+    paintAssembly();
     publishGateState();
   }
 
@@ -5486,7 +5548,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(state.lastError);
       return false;
     }
-    const flat = primApi.flattenMesh(view.mesh);
+    let sceneMesh = view.mesh;
+    if (state.bodies.length > 1) {
+      const savedMesh = body.mesh;
+      body.mesh = view.mesh;
+      sceneMesh = combineBodyMeshes(state.bodies);
+      body.mesh = savedMesh;
+    }
+    const flat = primApi.flattenMesh(sceneMesh);
     if (!flat.indices.length || typeof Module.replaceMesh !== 'function' || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'resize')) {
       dropShape(resized.shape);
       state.lastError = 'FAIL: resized mesh was rejected. The last good shape was kept.';
@@ -5509,6 +5578,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.topology = view.topology;
     state.topologySource = 'occt';
     state.shapeGate = view.gate;
+    if (state.bodies.length > 1) {
+      state.topology = null;
+      state.primitive = null;
+      state.shapeGate = sceneGate();
+    }
     state.lastError = '';
     state.projectBlank = false;
     if (!state.projectApplying) state.projectDirty = true;
@@ -5540,7 +5614,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function commitBBoxResize(spec) {
-    const body = singleBody();
+    const body = state.bodies.length > 1 ? sheetBBoxBody() : singleBody();
     if (!body || !body.shape || !oc || !opsApi || typeof opsApi.resizeShape !== 'function') {
       return failResize('FAIL: resize needs a shape. The last good shape was kept.');
     }
@@ -5683,9 +5757,204 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     });
   }
 
+  // Swap one part's solid and republish the whole scene. Other parts stay.
+  function replaceBodySolid(body, owned) {
+    if (!body || !owned || !owned.shape || !primApi) return false;
+    const previous = {
+      shape: body.shape,
+      mesh: body.mesh,
+      topology: body.topology,
+      gate: body.gate,
+      watertight: body.watertight,
+      params: body.params,
+      kind: body.kind,
+      shapeLocal: body.shapeLocal === true,
+      placement: body.placement
+        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
+        : { x: 0, y: 0, z: 0 }
+    };
+    body.shape = owned.shape;
+    body.mesh = owned.mesh;
+    body.topology = owned.topology;
+    body.gate = owned.gate;
+    body.watertight = owned.watertight;
+    body.params = owned.params;
+    body.kind = owned.kind;
+    body.shapeLocal = owned.shapeLocal === true;
+    body.placement = owned.placement;
+    const flat = primApi.flattenMesh(combineBodyMeshes(state.bodies));
+    if (!flat.indices.length || typeof Module.replaceMesh !== 'function' || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'resize')) {
+      body.shape = previous.shape;
+      body.mesh = previous.mesh;
+      body.topology = previous.topology;
+      body.gate = previous.gate;
+      body.watertight = previous.watertight;
+      body.params = previous.params;
+      body.kind = previous.kind;
+      body.shapeLocal = previous.shapeLocal;
+      body.placement = previous.placement;
+      dropShape(owned.shape);
+      state.lastError = 'FAIL: resized mesh was rejected. The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    dropShape(previous.shape);
+    state.primitive = state.bodies.length === 1 ? { kind: body.kind, params: body.params } : null;
+    state.topology = state.bodies.length === 1 ? body.topology : null;
+    state.topologySource = 'occt';
+    state.shapeGate = sceneGate();
+    state.lastError = '';
+    state.projectBlank = false;
+    if (!state.projectApplying) state.projectDirty = true;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    publishProjectHook();
+    return true;
+  }
+
+  function commitSelectedPrimitive(spec) {
+    const prim = sheetPrimitive();
+    const body = prim && prim.body;
+    if (!prim || !body || !body.shape || !prim.params) return false;
+    if (!oc || !opsApi || !primApi) {
+      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
+    }
+    const kind = prim.kind === 'cylinder' || prim.kind === 'disc' ? prim.kind : 'box';
+    const old = prim.params;
+    const cx = fieldMm('primCx');
+    const cy = fieldMm('primCy');
+    const cz = fieldMm('primCz');
+    if (cx == null || cy == null || cz == null) {
+      return failResize('Enter a number. The last good shape was kept.');
+    }
+    const rx = readField('primRx');
+    const ry = readField('primRy');
+    const rz = readField('primRz');
+    if (rx == null || ry == null || rz == null) {
+      return failResize('Enter a number. The last good shape was kept.');
+    }
+    const next = Object.assign({}, old, { cx: cx, cy: cy, cz: cz, rx: rx, ry: ry, rz: rz });
+    let keys = [];
+    let oldSizes = {};
+    let typed = {};
+    if (kind === 'box') {
+      const sx = fieldMm('boxSx');
+      const sy = fieldMm('boxSy');
+      const sz = fieldMm('boxSz');
+      if (sx == null || sy == null || sz == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(sx > 0) || !(sy > 0) || !(sz > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['sx', 'sy', 'sz'];
+      oldSizes = { sx: old.sx, sy: old.sy, sz: old.sz };
+      typed = { sx: sx, sy: sy, sz: sz };
+    } else if (kind === 'disc') {
+      const diameter = fieldMm('discD');
+      const thickness = fieldMm('discT');
+      if (diameter == null || thickness == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(diameter > 0) || !(thickness > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['diameter', 'thickness'];
+      oldSizes = { diameter: old.diameter, thickness: old.thickness };
+      typed = { diameter: diameter, thickness: thickness };
+    } else {
+      const diameter = fieldMm('cylD');
+      const height = fieldMm('cylH');
+      if (diameter == null || height == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(diameter > 0) || !(height > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['diameter', 'height'];
+      oldSizes = { diameter: old.radius * 2, height: old.height };
+      typed = { diameter: diameter, height: height };
+    }
+    const scaled = scaleLocked(oldSizes, typed, keys);
+    if (!scaled.ok) return failResize(scaled.error);
+    if (kind === 'box') {
+      next.sx = scaled.sizes.sx;
+      next.sy = scaled.sizes.sy;
+      next.sz = scaled.sizes.sz;
+    } else if (kind === 'disc') {
+      next.diameter = scaled.sizes.diameter;
+      next.thickness = scaled.sizes.thickness;
+    } else {
+      next.radius = scaled.sizes.diameter / 2;
+      next.height = scaled.sizes.height;
+    }
+    const sized = kind === 'box'
+      ? { sx: next.sx, sy: next.sy, sz: next.sz }
+      : (kind === 'disc'
+        ? { diameter: next.diameter, thickness: next.thickness }
+        : { diameter: next.radius * 2, height: next.height });
+    let sizesChanged = false;
+    for (let i = 0; i < keys.length; i += 1) {
+      if (!nearly(sized[keys[i]], oldSizes[keys[i]])) sizesChanged = true;
+    }
+    const centreChanged = !nearly(next.cx, old.cx) || !nearly(next.cy, old.cy) || !nearly(next.cz, old.cz);
+    const rotChanged = !nearly(next.rx, old.rx || 0) || !nearly(next.ry, old.ry || 0) || !nearly(next.rz, old.rz || 0);
+    if (!sizesChanged && !centreChanged && !rotChanged) return false;
+    function rebuildOwned() {
+      if (spec && spec.forceInvalid === true) {
+        state.lastError = 'FAIL: OCCT BRepCheck_Analyzer is not valid. The last good shape was kept.';
+        toast(state.lastError);
+        setHint(state.lastError);
+        return false;
+      }
+      const owned = makeOwned(kind, next);
+      if (!owned || owned.failed || !owned.shape) {
+        if (owned && owned.shape) dropShape(owned.shape);
+        state.lastError = (owned && owned.view && owned.view.gate && owned.view.gate.message) || 'FAIL: resize was rejected. The last good shape was kept.';
+        if (state.lastError.indexOf('kept') < 0) state.lastError += ' The last good shape was kept.';
+        toast(state.lastError);
+        setHint(state.lastError);
+        return false;
+      }
+      return replaceBodySolid(body, owned);
+    }
+    if (!sizesChanged) {
+      return runUndoable(centreChanged ? 'Move' : 'Rotate', function () { return rebuildOwned() === true; });
+    }
+    if (state.lockProportions !== false) {
+      return performResize(function () {
+        state.resizeMethod = 'rebuild';
+        return rebuildOwned();
+      });
+    }
+    if (typeof opsApi.resizeShape !== 'function') {
+      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
+    }
+    const factors = localFactors(kind, old, next);
+    if (!(factors[0] > 0) || !(factors[1] > 0) || !(factors[2] > 0)) {
+      return failResize('Size must be greater than zero. The last good shape was kept.');
+    }
+    return performResize(function () {
+      state.resizeMethod = 'gtransform';
+      const origin = body.shapeLocal === true
+        ? [0, 0, 0]
+        : [Number(old.cx) || 0, Number(old.cy) || 0, Number(old.cz) || 0];
+      const placeBefore = body.placement
+        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
+        : null;
+      if (body.shapeLocal === true) body.placement = { x: next.cx, y: next.cy, z: next.cz };
+      const resized = opsApi.resizeShape(oc, body.shape, {
+        factors: factors,
+        origin: origin,
+        euler: [Number(old.rx) || 0, Number(old.ry) || 0, Number(old.rz) || 0],
+        uniform: false,
+        forceInvalid: !!(spec && spec.forceInvalid === true)
+      });
+      const ok = installResized(body, resized, next);
+      if (!ok && placeBefore) body.placement = placeBefore;
+      return ok;
+    });
+  }
+
   function onPrimitiveCommit(extra) {
     if (state.writingFields) return;
     const spec = extra && extra.forceInvalid === true ? { forceInvalid: true } : {};
+    if (state.bodies.length > 1) {
+      if (sheetBBoxBody()) commitBBoxResize(spec);
+      else if (sheetPrimitive()) commitSelectedPrimitive(spec);
+      return;
+    }
     if (bboxMode()) commitBBoxResize(spec);
     else if (state.primitive) commitPrimitiveResize(spec);
   }
@@ -6137,7 +6406,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   };
 
   function resizeStatus() {
-    const body = singleBody();
+    const multi = state.bodies.length > 1;
+    const body = multi ? activeEditBody() : singleBody();
+    const prim = multi ? sheetPrimitive() : null;
     const bounds = body ? measureBodyBounds(body) : null;
     const sized = boundsSize(bounds);
     const last = state.lastResize || {};
@@ -6157,12 +6428,28 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       redoDepth: commandStack.redoDepth(),
       unit: state.unit,
       kind: body ? body.kind : '',
-      primitiveKind: state.primitive ? state.primitive.kind : '',
-      params: state.primitive && state.primitive.params ? Object.assign({}, state.primitive.params) : null,
+      primitiveKind: multi ? (prim ? prim.kind : '') : (state.primitive ? state.primitive.kind : ''),
+      params: multi
+        ? (prim && prim.params ? Object.assign({}, prim.params) : null)
+        : (state.primitive && state.primitive.params ? Object.assign({}, state.primitive.params) : null),
       bounds: bounds,
       dx: sized ? sized.x : null,
       dy: sized ? sized.y : null,
-      dz: sized ? sized.z : null
+      dz: sized ? sized.z : null,
+      parts: state.bodies.map(function (item) {
+        const p = item.params || {};
+        return {
+          id: item.id,
+          name: item.name,
+          kind: item.kind,
+          sx: p.sx == null ? null : p.sx,
+          sy: p.sy == null ? null : p.sy,
+          sz: p.sz == null ? null : p.sz,
+          radius: p.radius == null ? null : p.radius,
+          height: p.height == null ? null : p.height,
+          diameter: p.diameter == null ? null : p.diameter
+        };
+      })
     };
   }
 
@@ -6180,13 +6467,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (!Number.isFinite(value)) return;
       if (stageExactMm(id, value)) staged = true;
     }
-    if (bboxMode()) {
+    if (sheetBBoxBody() && !sheetPrimitive()) {
       put('bboxX', src.sx);
       put('bboxY', src.sy);
       put('bboxZ', src.sz);
       return staged;
     }
-    const kind = state.primitive ? state.primitive.kind : '';
+    const picked = sheetPrimitive();
+    const kind = picked ? picked.kind : '';
     if (kind === 'cylinder') {
       put('cylD', Number.isFinite(src.diameter) ? src.diameter : src.sx);
       put('cylH', src.height);
@@ -6233,6 +6521,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (stageResizeSpec(src)) onPrimitiveCommit({ forceInvalid: src.forceInvalid === true });
     return resizeStatus();
+  };
+
+  window.__cadcamPickPart = function (id) {
+    state.selection = 'item';
+    applyPickedIds(id ? [String(id)] : []);
+    publishGateState();
+    const prim = sheetPrimitive();
+    const bbox = sheetBBoxBody();
+    function hidden(nodeId) {
+      const el = document.getElementById(nodeId);
+      return !el || el.hidden === true;
+    }
+    return {
+      selected: state.selectedIds.slice(),
+      kind: prim ? prim.kind : (bbox ? bbox.kind : ''),
+      box: !hidden('primBox'),
+      cyl: !hidden('primCyl'),
+      disc: !hidden('primDisc'),
+      bbox: !hidden('primBbox')
+    };
   };
 
   function viewCaption() {
@@ -7812,6 +8120,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.selection = 'item';
       state.selectedIds = state.assemblyIds.slice();
       paintAssembly();
+      refreshAnchor();
       applyLook();
     });
   }
@@ -8059,7 +8368,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(message);
     } else if (action === 'cylAxis') {
       const axis = btn.getAttribute('data-axis') || 'Z';
-      if (state.primitive && (state.primitive.kind === 'cylinder' || state.primitive.kind === 'disc')) {
+      const picked = sheetPrimitive();
+      if (state.bodies.length > 1 && picked && picked.body && (picked.kind === 'cylinder' || picked.kind === 'disc')) {
+        const next = Object.assign({}, picked.params, { axis: axis });
+        performResize(function () {
+          state.resizeMethod = 'rebuild';
+          const owned = makeOwned(picked.kind, next);
+          if (!owned || owned.failed || !owned.shape) {
+            if (owned && owned.shape) dropShape(owned.shape);
+            state.lastError = 'FAIL: resize was rejected. The last good shape was kept.';
+            toast(state.lastError);
+            setHint(state.lastError);
+            return false;
+          }
+          return replaceBodySolid(picked.body, owned);
+        });
+      } else if (state.primitive && (state.primitive.kind === 'cylinder' || state.primitive.kind === 'disc')) {
         const next = Object.assign({}, state.primitive.params, { axis: axis });
         createPrimitive(state.primitive.kind, next, null, true);
       }
@@ -8645,13 +8969,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           shift: ev.shiftKey,
           ctrl: ev.ctrlKey
         });
-        state.selectedIds = next.ids;
-        state.hoverId = null;
-        if (state.holeTool && state.selection === 'face' && next.ids.length === 1 && lastPick && lastPick.id === next.ids[0]) {
-          rememberHoleFace(next.ids[0], lastPick.point, true);
+        if (state.bodies.length > 1 && state.selection === 'item') {
+          applyPickedIds(next.ids);
+        } else {
+          state.selectedIds = next.ids;
+          state.hoverId = null;
+          if (state.holeTool && state.selection === 'face' && next.ids.length === 1 && lastPick && lastPick.id === next.ids[0]) {
+            rememberHoleFace(next.ids[0], lastPick.point, true);
+          }
+          refreshAnchor();
+          applyLook();
         }
-        refreshAnchor();
-        applyLook();
         const label = state.selection === 'item' ? 'Item' : cap(state.selection);
         if (next.all) toast(label + ': all');
         else if (next.ids.length) toast('Select ' + label + ' ' + next.ids.join(', '));
