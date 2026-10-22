@@ -194,7 +194,13 @@ class PwCdp:
             elif kind == "touchEnd" and self._touch is not None:
                 x, y = self._touch
                 self._touch = None
-                self.page.touchscreen.tap(x, y)
+                try:
+                    self.page.touchscreen.tap(x, y)
+                except Exception as exc:
+                    # The 1440 desktop context has no touch. The same tap is a click.
+                    if "hasTouch" not in str(exc):
+                        raise
+                    self.page.mouse.click(x, y)
             return {}
         return {}
 
@@ -680,16 +686,18 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
         holes = deploy_smoke.run_portrait_holes(cdp, origin)
         if holes:
             return [f"{engine} portrait_holes", *holes[:40]]
+        # The plate shot has to run while the three holes are still on screen.
+        # type_in_resize loads a different model after this.
+        if shoot:
+            shots = shoot_plate(page, cdp)
+            if shots:
+                return [f"{engine} screenshot", *shots]
         resized = deploy_smoke.run_type_in_resize(cdp, origin)
         if resized:
             return [f"{engine} type_in_resize", *resized[:40]]
         pixels = canvas_pixel_problems(page, engine)
         if pixels:
             return [f"{engine} canvas", *pixels]
-        if shoot:
-            shots = shoot_plate(page, cdp)
-            if shots:
-                return [f"{engine} screenshot", *shots]
         deleted = deploy_smoke.delete_problems(cdp, origin, desktop=False)
         if deleted:
             return [f"{engine} delete", *deleted[:40]]

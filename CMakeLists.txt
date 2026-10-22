@@ -58,6 +58,7 @@ find_program(CADCAM_NODE node
     PATHS
         "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit"
         "${CMAKE_SOURCE_DIR}/builds/emsdk/node/24.19.0_64bit/bin"
+        "${CMAKE_SOURCE_DIR}/../cadcam-mvp/builds/emsdk/node/24.19.0_64bit"
     NO_DEFAULT_PATH
 )
 if(NOT CADCAM_NODE)
@@ -97,7 +98,18 @@ endif()
 
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
-find_program(CADCAM_PYTHON NAMES python3 python py)
+# gizmo_drag_smoke exits 77 when Playwright cannot be imported. Prefer the
+# sibling pwvenv when it exists so a local run is not that skip. CI without
+# that tree still finds python3 and treats exit 77 as a skip.
+if(NOT CADCAM_PYTHON)
+    set(_cadcam_pwvenv "${CMAKE_SOURCE_DIR}/../cadcam-mvp/builds/pwvenv/Scripts/python.exe")
+    if(EXISTS "${_cadcam_pwvenv}")
+        set(CADCAM_PYTHON "${_cadcam_pwvenv}" CACHE FILEPATH "Python interpreter for smoke tests")
+    endif()
+endif()
+if(NOT CADCAM_PYTHON)
+    find_program(CADCAM_PYTHON NAMES python3 python py)
+endif()
 if(CADCAM_PYTHON)
     add_test(
         NAME deploy_smoke
@@ -108,10 +120,19 @@ if(CADCAM_PYTHON)
         SKIP_RETURN_CODE 77
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
+    add_test(
+        NAME gizmo_drag_smoke
+        COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/gizmo_drag_smoke.py"
+    )
+    set_tests_properties(gizmo_drag_smoke PROPERTIES
+        TIMEOUT 600
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
 elseif(DEFINED ENV{CI})
-    message(FATAL_ERROR "deploy_smoke requires Python; CI must not skip it")
+    message(FATAL_ERROR "deploy_smoke and gizmo_drag_smoke require Python; CI must not skip them")
 else()
-    message(STATUS "deploy_smoke not added: Python was not found")
+    message(STATUS "deploy_smoke and gizmo_drag_smoke not added: Python was not found")
 endif()
 
 add_library(model

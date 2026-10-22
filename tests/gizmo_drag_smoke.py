@@ -6,8 +6,9 @@ profile and a pointerType 'touch' drag. The page listens to Pointer Events.
 Playwright WebKit has no touch-drag CDP, so the touch drag is dispatched
 on #viewport.
 
-Not part of CTest. Playwright lives in builds/pwvenv. Exit 77 when it
-cannot be imported.
+Wired into CTest next to deploy_smoke. Playwright lives in the pwvenv.
+Exit 77 when it cannot be imported. The visible undo and redo controls
+are the ones on screen: the top bar on desktop, the phone tab bar at 390.
 """
 from __future__ import annotations
 
@@ -135,14 +136,14 @@ def touch_drag(page: Any, down: dict[str, Any], up: dict[str, Any]) -> dict[str,
 
 def undo(page: Any, how: str) -> None:
     if how == "button":
-        page.locator('[data-action="undo"]').click()
+        page.locator('[data-action="undo"]:visible').click()
     else:
         page.keyboard.press("Control+z")
 
 
 def redo(page: Any, how: str) -> None:
     if how == "button":
-        page.locator('[data-action="redo"]').click()
+        page.locator('[data-action="redo"]:visible').click()
     else:
         page.keyboard.press("Control+y")
 
