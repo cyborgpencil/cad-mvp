@@ -2,14 +2,14 @@
 
 **Status**: Confirmed  
 **Date**: 2026-10-20  
-**Scope**: Single-part 2D/3D design → watertight STL/3MF for any slicer. Browser-portable target (WASM). C++ kernel preferred.
+**Scope**: Single-part 2D/3D design → STL/3MF for any slicer. Browser-portable target (WASM). C++ kernel preferred.
 
 ## Overview
 
 Tool for creating precise or freeform 3D parts from 2D sketches or direct modeling, then exporting clean, slicer-ready files. Priority is reliable print output over full CAM or advanced simulation.
 
 > [!IMPORTANT]
-> All geometry must pass a manifold/watertight check before export. Units must be locked and carried into the file.
+> Units must be locked and carried into the file.
 
 ## Goals
 
@@ -35,7 +35,7 @@ Tool for creating precise or freeform 3D parts from 2D sketches or direct modeli
 | Geometry healing | One-click or automatic fix for non-manifold edges, flipped normals, small gaps |
 | Measurements | Viewport readouts for distance, angle, radius, and volume |
 | Import | Baseline STL and STEP import |
-| Export validation | Clear pass/fail on watertight status + recommended tessellation quality before download |
+| Export validation | Units pass/fail + recommended tessellation quality before download; free-edge count shown as information only |
 | 3MF support | Units, single material/color, multi-body packing |
 | Undo/redo + autosave | Reliable session history so modeling is not fragile |
 | Selection & snapping | Face/edge/vertex selection + basic grid and vertex snapping |

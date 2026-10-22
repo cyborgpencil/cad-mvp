@@ -6,7 +6,7 @@
 **General skill**: See `.grok/skills/tooling-priority/SKILL.md` for the reusable version of this workflow.
 
 ## Goal
-Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot tokens last — without compromising geometry correctness, watertight export quality, or development speed.
+Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot tokens last — without compromising geometry correctness, export quality, or development speed.
 
 ## Tool Roles
 
@@ -37,7 +37,7 @@ Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot toke
 
 ## Quality Guardrails (non-negotiable)
 
-- Every geometry change must include a manifold/watertight check and units verification.  
+- Every geometry change must include units verification, and fillet, chamfer, Boolean and delete must pass the OCCT shape-validity check (a failure is a clean error and reverts; it does not block Export).  
 - Never invent missing constraints, tolerances, or material data — stop and record the gap.  
 - Human review of all diffs that touch export, healing, or tessellation.  
 - Keep strict MVP scope; do not expand into full CAM or advanced simulation.  
@@ -49,7 +49,7 @@ Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot toke
 - Start every non-trivial task in Grok Build plan mode and approve before execution.  
 - Move work to Cursor only when interactive inspection or fine-grained editing is faster than another Build cycle.  
 - Use Grok Bots only for recurring or research tasks that would otherwise interrupt coding.  
-- When a task fails quality (e.g., non-watertight output), re-scope it for Grok Build rather than burning Cursor or Bot tokens on repeated failed attempts.  
+- When a task fails quality (e.g., an invalid shape after an op), re-scope it for Grok Build rather than burning Cursor or Bot tokens on repeated failed attempts.  
 - Capture successful workflows as Grok Build skills or project notes so later sessions reuse them.
 
 ## Open Questions
@@ -62,3 +62,8 @@ Maximize use of Grok Build tokens first, Cursor tokens second, and Grok Bot toke
 ## Next Inputs Required
 
 Confirm the above priority and any constraints on the local development machine before beginning implementation sessions.
+## Overnight override 2026-10-22 (tonight only, Chief 02:17 MT)
+- HYBRID tooling for tonight only: Grok Build and Cursor cloud agents both write code. Cursor cloud agents take repo feature work (nav cube, save/load, assemblies, new tools), each as its own PR with CI, reviewable by Erik in the morning. Grok Build Pilot keeps Z13-bound work: finishing the phone fix, the gizmo/undo/shading/tooltip batch, local C++/WASM rebuilds, and Acceptance A and B in OrcaSlicer, and writes the Cursor launch prompts for steps 2 and 3 with Doc Steward. The normal Grok Build -> Cursor -> Grok Bots priority returns after tonight.
+- Merge rules: every change lands through a PR. Repo Keeper merges only after CI (ci.yml on pull_request) is green and the secrets/Blink scan passes. Branch protection requires ci.yml. No force-push. No direct pushes to main while a PR is open.
+- Before starting work and before every merge, run git pull --ff-only; if it can't fast-forward, stop and ask Repo Keeper instead of merging or rebasing.
+- Unchanged: units in mm and the OCCT shape-validity check after fillet, chamfer, Boolean and delete. No watertight requirement.

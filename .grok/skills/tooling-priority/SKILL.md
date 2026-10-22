@@ -43,3 +43,8 @@ General workflow for any project. Maximize Grok Build tokens first, Cursor secon
 ## Triggers
 
 "tooling priority", "Grok Build first", "use Build then Cursor", "token priority for tools", "workflow across Build Cursor Bots"
+## Overnight override 2026-10-22 (tonight only, Chief 02:17 MT)
+- HYBRID tooling for tonight only: Grok Build and Cursor cloud agents both write code. Cursor cloud agents take repo feature work (nav cube, save/load, assemblies, new tools), each as its own PR with CI, reviewable by Erik in the morning. Grok Build Pilot keeps Z13-bound work: finishing the phone fix, the gizmo/undo/shading/tooltip batch, local C++/WASM rebuilds, and Acceptance A and B in OrcaSlicer, and writes the Cursor launch prompts for steps 2 and 3 with Doc Steward. The normal Grok Build -> Cursor -> Grok Bots priority returns after tonight.
+- Merge rules: every change lands through a PR. Repo Keeper merges only after CI (ci.yml on pull_request) is green and the secrets/Blink scan passes. Branch protection requires ci.yml. No force-push. No direct pushes to main while a PR is open.
+- Before starting work and before every merge, run git pull --ff-only; if it can't fast-forward, stop and ask Repo Keeper instead of merging or rebasing.
+- Unchanged: units in mm and the OCCT shape-validity check after fillet, chamfer, Boolean and delete. No watertight requirement.
