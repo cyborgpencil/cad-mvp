@@ -15,8 +15,11 @@ export const SELECTION_HOTKEYS = {
 };
 
 // Screen-space radius for vertex and edge picking when the hit is a mesh.
-// App default. Team choice (Erik 7:00 PM MT), not a sourced spec.
+// Mouse stays at 8 px. Team choice (Erik 7:00 PM MT), not a sourced spec.
 export const PICK_TOLERANCE_PX = 8;
+
+// Finger pick radius. Team choice, 2026-10-21. Mouse stays on PICK_TOLERANCE_PX.
+export const TOUCH_PICK_TOLERANCE_PX = 20;
 
 // Coplanar test for mesh-face grouping when no OCCT solid is loaded.
 // TBD placeholder. Not a MODO value.

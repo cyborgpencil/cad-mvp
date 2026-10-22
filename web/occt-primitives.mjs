@@ -1,4 +1,4 @@
-// Box and cylinder solids through libcascade 3.1.0 (OCCT 8.0.1).
+// Box, cylinder, and disc solids through libcascade 3.1.0 (OCCT 8.0.1).
 // Signatures checked against builds/libcascade/pkg/package/dist/types.d.ts:
 //   BRepPrimAPI_MakeBox(gp_Pnt, dx, dy, dz)
 //   BRepPrimAPI_MakeCylinder(gp_Ax2, R, H)
@@ -15,6 +15,10 @@ export const BOX_EDGE_MM = 20;
 export const CYLINDER_DIAMETER_MM = 20;
 export const CYLINDER_HEIGHT_MM = 20;
 export const SPHERE_DIAMETER_MM = 20;
+// Disc. Team choice, 2026-10-21. Diameter 18 mm, thickness 4 mm.
+// Centre z is thickness/2 so the disc sits on z = 0, the same bottom rule as the 20 mm solids.
+export const DISC_DIAMETER_MM = 18;
+export const DISC_THICKNESS_MM = 4;
 
 export const PLACEHOLDER_BOX_MM = Object.freeze({
   cx: 0,
@@ -31,6 +35,15 @@ export const PLACEHOLDER_CYLINDER_MM = Object.freeze({
   cz: 10,
   radius: CYLINDER_DIAMETER_MM / 2,
   height: CYLINDER_HEIGHT_MM,
+  axis: 'Z',
+});
+
+export const PLACEHOLDER_DISC_MM = Object.freeze({
+  cx: 0,
+  cy: 0,
+  cz: DISC_THICKNESS_MM / 2,
+  diameter: DISC_DIAMETER_MM,
+  thickness: DISC_THICKNESS_MM,
   axis: 'Z',
 });
 
@@ -95,6 +108,26 @@ export function normalizeCylinder(params) {
     cz: num(src.cz, PLACEHOLDER_CYLINDER_MM.cz),
     radius: num(src.radius, PLACEHOLDER_CYLINDER_MM.radius),
     height: num(src.height, PLACEHOLDER_CYLINDER_MM.height),
+    axis: axis,
+  };
+}
+
+export function normalizeDisc(params) {
+  const src = params || {};
+  let axis = String(src.axis || PLACEHOLDER_DISC_MM.axis).toUpperCase();
+  if (axis !== 'X' && axis !== 'Y' && axis !== 'Z') axis = 'Z';
+  const diameter = src.diameter === undefined && src.radius !== undefined
+    ? num(src.radius, PLACEHOLDER_DISC_MM.diameter / 2) * 2
+    : num(src.diameter, PLACEHOLDER_DISC_MM.diameter);
+  const thickness = src.thickness === undefined && src.height !== undefined
+    ? num(src.height, PLACEHOLDER_DISC_MM.thickness)
+    : num(src.thickness, PLACEHOLDER_DISC_MM.thickness);
+  return {
+    cx: num(src.cx, PLACEHOLDER_DISC_MM.cx),
+    cy: num(src.cy, PLACEHOLDER_DISC_MM.cy),
+    cz: num(src.cz, PLACEHOLDER_DISC_MM.cz),
+    diameter: diameter,
+    thickness: thickness,
     axis: axis,
   };
 }
@@ -608,6 +641,37 @@ export function buildCylinder(oc, params) {
   } finally {
     dispose(trash);
   }
+}
+
+function emptyDisc(disc, message) {
+  return {
+    kind: 'disc',
+    params: disc,
+    units: 'mm',
+    gate: { pass: false, valid: false, freeEdges: -1, message: message },
+    watertight: { pass: false, message: 'FAIL: mesh has no triangles.' },
+    mesh: { vertices: [], triangles: [] },
+    topology: { source: 'occt', vertices: [], edges: [], faces: [], triFace: [] },
+  };
+}
+
+// A disc is a short cylinder. Display and export use the same mesh path as the cylinder.
+export function buildDisc(oc, params) {
+  const disc = normalizeDisc(params);
+  if (!(disc.diameter > 0) || !(disc.thickness > 0)) {
+    return emptyDisc(disc, 'FAIL: disc diameter and thickness must be positive millimetres.');
+  }
+  const built = buildCylinder(oc, {
+    cx: disc.cx,
+    cy: disc.cy,
+    cz: disc.cz,
+    radius: disc.diameter / 2,
+    height: disc.thickness,
+    axis: disc.axis,
+  });
+  built.kind = 'disc';
+  built.params = disc;
+  return built;
 }
 
 export function flattenMesh(mesh) {

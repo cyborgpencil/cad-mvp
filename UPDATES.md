@@ -172,3 +172,29 @@ Newest entries at the top.
 ## 2026-10-21 19:59 MT - Chief rulings folded into prompts/blink-holes-disc.md (#8 wood-screw leg holes, M3 disc only, two-body Booleans, UI fixes).
 
 ## 2026-10-21 20:05 MT - prompts/blink-holes-disc.md now uses Research Digest's revised values: 4.5 mm holes with a 9.5 mm countersink, and an 18 mm disc in place of the 30 mm one.
+
+## 2026-10-21 20:25 MT - The Chief confirmed the 4.5 mm hole, 9.5 mm countersink and 18 mm disc. The TBD in prompts/blink-holes-disc.md is replaced. Erik rule (8:24 PM): Z13 is the main machine and nobody uses Ally.
+
+## 2026-10-21 20:26 MT - Chief ruling: drop the vertical-leg holes the disc covers (probably all three); the horizontal leg keeps its three wood-screw holes. Added to prompts/blink-holes-disc.md. Erik clarified that only the NOC team uses Ally.
+
+## 2026-10-21 20:43 MT - Chief reversed the hole drop: 60 mm vertical leg, holes at 8/20/32 mm on both legs, 18 mm disc centred at 48 mm. Logged in web/PROGRESS.md and prompts/blink-holes-disc.md.
+
+## 2026-10-21 20:46 MT - Erik pivot: stop the baked-in Blink bracket. Erik will build it himself in the mobile app. The bracket stays a test case only, not a shipped demo. New priority: mobile tools (primitives with editable mm dimensions; move, rotate and resize; parameter edits; holes and countersinks; fillet and chamfer on picked edges; touch-friendly Booleans). Acceptance test: on a portrait phone, build an L-bracket with 3 countersunk holes per leg and an off-centre disc using only the UI. Gate and watertight checks apply. prompts/blink-holes-disc.md is superseded.
+
+## 2026-10-21 20:50 MT - Added prompts/mobile-1-primitives, -2-transforms, -3-holes, -4-fillet-chamfer and -5-booleans. Blink spec now marked as a UI acceptance test. web/PROGRESS.md records the change of plan.
+
+## 2026-10-21 20:48 MT - Linked research/mobile-touch-cad.md into the step 2 prompt. Recorded the Chief's rulings: BLINK_DEFAULTS goes to tests/fixtures/, and the 44 px targets, 20 px touch pick radius and 4.5/9.5 mm hole defaults are adopted as team choices.
+
+## 2026-10-21 20:49 MT - Logged the mobile touch team choices (snap, steppers, tap threshold, gizmo, pick radius, number fields) in web/PROGRESS.md and the step 2 prompt.
+
+## 2026-10-21 21:17 MT - Moved the BLINK_DEFAULTS and ?demo=blink removal into prompts/mobile-1-primitives.md as its first task. Step 5 now only checks it.
+
+## 2026-10-21 21:20 MT - Logged the mobile step 1 results in web/PROGRESS.md, and added the portrait panel/Home overlap fix to prompts/mobile-2-transforms.md.
+
+## 2026-10-21 21:28 MT - The step 1 commit is on hold: occt_gate imports the local Blink fixture. The proposed fix is a skip-if-missing check plus gitignoring tests/fixtures/blink.*. The step 5 prompt now expects 8 holes (6+2).
+
+## 2026-10-21 21:29 MT - Chief's final ruling: the Blink fixture gets committed under tests/fixtures/ with no skip change, which replaces the 21:28 skip plan. Updated the step 5 prompt to match.
+
+## 2026-10-21 21:38 MT - Final ruling: the Blink fixture stays local-only (skip if missing, gitignored), unless Erik approves publishing it. This replaces the 21:29 entry. Step 5 prompt updated.
+
+## 2026-10-21 21:42 MT - The skip fix landed. occt_gate loads the Blink fixture with a guarded dynamic import, and tests/fixtures/blink.* is gitignored. CTest passes 7/7 both with and without the fixture. Step 1 is clear for commit and push.

@@ -36,9 +36,15 @@ const viewUrl = pathToFileURL(path.join(root, 'web', 'viewport-selection.mjs')).
 
 const { createInstance } = await import(initUrl);
 const { checkOcctGate, closedBoxMesh, openBoxMesh, box20Mesh } = await import(gateUrl);
-const { buildBox, buildCylinder, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight, TESSELLATION_DEFLECTION_MM, TESSELLATION_ANGULAR, TESSELLATION_RELATIVE, TESSELLATION_CONTROL_SURFACE, TESSELLATION_IN_PARALLEL } = await import(primUrl);
+const { buildBox, buildCylinder, buildDisc, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, PLACEHOLDER_DISC_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, DISC_DIAMETER_MM, DISC_THICKNESS_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight, TESSELLATION_DEFLECTION_MM, TESSELLATION_ANGULAR, TESSELLATION_RELATIVE, TESSELLATION_CONTROL_SURFACE, TESSELLATION_IN_PARALLEL } = await import(primUrl);
 const ops = await import(opsUrl);
-const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX } = await import(selUrl);
+const blinkPath = path.join(root, 'tests', 'fixtures', 'blink.mjs');
+const blinkUrl = pathToFileURL(blinkPath).href;
+let blinkMod = null;
+if (existsSync(blinkPath)) {
+  try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
+}
+const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
 const { threeDeltaToCad, GIZMO_AXIS_THREE } = await import(viewUrl);
 
 let failures = 0;
@@ -90,6 +96,13 @@ expect('cylinder edges ' + cyl.topology.edges.length, cyl.topology.edges.length 
 expect('cylinder defaults', CYLINDER_DIAMETER_MM === 20 && CYLINDER_HEIGHT_MM === 20 && PLACEHOLDER_CYLINDER_MM.radius === 10 && PLACEHOLDER_CYLINDER_MM.height === 20 && cyl.params.radius === 10 && cyl.params.height === 20 && cyl.params.axis === 'Z' && PLACEHOLDER_CYLINDER_MM.tbd === undefined);
 expect('sphere default only', SPHERE_DIAMETER_MM === 20);
 
+const disc = buildDisc(oc, null);
+expect('disc gate', disc.gate.pass === true && disc.gate.freeEdges === 0);
+expect('disc watertight', disc.watertight.pass === true && disc.units === 'mm');
+expect('disc kind', disc.kind === 'disc');
+expect('disc defaults', DISC_DIAMETER_MM === 18 && DISC_THICKNESS_MM === 4 && PLACEHOLDER_DISC_MM.diameter === 18 && PLACEHOLDER_DISC_MM.thickness === 4 && PLACEHOLDER_DISC_MM.cz === 2 && disc.params.diameter === 18 && disc.params.thickness === 4 && disc.params.axis === 'Z');
+expect('disc faces ' + disc.topology.faces.length, disc.topology.faces.length === 3);
+
 const cylX = buildCylinder(oc, { axis: 'X' });
 expect('cylinder X gate', cylX.gate.pass === true && cylX.watertight.pass === true && cylX.units === 'mm');
 
@@ -118,6 +131,7 @@ expect('hotkey 3', modeFromHotkey('3') === 'face');
 expect('hotkey 4 item', modeFromHotkey('4') === 'item');
 expect('hotkey 5', modeFromHotkey('5') === 'item');
 expect('pick tolerance 8', PICK_TOLERANCE_PX === 8);
+expect('touch pick tolerance 20', TOUCH_PICK_TOLERANCE_PX === 20);
 
 const cad = threeDeltaToCad(1, 2, 3);
 expect('three Y is cad Z', cad.x === 1 && cad.y === 3 && cad.z === 2);
@@ -366,6 +380,91 @@ for (let di = 0; di < demoOps.length; di += 1) {
     console.log('boolean-demo triangles', demoStl.triangles, 'bytes', demoStl.bytes);
   }
   if (demo.shape) demo.shape.delete();
+}
+
+const opsSrc = readFileSync(path.join(root, 'web', 'occt-ops.mjs'), 'utf8');
+const glueCalls = opsSrc.split('algo.SetGlue(').length - 1;
+expect('SetGlue once', glueCalls === 1);
+expect('flush fuse helper', opsSrc.indexOf('export function fuseFlushShapes') !== -1);
+expect('plain fuse stays glue-free', opsSrc.indexOf("booleanOp(oc, 'fuse', shapeA, shapeB, null)") !== -1);
+
+const primBoxBounds = { xmin: -10, ymin: -10, zmin: 0, xmax: 10, ymax: 10, zmax: 20 };
+const primCylBounds = { xmin: -10, ymin: -10, zmin: 0, xmax: 10, ymax: 10, zmax: 20 };
+const primDiscBounds = { xmin: -9, ymin: -9, zmin: 0, xmax: 9, ymax: 9, zmax: 4 };
+const primBoxStl = writeCheckedStl('prim-box.stl', box.mesh, primBoxBounds, 0.05);
+const primCylStl = writeCheckedStl('prim-cylinder.stl', cyl.mesh, primCylBounds, 0.05);
+const primDiscStl = writeCheckedStl('prim-disc.stl', disc.mesh, primDiscBounds, 0.05);
+console.log('prim-box triangles', primBoxStl.triangles, 'bytes', primBoxStl.bytes);
+console.log('prim-cylinder triangles', primCylStl.triangles, 'bytes', primCylStl.bytes);
+console.log('prim-disc triangles', primDiscStl.triangles, 'bytes', primDiscStl.bytes);
+
+const pageSrc = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
+expect('no bracket demo in the page', pageSrc.indexOf('demo=blink') === -1 && pageSrc.indexOf('buildBlink') === -1);
+expect('disc hook', pageSrc.indexOf("primKind === 'disc'") !== -1);
+expect('touch toolbar', pageSrc.indexOf('id="touchToolbar"') !== -1);
+expect('decimal keypad', pageSrc.indexOf('inputmode="decimal"') !== -1);
+expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);
+
+if (blinkMod) {
+  const blinkPlan = blinkMod.blinkHolePlan(null);
+  expect('drop log empty', blinkPlan.dropped.length === 0);
+  const keptCountersink = blinkPlan.kept.filter(function (hole) { return hole.kind === 'countersink'; });
+  expect('six countersinks', keptCountersink.length === 6);
+  expect('three horizontal countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'horizontal'; }).length === 3);
+  expect('three vertical countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'vertical' && hole.kind === 'countersink'; }).length === 3);
+  expect('two disc screws', blinkPlan.discHoles.length === 2 && blinkPlan.discHoles[0].fit.indexOf('Erik to measure') !== -1);
+  expect('eight through-holes planned', keptCountersink.length + blinkPlan.discHoles.length === 8);
+  const clearance = blinkMod.countersinkClearance(null);
+  expect('countersink clearance ' + clearance.failures.join('; '), clearance.pass === true);
+  const blinkSpec = blinkMod.blinkSpec(null);
+  expect('fixture legs 60', blinkSpec.legLengthMm === 60 && blinkSpec.uprightHeightMm === 60 && blinkSpec.legWidthMm === 20 && blinkSpec.thicknessMm === 4);
+  expect('fixture holes 11 23 35', blinkSpec.legHoleOffsetsMm.join(',') === '11,23,35');
+  expect('fixture disc 50', blinkSpec.discAlongMm === 50 && blinkSpec.discAcrossMm === 10 && blinkSpec.discDiameterMm === 18 && blinkSpec.discThicknessMm === 4);
+  expect('edge defaults', ops.EDGE_FILLET_RADIUS_MM === 2 && ops.EDGE_CHAMFER_DISTANCE_MM === 0.5 && blinkSpec.userFilletRadiusMm === 2 && blinkSpec.userChamferMm === 0.5);
+
+  const blinkWant = blinkMod.expectedBlinkVolume(null);
+  const blinkBounds = blinkMod.expectedBlinkBounds(null);
+  const blink = blinkMod.buildBlink(oc, null);
+  expect('blink pass ' + (blink.lastError || ''), blink.pass === true && blink.lastError === '');
+  expect('blink units', blink.units === 'mm' && blink.fit === 'unverified fit');
+  expect('blink gate', blink.gate.pass === true && blink.watertight.pass === true && blink.solids === 1);
+  expect('blink volume ' + blink.volumeMm3 + ' want ' + blinkWant, Math.abs(blink.volumeMm3 - blinkWant) <= blinkSpec.volumeTolMm3);
+  expect('blink analytic field', Math.abs(blink.analyticVolumeMm3 - blinkWant) <= 1e-9);
+  nearBounds('blink bounds', blink.bounds, blinkBounds, blinkSpec.boundsTolMm);
+  const blinkSteps = blink.log.filter(function (item) { return item.pass; }).map(function (item) { return item.step; });
+  expect('blink steps ' + blinkSteps.join(','), blinkSteps[0] === 'fuse' && blinkSteps[1] === 'fillet' && blinkSteps[2] === 'disc' && blinkSteps[blinkSteps.length - 1] === 'hole');
+  expect('blink fuse glue off', blink.log[0].glue === false);
+  expect('blink disc glue on', blink.log[2].glue === true && blink.log[2].step === 'disc');
+  expect('blink holes glue off', blink.log.filter(function (item) { return item.step === 'hole'; }).every(function (item) { return item.glue === false && item.pass === true; }));
+  expect('blink eight hole steps', blink.log.filter(function (item) { return item.step === 'hole' && item.pass; }).length === 8);
+  expect('blink through count', blink.throughHoles === 8 && blink.droppedHoles.length === 0);
+  const blinkClass = blinkMod.classifyBlinkHoles(oc, blink.shape, null);
+  expect('blink holes through ' + blinkClass.message, blinkClass.pass === true);
+  if (!blinkClass.pass) console.error(blinkClass.failures.join('\n'));
+  const blinkMeshVol = ops.meshVolumeMm3(blink.mesh);
+  expect('blink mesh volume ' + blinkMeshVol, Math.abs(blinkMeshVol - blinkWant) <= blinkSpec.meshVolumeTolMm3);
+  if (blink.mesh) {
+    const blinkStl = writeCheckedStl('blink.stl', blink.mesh, blinkBounds, 0.05);
+    console.log('blink triangles', blinkStl.triangles, 'bytes', blinkStl.bytes);
+  }
+  expect('blink mesh settings', blink.meshSettings && Math.abs(blink.meshSettings.Deflection - 0.05) < 1e-9 && blink.meshSettings.Relative === false && Math.abs(blink.meshSettings.Angle - 0.2) < 1e-9);
+
+  const huge = ops.applyPickedEdgeOp(oc, blink.shape, [blinkMod.blinkPickSegments(null)[0]], 'fillet', 100);
+  expect('oversized fillet rejected', huge.ok === false && huge.shape === null && huge.kept === true);
+  expect('oversized keeps shape', Math.abs(ops.solidVolumeMm3(oc, blink.shape) - blink.volumeMm3) <= 1e-6);
+  const tipped = ops.applyPickedEdgeOp(oc, blink.shape, [blinkMod.blinkPickSegments(null)[0]], 'fillet', ops.EDGE_FILLET_RADIUS_MM);
+  expect('picked fillet ' + (tipped.error || ''), tipped.ok === true && !!tipped.shape && tipped.volumeMm3 < blink.volumeMm3);
+  const chamfered = tipped.ok && tipped.shape
+    ? ops.applyPickedEdgeOp(oc, tipped.shape, [blinkMod.blinkPickSegments(null)[1]], 'chamfer', ops.EDGE_CHAMFER_DISTANCE_MM)
+    : { ok: false, shape: null, error: 'fillet did not run' };
+  expect('picked chamfer ' + (chamfered.error || ''), chamfered.ok === true && !!chamfered.shape);
+  if (blink.shape) blink.shape.delete();
+  if (tipped.shape) tipped.shape.delete();
+  if (chamfered.shape) chamfered.shape.delete();
+  console.log('blink volume', blink.volumeMm3, 'analytic', blinkWant, 'mesh', blinkMeshVol);
+  console.log('blink dropped', blink.droppedHoles.length);
+} else {
+  console.log('skipped, local fixture');
 }
 
 console.log('lbracket triangles', bracket.mesh.triangles.length);

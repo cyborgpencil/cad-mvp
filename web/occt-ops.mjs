@@ -198,9 +198,28 @@ function copyOwned(oc, source, trash) {
   return takeDoneShape(oc, copier, 'BRepBuilderAPI_Copy');
 }
 
-function booleanOp(oc, kind, shapeA, shapeB) {
+function shapeList(oc, trash, shape) {
+  const Ctor = oc.TopTools_ListOfShape || oc.NCollection_List_TopoDS_Shape;
+  if (!Ctor) return null;
+  const list = track(trash, new Ctor());
+  let appended = null;
+  try {
+    appended = list.Append(shape);
+  } catch (_err) {
+    return null;
+  }
+  if (appended && appended !== shape && appended !== list && typeof appended.delete === 'function') track(trash, appended);
+  return list;
+}
+
+// options.glueShift is the flush disc fuse only. Cuts never set it.
+function booleanOp(oc, kind, shapeA, shapeB, options) {
   if (!shapeA || !shapeB) {
     return { ok: false, shape: null, error: 'FAIL: ' + kind + ' needs two shapes.' };
+  }
+  const glueShift = !!(options && options.glueShift);
+  if (glueShift && kind !== 'fuse') {
+    return { ok: false, shape: null, error: 'FAIL: SetGlue is only allowed on a flush fuse.' };
   }
   const Ctor = kind === 'cut'
     ? oc.BRepAlgoAPI_Cut
@@ -211,16 +230,55 @@ function booleanOp(oc, kind, shapeA, shapeB) {
   const trash = [];
   let owned = null;
   try {
-    const algo = track(trash, new Ctor(shapeA, shapeB));
-    if (kind === 'fuse') {
+    let algo;
+    if (glueShift) {
+      algo = track(trash, new Ctor());
+      const args = shapeList(oc, trash, shapeA);
+      const tools = shapeList(oc, trash, shapeB);
+      if (!args || !tools) {
+        return { ok: false, shape: null, error: 'FAIL: flush fuse could not build the shape lists.' };
+      }
+      algo.SetArguments(args);
+      algo.SetTools(tools);
+      if (typeof algo.SetNonDestructive === 'function') algo.SetNonDestructive(true);
+      const glue = oc.BOPAlgo_GlueEnum && oc.BOPAlgo_GlueEnum.BOPAlgo_GlueShift;
+      if (!glue) {
+        return { ok: false, shape: null, error: 'FAIL: BOPAlgo_GlueShift is missing from this libcascade build.' };
+      }
+      algo.SetGlue(glue);
       try {
-        algo.SimplifyResult(true, true);
+        algo.Build();
       } catch (err) {
         return {
           ok: false,
           shape: null,
-          error: 'FAIL: fuse SimplifyResult threw ' + explain(oc, err) + '; Shape() was not called.',
+          error: 'FAIL: flush fuse Build threw ' + explain(oc, err) + '; Shape() was not called.',
         };
+      }
+    } else {
+      algo = track(trash, new Ctor(shapeA, shapeB));
+    }
+    if (kind === 'fuse') {
+      let done = false;
+      try {
+        done = algo.IsDone() === true;
+      } catch (err) {
+        return {
+          ok: false,
+          shape: null,
+          error: 'FAIL: fuse IsDone threw ' + explain(oc, err) + '; Shape() was not called.',
+        };
+      }
+      if (done) {
+        try {
+          algo.SimplifyResult(true, true);
+        } catch (err) {
+          return {
+            ok: false,
+            shape: null,
+            error: 'FAIL: fuse SimplifyResult threw ' + explain(oc, err) + '; Shape() was not called.',
+          };
+        }
       }
     }
     const taken = takeDoneShape(oc, algo, label);
@@ -241,7 +299,12 @@ function booleanOp(oc, kind, shapeA, shapeB) {
 }
 
 export function fuseShapes(oc, shapeA, shapeB) {
-  return booleanOp(oc, 'fuse', shapeA, shapeB);
+  return booleanOp(oc, 'fuse', shapeA, shapeB, null);
+}
+
+// Flush contact only. The disc on the leg uses this. Hole cuts do not.
+export function fuseFlushShapes(oc, shapeA, shapeB) {
+  return booleanOp(oc, 'fuse', shapeA, shapeB, { glueShift: true });
 }
 
 export function cutShapes(oc, shapeA, shapeB) {
@@ -626,8 +689,8 @@ export function buildLBracket(oc, overrides) {
 // The second is shifted +10 mm on X, so the overlap is 10 x 20 x 20 mm.
 // Cut is the first body minus the second. A 40 mm shift leaves a gap.
 // The demo cuts a Z cylinder (diameter 10 mm, height 30 mm, same centre)
-// through that box. Volume tolerance for the boxes is 1e-3 mm³.
-// The cylinder demo uses 1e-2 mm³. An absolute volume at or below 1e-4 mm³
+// through that box. Volume tolerance for the boxes is 1e-3 mmÂ³.
+// The cylinder demo uses 1e-2 mmÂ³. An absolute volume at or below 1e-4 mmÂ³
 // is empty. Bounding boxes from BRepBndLib.Add (exact geometry) use 1e-3 mm.
 export const BOOLEAN_BOX_EDGE_MM = 20;
 export const BOOLEAN_OVERLAP_SHIFT_MM = 10;
@@ -1025,3 +1088,246 @@ export function meshBounds(mesh) {
   }
   return { xmin: xmin, ymin: ymin, zmin: zmin, xmax: xmax, ymax: ymax, zmax: zmax };
 }
+
+export function meshVolumeMm3(mesh) {
+  const vertices = mesh && mesh.vertices ? mesh.vertices : [];
+  const triangles = mesh && mesh.triangles ? mesh.triangles : [];
+  let sum = 0;
+  for (let i = 0; i < triangles.length; i += 1) {
+    const tri = triangles[i];
+    const a = vertices[tri[0]];
+    const b = vertices[tri[1]];
+    const c = vertices[tri[2]];
+    if (!a || !b || !c) continue;
+    sum += a[0] * (b[1] * c[2] - b[2] * c[1])
+      + a[1] * (b[2] * c[0] - b[0] * c[2])
+      + a[2] * (b[0] * c[1] - b[1] * c[0]);
+  }
+  return Math.abs(sum) / 6;
+}
+
+
+// Confirm sizes. Team choice, 2026-10-21. Same 2 mm and 0.5 mm as the L-bracket defaults.
+export const EDGE_FILLET_RADIUS_MM = 2;
+export const EDGE_CHAMFER_DISTANCE_MM = 0.5;
+
+function addScaled(point, dir, scale) {
+  return [
+    point[0] + dir[0] * scale,
+    point[1] + dir[1] * scale,
+    point[2] + dir[2] * scale,
+  ];
+}
+
+function makeConeSolid(oc, r1, r2, height, base, direction) {
+  if (!(r1 >= 0) || !(r2 >= 0) || !(height > 0) || (r1 === 0 && r2 === 0)) return null;
+  const at = base || [0, 0, 0];
+  const dir = direction || [0, 0, 1];
+  const trash = [];
+  let owned = null;
+  try {
+    const origin = track(trash, new oc.gp_Pnt(at[0], at[1], at[2]));
+    const gpDir = track(trash, new oc.gp_Dir(dir[0], dir[1], dir[2]));
+    const axes = track(trash, new oc.gp_Ax2(origin, gpDir));
+    const maker = track(trash, new oc.BRepPrimAPI_MakeCone(axes, r1, r2, height));
+    try {
+      maker.Build();
+    } catch (_err) {
+      return null;
+    }
+    const taken = takeDoneShape(oc, maker, 'BRepPrimAPI_MakeCone');
+    if (!taken.ok) return null;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return null;
+    owned = copied.shape;
+    return owned;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+
+// Countersunk through-hole. The cone and the drill are fused once.
+// face is the outer-face point. dir points into the solid.
+// padMm extends the cutter past both faces. The caller cuts with cutShapes, which does not set glue.
+export function makeCountersunkThroughHole(oc, options) {
+  const src = options || {};
+  const holeRadius = Number(src.holeDiameterMm) / 2;
+  const countersinkRadius = Number(src.countersinkDiameterMm) / 2;
+  const through = Number(src.throughMm);
+  const pad = Number(src.padMm);
+  const face = src.face;
+  const dir = src.dir;
+  const halfAngle = (Number(src.countersinkAngleDeg) / 2) * Math.PI / 180;
+  if (!(holeRadius > 0) || !(countersinkRadius > holeRadius) || !(through > 0) || !(pad >= 0) || !(halfAngle > 0) || !face || !dir) {
+    return null;
+  }
+  const depth = (countersinkRadius - holeRadius) / Math.tan(halfAngle);
+  if (!(depth > 0)) return null;
+  const cone = makeConeSolid(
+    oc,
+    holeRadius + (depth + pad) * Math.tan(halfAngle),
+    holeRadius,
+    depth + pad,
+    addScaled(face, dir, -pad),
+    dir
+  );
+  const cylinder = makeCylinderSolid(
+    oc,
+    holeRadius,
+    through + pad * 2,
+    addScaled(face, dir, -pad),
+    dir
+  );
+  if (!cone || !cylinder) {
+    releaseShape(cone);
+    releaseShape(cylinder);
+    return null;
+  }
+  const fused = fuseShapes(oc, cone, cylinder);
+  releaseShape(cone);
+  releaseShape(cylinder);
+  if (!fused.ok || !fused.shape) {
+    if (fused.shape) releaseShape(fused.shape);
+    return null;
+  }
+  return fused.shape;
+}
+
+export function checkSolidGate(oc, shape) {
+  let view;
+  try {
+    view = inspectSolid(oc, shape);
+  } catch (err) {
+    return {
+      pass: false,
+      error: 'FAIL: gate threw ' + explain(oc, err),
+      view: emptySolid(),
+      solids: 0,
+      volume: 0,
+      bounds: null,
+    };
+  }
+  let solids = 0;
+  let volume = 0;
+  let bounds = null;
+  try {
+    solids = countSolids(oc, shape);
+    volume = solidVolumeMm3(oc, shape);
+    bounds = solidBounds(oc, shape);
+  } catch (err) {
+    return {
+      pass: false,
+      error: 'FAIL: volume threw ' + explain(oc, err),
+      view: view,
+      solids: solids,
+      volume: volume,
+      bounds: bounds,
+    };
+  }
+  const units = unitsLockGate();
+  const pass = view.gate.pass === true
+    && view.watertight.pass === true
+    && units.pass === true
+    && solids === 1
+    && volume > BOOLEAN_EMPTY_VOLUME_MM3;
+  let error = '';
+  if (!pass) {
+    if (view.gate.pass !== true) error = view.gate.message || 'FAIL: OCCT gate failed.';
+    else if (view.watertight.pass !== true) error = view.watertight.message || 'FAIL: mesh is not watertight.';
+    else if (units.pass !== true) error = units.message;
+    else if (solids !== 1) error = 'FAIL: expected one solid, found ' + solids + '.';
+    else error = 'FAIL: result is empty.';
+  }
+  return { pass: pass, error: error, view: view, solids: solids, volume: volume, bounds: bounds };
+}
+
+function matchEdges(oc, shape, segments, trash) {
+  const found = collectEdges(oc, shape, trash);
+  const chosen = [];
+  const used = new Set();
+  for (let i = 0; i < segments.length; i += 1) {
+    const segment = segments[i];
+    const hit = found.find(function (edge, index) {
+      if (used.has(index)) return false;
+      return segmentMatch(edge.a, edge.b, segment.a[0], segment.a[1], segment.a[2], segment.b[0], segment.b[1], segment.b[2]);
+    });
+    if (!hit) return [];
+    used.add(found.indexOf(hit));
+    chosen.push(hit.edge);
+  }
+  return chosen;
+}
+
+// Fillet or chamfer on edges the user picked. Failure leaves the caller's shape alone.
+export function applyPickedEdgeOp(oc, shape, segments, kind, size) {
+  const which = kind === 'chamfer' ? 'chamfer' : 'fillet';
+  if (!shape || !segments || !segments.length) {
+    return { ok: false, shape: null, error: 'FAIL: ' + which + ' has no picked edge. The last good shape was kept.', kept: true };
+  }
+  const trash = [];
+  let made = null;
+  try {
+    const edges = matchEdges(oc, shape, segments, trash);
+    if (!edges.length) {
+      return {
+        ok: false,
+        shape: null,
+        error: 'FAIL: picked edge was not found on the solid. The last good shape was kept.',
+        kept: true,
+      };
+    }
+    made = which === 'chamfer'
+      ? chamferEdges(oc, shape, size, edges)
+      : filletEdges(oc, shape, size, edges);
+  } catch (err) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: ' + which + ' threw ' + explain(oc, err) + ' The last good shape was kept.',
+      kept: true,
+    };
+  } finally {
+    dispose(trash);
+  }
+  if (!made || !made.ok || !made.shape) {
+    return {
+      ok: false,
+      shape: null,
+      error: (made && made.error ? made.error : 'FAIL: ' + which + ' was rejected.') + ' The last good shape was kept.',
+      kept: true,
+    };
+  }
+  const gated = checkSolidGate(oc, made.shape);
+  if (!gated.pass) {
+    releaseShape(made.shape);
+    return {
+      ok: false,
+      shape: null,
+      error: gated.error + ' The last good shape was kept.',
+      kept: true,
+    };
+  }
+  return {
+    ok: true,
+    shape: made.shape,
+    error: '',
+    kept: false,
+    units: 'mm',
+    volumeMm3: gated.volume,
+    bounds: gated.bounds,
+    solids: gated.solids,
+    gate: gated.view.gate,
+    watertight: gated.view.watertight,
+    mesh: gated.view.mesh,
+    topology: gated.view.topology,
+    meshTimeMs: gated.view.meshTimeMs || 0,
+    meshSettings: gated.view.meshSettings || null,
+    meshPath: gated.view.meshPath || '',
+  };
+}
+

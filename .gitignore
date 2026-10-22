@@ -50,3 +50,4 @@ qrc_*.cpp
 node_modules/
 *.wasm
 web/dist/
+tests/fixtures/blink.*

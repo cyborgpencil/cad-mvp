@@ -1,4 +1,4 @@
-# Project 1: Blink camera L-bracket (first end-to-end test case)
+﻿# Project 1: Blink camera L-bracket (first end-to-end test case)
 
 Status: spec draft (Doc Steward, 2026-10-21). Erik picked this part; every dimension he hasn't given is **TBD**. Don't guess values. Ask Erik through the chief.
 
@@ -26,6 +26,9 @@ A 3D-printed L-bracket that fits over the 90° outside corner of a flat door fra
 | Screw gauge, length and head type | TBD | Proposal only: #6 or #8 wood screw |
 | Printed hole oversize | TBD, settle with a test print | |
 | Material / printer | TBD | |
+
+## Status (2026-10-21 20:46 MT)
+This bracket is a UI acceptance test, not a shipped layout. Erik builds it himself in the mobile app. The acceptance script in prompts/mobile-5-booleans.md must be able to build it using only the UI: 3 countersunk holes per leg and an off-centre disc. No baked-in layout.
 
 ## Reference notes (not specs)
 - Blink publishes no mount dimensions for the XT, XT2 or Indoor/Outdoor; Erik measures his own base plate (diameter, hole spacing, hole size).

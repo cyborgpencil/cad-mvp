@@ -258,6 +258,54 @@
     box-shadow: none;
   }
   .tool-btn:disabled { opacity: 0.38; }
+  .tool-btn.bool-op {
+    width: auto;
+    min-width: 76px;
+    padding: 0 8px;
+    background: var(--accent);
+    color: var(--ink);
+    border: 1px solid var(--active-border);
+    opacity: 1;
+  }
+  .tool-btn.bool-op span,
+  .tool-btn.edge-confirm span { display: block; font-weight: 650; }
+  .tool-btn.bool-op:disabled {
+    opacity: 1;
+    background: var(--disabled-bg);
+    color: var(--disabled-ink);
+    border-color: var(--ink);
+  }
+  .tool-btn.bool-op.is-on,
+  .tool-btn.edge-confirm.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
+  .tool-btn.edge-confirm {
+    width: auto;
+    min-width: 76px;
+    padding: 0 8px;
+    background: var(--accent);
+    color: var(--ink);
+    border: 1px solid var(--active-border);
+    opacity: 1;
+    flex-direction: row;
+  }
+  .edge-size {
+    display: flex;
+    align-items: center;
+    height: 44px;
+    margin: 0 2px;
+  }
+  .edge-size input {
+    width: 64px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--active-border);
+    background: var(--field);
+    color: var(--ink);
+    padding: 0 6px;
+  }
   .bool-badges { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
   .bool-badge {
     position: absolute;
@@ -515,6 +563,84 @@
     background: var(--active-fill);
     border-color: var(--active-border);
   }
+  .touch-toolbar {
+    display: none;
+    gap: 8px;
+  }
+  .touch-tool {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    font-weight: 650;
+  }
+  .touch-tool.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
+  .dim-panel {
+    position: absolute;
+    z-index: 6;
+    left: 8px;
+    top: 52px;
+    width: min(336px, calc(100% - 16px));
+    max-height: calc(100% - 150px);
+    overflow: auto;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .dim-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    font-weight: 650;
+  }
+  .dim-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+  }
+  .dim-label {
+    width: 72px;
+    flex: none;
+    color: var(--muted);
+  }
+  .dim-step {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    border: 1px solid var(--line);
+    font-size: 20px;
+    line-height: 1;
+  }
+  .dim-panel input {
+    flex: 1;
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+    height: 44px;
+    background: var(--field);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 8px;
+  }
+  .dim-panel .axis-row { margin: 0 0 4px; }
+  .dim-note { margin: 4px 0 0; }
   .statusbar {
     min-height: var(--status-h);
     height: auto;
@@ -870,6 +996,15 @@
     }
     .vp-bar::-webkit-scrollbar { display: none; }
     .hud { top: 8px; left: 8px; }
+    .touch-toolbar {
+      display: flex;
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 76px;
+      z-index: 6;
+    }
+    .dim-panel { top: 8px; max-height: calc(100% - 150px); }
     .phone-tabbar {
       display: flex;
       height: var(--phone-tabs-h);
@@ -934,6 +1069,22 @@
       padding: 0;
       gap: 0;
     }
+    .tool-btn.bool-op,
+    .tool-btn.edge-confirm,
+    .toolbox .tool-btn.bool-op,
+    .toolbox .tool-btn.edge-confirm {
+      width: auto;
+      min-width: 72px;
+      height: 44px;
+      flex-direction: row;
+      gap: 4px;
+      padding: 0 8px;
+    }
+    .tool-btn.bool-op span,
+    .tool-btn.edge-confirm span,
+    .toolbox .tool-btn.bool-op span,
+    .toolbox .tool-btn.edge-confirm span { display: block; }
+    .edge-size, .edge-size input { display: flex; }
     .workspace { display: flex; flex-direction: column; }
     .toolbox, #viewport, .browser, .inspector { grid-column: auto; grid-row: auto; }
   }
@@ -1023,6 +1174,7 @@
   <symbol id="i-arc" viewBox="0 0 24 24"><path d="M5 16a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-poly" viewBox="0 0 24 24"><path d="M12 4 20 10l-3 9H7L4 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-fillet" viewBox="0 0 24 24"><path d="M6 18V11a5 5 0 0 1 5-5h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-chamfer" viewBox="0 0 24 24"><path d="M6 18V10l6-6h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-trim" viewBox="0 0 24 24"><path d="M5 8h8M13 16h6M12 5v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-offset" viewBox="0 0 24 24"><path d="M8 8h10v10H8zM5 5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-dim" viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M6 12h12M8.5 10 6 12l2.5 2M15.5 10 18 12l-2.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -1152,11 +1304,15 @@
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
         <button type="button" class="tool-btn" data-action="primitive" data-kind="box" data-tool="Box" title="Box"><svg class="ico"><use href="#i-box"></use></svg><span>Box</span></button>
         <button type="button" class="tool-btn" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder"><svg class="ico"><use href="#i-cyl"></use></svg><span>Cylinder</span></button>
+        <button type="button" class="tool-btn" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc"><svg class="ico"><use href="#i-circle"></use></svg><span>Disc</span></button>
         <button type="button" class="tool-btn" data-tool="Extrude (Push/Pull)" title="Extrude (Push/Pull)"><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Fillet" title="Fillet"><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
+        <button type="button" class="tool-btn" id="filletBtn" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet. Pick edges, then Confirm. Default 2 mm."><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
+        <button type="button" class="tool-btn" id="chamferBtn" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer. Pick edges, then Confirm. Default 0.5 mm."><svg class="ico"><use href="#i-chamfer"></use></svg><span>Chamfer</span></button>
+        <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="number" min="0.01" step="0.1" value="2" aria-label="Edge size mm"></label>
+        <button type="button" class="tool-btn edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges."><span>Confirm</span></button>
         <button type="button" class="tool-btn" data-tool="Loop Cut" title="Loop Cut"><svg class="ico"><use href="#i-loop"></use></svg><span>Loop Cut</span></button>
         <button type="button" class="tool-btn" data-tool="Knife" title="Knife"><svg class="ico"><use href="#i-knife"></use></svg><span>Knife</span></button>
       </div><div class="group-label">Modify</div></div>
@@ -1166,9 +1322,9 @@
         <button type="button" class="tool-btn" data-tool="Scale" title="Scale"><svg class="ico"><use href="#i-scale"></use></svg><span>Scale</span></button>
       </div><div class="group-label">Transform</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" id="boolUnion" data-action="boolean" data-op="union" data-tool="Union" title="Union. 1 with 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-union"></use></svg><span>Union</span></button>
-        <button type="button" class="tool-btn" id="boolCut" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut. 1 minus 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-cut"></use></svg><span>Cut</span></button>
-        <button type="button" class="tool-btn" id="boolIntersect" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect. Shared volume of 1 and 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-intersect"></use></svg><span>Intersect</span></button>
+        <button type="button" class="tool-btn bool-op" id="boolUnion" data-action="boolean" data-op="union" data-tool="Union" title="Union. 1 with 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-union"></use></svg><span>Union</span></button>
+        <button type="button" class="tool-btn bool-op" id="boolCut" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut. 1 minus 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-cut"></use></svg><span>Cut</span></button>
+        <button type="button" class="tool-btn bool-op" id="boolIntersect" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect. Shared volume of 1 and 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-intersect"></use></svg><span>Intersect</span></button>
       </div><div class="group-label" id="boolOrder">1 = target, 2 = tool</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" id="snapBtn" data-action="snap" data-tool="Snapping" title="Snapping" aria-pressed="false"><svg class="ico"><use href="#i-snap"></use></svg><span>Snap</span></button>
@@ -1257,6 +1413,43 @@
         <div><b id="hudName">Body1</b></div>
         <div><span id="hudSize">…</span> · <span id="viewLabel">Iso</span></div>
       </div>
+      <nav id="touchToolbar" class="touch-toolbar" aria-label="Primitives">
+        <button type="button" class="touch-tool" data-action="primitive" data-kind="box" data-tool="Box" title="Box">Box</button>
+        <button type="button" class="touch-tool" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder">Cylinder</button>
+        <button type="button" class="touch-tool" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
+      </nav>
+      <form id="dimPanel" class="dim-panel" hidden>
+        <div class="dim-head"><span id="primTitle">Primitive</span><span>mm</span></div>
+        <div class="dim-row"><span class="dim-label">Centre X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="-1" data-tool="Centre X minus" aria-label="Centre X minus 1 mm">−</button><input id="primCx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="1" data-tool="Centre X plus" aria-label="Centre X plus 1 mm">+</button></div>
+        <div class="dim-row"><span class="dim-label">Centre Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="-1" data-tool="Centre Y minus" aria-label="Centre Y minus 1 mm">−</button><input id="primCy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="1" data-tool="Centre Y plus" aria-label="Centre Y plus 1 mm">+</button></div>
+        <div class="dim-row"><span class="dim-label">Centre Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="-1" data-tool="Centre Z minus" aria-label="Centre Z minus 1 mm">−</button><input id="primCz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="1" data-tool="Centre Z plus" aria-label="Centre Z plus 1 mm">+</button></div>
+        <div id="primBox">
+          <div class="dim-row"><span class="dim-label">Size X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="-1" data-tool="Size X minus" aria-label="Box size X minus 1 mm">−</button><input id="boxSx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="1" data-tool="Size X plus" aria-label="Box size X plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="-1" data-tool="Size Y minus" aria-label="Box size Y minus 1 mm">−</button><input id="boxSy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="1" data-tool="Size Y plus" aria-label="Box size Y plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="-1" data-tool="Size Z minus" aria-label="Box size Z minus 1 mm">−</button><input id="boxSz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="1" data-tool="Size Z plus" aria-label="Box size Z plus 1 mm">+</button></div>
+        </div>
+        <div id="primCyl" hidden>
+          <div class="dim-row"><span class="dim-label">Radius</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="-1" data-tool="Radius minus" aria-label="Cylinder radius minus 1 mm">−</button><input id="cylR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder radius mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="1" data-tool="Radius plus" aria-label="Cylinder radius plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Height</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="-1" data-tool="Height minus" aria-label="Cylinder height minus 1 mm">−</button><input id="cylH" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder height mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="1" data-tool="Height plus" aria-label="Cylinder height plus 1 mm">+</button></div>
+          <div class="muted">Axis</div>
+          <div class="axis-row" role="group" aria-label="Cylinder axis">
+            <button type="button" data-action="cylAxis" data-axis="X" data-tool="Axis X">X</button>
+            <button type="button" data-action="cylAxis" data-axis="Y" data-tool="Axis Y">Y</button>
+            <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Axis Z">Z</button>
+          </div>
+        </div>
+        <div id="primDisc" hidden>
+          <div class="dim-row"><span class="dim-label">Diameter</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="-1" data-tool="Diameter minus" aria-label="Disc diameter minus 1 mm">−</button><input id="discD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="1" data-tool="Diameter plus" aria-label="Disc diameter plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Thickness</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="-1" data-tool="Thickness minus" aria-label="Disc thickness minus 1 mm">−</button><input id="discT" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc thickness mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="1" data-tool="Thickness plus" aria-label="Disc thickness plus 1 mm">+</button></div>
+          <div class="muted">Axis</div>
+          <div class="axis-row" role="group" aria-label="Disc axis">
+            <button type="button" data-action="cylAxis" data-axis="X" data-tool="Disc axis X">X</button>
+            <button type="button" data-action="cylAxis" data-axis="Y" data-tool="Disc axis Y">Y</button>
+            <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Disc axis Z">Z</button>
+          </div>
+        </div>
+        <p class="fine dim-note">Millimetres. Box 20 mm, cylinder diameter 20 mm and height 20 mm, disc diameter 18 mm and thickness 4 mm. A rejected edit keeps the last solid.</p>
+      </form>
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View">
@@ -1328,34 +1521,11 @@
         <p class="fine" id="inspFine">Labels only. This cube is not editable geometry.</p>
         <div id="moveFields" class="move-fields">
           <div class="muted">Position (mm)</div>
-          <label>X <input id="posX" type="number" step="0.001" inputmode="decimal" aria-label="Position X mm"></label>
-          <label>Y <input id="posY" type="number" step="0.001" inputmode="decimal" aria-label="Position Y mm"></label>
-          <label>Z <input id="posZ" type="number" step="0.001" inputmode="decimal" aria-label="Position Z mm"></label>
+          <label>X <input id="posX" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position X mm"></label>
+          <label>Y <input id="posY" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position Y mm"></label>
+          <label>Z <input id="posZ" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position Z mm"></label>
         </div>
-        <div id="primFields" class="prim-fields" hidden>
-          <div class="muted" id="primTitle">Primitive</div>
-          <div class="muted">Centre (mm)</div>
-          <label>X <input id="primCx" type="number" step="0.001" inputmode="decimal" aria-label="Centre X mm"></label>
-          <label>Y <input id="primCy" type="number" step="0.001" inputmode="decimal" aria-label="Centre Y mm"></label>
-          <label>Z <input id="primCz" type="number" step="0.001" inputmode="decimal" aria-label="Centre Z mm"></label>
-          <div id="primBox">
-            <div class="muted">Size (mm)</div>
-            <label>X <input id="boxSx" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size X mm"></label>
-            <label>Y <input id="boxSy" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size Y mm"></label>
-            <label>Z <input id="boxSz" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Box size Z mm"></label>
-          </div>
-          <div id="primCyl" hidden>
-            <label>Radius <input id="cylR" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Cylinder radius mm"></label>
-            <label>Height <input id="cylH" type="number" step="0.001" min="0" inputmode="decimal" aria-label="Cylinder height mm"></label>
-            <div class="muted">Axis</div>
-            <div class="axis-row" role="group" aria-label="Cylinder axis">
-              <button type="button" data-action="cylAxis" data-axis="X" data-tool="Axis X">X</button>
-              <button type="button" data-action="cylAxis" data-axis="Y" data-tool="Axis Y">Y</button>
-              <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Axis Z">Z</button>
-            </div>
-          </div>
-          <p class="fine">App defaults: box edge 20 mm, cylinder diameter 20 mm and height 20 mm. Each edit rebuilds the solid. No Sides control.</p>
-        </div>
+        <p class="fine" id="primNote">Dimensions for a box, cylinder, or disc open on the model.</p>
       </div>
       <div data-side-panel="channels" hidden>
         <h2 class="panel-h">Channels</h2>
@@ -1527,9 +1697,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     { name: 'New Sketch', tab: 'model', action: 'newSketch' },
     { name: 'Box', tab: 'model', action: 'primitive', kind: 'box' },
     { name: 'Cylinder', tab: 'model', action: 'primitive', kind: 'cylinder' },
+    { name: 'Disc', tab: 'model', action: 'primitive', kind: 'disc' },
     { name: 'Extrude (Push/Pull)', tab: 'model' },
     { name: 'Inset', tab: 'model' },
-    { name: 'Fillet', tab: 'model' },
+    { name: 'Fillet', tab: 'model', action: 'armEdge', op: 'fillet' },
+    { name: 'Chamfer', tab: 'model', action: 'armEdge', op: 'chamfer' },
+    { name: 'Confirm', tab: 'model', action: 'confirmEdge' },
     { name: 'Loop Cut', tab: 'model' },
     { name: 'Knife', tab: 'model' },
     { name: 'Grab', tab: 'model' },
@@ -1604,6 +1777,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     primitive: null,
     shapeGate: null,
     opLog: [],
+    edgeOpLog: [],
+    droppedHoles: [],
+    edgeArm: '',
+    edgePickName: 'base-tip',
     lastError: '',
     demo: '',
     bodies: [],
@@ -1910,9 +2087,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function gizmoShouldShow() {
     if (state.bodies.length > 1) return false;
-    if (state.bodies.length === 1 && !state.primitive) return false;
     if (state.preview) return true;
-    if (state.selection === 'item') return state.selectedIds.length > 0;
+    if (state.selection === 'item' && state.selectedIds.length > 0) return true;
+    if (state.bodies.length === 1 && !state.primitive) return false;
+    if (state.selection === 'item') return false;
     return true;
   }
 
@@ -2004,36 +2182,55 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     writePosFields();
   }
 
+  function primitiveLabel(kind) {
+    if (kind === 'cylinder') return 'Cylinder';
+    if (kind === 'disc') return 'Disc';
+    return 'Box';
+  }
+
+  function paintAxis(axis) {
+    const axes = document.querySelectorAll('[data-action="cylAxis"]');
+    for (let i = 0; i < axes.length; i += 1) {
+      const on = axes[i].getAttribute('data-axis') === axis;
+      axes[i].classList.toggle('is-on', on);
+      axes[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
   function paintPrimFields() {
-    const host = document.getElementById('primFields');
+    const host = document.getElementById('dimPanel');
     const box = document.getElementById('primBox');
     const cyl = document.getElementById('primCyl');
-    if (!host || !box || !cyl) return;
+    const disc = document.getElementById('primDisc');
+    if (!host || !box || !cyl || !disc) return;
     const prim = state.primitive;
     host.hidden = !prim;
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
-    if (!prim) return;
-    state.writingFields = true;
-    document.getElementById('primTitle').textContent = prim.kind === 'cylinder' ? 'Cylinder' : 'Box';
-    document.getElementById('primCx').value = String(prim.params.cx);
-    document.getElementById('primCy').value = String(prim.params.cy);
-    document.getElementById('primCz').value = String(prim.params.cz);
-    if (prim.kind === 'box') {
-      document.getElementById('boxSx').value = String(prim.params.sx);
-      document.getElementById('boxSy').value = String(prim.params.sy);
-      document.getElementById('boxSz').value = String(prim.params.sz);
-    } else {
-      document.getElementById('cylR').value = String(prim.params.radius);
-      document.getElementById('cylH').value = String(prim.params.height);
-      const axes = document.querySelectorAll('[data-action="cylAxis"]');
-      for (let i = 0; i < axes.length; i += 1) {
-        const on = axes[i].getAttribute('data-axis') === prim.params.axis;
-        axes[i].classList.toggle('is-on', on);
-        axes[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    disc.hidden = !prim || prim.kind !== 'disc';
+    if (prim) {
+      state.writingFields = true;
+      const title = document.getElementById('primTitle');
+      if (title) title.textContent = primitiveLabel(prim.kind);
+      document.getElementById('primCx').value = String(prim.params.cx);
+      document.getElementById('primCy').value = String(prim.params.cy);
+      document.getElementById('primCz').value = String(prim.params.cz);
+      if (prim.kind === 'box') {
+        document.getElementById('boxSx').value = String(prim.params.sx);
+        document.getElementById('boxSy').value = String(prim.params.sy);
+        document.getElementById('boxSz').value = String(prim.params.sz);
+      } else if (prim.kind === 'disc') {
+        document.getElementById('discD').value = String(prim.params.diameter);
+        document.getElementById('discT').value = String(prim.params.thickness);
+        paintAxis(prim.params.axis);
+      } else {
+        document.getElementById('cylR').value = String(prim.params.radius);
+        document.getElementById('cylH').value = String(prim.params.height);
+        paintAxis(prim.params.axis);
       }
+      state.writingFields = false;
     }
-    state.writingFields = false;
+    publishGateState();
   }
 
   function captureMeshCad() {
@@ -2158,19 +2355,33 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     const owned = makeOwned(kind, params);
     if (owned && owned.failed) {
+      const why = (owned.view && owned.view.gate && owned.view.gate.message) || 'Primitive mesh was rejected.';
+      if (state.bodies.length && state.primitive) {
+        toast(why);
+        setHint(why + ' The last solid was kept.');
+        publishGateState();
+        return false;
+      }
       state.shapeGate = owned.view.gate;
-      setHint((owned.view.gate && owned.view.gate.message) || 'Primitive mesh was rejected.');
+      setHint(why);
       paintExport();
       return false;
     }
     const built = owned && owned.shape
       ? { kind: owned.kind, params: owned.params, gate: owned.gate, watertight: owned.watertight, mesh: owned.mesh, topology: owned.topology }
-      : (kind === 'cylinder' ? primApi.buildCylinder(oc, params) : primApi.buildBox(oc, params));
+      : (kind === 'cylinder' ? primApi.buildCylinder(oc, params) : kind === 'disc' ? primApi.buildDisc(oc, params) : primApi.buildBox(oc, params));
     const flat = primApi.flattenMesh(built.mesh);
     if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, kind)) {
       if (owned && owned.shape) dropShape(owned.shape);
+      const why = (built.gate && built.gate.message) || 'Primitive mesh was rejected.';
+      if (state.bodies.length && state.primitive) {
+        toast(why);
+        setHint(why + ' The last solid was kept.');
+        publishGateState();
+        return false;
+      }
       state.shapeGate = built.gate;
-      setHint(built.gate.message || 'Primitive mesh was rejected.');
+      setHint(why);
       paintExport();
       return false;
     }
@@ -2178,7 +2389,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       clearOwnedBodies();
       state.bodySeq += 1;
       owned.id = 'b' + state.bodySeq;
-      owned.name = kind === 'cylinder' ? 'Cylinder' : 'Box';
+      owned.name = primitiveLabel(owned.kind);
       state.bodies = [owned];
     } else {
       clearOwnedBodies();
@@ -2191,7 +2402,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     state.hoverId = null;
     if (kept) state.selectedIds = kept;
     else selectFromQuery(selectMode, built.topology);
-    state.activeTool = kind === 'cylinder' ? 'Cylinder' : 'Box';
+    state.activeTool = primitiveLabel(built.kind);
     state.booleanOp = '';
     syncFromKernel();
     mountBodyMeshes();
@@ -2264,6 +2475,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       state.opLog = built.log || [];
       state.lastError = built.lastError || '';
       state.primitive = null;
+      paintPrimFields();
       state.shapeGate = built.gate;
       state.topology = built.topology;
       state.topologySource = 'occt';
@@ -2405,17 +2617,33 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     };
   }
 
+  function axisDir(axis) {
+    if (axis === 'X') return [1, 0, 0];
+    if (axis === 'Y') return [0, 1, 0];
+    return [0, 0, 1];
+  }
+
   function makeOwned(kind, params) {
     if (!oc || !primApi || !opsApi || typeof opsApi.makeBoxSolid !== 'function') return null;
+    const want = kind === 'cylinder' || kind === 'disc' ? kind : 'box';
     let shape = null;
     let normalized = null;
-    if (kind === 'cylinder') {
+    if (want === 'cylinder') {
       normalized = primApi.normalizeCylinder(params);
-      const dir = normalized.axis === 'X' ? [1, 0, 0] : normalized.axis === 'Y' ? [0, 1, 0] : [0, 0, 1];
+      const dir = axisDir(normalized.axis);
       shape = opsApi.makeCylinderSolid(oc, normalized.radius, normalized.height, [
         normalized.cx - dir[0] * normalized.height / 2,
         normalized.cy - dir[1] * normalized.height / 2,
         normalized.cz - dir[2] * normalized.height / 2,
+      ], dir);
+    } else if (want === 'disc') {
+      normalized = primApi.normalizeDisc(params);
+      const dir = axisDir(normalized.axis);
+      const height = normalized.thickness;
+      shape = opsApi.makeCylinderSolid(oc, normalized.diameter / 2, height, [
+        normalized.cx - dir[0] * height / 2,
+        normalized.cy - dir[1] * height / 2,
+        normalized.cz - dir[2] * height / 2,
       ], dir);
     } else {
       normalized = primApi.normalizeBox(params);
@@ -2439,8 +2667,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     return {
       id: '',
-      name: kind === 'cylinder' ? 'Cylinder' : 'Box',
-      kind: kind === 'cylinder' ? 'cylinder' : 'box',
+      name: primitiveLabel(want),
+      kind: want,
       params: normalized,
       shape: shape,
       mesh: view.mesh,
@@ -2531,11 +2759,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     state.topology = state.bodies.length === 1 ? state.bodies[0].topology : null;
     state.topologySource = 'occt';
     state.hoverId = null;
-    if (state.bodies.length === 1 && (state.bodies[0].kind === 'box' || state.bodies[0].kind === 'cylinder')) {
+    if (state.bodies.length === 1 && (state.bodies[0].kind === 'box' || state.bodies[0].kind === 'cylinder' || state.bodies[0].kind === 'disc')) {
       state.primitive = { kind: state.bodies[0].kind, params: state.bodies[0].params };
     } else {
       state.primitive = null;
     }
+    paintPrimFields();
     const flat = primApi.flattenMesh(combined);
     if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, fixtureName || 'bodies')) {
       state.lastError = 'FAIL: the scene mesh was rejected.';
@@ -2552,9 +2781,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function addAnotherBody(kind) {
     const shift = (opsApi && opsApi.BOOLEAN_OVERLAP_SHIFT_MM ? opsApi.BOOLEAN_OVERLAP_SHIFT_MM : 10) * state.bodies.length;
+    const discBase = primApi && primApi.PLACEHOLDER_DISC_MM ? primApi.PLACEHOLDER_DISC_MM : null;
     const params = kind === 'cylinder'
       ? { cx: shift, cy: 0, cz: 10, radius: 10, height: 20, axis: 'Z' }
-      : { cx: shift, cy: 0, cz: 10, sx: 20, sy: 20, sz: 20 };
+      : kind === 'disc'
+        ? {
+          cx: shift,
+          cy: discBase ? discBase.cy : 0,
+          cz: discBase ? discBase.cz : 2,
+          diameter: discBase ? discBase.diameter : 18,
+          thickness: discBase ? discBase.thickness : 4,
+          axis: discBase ? discBase.axis : 'Z'
+        }
+        : { cx: shift, cy: 0, cz: 10, sx: 20, sy: 20, sz: 20 };
     const owned = makeOwned(kind, params);
     if (!owned || owned.failed || !owned.shape) {
       const why = owned && owned.view
@@ -2569,7 +2808,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     state.bodySeq += 1;
     owned.id = 'b' + state.bodySeq;
-    owned.name = (kind === 'cylinder' ? 'Cylinder' : 'Box') + ' ' + (state.bodies.length + 1);
+    owned.name = primitiveLabel(kind) + ' ' + (state.bodies.length + 1);
     state.bodies.push(owned);
     state.selection = 'item';
     state.selectedIds = [];
@@ -2672,6 +2911,102 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     return ok && built.gate.pass === true && built.watertight.pass === true && !state.lastError;
   }
 
+  function selectedEdgeSegments() {
+    const topo = state.topology;
+    const segments = [];
+    if (!topo || state.selection !== 'edge') return segments;
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      for (let k = 0; k < topo.edges.length; k += 1) {
+        const edge = topo.edges[k];
+        if (edge.id !== id || !edge.pts || edge.pts.length < 2) continue;
+        segments.push({
+          a: edge.pts[0].slice(),
+          b: edge.pts[edge.pts.length - 1].slice()
+        });
+      }
+    }
+    return segments;
+  }
+
+  function confirmPickedEdge() {
+    const kind = state.edgeArm === 'chamfer' ? 'chamfer' : state.edgeArm === 'fillet' ? 'fillet' : '';
+    const sizeInput = document.getElementById('edgeSize');
+    const size = sizeInput ? Number(sizeInput.value) : NaN;
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    function reject(message) {
+      state.lastError = message;
+      state.edgeOpLog.push({ kind: kind || state.edgeArm || '', size: size, pass: false, kept: true, error: message });
+      toast(message);
+      setHint(message);
+      publishGateState();
+    }
+    if (!oc || !opsApi || typeof opsApi.applyPickedEdgeOp !== 'function') {
+      reject('FAIL: edge ops are not loaded. The last good shape was kept.');
+      return;
+    }
+    if (!kind) {
+      reject('FAIL: choose Fillet or Chamfer, then Confirm. The last good shape was kept.');
+      return;
+    }
+    if (!body || !body.shape) {
+      reject('FAIL: there is no solid to fillet. The last good shape was kept.');
+      return;
+    }
+    const segments = selectedEdgeSegments();
+    if (!segments.length) {
+      reject('FAIL: pick an edge, then Confirm. The last good shape was kept.');
+      return;
+    }
+    let result;
+    try {
+      result = opsApi.applyPickedEdgeOp(oc, body.shape, segments, kind, size);
+    } catch (err) {
+      reject('FAIL: ' + kind + ' threw ' + (err && err.message ? err.message : String(err)) + ' The last good shape was kept.');
+      return;
+    }
+    if (!result || !result.ok || !result.shape) {
+      if (result && result.shape) dropShape(result.shape);
+      reject((result && result.error) || ('FAIL: ' + kind + ' was rejected. The last good shape was kept.'));
+      return;
+    }
+    const previous = {
+      shape: body.shape,
+      mesh: body.mesh,
+      topology: body.topology,
+      gate: body.gate,
+      watertight: body.watertight
+    };
+    body.shape = result.shape;
+    body.mesh = result.mesh;
+    body.topology = result.topology;
+    body.gate = result.gate;
+    body.watertight = result.watertight;
+    state.lastError = '';
+    state.edgeOpLog.push({ kind: kind, size: size, pass: true, kept: false, error: '' });
+    state.selection = 'edge';
+    state.selectedIds = [];
+    state.hoverId = null;
+    const partName = state.demo || 'part';
+    const ok = installBodiesAndSync(partName);
+    if (ok) dropShape(previous.shape);
+    else {
+      dropShape(result.shape);
+      body.shape = previous.shape;
+      body.mesh = previous.mesh;
+      body.topology = previous.topology;
+      body.gate = previous.gate;
+      body.watertight = previous.watertight;
+      state.lastError = 'FAIL: the new mesh was rejected. The last good shape was kept.';
+      state.edgeOpLog[state.edgeOpLog.length - 1].pass = false;
+      state.edgeOpLog[state.edgeOpLog.length - 1].kept = true;
+      state.edgeOpLog[state.edgeOpLog.length - 1].error = state.lastError;
+      installBodiesAndSync(partName);
+    }
+    setHint(state.lastError || (kind === 'chamfer' ? 'Chamfer applied.' : 'Fillet applied.'));
+    if (state.lastError) toast(state.lastError);
+  }
+
   function applySceneBoolean(op) {
     if (!oc || !opsApi || typeof opsApi.applyBooleanSolids !== 'function') {
       state.lastError = 'FAIL: Boolean ops are not loaded.';
@@ -2759,6 +3094,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     mountBodyMeshes();
     refreshAnchor();
     applyLook();
+    paintPrimFields();
     toast(name);
     setHint(state.booleanMessage);
   }
@@ -2840,7 +3176,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
   }
 
-  function pickElement(clientX, clientY) {
+  function pickElement(clientX, clientY, pointerType) {
     const mode = state.selection;
     const topo = state.topology;
     pointerNdc(clientX, clientY);
@@ -2856,7 +3192,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const bounds = canvas.getBoundingClientRect();
     const px = clientX - bounds.left;
     const py = clientY - bounds.top;
-    const limit = selApi.PICK_TOLERANCE_PX;
+    const limit = pointerType === 'touch' && selApi.TOUCH_PICK_TOLERANCE_PX
+      ? selApi.TOUCH_PICK_TOLERANCE_PX
+      : selApi.PICK_TOLERANCE_PX;
     if (mode === 'vertex') {
       let best = null;
       let bestD = limit;
@@ -2898,7 +3236,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     if (!selApi || gesture) return;
     const handle = pickHandle(ev.clientX, ev.clientY);
     gizmo.setHover(handle || null);
-    const next = handle ? null : pickElement(ev.clientX, ev.clientY);
+    const next = handle ? null : pickElement(ev.clientX, ev.clientY, ev.pointerType);
     if (next !== state.hoverId) {
       state.hoverId = next;
       updateHighlights();
@@ -2955,7 +3293,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function readField(id) {
     const el = document.getElementById(id);
     if (!el) return null;
-    const n = Number(el.value);
+    const n = Number(String(el.value).trim().replace(',', '.'));
     return Number.isFinite(n) ? n : null;
   }
 
@@ -2983,6 +3321,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       next.sx = sx;
       next.sy = sy;
       next.sz = sz;
+    } else if (state.primitive.kind === 'disc') {
+      const diameter = readField('discD');
+      const thickness = readField('discT');
+      if (diameter == null || thickness == null) return;
+      next.diameter = diameter;
+      next.thickness = thickness;
     } else {
       const radius = readField('cylR');
       const height = readField('cylH');
@@ -3150,7 +3494,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     document.getElementById('inspColors').hidden = !((INSP[state.node] || {}).colors && !tool);
     document.getElementById('inspFine').textContent = info.fine || (state.node === 'body' ? 'Triangle mesh from the wasm checks.' : 'TBD. This control does not edit the mesh.');
-    const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool]');
+    const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool], .touch-tool[data-tool]');
     for (let i = 0; i < toolBtns.length; i++) {
       if (toolBtns[i].id === 'snapBtn') continue;
       toolBtns[i].classList.toggle('is-on', toolBtns[i].getAttribute('data-tool') === state.activeTool);
@@ -3334,8 +3678,37 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       booleanOp: state.booleanOp || '',
       booleanMessage: state.booleanMessage || '',
       bodyCount: state.bodies.length,
-      selectionOrder: orderedBodies().map(function (body) { return body.id; })
+      selectionOrder: orderedBodies().map(function (body) { return body.id; }),
+      droppedHoles: state.droppedHoles || [],
+      gizmoVisible: !!(handles && handles.visible),
+      edgePickPoint: currentEdgePickPoint(),
+      edgeOpLog: state.edgeOpLog || [],
+      edgeArm: state.edgeArm || '',
+      selectedEdge: selectedEdgeEnds(),
+      primitiveKind: state.primitive ? state.primitive.kind : '',
+      primitiveParams: state.primitive ? Object.assign({}, state.primitive.params) : null,
+      dimPanelOpen: (function () {
+        const panel = document.getElementById('dimPanel');
+        return !!(panel && panel.hidden !== true);
+      })()
     };
+  }
+
+  function selectedEdgeEnds() {
+    const topo = state.topology;
+    if (!topo || state.selection !== 'edge' || !state.selectedIds.length) return null;
+    const id = state.selectedIds[0];
+    for (let i = 0; i < topo.edges.length; i += 1) {
+      const edge = topo.edges[i];
+      if (edge.id === id && edge.pts && edge.pts.length >= 2) {
+        return { a: edge.pts[0], b: edge.pts[edge.pts.length - 1] };
+      }
+    }
+    return null;
+  }
+
+  function currentEdgePickPoint() {
+    return null;
   }
 
   function runOcctGate() {
@@ -3688,6 +4061,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       const name = btn.getAttribute('data-fixture') || '';
       clearOwnedBodies();
       state.primitive = null;
+      paintPrimFields();
       state.shapeGate = null;
       state.topologySource = 'mesh';
       state.selectedIds = [];
@@ -3718,18 +4092,45 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       message = 'Selection: ' + cap(state.selection);
       setHint(message);
     } else if (action === 'primitive') {
-      const kind = btn.getAttribute('data-kind') === 'cylinder' ? 'cylinder' : 'box';
+      const rawKind = btn.getAttribute('data-kind');
+      const kind = rawKind === 'cylinder' || rawKind === 'disc' ? rawKind : 'box';
       if (state.bodies.length >= 1) addAnotherBody(kind);
       else createPrimitive(kind, null, state.selection === 'item' ? 'item' : state.selection, false);
-      message = kind === 'cylinder' ? 'Cylinder' : 'Box';
+      message = primitiveLabel(kind);
     } else if (action === 'boolean') {
       applySceneBoolean(btn.getAttribute('data-op') || '');
       return;
+    } else if (action === 'armEdge') {
+      const op = btn.getAttribute('data-op') === 'chamfer' ? 'chamfer' : 'fillet';
+      state.edgeArm = op;
+      state.activeTool = op === 'chamfer' ? 'Chamfer' : 'Fillet';
+      const sizeInput = document.getElementById('edgeSize');
+      if (sizeInput && opsApi) {
+        const sized = op === 'chamfer' ? opsApi.EDGE_CHAMFER_DISTANCE_MM : opsApi.EDGE_FILLET_RADIUS_MM;
+        sizeInput.value = String(sized);
+      }
+      message = state.activeTool + ' on confirm';
+      setHint('Pick an edge, then Confirm. Nothing changes until Confirm.');
+      updateInspector();
+      publishGateState();
+    } else if (action === 'confirmEdge') {
+      confirmPickedEdge();
+      return;
+    } else if (action === 'dimStep') {
+      const dimId = btn.getAttribute('data-dim') || '';
+      const delta = Number(btn.getAttribute('data-delta'));
+      const field = document.getElementById(dimId);
+      const current = readField(dimId);
+      if (field && Number.isFinite(delta) && current != null) {
+        field.value = String(Math.round((current + delta) * 1000) / 1000);
+        onPrimitiveCommit();
+      }
+      message = btn.getAttribute('data-tool') || 'Dimension';
     } else if (action === 'cylAxis') {
       const axis = btn.getAttribute('data-axis') || 'Z';
-      if (state.primitive && state.primitive.kind === 'cylinder') {
+      if (state.primitive && (state.primitive.kind === 'cylinder' || state.primitive.kind === 'disc')) {
         const next = Object.assign({}, state.primitive.params, { axis: axis });
-        createPrimitive('cylinder', next, null, true);
+        createPrimitive(state.primitive.kind, next, null, true);
       }
       message = 'Axis ' + axis;
     } else if (action === 'display') {
@@ -3976,7 +4377,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   }
 
   viewport.addEventListener('pointerdown', function (ev) {
-    if (ev.target.closest('button, a, input, textarea, .vp-bar, .sheet, .hud')) return;
+    if (ev.target.closest('button, a, input, textarea, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar')) return;
     closePopups();
     ev.preventDefault();
     try { viewport.setPointerCapture(ev.pointerId); } catch (err) { /* already captured */ }
@@ -4086,7 +4487,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       if (g.type === 'gizmo') commitGizmoDrag();
       else if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
       else if (g.type === 'orbit' && !g.moved && ev.button === 0) {
-        const hitId = pickElement(ev.clientX, ev.clientY);
+        const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
         const next = selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
           shift: ev.shiftKey,
           ctrl: ev.ctrlKey
@@ -4162,9 +4563,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   for (let pi = 0; pi < positionIds.length; pi += 1) {
     document.getElementById(positionIds[pi]).addEventListener('change', onPositionCommit);
   }
-  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH'];
+  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH', 'discD', 'discT'];
   for (let pi = 0; pi < primIds.length; pi += 1) {
     document.getElementById(primIds[pi]).addEventListener('change', onPrimitiveCommit);
+  }
+  const dimPanel = document.getElementById('dimPanel');
+  if (dimPanel) {
+    dimPanel.addEventListener('submit', function (ev) { ev.preventDefault(); });
+    dimPanel.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || !ev.target || ev.target.tagName !== 'INPUT') return;
+      ev.preventDefault();
+      ev.target.blur();
+    });
   }
 
   document.addEventListener('keydown', function (ev) {
@@ -4242,7 +4652,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     updateCamera();
   }
   const primKind = params.get('primitive');
-  if (primKind === 'box' || primKind === 'cylinder') {
+  if (primKind === 'box' || primKind === 'cylinder' || primKind === 'disc') {
     const asked = params.get('select') || 'item';
     createPrimitive(primKind, null, asked, false);
     spherical.radius = fitDistance();
@@ -4267,6 +4677,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   const startTab = params.get('tab');
   if (startTab === 'sketch' || startTab === 'model' || startTab === 'repair' || startTab === 'export') setTab(startTab);
   else setTab('model');
+  publishGateState();
   renderFrame();
 
   function frame() {

@@ -18,7 +18,9 @@ Asserts window.__cadcamExportState.occtReady for:
   ?demo=booleans&op=    union, cut, and intersect each PASS
   ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
   /?fixture=closed_box  plain 4 key selects the whole body
-  /tests/fixtures/lbracket.json and /fixtures/lbracket.json return 404
+  portrait 390x844      touch-create box, cylinder, and disc, then edit one dimension
+  /tests/fixtures/lbracket.json, /fixtures/lbracket.json,
+  /tests/fixtures/blink.json, and /fixtures/blink.json return 404
 
 Exit 77 (CTest skip) only when the browser or libcascade is missing and
 CI is not set. In CI those gaps fail the run.
@@ -671,8 +673,8 @@ def wait_for_page(port: int) -> str:
     raise SystemExit("CDP did not expose a page target")
 
 
-def press_plain_4(cdp: Cdp) -> None:
-    """Press the plain 4 key. Alt is not held, so this is Item select, not Export."""
+def press_digit(cdp: Cdp, digit: str) -> None:
+    """Press a plain digit key. Alt is not held, so 4 stays Item select."""
     cdp.call(
         "Runtime.evaluate",
         {
@@ -688,19 +690,220 @@ def press_plain_4(cdp: Cdp) -> None:
             "returnByValue": True,
         },
     )
+    code = ord(digit)
     for kind in ("keyDown", "keyUp"):
         cdp.call(
             "Input.dispatchKeyEvent",
             {
                 "type": kind,
-                "key": "4",
-                "code": "Digit4",
-                "windowsVirtualKeyCode": 52,
-                "nativeVirtualKeyCode": 52,
-                "text": "4" if kind == "keyDown" else "",
+                "key": digit,
+                "code": "Digit" + digit,
+                "windowsVirtualKeyCode": code,
+                "nativeVirtualKeyCode": code,
+                "text": digit if kind == "keyDown" else "",
                 "modifiers": 0,
             },
         )
+
+
+def press_plain_4(cdp: Cdp) -> None:
+    """Press the plain 4 key. Alt is not held, so this is Item select, not Export."""
+    press_digit(cdp, "4")
+
+
+
+PORTRAIT = (
+    {"kind": "box", "field": "boxSx", "value": "30", "key": "sx", "fresh": 20.0, "want": 30.0},
+    {"kind": "cylinder", "field": "cylH", "value": "24", "key": "height", "fresh": 20.0, "want": 24.0},
+    {"kind": "disc", "field": "discD", "value": "22", "key": "diameter", "fresh": 18.0, "want": 22.0},
+)
+
+
+def eval_expr(cdp: Cdp, expression: str) -> tuple[Any, str]:
+    result = cdp.call(
+        "Runtime.evaluate",
+        {"expression": expression, "returnByValue": True},
+        timeout=30,
+    )
+    if result.get("exceptionDetails"):
+        detail = result.get("exceptionDetails") or {}
+        return None, str(detail.get("text") or detail.get("exception") or "evaluate failed")
+    remote = result.get("result") or {}
+    return remote.get("value"), ""
+
+
+def set_portrait(cdp: Cdp) -> None:
+    cdp.call(
+        "Emulation.setDeviceMetricsOverride",
+        {"width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True},
+    )
+    cdp.call("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 1})
+
+
+def touch_tap(cdp: Cdp, x: float, y: float) -> None:
+    point = {"x": float(x), "y": float(y), "radiusX": 1.0, "radiusY": 1.0, "force": 1.0, "id": 0}
+    cdp.call("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [point]})
+    time.sleep(0.05)
+    cdp.call("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+
+
+def toolbar_point_expr(kind: str) -> str:
+    return (
+        "(function(){"
+        f"var b=document.querySelector('#touchToolbar [data-kind=\"{kind}\"]');"
+        "if(!b) return 'missing';"
+        "var st=getComputedStyle(b);"
+        "if(st.display==='none'||st.visibility==='hidden') return 'hidden';"
+        "var r=b.getBoundingClientRect();"
+        "if(r.width<1||r.height<1) return 'empty';"
+        "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height});"
+        "})()"
+    )
+
+
+TARGET_EXPR = (
+    "(function(){"
+    "function shown(el){"
+    "if(!el||el.closest('[hidden]')) return null;"
+    "var st=getComputedStyle(el);"
+    "if(st.display==='none'||st.visibility==='hidden') return null;"
+    "var r=el.getBoundingClientRect();"
+    "if(r.width<1||r.height<1) return null;"
+    "var label=(el.id||el.getAttribute('aria-label')||el.textContent||'').replace(/\\s+/g,' ').trim();"
+    "return {w:r.width,h:r.height,label:label};"
+    "}"
+    "var nodes=document.querySelectorAll('#touchToolbar button, #dimPanel button, #dimPanel input');"
+    "var bad=[];"
+    "var n=0;"
+    "for(var i=0;i<nodes.length;i++){"
+    "var box=shown(nodes[i]);"
+    "if(!box) continue;"
+    "n++;"
+    "if(box.w<44||box.h<44) bad.push(box.label+' '+box.w.toFixed(1)+'x'+box.h.toFixed(1));"
+    "}"
+    "return JSON.stringify({n:n,bad:bad});"
+    "})()"
+)
+
+
+def edit_expr(field: str, value: str) -> str:
+    return (
+        "(function(){"
+        f"var el=document.getElementById('{field}');"
+        "if(!el) return 'missing';"
+        "if(el.getAttribute('inputmode')!=='decimal') return 'inputmode='+String(el.getAttribute('inputmode'));"
+        f"el.value='{value}';"
+        "el.dispatchEvent(new Event('change',{bubbles:true}));"
+        "return 'edited';"
+        "})()"
+    )
+
+
+def param_is(state: dict[str, Any], key: str, want: float) -> bool:
+    params = state.get("primitiveParams") or {}
+    if not isinstance(params, dict) or key not in params:
+        return False
+    try:
+        return abs(float(params.get(key)) - want) < 1e-6
+    except (TypeError, ValueError):
+        return False
+
+
+def wait_portrait(
+    cdp: Cdp,
+    origin: str,
+    kind: str,
+    key: str,
+    want: float,
+    timeout: float,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    deadline = time.time() + timeout
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.3)
+        problems = site_problems(cdp.events, origin, cdp.urls)
+        payload = eval_state(cdp)
+        problems.extend(smoke_notes(payload))
+        if problems:
+            return last, problems
+        state = (payload or {}).get("state") if payload else None
+        if isinstance(state, dict):
+            last = state
+            ready = (
+                state.get("primitiveKind") == kind
+                and state.get("occtGate") is True
+                and state.get("gateOcct") == "PASS"
+                and state.get("dimPanelOpen") is True
+                and state.get("watertight") is True
+                and state.get("unitsPass") is True
+                and not state.get("lastError")
+                and int(state.get("bodyCount") or 0) == 1
+                and param_is(state, key, want)
+            )
+            if ready:
+                return state, []
+        time.sleep(0.15)
+    return last, [f"portrait {kind} timed out waiting for {key}={want}", json.dumps(last)]
+
+
+def run_portrait(cdp: Cdp, origin: str) -> list[str]:
+    """390x844 touch emulation. Tap each primitive, edit one dimension, gate PASS."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"portrait emulation failed: {exc}"]
+    problems: list[str] = []
+    for spec in PORTRAIT:
+        kind = str(spec["kind"])
+        url = origin + "/"
+        print(f"load portrait_{kind} {url}", flush=True)
+        _state, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+        if load_problems:
+            problems.append(f"portrait {kind} load")
+            problems.extend(load_problems[:20])
+            return problems
+        raw, err = eval_expr(cdp, toolbar_point_expr(kind))
+        if err or not isinstance(raw, str) or not raw.startswith("{"):
+            problems.append(f"portrait {kind} toolbar {raw or err}")
+            return problems
+        box = json.loads(raw)
+        if float(box["w"]) < 44 or float(box["h"]) < 44:
+            problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
+            return problems
+        touch_tap(cdp, float(box["x"]), float(box["y"]))
+        created, wait_problems = wait_portrait(
+            cdp, origin, kind, str(spec["key"]), float(spec["fresh"]), PAGE_TIMEOUT_S
+        )
+        if wait_problems or not isinstance(created, dict):
+            problems.append(f"portrait {kind} create")
+            problems.extend(wait_problems[:20])
+            return problems
+        measured, measure_err = eval_expr(cdp, TARGET_EXPR)
+        if measure_err or not isinstance(measured, str):
+            problems.append(f"portrait {kind} targets {measured or measure_err}")
+            return problems
+        sizes = json.loads(measured)
+        if int(sizes.get("n") or 0) < 12 or sizes.get("bad"):
+            problems.append(f"portrait {kind} targets {measured}")
+            return problems
+        edited, edit_err = eval_expr(cdp, edit_expr(str(spec["field"]), str(spec["value"])))
+        if edit_err or edited != "edited":
+            problems.append(f"portrait {kind} edit {edited or edit_err}")
+            return problems
+        done, edit_problems = wait_portrait(
+            cdp, origin, kind, str(spec["key"]), float(spec["want"]), PAGE_TIMEOUT_S
+        )
+        if edit_problems or not isinstance(done, dict):
+            problems.append(f"portrait {kind} edited")
+            problems.extend(edit_problems[:20])
+            return problems
+        print(
+            f"portrait_{kind}: gate PASS, {spec['field']} {spec['fresh']} -> {spec['want']}, "
+            f"targets {sizes.get('n')}",
+            flush=True,
+        )
+    return problems
+
 
 
 def click_boolean(cdp: Cdp, op: str) -> str:
@@ -762,8 +965,13 @@ def response_count(events: list[dict[str, Any]], origin: str) -> int:
 
 
 def assert_fixture_urls_404(origin: str) -> list[str]:
-    """The test fixture stays in tests/ and is not part of the served site."""
-    paths = ("/tests/fixtures/lbracket.json", "/fixtures/lbracket.json")
+    """Acceptance fixtures stay in tests/ and are not part of the served site."""
+    paths = (
+        "/tests/fixtures/lbracket.json",
+        "/fixtures/lbracket.json",
+        "/tests/fixtures/blink.json",
+        "/fixtures/blink.json",
+    )
     problems: list[str] = []
     for path in paths:
         url = origin + path
@@ -817,6 +1025,8 @@ def run(omit: list[str]) -> int:
     banned = (
         site / "tests" / "fixtures" / "lbracket.json",
         site / "fixtures" / "lbracket.json",
+        site / "tests" / "fixtures" / "blink.json",
+        site / "fixtures" / "blink.json",
     )
     for banned_path in banned:
         if banned_path.exists():
@@ -966,6 +1176,11 @@ def run(omit: list[str]) -> int:
                     failures.extend(problems[:40])
                     break
                 print(f"boolean_{op}: gate PASS, {elapsed:.1f}s", flush=True)
+        if not failures:
+            portrait_problems = run_portrait(cdp, origin)
+            if portrait_problems:
+                failures.append("portrait")
+                failures.extend(portrait_problems[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

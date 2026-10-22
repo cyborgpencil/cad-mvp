@@ -190,3 +190,75 @@ Boolean values are a team choice, 2026-10-21. Mesh values are a team proposal, s
 
 Re-export of `builds/export/lbracket.stl` with those mesh settings: 92 triangles, 4684 bytes, final tessellation 5.2 ms (CTest `occt_gate`, 2026-10-21). Node also writes `builds/export/boolean-union.stl`, `boolean-cut.stl`, `boolean-intersect.stl`, and `boolean-demo.stl`. The demo cut STL was 268 triangles and 13484 bytes, watertight, millimetre header, box bounds.
 
+## Blink L-bracket (2026-10-21)
+
+Superseded in the app on 2026-10-21. `web/` no longer contains this layout or `?demo=blink`. Acceptance geometry is `tests/fixtures/blink.json` (Mobile step 1). The table below is the earlier 40 mm drop layout.
+
+Erik delegated the design values (2026-10-21 19:00 MT). The numbers below are the Pilot final values (20:06 MT) and they override the earlier 8.5 mm countersink, the 30 mm disc, and the Outdoor 2K+ 36/55 mm pattern. Every one is a team choice tagged **unverified fit**. Do not print this bracket until Erik measures the camera and the frame. No `src/` edit.
+
+All of them live in one block, `BLINK_DEFAULTS`, in `web/occt-ops.mjs`. Thickness stays 4 mm. Leg length 40 mm, width 20 mm, upright 40 mm, overlap 4 mm, and the corner at the origin are the existing L-bracket defaults.
+
+| What | Value | Tag |
+| --- | --- | --- |
+| Leg holes, #8 wood screws | 4.5 mm through, three per leg, centreline at 10 mm, at 10, 20 and 30 mm from the corner | unverified fit |
+| Countersink | 90°, 9.5 mm across, on the outer face | unverified fit |
+| Disc | 18 mm across, 4 mm thick, flush on the outer face of the vertical leg, centred on the 20 mm width, centre 25 mm from the corner | unverified fit |
+| Disc screws | M3 clearance 3.4 mm, two holes at ±5 mm from the disc centre along the leg, through the disc and the leg | unverified fit — Erik to measure |
+| Blink boss size | not used; the 18 mm disc is the team size so it stays inside the leg | unverified fit |
+| Casing width and profile | not modelled | unverified fit |
+| Printed-hole oversize | not applied | unverified fit |
+| User fillet / chamfer | edge mode (hotkey 2), apply on Confirm, defaults 2 mm and 0.5 mm | team choice |
+| Inner fillet | R2 on the concave corner, applied during the build | existing L-bracket default |
+
+Build order: fuse the two legs with no glue, fillet the inner edge, flush-fuse the disc with `SetGlue(BOPAlgo_GlueShift)` only, then cut holes with the existing two-body wrappers. Hole cuts never call `SetGlue`. `algo.SetGlue` appears once.
+
+Dropped holes, not moved: a leg hole is dropped when its countersink circle (radius 4.75 mm) overlaps the disc footprint (radius 9 mm). Distance from the disc centre to the vertical holes at 20 mm and 30 mm is 5 mm, which is inside 13.75 mm, so those two are dropped. The vertical hole at 10 mm is 15 mm away and is kept. The three horizontal holes are not on the disc face and are kept. The same list is on `window.__cadcamExportState.droppedHoles`. The two disc screws are then cut at 20 mm and 30 mm, so those stations stay closed to a #8 drill and open only for the 3.4 mm screw.
+
+Analytic volume 6473.143483734319 mm³. L fuse 6080 mm³, plus the inner fillet `r² (1 − π/4) × 20` = 17.168146928204 mm³ (the fuse-then-fillet step in libcascade 3.1.0 gains that amount), plus the disc `π × 9² × 4`, minus four countersunk holes and two M3 cylinders through 8 mm. `BRepGProp` matched that estimate inside `BLINK_VOLUME_TOL_MM3` (1e-2 mm³). Mesh volume 6473.679198574847 mm³, inside `BLINK_MESH_VOLUME_TOL_MM3` (80 mm³). Bounds x −4..40, y 0..20, z 0..40 mm (`BLINK_BOUNDS_TOL_MM` 1e-3 on the BRep box, 0.05 mm on the mesh). `builds/export/blink.stl` is 2888 triangles, 144484 bytes, watertight, millimetre header. Display and export both use the Booleans mesh settings (deflection 0.05 mm, angle 0.2 rad, relative off, surface deflection on, not parallel).
+
+`?demo=blink` builds that solid and keeps the OCCT shape. Fillet and Chamfer arm a size and apply on Confirm. A fillet or chamfer that OCCT or the gate rejects leaves the last good shape. Union, Cut, and Intersect keep their labels, using `--accent`, `--ink`, `--active-fill`, `--active-border`, `--disabled-bg`, and `--disabled-ink`, including on a narrow window and while the buttons are disabled. Item mode shows the move gizmo when a body is selected. The gizmo does not move a Boolean or Blink solid. Edge mode on that solid hides the gizmo so a click can hit an edge.
+
+
+### Blink disc and holes (team choice, unverified fit; Chief ruling 2026-10-21 20:43 MT)
+| Item | Value | Status |
+|---|---|---|
+| Vertical leg length | 60 mm (was 40); thickness stays 4 mm | team choice |
+| Leg holes, both legs | 3 per leg (Erik's spec), #8 wood screw, 4.5 mm clearance, 9.5 mm 90 degree countersink, at 8, 20 and 32 mm | team choice, unverified fit |
+| Disc | 18 mm diameter, 4 mm thick, centred at 48 mm on the vertical leg (spans 39 to 57 mm) | team choice, unverified fit |
+| Disc screw holes, Blink boss, casing profile, hole oversize | still to be measured by Erik | unverified fit |
+
+### Change of plan 2026-10-21 20:46 MT (Erik)
+The baked-in Blink layout above is withdrawn and kept as a test fixture only. Work now follows prompts/mobile-1..5 (primitives, transforms, holes, fillet and chamfer, touch Booleans). New team choices: 44 px touch targets, a 20 px touch pick radius (mouse stays 8 px), and the hole tool defaults to 4.5 mm with a 9.5 mm countersink (unverified fit).
+
+### Mobile touch team choices (Chief, 2026-10-21 20:48 MT; source research/mobile-touch-cad.md)
+| Item | Value | Status |
+|---|---|---|
+| Snap | 1 mm for move and resize, 15 degrees for rotate, on by default, 44 px toggle | team choice |
+| Steppers | 1 mm per tap, 0.1 mm per tap on long press (400 ms, Android default) | team choice |
+| Tap vs drag | under 8 px of movement counts as a tap | team choice (Android touch slop 8 dp) |
+| Gizmo zones (finger) | at least 44 px; one Move/Rotate/Scale mode at a time behind a 44 px switch | team choice |
+| Touch edge pick | about 20 px radius, edges win over faces, Face/Edge filter, tap again to cycle | team choice |
+| Number fields | type=text inputmode=decimal, fixed mm label, steppers at least 44 px | team choice |
+
+## Mobile step 1: primitives (2026-10-21)
+
+Team choices for this step. None of these are Erik measurements.
+
+| Item | Value | Status |
+| --- | --- | --- |
+| Touch target | at least 44×44 CSS px (WCAG 2.5.5 / Apple HIG) | team choice |
+| Touch pick radius | 20 px. Mouse stays 8 px | team choice |
+| Box | 20 mm | team choice |
+| Cylinder | diameter 20 mm, height 20 mm | team choice |
+| Disc | diameter 18 mm, thickness 4 mm | team choice |
+
+The existing bottom-on-zero placement stays. A disc sits with its centre at z = thickness / 2, so the default centre is (0, 0, 2) mm and the axis is Z.
+
+The narrow layout shows a touch toolbar for Box, Cylinder, and Disc. Each one opens the millimetre dimension panel (`type=text`, `inputmode=decimal`, 44 px steppers). The same panel edits a primitive after it exists. A rejected edit keeps the last solid and the typed values. `?primitive=disc` is the test hook. `?demo=lbracket` (40 mm) and `?demo=booleans` stay.
+
+Countersunk through-holes, flush-disc fuse, fillet and chamfer on Confirm, Union / Cut / Intersect, and the Item-mode gizmo stay as general tools. Fillet and chamfer defaults are `EDGE_FILLET_RADIUS_MM` 2 and `EDGE_CHAMFER_DISTANCE_MM` 0.5 in `web/occt-ops.mjs`.
+
+The camera-bracket acceptance solid is only in `tests/fixtures/blink.json` and `tests/fixtures/blink.mjs`. Final Chief layout, unverified fit: both legs 60 mm, width 20 mm, thickness 4 mm, inner fillet R2, #8 holes 4.5 mm through with a 9.5 mm 90° countersink on the outer face at 11, 23 and 35 mm on both legs (centreline 10 mm), disc 18 mm × 4 mm flush on the vertical leg outer face centred at 50 mm along and centred across, M3 3.4 mm disc holes at ±5 mm. The drop log is empty. Each countersink rim is at least 6 mm from the leg-end corner, and each vertical countersink stays clear of the disc. Eight through-holes. `web/assemble_site.py` does not ship `tests/`. Node writes `builds/export/prim-box.stl`, `prim-cylinder.stl`, `prim-disc.stl`, and `blink.stl`.
+
+### Mobile step 1 results (Pilot, 21:17 MT)
+PASS, not yet committed. Box, Cylinder and Disc touch toolbar with editable mm panels, 44 px targets and a 20 px touch pick. ?demo=blink is out of web/, and the layout lives in tests/fixtures/. CTest 7/7, occt_gate passed, deploy_smoke passed including a 390x844 portrait run, and the fixture URLs return 404. STLs are watertight and in mm (box 8000 mm3 exact, cylinder 6272.8/6283.2, disc 1016.2/1017.9). Gaps: the portrait panel covers the view and the Home button overlaps it (moved to step 2), touch has only been tested in emulation, and Erik still needs to review the index.html and occt-ops.mjs diffs.

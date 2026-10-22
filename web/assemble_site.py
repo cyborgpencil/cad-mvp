@@ -116,6 +116,8 @@ def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
     leaked = (
         dest / "tests" / "fixtures" / "lbracket.json",
         dest / "fixtures" / "lbracket.json",
+        dest / "tests" / "fixtures" / "blink.json",
+        dest / "fixtures" / "blink.json",
     )
     for path in leaked:
         if path.exists():
