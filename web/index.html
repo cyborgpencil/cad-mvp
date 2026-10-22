@@ -701,6 +701,22 @@
   }
   .dim-panel .axis-row { margin: 0 0 4px; }
   .dim-note { margin: 4px 0 0; }
+  .lock-btn {
+    width: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--tab-bg);
+    color: var(--ink);
+    font-weight: 650;
+    padding: 0 12px;
+  }
+  .lock-btn.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
   .dim-toggle {
     flex: 1;
     min-width: 44px;
@@ -1630,7 +1646,7 @@
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
           <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
-          <span class="dim-unit">mm</span>
+          <span class="dim-unit" id="dimUnit">mm</span>
         </div>
         <nav id="gizmoSwitch" class="gizmo-switch" aria-label="Transform">
           <button type="button" class="is-on" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move" aria-pressed="true">Move</button>
@@ -1639,16 +1655,18 @@
           <button type="button" class="is-on" data-action="snap" id="snapTouch" data-tool="Snapping" title="Snap 1 mm and 15 deg" aria-pressed="true">Snap</button>
         </nav>
         <div id="dimBody" class="dim-body">
+        <div id="primCentres">
         <div class="dim-row"><span class="dim-label">Centre X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="-1" data-unit="mm" data-tool="Centre X minus" aria-label="Centre X minus">−</button><input id="primCx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="1" data-unit="mm" data-tool="Centre X plus" aria-label="Centre X plus">+</button></div>
         <div class="dim-row"><span class="dim-label">Centre Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="-1" data-unit="mm" data-tool="Centre Y minus" aria-label="Centre Y minus">−</button><input id="primCy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="1" data-unit="mm" data-tool="Centre Y plus" aria-label="Centre Y plus">+</button></div>
         <div class="dim-row"><span class="dim-label">Centre Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="-1" data-unit="mm" data-tool="Centre Z minus" aria-label="Centre Z minus">−</button><input id="primCz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="1" data-unit="mm" data-tool="Centre Z plus" aria-label="Centre Z plus">+</button></div>
+        </div>
         <div id="primBox">
           <div class="dim-row"><span class="dim-label">Size X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="-1" data-unit="mm" data-tool="Size X minus" aria-label="Box size X minus">−</button><input id="boxSx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="1" data-unit="mm" data-tool="Size X plus" aria-label="Box size X plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Size Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="-1" data-unit="mm" data-tool="Size Y minus" aria-label="Box size Y minus">−</button><input id="boxSy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="1" data-unit="mm" data-tool="Size Y plus" aria-label="Box size Y plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Size Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="-1" data-unit="mm" data-tool="Size Z minus" aria-label="Box size Z minus">−</button><input id="boxSz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="1" data-unit="mm" data-tool="Size Z plus" aria-label="Box size Z plus">+</button></div>
         </div>
         <div id="primCyl" hidden>
-          <div class="dim-row"><span class="dim-label">Radius</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="-1" data-unit="mm" data-tool="Radius minus" aria-label="Cylinder radius minus">−</button><input id="cylR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder radius mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="1" data-unit="mm" data-tool="Radius plus" aria-label="Cylinder radius plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Diameter</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylD" data-delta="-1" data-unit="mm" data-tool="Diameter minus" aria-label="Cylinder diameter minus">−</button><input id="cylD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylD" data-delta="1" data-unit="mm" data-tool="Diameter plus" aria-label="Cylinder diameter plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Height</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="-1" data-unit="mm" data-tool="Height minus" aria-label="Cylinder height minus">−</button><input id="cylH" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder height mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="1" data-unit="mm" data-tool="Height plus" aria-label="Cylinder height plus">+</button></div>
           <div class="muted">Axis</div>
           <div class="axis-row" role="group" aria-label="Cylinder axis">
@@ -1672,6 +1690,13 @@
           <div class="dim-row"><span class="dim-label">Rot Y °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="-15" data-unit="deg" data-tool="Rotate Y minus" aria-label="Rotate Y minus">−</button><input id="primRy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Y degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="15" data-unit="deg" data-tool="Rotate Y plus" aria-label="Rotate Y plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Rot Z °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="-15" data-unit="deg" data-tool="Rotate Z minus" aria-label="Rotate Z minus">−</button><input id="primRz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Z degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="15" data-unit="deg" data-tool="Rotate Z plus" aria-label="Rotate Z plus">+</button></div>
         </div>
+        <div id="primBbox" hidden>
+          <div class="dim-row"><span class="dim-label">Size X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxX" data-delta="-1" data-unit="mm" data-tool="BBox X minus" aria-label="Bounding box X minus">−</button><input id="bboxX" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Bounding box X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxX" data-delta="1" data-unit="mm" data-tool="BBox X plus" aria-label="Bounding box X plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxY" data-delta="-1" data-unit="mm" data-tool="BBox Y minus" aria-label="Bounding box Y minus">−</button><input id="bboxY" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Bounding box Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxY" data-delta="1" data-unit="mm" data-tool="BBox Y plus" aria-label="Bounding box Y plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxZ" data-delta="-1" data-unit="mm" data-tool="BBox Z minus" aria-label="Bounding box Z minus">−</button><input id="bboxZ" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Bounding box Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="bboxZ" data-delta="1" data-unit="mm" data-tool="BBox Z plus" aria-label="Bounding box Z plus">+</button></div>
+        </div>
+        <button type="button" class="lock-btn is-on" id="lockProportions" data-action="lockProportions" data-tool="Lock proportions" aria-pressed="true">Lock proportions</button>
+        <p class="fine dim-note" id="ellipseNote" hidden>Circles may become ellipses.</p>
         <div id="holeFields" hidden>
           <div class="dim-row"><span class="dim-label">Edge U</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="-1" data-unit="mm" data-tool="Edge U minus" aria-label="Edge U minus">−</button><input id="holeU" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge U mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="1" data-unit="mm" data-tool="Edge U plus" aria-label="Edge U plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Edge V</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="-1" data-unit="mm" data-tool="Edge V minus" aria-label="Edge V minus">−</button><input id="holeV" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge V mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="1" data-unit="mm" data-tool="Edge V plus" aria-label="Edge V plus">+</button></div>
@@ -1768,7 +1793,9 @@
           <label>Y <input id="posY" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position Y mm"></label>
           <label>Z <input id="posZ" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position Z mm"></label>
         </div>
+        <button type="button" class="lock-btn is-on" id="lockProportionsSide" data-action="lockProportions" data-tool="Lock proportions" aria-pressed="true">Lock proportions</button>
         <p class="fine" id="primNote">Dimensions for a box, cylinder, or disc open on the model.</p>
+        <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
       </div>
       <div data-side-panel="channels" hidden>
         <h2 class="panel-h">Channels</h2>
@@ -2084,6 +2111,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     boundsCad: { cx: 0, cy: 0, cz: 0 },
     writingFields: false,
     snap: true,
+    lockProportions: true,
+    lastResize: null,
+    bboxMm: null,
     gizmoMode: 'move',
     dimSheetOpen: false,
     holeTool: false,
@@ -2419,6 +2449,57 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return false;
   }
 
+  function parseEntry(text) {
+    const raw = String(text == null ? '' : text).trim().replace(',', '.');
+    if (!raw) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    if (state.unit === 'in') return n * MM_PER_IN;
+    return n;
+  }
+
+  function formatEntry(mm) {
+    if (!Number.isFinite(mm)) return '';
+    if (state.unit === 'in') {
+      const inches = mm / MM_PER_IN;
+      return inches.toFixed(6).replace(/\.?0+$/, '');
+    }
+    const rounded = Math.round(mm * 1000) / 1000;
+    if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+    return String(rounded);
+  }
+
+  function writeLength(id, mm) {
+    const el = document.getElementById(id);
+    if (!el || !Number.isFinite(mm)) return;
+    el.setAttribute('data-mm', String(mm));
+    if (document.activeElement === el) return;
+    el.value = formatEntry(mm);
+  }
+
+  function fieldMm(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const stored = Number(el.getAttribute('data-mm'));
+    if (el.dataset.preferStored === '1' && Number.isFinite(stored)) {
+      delete el.dataset.preferStored;
+      return stored;
+    }
+    const parsed = parseEntry(el.value);
+    if (parsed == null) return null;
+    if (Number.isFinite(stored) && Math.abs(parsed - stored) <= 0.001) return stored;
+    return parsed;
+  }
+
+  function stageExactMm(id, mm) {
+    const el = document.getElementById(id);
+    if (!el || !Number.isFinite(mm)) return false;
+    el.setAttribute('data-mm', String(mm));
+    el.value = formatEntry(mm);
+    el.dataset.preferStored = '1';
+    return true;
+  }
+
   function formatLength(mm) {
     if (state.unit === 'mm') {
       const rounded = Math.round(mm * 1000) / 1000;
@@ -2541,9 +2622,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         z: state.anchor.z + gizmoDrag.cad.z
       }
       : state.anchor;
-    x.value = String(Math.round(show.x * 1000) / 1000);
-    y.value = String(Math.round(show.y * 1000) / 1000);
-    z.value = String(Math.round(show.z * 1000) / 1000);
+    writeLength('posX', show.x);
+    writeLength('posY', show.y);
+    writeLength('posZ', show.z);
     const on = gizmoShouldShow();
     x.disabled = !on;
     y.disabled = !on;
@@ -2619,40 +2700,109 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   }
 
+  function singleBody() {
+    return state.bodies.length === 1 ? state.bodies[0] : null;
+  }
+
+  function parametricBody() {
+    const body = singleBody();
+    if (!body || !state.primitive || !state.primitive.params) return false;
+    if (state.holeLog && state.holeLog.length) return false;
+    const kind = state.primitive.kind;
+    return kind === 'box' || kind === 'cylinder' || kind === 'disc';
+  }
+
+  function bboxMode() {
+    return !!singleBody() && !parametricBody();
+  }
+
+  function paintLock() {
+    const on = state.lockProportions !== false;
+    const buttons = document.querySelectorAll('[data-action="lockProportions"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].classList.toggle('is-on', on);
+      buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    const ellipse = document.getElementById('ellipseNote');
+    const side = document.getElementById('primEllipse');
+    if (ellipse) ellipse.hidden = on;
+    if (side) side.hidden = on;
+    const note = document.getElementById('primNote');
+    if (note) {
+      note.textContent = bboxMode()
+        ? 'Bounding box X, Y, Z. Type a size, then press Enter.'
+        : 'Dimensions for a box, cylinder, or disc open on the model.';
+    }
+  }
+
+  function measureBodyBounds(body) {
+    if (!body || !body.shape || !oc || !opsApi || typeof opsApi.optimalBounds !== 'function') return null;
+    try {
+      return opsApi.optimalBounds(oc, body.shape);
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function boundsSize(bounds) {
+    if (!bounds) return null;
+    return {
+      x: bounds.xmax - bounds.xmin,
+      y: bounds.ymax - bounds.ymin,
+      z: bounds.zmax - bounds.zmin,
+      cx: (bounds.xmin + bounds.xmax) / 2,
+      cy: (bounds.ymin + bounds.ymax) / 2,
+      cz: (bounds.zmin + bounds.zmax) / 2,
+    };
+  }
+
   function paintPrimFields() {
     const host = document.getElementById('dimPanel');
     const box = document.getElementById('primBox');
     const cyl = document.getElementById('primCyl');
     const disc = document.getElementById('primDisc');
     if (!host || !box || !cyl || !disc) return;
-    const prim = state.primitive;
+    const prim = parametricBody() ? state.primitive : null;
+    const bbox = bboxMode();
     const holeFields = document.getElementById('holeFields');
-    host.hidden = !prim && !state.holeTool;
+    const centres = document.getElementById('primCentres');
+    const rotate = document.getElementById('primRotate');
+    const bboxHost = document.getElementById('primBbox');
+    host.hidden = !prim && !bbox && !state.holeTool;
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     disc.hidden = !prim || prim.kind !== 'disc';
+    if (centres) centres.hidden = !prim;
+    if (rotate) rotate.hidden = !prim;
+    if (bboxHost) bboxHost.hidden = !bbox;
     if (holeFields) holeFields.hidden = !state.holeTool;
-    if (prim || state.holeTool) {
+    const unitLabel = document.getElementById('dimUnit');
+    if (unitLabel) unitLabel.textContent = state.unit;
+    if (prim || bbox || state.holeTool) {
       state.writingFields = true;
       const title = document.getElementById('primTitle');
-      if (title) title.textContent = state.holeTool ? 'Hole' : primitiveLabel(prim.kind);
+      if (title) {
+        if (state.holeTool) title.textContent = 'Hole';
+        else if (bbox) title.textContent = singleBody().name || 'Size';
+        else title.textContent = primitiveLabel(prim.kind);
+      }
     }
     if (prim) {
       state.writingFields = true;
-      document.getElementById('primCx').value = String(prim.params.cx);
-      document.getElementById('primCy').value = String(prim.params.cy);
-      document.getElementById('primCz').value = String(prim.params.cz);
+      writeLength('primCx', prim.params.cx);
+      writeLength('primCy', prim.params.cy);
+      writeLength('primCz', prim.params.cz);
       if (prim.kind === 'box') {
-        document.getElementById('boxSx').value = String(prim.params.sx);
-        document.getElementById('boxSy').value = String(prim.params.sy);
-        document.getElementById('boxSz').value = String(prim.params.sz);
+        writeLength('boxSx', prim.params.sx);
+        writeLength('boxSy', prim.params.sy);
+        writeLength('boxSz', prim.params.sz);
       } else if (prim.kind === 'disc') {
-        document.getElementById('discD').value = String(prim.params.diameter);
-        document.getElementById('discT').value = String(prim.params.thickness);
+        writeLength('discD', prim.params.diameter);
+        writeLength('discT', prim.params.thickness);
         paintAxis(prim.params.axis);
       } else {
-        document.getElementById('cylR').value = String(prim.params.radius);
-        document.getElementById('cylH').value = String(prim.params.height);
+        writeLength('cylD', prim.params.radius * 2);
+        writeLength('cylH', prim.params.height);
         paintAxis(prim.params.axis);
       }
       const rx = document.getElementById('primRx');
@@ -2662,7 +2812,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (ry) ry.value = String(prim.params.ry || 0);
       if (rz) rz.value = String(prim.params.rz || 0);
       state.writingFields = false;
+    } else if (bbox) {
+      state.writingFields = true;
+      const sized = boundsSize(measureBodyBounds(singleBody()));
+      if (sized) {
+        state.bboxMm = { x: sized.x, y: sized.y, z: sized.z };
+        writeLength('bboxX', sized.x);
+        writeLength('bboxY', sized.y);
+        writeLength('bboxZ', sized.z);
+      }
+      state.writingFields = false;
     }
+    paintLock();
     paintHoleChrome();
     host.classList.toggle('is-open', state.dimSheetOpen === true);
     const toggle = document.getElementById('dimToggle');
@@ -3017,10 +3178,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return false;
     }
     if (owned && owned.shape) {
+      const previous = keepSelection && state.bodies.length === 1 ? state.bodies[0] : null;
       clearOwnedBodies();
       state.bodySeq += 1;
       owned.id = 'b' + state.bodySeq;
       owned.name = primitiveLabel(owned.kind);
+      if (previous && previous.kind === owned.kind) {
+        if (previous.id) owned.id = previous.id;
+        if (previous.name) owned.name = previous.name;
+        owned.material = typeof previous.material === 'string' ? previous.material : 'default';
+        owned.features = cloneData(previous.features) || [];
+        owned.source = previous.source || '';
+      }
       state.bodies = [owned];
     } else {
       clearOwnedBodies();
@@ -4385,10 +4554,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function onPositionCommit() {
     if (state.writingFields) return;
-    const x = readField('posX');
-    const y = readField('posY');
-    const z = readField('posZ');
-    if (x == null || y == null || z == null) return;
+    const x = fieldMm('posX');
+    const y = fieldMm('posY');
+    const z = fieldMm('posZ');
+    if (x == null || y == null || z == null) {
+      writePosFields();
+      return;
+    }
     const dx = x - state.anchor.x;
     const dy = y - state.anchor.y;
     const dz = z - state.anchor.z;
@@ -4396,48 +4568,330 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     runUndoable('Move', function () { return translateBody(dx, dy, dz); });
   }
 
-  function onPrimitiveCommit() {
-    if (state.writingFields || !state.primitive) return;
-    if (state.holeLog && state.holeLog.length) {
-      const why = 'The solid already has holes. The solid was kept.';
-      toast(why);
-      setHint(why);
-      paintPrimFields();
-      return;
+  function nearly(a, b) {
+    return Math.abs(Number(a) - Number(b)) <= 1e-9;
+  }
+
+  function failResize(message) {
+    state.resizeMethod = '';
+    state.lastError = message;
+    state.lastResize = {
+      ok: false,
+      rolledBack: true,
+      kept: true,
+      method: '',
+      error: message,
+      valid: false,
+      done: ''
+    };
+    toast(message);
+    setHint(message);
+    paintPrimFields();
+    return false;
+  }
+
+  function scaleLocked(oldSizes, newSizes, keys) {
+    if (state.lockProportions === false) return { ok: true, sizes: newSizes };
+    let changed = '';
+    for (let i = 0; i < keys.length; i += 1) {
+      if (!nearly(newSizes[keys[i]], oldSizes[keys[i]])) {
+        changed = keys[i];
+        break;
+      }
     }
-    const cx = readField('primCx');
-    const cy = readField('primCy');
-    const cz = readField('primCz');
-    if (cx == null || cy == null || cz == null) return;
+    if (!changed) return { ok: true, sizes: Object.assign({}, oldSizes) };
+    const base = Number(oldSizes[changed]);
+    if (!(base > 0)) {
+      return { ok: false, error: 'Size must be greater than zero. The last good shape was kept.' };
+    }
+    const ratio = Number(newSizes[changed]) / base;
+    const out = {};
+    for (let i = 0; i < keys.length; i += 1) out[keys[i]] = Number(oldSizes[keys[i]]) * ratio;
+    return { ok: true, sizes: out };
+  }
+
+  function axisIndex(axis) {
+    const name = String(axis || 'Z').toUpperCase();
+    if (name === 'X') return 0;
+    if (name === 'Y') return 1;
+    return 2;
+  }
+
+  function localFactors(kind, oldParams, next) {
+    if (kind === 'box') {
+      return [next.sx / oldParams.sx, next.sy / oldParams.sy, next.sz / oldParams.sz];
+    }
+    const across = kind === 'disc'
+      ? next.diameter / oldParams.diameter
+      : (next.radius * 2) / (oldParams.radius * 2);
+    const along = kind === 'disc'
+      ? next.thickness / oldParams.thickness
+      : next.height / oldParams.height;
+    const factors = [across, across, across];
+    factors[axisIndex(oldParams.axis)] = along;
+    return factors;
+  }
+
+  function performResize(work) {
+    state.resizeMethod = '';
+    const ok = runUndoable('Resize', function () { return work() === true; });
+    if (ok) {
+      state.lastResize = {
+        ok: true,
+        rolledBack: false,
+        kept: false,
+        method: state.resizeMethod || '',
+        error: '',
+        valid: true,
+        done: 'RESIZE_DONE'
+      };
+      state.lastError = '';
+      console.log('RESIZE_DONE');
+      setHint('RESIZE_DONE');
+      publishGateState();
+      return true;
+    }
+    state.lastResize = {
+      ok: false,
+      rolledBack: true,
+      kept: true,
+      method: state.resizeMethod || '',
+      error: state.lastError || 'FAIL: resize was rejected. The last good shape was kept.',
+      valid: false,
+      done: ''
+    };
+    paintPrimFields();
+    return false;
+  }
+
+  function installResized(body, resized, nextParams) {
+    if (!resized || resized.ok !== true || !resized.shape) {
+      if (resized && resized.shape) dropShape(resized.shape);
+      state.lastError = (resized && resized.error) || 'FAIL: resize was rejected. The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, resized.shape);
+    } catch (_err) {
+      dropShape(resized.shape);
+      state.lastError = 'FAIL: resize check threw. The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    if (!view || !view.gate || view.gate.pass !== true) {
+      dropShape(resized.shape);
+      state.lastError = (view && view.gate && view.gate.message) || 'FAIL: OCCT BRepCheck_Analyzer is not valid. The last good shape was kept.';
+      if (state.lastError.indexOf('kept') < 0) state.lastError += ' The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    const flat = primApi.flattenMesh(view.mesh);
+    if (!flat.indices.length || typeof Module.replaceMesh !== 'function' || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'resize')) {
+      dropShape(resized.shape);
+      state.lastError = 'FAIL: resized mesh was rejected. The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    dropShape(body.shape);
+    body.shape = resized.shape;
+    body.mesh = view.mesh;
+    body.topology = view.topology;
+    body.gate = view.gate;
+    body.watertight = view.watertight;
+    if (nextParams) {
+      body.params = nextParams;
+      if (state.primitive && state.primitive.kind === body.kind) {
+        state.primitive = { kind: body.kind, params: nextParams };
+      }
+    }
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    state.lastError = '';
+    state.projectBlank = false;
+    if (!state.projectApplying) state.projectDirty = true;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    publishProjectHook();
+    return true;
+  }
+
+  function rebuildResize(kind, next, spec) {
+    state.resizeMethod = 'rebuild';
+    if (spec && spec.forceInvalid === true) {
+      const owned = makeOwned(kind, next);
+      if (owned && owned.shape) dropShape(owned.shape);
+      state.lastError = 'FAIL: OCCT BRepCheck_Analyzer is not valid. The last good shape was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      return false;
+    }
+    const beforeId = state.bodies.length === 1 ? state.bodies[0].id : '';
+    const built = createPrimitive(kind, next, null, true) === true;
+    if (built) return true;
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (body && body.id !== beforeId && body.gate && body.gate.pass === true) return true;
+    if (!state.lastError) state.lastError = 'FAIL: resize was rejected. The last good shape was kept.';
+    return false;
+  }
+
+  function commitBBoxResize(spec) {
+    const body = singleBody();
+    if (!body || !body.shape || !oc || !opsApi || typeof opsApi.resizeShape !== 'function') {
+      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
+    }
+    const measured = boundsSize(measureBodyBounds(body));
+    if (!measured || !(measured.x > 0) || !(measured.y > 0) || !(measured.z > 0)) {
+      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
+    }
+    const sx = fieldMm('bboxX');
+    const sy = fieldMm('bboxY');
+    const sz = fieldMm('bboxZ');
+    if (sx == null || sy == null || sz == null) {
+      return failResize('Enter a number. The last good shape was kept.');
+    }
+    if (!(sx > 0) || !(sy > 0) || !(sz > 0)) {
+      return failResize('Size must be greater than zero. The last good shape was kept.');
+    }
+    const scaled = scaleLocked(
+      { x: measured.x, y: measured.y, z: measured.z },
+      { x: sx, y: sy, z: sz },
+      ['x', 'y', 'z']
+    );
+    if (!scaled.ok) return failResize(scaled.error);
+    const nx = scaled.sizes.x;
+    const ny = scaled.sizes.y;
+    const nz = scaled.sizes.z;
+    if (nearly(nx, measured.x) && nearly(ny, measured.y) && nearly(nz, measured.z)) return false;
+    const uniform = state.lockProportions !== false;
+    const factors = [nx / measured.x, ny / measured.y, nz / measured.z];
+    return performResize(function () {
+      state.resizeMethod = uniform ? 'scale' : 'gtransform';
+      const resized = opsApi.resizeShape(oc, body.shape, {
+        factors: factors,
+        origin: [measured.cx, measured.cy, measured.cz],
+        euler: [0, 0, 0],
+        uniform: uniform,
+        forceInvalid: !!(spec && spec.forceInvalid === true)
+      });
+      return installResized(body, resized, null);
+    });
+  }
+
+  function commitPrimitiveResize(spec) {
+    const prim = state.primitive;
+    if (!prim || !prim.params) return false;
+    const kind = prim.kind === 'cylinder' || prim.kind === 'disc' ? prim.kind : 'box';
+    const old = prim.params;
+    const cx = fieldMm('primCx');
+    const cy = fieldMm('primCy');
+    const cz = fieldMm('primCz');
+    if (cx == null || cy == null || cz == null) {
+      return failResize('Enter a number. The last good shape was kept.');
+    }
     const rx = readField('primRx');
     const ry = readField('primRy');
     const rz = readField('primRz');
-    const next = Object.assign({}, state.primitive.params, { cx: cx, cy: cy, cz: cz });
-    if (rx != null) next.rx = rx;
-    if (ry != null) next.ry = ry;
-    if (rz != null) next.rz = rz;
-    if (state.primitive.kind === 'box') {
-      const sx = readField('boxSx');
-      const sy = readField('boxSy');
-      const sz = readField('boxSz');
-      if (sx == null || sy == null || sz == null) return;
-      next.sx = sx;
-      next.sy = sy;
-      next.sz = sz;
-    } else if (state.primitive.kind === 'disc') {
-      const diameter = readField('discD');
-      const thickness = readField('discT');
-      if (diameter == null || thickness == null) return;
-      next.diameter = diameter;
-      next.thickness = thickness;
-    } else {
-      const radius = readField('cylR');
-      const height = readField('cylH');
-      if (radius == null || height == null) return;
-      next.radius = radius;
-      next.height = height;
+    if (rx == null || ry == null || rz == null) {
+      return failResize('Enter a number. The last good shape was kept.');
     }
-    createPrimitive(state.primitive.kind, next, null, true);
+    const next = Object.assign({}, old, { cx: cx, cy: cy, cz: cz, rx: rx, ry: ry, rz: rz });
+    let keys = [];
+    let oldSizes = {};
+    let typed = {};
+    if (kind === 'box') {
+      const sx = fieldMm('boxSx');
+      const sy = fieldMm('boxSy');
+      const sz = fieldMm('boxSz');
+      if (sx == null || sy == null || sz == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(sx > 0) || !(sy > 0) || !(sz > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['sx', 'sy', 'sz'];
+      oldSizes = { sx: old.sx, sy: old.sy, sz: old.sz };
+      typed = { sx: sx, sy: sy, sz: sz };
+    } else if (kind === 'disc') {
+      const diameter = fieldMm('discD');
+      const thickness = fieldMm('discT');
+      if (diameter == null || thickness == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(diameter > 0) || !(thickness > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['diameter', 'thickness'];
+      oldSizes = { diameter: old.diameter, thickness: old.thickness };
+      typed = { diameter: diameter, thickness: thickness };
+    } else {
+      const diameter = fieldMm('cylD');
+      const height = fieldMm('cylH');
+      if (diameter == null || height == null) return failResize('Enter a number. The last good shape was kept.');
+      if (!(diameter > 0) || !(height > 0)) return failResize('Size must be greater than zero. The last good shape was kept.');
+      keys = ['diameter', 'height'];
+      oldSizes = { diameter: old.radius * 2, height: old.height };
+      typed = { diameter: diameter, height: height };
+    }
+    const scaled = scaleLocked(oldSizes, typed, keys);
+    if (!scaled.ok) return failResize(scaled.error);
+    if (kind === 'box') {
+      next.sx = scaled.sizes.sx;
+      next.sy = scaled.sizes.sy;
+      next.sz = scaled.sizes.sz;
+    } else if (kind === 'disc') {
+      next.diameter = scaled.sizes.diameter;
+      next.thickness = scaled.sizes.thickness;
+    } else {
+      next.radius = scaled.sizes.diameter / 2;
+      next.height = scaled.sizes.height;
+    }
+    const sized = kind === 'box'
+      ? { sx: next.sx, sy: next.sy, sz: next.sz }
+      : (kind === 'disc'
+        ? { diameter: next.diameter, thickness: next.thickness }
+        : { diameter: next.radius * 2, height: next.height });
+    let sizesChanged = false;
+    for (let i = 0; i < keys.length; i += 1) {
+      if (!nearly(sized[keys[i]], oldSizes[keys[i]])) sizesChanged = true;
+    }
+    const centreChanged = !nearly(next.cx, old.cx) || !nearly(next.cy, old.cy) || !nearly(next.cz, old.cz);
+    const rotChanged = !nearly(next.rx, old.rx || 0) || !nearly(next.ry, old.ry || 0) || !nearly(next.rz, old.rz || 0);
+    if (!sizesChanged && !centreChanged && !rotChanged) return false;
+    if (!sizesChanged) {
+      return runUndoable(centreChanged ? 'Move' : 'Rotate', function () {
+        return createPrimitive(kind, next, null, true) === true;
+      });
+    }
+    const body = singleBody();
+    if (!body || !body.shape || !oc || !opsApi || typeof opsApi.resizeShape !== 'function') {
+      return failResize('FAIL: resize needs a shape. The last good shape was kept.');
+    }
+    if (state.lockProportions !== false) {
+      return performResize(function () { return rebuildResize(kind, next, spec); });
+    }
+    const factors = localFactors(kind, old, next);
+    if (!(factors[0] > 0) || !(factors[1] > 0) || !(factors[2] > 0)) {
+      return failResize('Size must be greater than zero. The last good shape was kept.');
+    }
+    return performResize(function () {
+      state.resizeMethod = 'gtransform';
+      const resized = opsApi.resizeShape(oc, body.shape, {
+        factors: factors,
+        origin: [Number(old.cx) || 0, Number(old.cy) || 0, Number(old.cz) || 0],
+        euler: [Number(old.rx) || 0, Number(old.ry) || 0, Number(old.rz) || 0],
+        uniform: false,
+        forceInvalid: !!(spec && spec.forceInvalid === true)
+      });
+      return installResized(body, resized, next);
+    });
+  }
+
+  function onPrimitiveCommit(extra) {
+    if (state.writingFields) return;
+    const spec = extra && extra.forceInvalid === true ? { forceInvalid: true } : {};
+    if (bboxMode()) commitBBoxResize(spec);
+    else if (state.primitive) commitPrimitiveResize(spec);
   }
 
   function applyDimStep(btn, fine) {
@@ -4448,13 +4902,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       ? (fine ? (viewApi && viewApi.STEPPER_FINE_DEG) || 1 : (viewApi && viewApi.STEPPER_DEG) || 15)
       : (fine ? (viewApi && viewApi.STEPPER_FINE_MM) || 0.1 : (viewApi && viewApi.STEPPER_MM) || 1);
     const field = document.getElementById(dimId);
-    const current = readField(dimId);
-    if (!field || current == null || field.disabled) return false;
+    if (!field || field.disabled) return false;
     const custom = Number(btn.getAttribute('data-step'));
     const used = custom > 0 ? (fine && unit === 'deg' ? 1 : custom) : step;
-    const fineStep = fine && !(custom > 0) ? step : used;
-    field.value = String(Math.round((current + sign * (fine ? fineStep : used)) * 1000) / 1000);
-    if (dimId.indexOf('hole') === 0) return true;
+    const amount = sign * (fine && !(custom > 0) ? step : used);
+    if (unit === 'deg' || dimId.indexOf('hole') === 0) {
+      const current = readField(dimId);
+      if (current == null) return false;
+      field.value = String(Math.round((current + amount) * 1000) / 1000);
+      if (dimId.indexOf('hole') === 0) return true;
+      onPrimitiveCommit();
+      return true;
+    }
+    const currentMm = fieldMm(dimId);
+    if (currentMm == null) return false;
+    stageExactMm(dimId, Math.round((currentMm + amount) * 1000) / 1000);
     onPrimitiveCommit();
     return true;
   }
@@ -4876,6 +5338,105 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const shifted = along(world, step);
     return { axis: name, mm: step, handle: handle, down: down, up: pageOf(shifted) };
+  };
+
+  function resizeStatus() {
+    const body = singleBody();
+    const bounds = body ? measureBodyBounds(body) : null;
+    const sized = boundsSize(bounds);
+    const last = state.lastResize || {};
+    const ellipse = document.getElementById('ellipseNote');
+    return {
+      ok: last.ok === true,
+      method: last.method || '',
+      rolledBack: last.rolledBack === true,
+      kept: last.kept === true,
+      error: last.error || '',
+      valid: last.valid === true,
+      done: last.done || '',
+      lock: state.lockProportions !== false,
+      ellipse: !!(ellipse && ellipse.hidden !== true),
+      ellipseText: ellipse ? ellipse.textContent : '',
+      undoDepth: commandStack.depth(),
+      redoDepth: commandStack.redoDepth(),
+      unit: state.unit,
+      kind: body ? body.kind : '',
+      primitiveKind: state.primitive ? state.primitive.kind : '',
+      params: state.primitive && state.primitive.params ? Object.assign({}, state.primitive.params) : null,
+      bounds: bounds,
+      dx: sized ? sized.x : null,
+      dy: sized ? sized.y : null,
+      dz: sized ? sized.z : null
+    };
+  }
+
+  function setDisplayUnit(unit) {
+    const want = unit === 'in' ? 'in' : 'mm';
+    if (state.unit !== want && Module && typeof Module.toggleUnits === 'function') Module.toggleUnits();
+    if (Module && typeof Module.gate === 'function') applyReport(Module.gate());
+    refreshUnits();
+    applyLook();
+  }
+
+  function stageResizeSpec(src) {
+    let staged = false;
+    function put(id, value) {
+      if (!Number.isFinite(value)) return;
+      if (stageExactMm(id, value)) staged = true;
+    }
+    if (bboxMode()) {
+      put('bboxX', src.sx);
+      put('bboxY', src.sy);
+      put('bboxZ', src.sz);
+      return staged;
+    }
+    const kind = state.primitive ? state.primitive.kind : '';
+    if (kind === 'cylinder') {
+      put('cylD', Number.isFinite(src.diameter) ? src.diameter : src.sx);
+      put('cylH', src.height);
+      return staged;
+    }
+    if (kind === 'disc') {
+      put('discD', src.diameter);
+      put('discT', src.thickness);
+      return staged;
+    }
+    put('boxSx', src.sx);
+    put('boxSy', src.sy);
+    put('boxSz', src.sz);
+    return staged;
+  }
+
+  // Smoke hook. Sizes are millimetres. field+text types the display string
+  // (inches when the UI is in inches). Each successful resize is one undo step.
+  window.__cadcamResize = function (spec) {
+    const src = spec || {};
+    if (src.unit === 'mm' || src.unit === 'in') setDisplayUnit(src.unit);
+    if (src.lock === true || src.lock === false) {
+      state.lockProportions = src.lock;
+      paintLock();
+    }
+    if (src.undo === true) {
+      doUndo();
+      if (state.lastResize) state.lastResize.done = '';
+      return resizeStatus();
+    }
+    if (src.redo === true) {
+      doRedo();
+      if (state.lastResize) state.lastResize.done = '';
+      return resizeStatus();
+    }
+    if (src.field) {
+      const el = document.getElementById(String(src.field));
+      if (el) {
+        el.value = src.text == null ? '' : String(src.text);
+        delete el.dataset.preferStored;
+        onPrimitiveCommit({ forceInvalid: src.forceInvalid === true });
+      }
+      return resizeStatus();
+    }
+    if (stageResizeSpec(src)) onPrimitiveCommit({ forceInvalid: src.forceInvalid === true });
+    return resizeStatus();
   };
 
   function viewCaption() {
@@ -5421,6 +5982,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       holeCount: state.holeLog.length,
       undoDepth: commandStack.depth(),
       redoDepth: commandStack.redoDepth(),
+      lockProportions: state.lockProportions !== false,
+      ellipseNote: !!(document.getElementById('ellipseNote') && document.getElementById('ellipseNote').hidden !== true),
+      resizeDone: !!(state.lastResize && state.lastResize.done === 'RESIZE_DONE'),
       holeLog: state.holeLog.slice(),
       facePick: upwardFacePick(),
       holeDefaults: opsApi ? {
@@ -6054,6 +6618,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.dimSheetOpen = !state.dimSheetOpen;
       paintPrimFields();
       message = state.dimSheetOpen ? 'Dimensions' : 'Hide dimensions';
+    } else if (action === 'lockProportions') {
+      state.lockProportions = state.lockProportions === false;
+      paintLock();
+      message = state.lockProportions ? 'Lock proportions' : 'Circles may become ellipses.';
+      setHint(message);
     } else if (action === 'cylAxis') {
       const axis = btn.getAttribute('data-axis') || 'Z';
       if (state.primitive && (state.primitive.kind === 'cylinder' || state.primitive.kind === 'disc')) {
@@ -6712,7 +7281,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   for (let pi = 0; pi < positionIds.length; pi += 1) {
     document.getElementById(positionIds[pi]).addEventListener('change', onPositionCommit);
   }
-  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH', 'discD', 'discT', 'primRx', 'primRy', 'primRz'];
+  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylD', 'cylH', 'discD', 'discT', 'primRx', 'primRy', 'primRz', 'bboxX', 'bboxY', 'bboxZ'];
   for (let pi = 0; pi < primIds.length; pi += 1) {
     document.getElementById(primIds[pi]).addEventListener('change', onPrimitiveCommit);
   }
