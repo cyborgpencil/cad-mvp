@@ -1430,6 +1430,62 @@
     }
     #viewport { flex: 1 1 auto; min-height: 96px; }
   }
+  .assembly-panel { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .part-list { display: flex; flex-direction: column; gap: 4px; }
+  .part-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 255, 255, 0.04);
+    text-align: left;
+  }
+  .part-row.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
+  .part-row .part-name {
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .part-row .part-mat { flex: none; font-size: 12px; }
+  .assembly-material {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+  .assembly-material select,
+  #combineBtn {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+  }
+  .assembly-material select {
+    flex: 1;
+    font-size: 16px;
+    background: var(--top);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 0 8px;
+  }
+  #combineBtn {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--line-strong);
+    background: var(--tab-bg);
+    font-weight: 650;
+  }
+  #combineBtn:disabled { opacity: 0.38; }
 </style>
 </head>
 <body>
@@ -1848,6 +1904,19 @@
         <button type="button" class="lock-btn is-on" id="lockProportionsSide" data-action="lockProportions" data-tool="Lock proportions" aria-pressed="true">Lock proportions</button>
         <p class="fine" id="primNote">Dimensions for a box, cylinder, or disc open on the model.</p>
         <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
+        <div id="assemblyPanel" class="assembly-panel">
+          <div class="muted">Parts</div>
+          <div id="partList" class="part-list" role="listbox" aria-label="Parts" aria-multiselectable="true"></div>
+          <label class="assembly-material">Material
+            <select id="partMaterial" aria-label="Part material">
+              <option value="PLA">PLA</option>
+              <option value="PETG">PETG</option>
+              <option value="TPU">TPU</option>
+            </select>
+          </label>
+          <button type="button" id="combineBtn" data-action="combine" data-tool="Combine" disabled aria-disabled="true">Combine</button>
+          <p class="fine" id="assemblyNote"></p>
+        </div>
       </div>
       <div data-side-panel="channels" hidden>
         <h2 class="panel-h">Channels</h2>
@@ -2005,9 +2074,13 @@ async function boot() {
       console.error('undo failed', err);
       return null;
     });
+    const assemblyPromise = import('./assemblies.mjs').catch(function (err) {
+      console.error('assemblies failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -2015,7 +2088,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -2196,6 +2269,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     projectError: '',
     projectApplying: false,
     projectBlank: false,
+    assemblyIds: [],
+    assemblyMessage: '',
+    assemblyForceFail: false,
     dimStepFromPointer: false,
     section: false,
     measure: false,
@@ -3265,11 +3341,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (previous && previous.kind === owned.kind) {
         if (previous.id) owned.id = previous.id;
         if (previous.name) owned.name = previous.name;
-        owned.material = typeof previous.material === 'string' ? previous.material : 'default';
+        owned.material = typeof previous.material === 'string' ? previous.material : 'PLA';
         owned.features = cloneData(previous.features) || [];
         owned.source = previous.source || '';
       }
       state.bodies = [owned];
+      state.assemblyIds = [owned.id];
     } else {
       clearOwnedBodies();
     }
@@ -3396,6 +3473,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function clearOwnedBodies() {
     for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
     state.bodies = [];
+    state.assemblyIds = [];
     mountBodyMeshes();
   }
 
@@ -3564,6 +3642,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       gate: view.gate,
       watertight: view.watertight,
       features: [],
+      material: 'PLA',
+      shapeLocal: false,
+      placement: { x: normalized.cx, y: normalized.cy, z: normalized.cz },
     };
   }
 
@@ -4036,9 +4117,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         name: body.name,
         kind: body.kind,
         params: cloneData(body.params),
-        material: typeof body.material === 'string' ? body.material : 'default',
+        material: typeof body.material === 'string' ? body.material : 'PLA',
         features: cloneData(body.features) || [],
         source: body.source || '',
+        shapeLocal: body.shapeLocal === true,
+        placement: body.placement ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 } : { x: 0, y: 0, z: 0 },
         shape: body.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, body.shape) : null,
         mesh: body.mesh || null,
         topology: body.topology || null,
@@ -4094,9 +4177,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         name: src.name,
         kind: src.kind,
         params: cloneData(src.params),
-        material: typeof src.material === 'string' ? src.material : 'default',
+        material: typeof src.material === 'string' ? src.material : 'PLA',
         features: cloneData(src.features) || [],
         source: src.source || '',
+        shapeLocal: src.shapeLocal === true,
+        placement: src.placement ? { x: Number(src.placement.x) || 0, y: Number(src.placement.y) || 0, z: Number(src.placement.z) || 0 } : { x: 0, y: 0, z: 0 },
         shape: src.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, src.shape) : null,
         mesh: src.mesh,
         topology: src.topology,
@@ -4181,6 +4266,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function moveOwnedShape(dx, dy, dz) {
     const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (body && body.shapeLocal === true && body.placement && assemblyApi && primApi) {
+      const previous = { x: body.placement.x, y: body.placement.y, z: body.placement.z };
+      body.placement = { x: previous.x + dx, y: previous.y + dy, z: previous.z + dz };
+      shiftParams(body.params, dx, dy, dz);
+      const placed = assemblyApi.placedCopy(oc, body.shape, body.placement);
+      let view = null;
+      if (placed.ok && placed.shape) {
+        try { view = primApi.inspectSolid(oc, placed.shape); } catch (_err) { view = null; }
+        dropShape(placed.shape);
+      }
+      const flat = view && view.mesh ? primApi.flattenMesh(view.mesh) : { indices: [] };
+      if (!view || !view.gate || view.gate.valid !== true || !flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'move')) {
+        body.placement = previous;
+        shiftParams(body.params, -dx, -dy, -dz);
+        setHint('FAIL: move was rejected. The solid was kept.');
+        writePosFields();
+        return false;
+      }
+      body.mesh = view.mesh;
+      body.topology = view.topology;
+      body.gate = view.gate;
+      body.watertight = view.watertight;
+      if (state.primitive && state.primitive.params && state.primitive.params !== body.params) {
+        shiftParams(state.primitive.params, dx, dy, dz);
+      }
+      state.topology = view.topology;
+      state.topologySource = 'occt';
+      state.shapeGate = view.gate;
+      state.sceneCleared = false;
+      syncFromKernel();
+      mountBodyMeshes();
+      refreshAnchor();
+      applyLook();
+      publishGateState();
+      return true;
+    }
     if (!body || !body.shape || !oc || !opsApi || typeof opsApi.transformShape !== 'function' || !primApi) return false;
     const moved = opsApi.transformShape(oc, body.shape, { dx: dx, dy: dy, dz: dz });
     if (!moved || !moved.ok || !moved.shape) {
@@ -6487,6 +6608,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         material: part.material,
         features: part.features || [],
         source: part.source || '',
+        shapeLocal: false,
+        placement: part.placement ? { x: part.placement.x, y: part.placement.y, z: part.placement.z } : { x: 0, y: 0, z: 0 },
         shape: part.shape,
         mesh: view.mesh,
         topology: view.topology,
@@ -6593,6 +6716,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function publishGateState() {
+    paintAssembly();
     const btn = document.getElementById('exportBtn');
     const gateLabel = state.occtReady !== true ? 'PENDING' : (state.occtGate ? 'PASS' : 'FAIL');
     const shelf = document.getElementById('modifyShelf');
@@ -6622,6 +6746,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       booleanOp: state.booleanOp || '',
       booleanMessage: state.booleanMessage || '',
       bodyCount: state.bodies.length,
+      assemblyMessage: state.assemblyMessage || '',
+      assemblyMaterials: state.bodies.map(function (body) { return body.material || 'PLA'; }),
       selectionOrder: orderedBodies().map(function (body) { return body.id; }),
       droppedHoles: state.droppedHoles || [],
       gizmoVisible: !!(handles && handles.visible),
@@ -7144,6 +7270,399 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   }
 
+  function selectedAssemblyBodies() {
+    const out = [];
+    const live = [];
+    for (let i = 0; i < state.assemblyIds.length; i += 1) {
+      const id = state.assemblyIds[i];
+      for (let b = 0; b < state.bodies.length; b += 1) {
+        if (state.bodies[b].id === id) {
+          out.push(state.bodies[b]);
+          live.push(id);
+        }
+      }
+    }
+    state.assemblyIds = live;
+    return out;
+  }
+
+  function paintAssembly() {
+    const host = document.getElementById('partList');
+    const button = document.getElementById('combineBtn');
+    const note = document.getElementById('assemblyNote');
+    const material = document.getElementById('partMaterial');
+    if (!host || !button) return;
+    const selected = selectedAssemblyBodies();
+    const signature = state.bodies.map(function (body) {
+      const on = state.assemblyIds.indexOf(body.id) >= 0;
+      const tag = assemblyApi ? assemblyApi.materialTag(body) : (body.material || 'PLA');
+      return body.id + ':' + body.name + ':' + tag + ':' + (on ? '1' : '0');
+    }).join('|');
+    if (host.dataset.signature !== signature) {
+      host.dataset.signature = signature;
+      host.replaceChildren();
+      for (let i = 0; i < state.bodies.length; i += 1) {
+        const body = state.bodies[i];
+        const place = body.placement || { x: 0, y: 0, z: 0 };
+        const tag = assemblyApi ? assemblyApi.materialTag(body) : (body.material || 'PLA');
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'part-row';
+        row.setAttribute('role', 'option');
+        row.setAttribute('data-part-id', body.id);
+        const on = state.assemblyIds.indexOf(body.id) >= 0;
+        row.classList.toggle('is-on', on);
+        row.setAttribute('aria-selected', on ? 'true' : 'false');
+        row.title = body.name + ' · ' + tag + ' · ' + place.x + ', ' + place.y + ', ' + place.z + ' mm';
+        const name = document.createElement('span');
+        name.className = 'part-name';
+        name.textContent = body.name || 'Part';
+        const mat = document.createElement('span');
+        mat.className = 'part-mat';
+        mat.textContent = tag;
+        row.appendChild(name);
+        row.appendChild(mat);
+        host.appendChild(row);
+      }
+    }
+    const two = selected.length >= 2;
+    button.disabled = !two;
+    button.setAttribute('aria-disabled', two ? 'false' : 'true');
+    if (note) note.textContent = state.assemblyMessage || '';
+    if (material && document.activeElement !== material) {
+      const tags = [];
+      for (let i = 0; i < selected.length; i += 1) {
+        const tag = assemblyApi ? assemblyApi.materialTag(selected[i]) : (selected[i].material || 'PLA');
+        if (tags.indexOf(tag) < 0) tags.push(tag);
+      }
+      const key = state.assemblyIds.join(',') + ':' + tags.join(',');
+      if (material.dataset.key !== key) {
+        material.dataset.key = key;
+        if (tags.length === 1) material.value = tags[0];
+        else material.selectedIndex = -1;
+      }
+    }
+  }
+
+  function partsForAssemblyExport() {
+    if (!assemblyApi || !state.bodies.length) return null;
+    const out = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      if (!body.shape) return null;
+      out.push({
+        name: body.name || 'Part',
+        material: body.material || 'PLA',
+        shape: body.shape,
+        placement: body.placement || { x: 0, y: 0, z: 0 },
+        shapeLocal: body.shapeLocal === true
+      });
+    }
+    return out;
+  }
+
+  function applyCombine(selected) {
+    const result = assemblyApi.combineParts(oc, selected, { forceFail: state.assemblyForceFail === true });
+    if (!result.ok || !result.shape) {
+      if (result && result.shape) dropShape(result.shape);
+      state.assemblyMessage = (result && result.error) || assemblyApi.ERR_COMBINE;
+      setHint(state.assemblyMessage);
+      toast(state.assemblyMessage);
+      return false;
+    }
+    let view = null;
+    try { view = primApi.inspectSolid(oc, result.shape); } catch (_err) { view = null; }
+    if (!view || !view.gate || view.gate.valid !== true || !view.mesh) {
+      dropShape(result.shape);
+      state.assemblyMessage = assemblyApi.ERR_COMBINE;
+      setHint(state.assemblyMessage);
+      toast(state.assemblyMessage);
+      return false;
+    }
+    state.bodySeq += 1;
+    const body = {
+      id: 'b' + state.bodySeq,
+      name: result.name || selected[0].name,
+      kind: 'combined',
+      params: null,
+      material: result.material,
+      features: [],
+      source: 'combine',
+      shape: result.shape,
+      shapeLocal: false,
+      placement: { x: 0, y: 0, z: 0 },
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight
+    };
+    const dropIds = {};
+    for (let i = 0; i < selected.length; i += 1) dropIds[selected[i].id] = true;
+    const kept = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (!dropIds[state.bodies[i].id]) kept.push(state.bodies[i]);
+    }
+    const next = kept.concat([body]);
+    const flat = primApi.flattenMesh(combineBodyMeshes(next));
+    if (!flat.indices.length || typeof Module.replaceMesh !== 'function' || !Module.replaceMesh(flat.positions, flat.indices, 'combine')) {
+      dropShape(result.shape);
+      state.assemblyMessage = assemblyApi.ERR_COMBINE;
+      setHint(state.assemblyMessage);
+      toast(state.assemblyMessage);
+      return false;
+    }
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (dropIds[state.bodies[i].id]) dropShape(state.bodies[i].shape);
+    }
+    state.bodies = next;
+    state.assemblyIds = [body.id];
+    state.selection = 'item';
+    state.selectedIds = [body.id];
+    state.primitive = null;
+    state.hoverId = null;
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    state.sceneCleared = false;
+    state.assemblyMessage = '';
+    state.lastError = '';
+    state.projectBlank = false;
+    if (!state.projectApplying) state.projectDirty = true;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    paintPrimFields();
+    publishProjectHook();
+    setHint('Combined ' + body.name);
+    return true;
+  }
+
+  function combineSelected() {
+    if (!assemblyApi || !oc || !primApi) {
+      state.assemblyMessage = assemblyApi ? assemblyApi.ERR_COMBINE : 'Combine failed the shape check. The model was not changed.';
+      toast(state.assemblyMessage);
+      setHint(state.assemblyMessage);
+      publishGateState();
+      return false;
+    }
+    const selected = selectedAssemblyBodies();
+    if (selected.length < 2) {
+      state.assemblyMessage = assemblyApi.ERR_NEED;
+      toast(state.assemblyMessage);
+      setHint(state.assemblyMessage);
+      publishGateState();
+      return false;
+    }
+    const tag = assemblyApi.materialTag(selected[0]);
+    for (let i = 1; i < selected.length; i += 1) {
+      if (assemblyApi.materialTag(selected[i]) !== tag) {
+        state.assemblyMessage = assemblyApi.ERR_MIXED;
+        toast(state.assemblyMessage);
+        setHint(state.assemblyMessage);
+        publishGateState();
+        return false;
+      }
+    }
+    state.assemblyMessage = '';
+    const ok = runUndoable('Combine', function () { return applyCombine(selected) === true; });
+    publishGateState();
+    return ok === true;
+  }
+
+  function showAssembly() {
+    if (!oc || !opsApi || !assemblyApi || !primApi) {
+      state.lastError = 'FAIL: assembly tools are not loaded.';
+      state.demo = 'assembly';
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    clearOwnedBodies();
+    state.demo = 'assembly';
+    state.primitive = null;
+    state.booleanOp = '';
+    state.lastError = '';
+    const specs = [
+      {
+        name: 'Box',
+        kind: 'box',
+        material: 'PLA',
+        placement: { x: 0, y: 0, z: 10 },
+        shape: opsApi.makeBoxSolid(oc, 20, 20, 20, [-10, -10, -10]),
+        params: primApi.normalizeBox({ cx: 0, cy: 0, cz: 10, sx: 20, sy: 20, sz: 20 })
+      },
+      {
+        name: 'Cylinder',
+        kind: 'cylinder',
+        material: 'PETG',
+        placement: { x: 10, y: 0, z: 10 },
+        shape: opsApi.makeCylinderSolid(oc, 10, 20, [0, 0, -10], [0, 0, 1]),
+        params: primApi.normalizeCylinder({ cx: 10, cy: 0, cz: 10, radius: 10, height: 20, axis: 'Z' })
+      }
+    ];
+    const next = [];
+    for (let i = 0; i < specs.length; i += 1) {
+      const spec = specs[i];
+      if (!spec.shape) {
+        state.lastError = assemblyApi.ERR_COMBINE;
+        setHint(state.lastError);
+        publishGateState();
+        return false;
+      }
+      const placed = assemblyApi.placedCopy(oc, spec.shape, spec.placement);
+      let view = null;
+      if (placed.ok && placed.shape) {
+        try { view = primApi.inspectSolid(oc, placed.shape); } catch (_err) { view = null; }
+        dropShape(placed.shape);
+      }
+      if (!view || !view.mesh || !view.mesh.triangles.length) {
+        dropShape(spec.shape);
+        for (let j = 0; j < next.length; j += 1) dropShape(next[j].shape);
+        state.lastError = 'FAIL: the assembly mesh was rejected.';
+        setHint(state.lastError);
+        publishGateState();
+        return false;
+      }
+      state.bodySeq += 1;
+      next.push({
+        id: 'b' + state.bodySeq,
+        name: spec.name,
+        kind: spec.kind,
+        params: spec.params,
+        material: spec.material,
+        features: [],
+        source: 'assembly',
+        shape: spec.shape,
+        shapeLocal: true,
+        placement: spec.placement,
+        mesh: view.mesh,
+        topology: view.topology,
+        gate: view.gate,
+        watertight: view.watertight
+      });
+    }
+    state.bodies = next;
+    state.assemblyIds = next.map(function (body) { return body.id; });
+    state.selection = 'item';
+    state.selectedIds = state.assemblyIds.slice();
+    state.sceneCleared = false;
+    state.projectBlank = false;
+    const flat = primApi.flattenMesh(combineBodyMeshes(next));
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, 'assembly')) {
+      state.lastError = 'FAIL: the assembly mesh was rejected.';
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    paintPrimFields();
+    if (!state.projectApplying) state.projectDirty = true;
+    publishProjectHook();
+    setHint('Assembly: Box PLA, Cylinder PETG');
+    publishGateState();
+    return true;
+  }
+
+  function assemblyStatus() {
+    const parts = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      let volumeMm3 = null;
+      if (projectApi && oc && body.shape && typeof projectApi.measureShape === 'function') {
+        try { volumeMm3 = projectApi.measureShape(oc, body.shape).volumeMm3; } catch (_err) { volumeMm3 = null; }
+      }
+      parts.push({
+        name: body.name,
+        material: body.material || '',
+        tag: assemblyApi ? assemblyApi.materialTag(body) : '',
+        placement: body.placement || null,
+        shapeLocal: body.shapeLocal === true,
+        volumeMm3: volumeMm3
+      });
+    }
+    return {
+      count: state.bodies.length,
+      undoDepth: commandStack.depth(),
+      message: state.assemblyMessage || '',
+      parts: parts
+    };
+  }
+
+  function runAssemblyProbe() {
+    const report = { error: '' };
+    try {
+      const before = state.bodies.length;
+      const depth = commandStack.depth();
+      state.assemblyForceFail = false;
+      state.assemblyIds = state.bodies.map(function (body) { return body.id; });
+      combineSelected();
+      report.mixedUnchanged = state.bodies.length === before && commandStack.depth() === depth;
+      report.mixedError = state.assemblyMessage || '';
+      for (let i = 0; i < state.bodies.length; i += 1) state.bodies[i].material = 'PLA';
+      state.assemblyForceFail = true;
+      state.assemblyIds = state.bodies.map(function (body) { return body.id; });
+      combineSelected();
+      report.failUnchanged = state.bodies.length === before && commandStack.depth() === depth;
+      report.failError = state.assemblyMessage || '';
+      state.assemblyForceFail = false;
+      state.assemblyIds = state.bodies.map(function (body) { return body.id; });
+      report.combined = combineSelected() === true && state.bodies.length === 1 && commandStack.depth() === depth + 1;
+      report.combinedMaterial = state.bodies[0] ? state.bodies[0].material : '';
+      report.combinedValid = !!(state.bodies[0] && state.bodies[0].gate && state.bodies[0].gate.valid === true);
+      doUndo();
+      report.undoRestored = state.bodies.length === before && commandStack.depth() === depth;
+      report.undoStep = report.combined === true && report.undoRestored === true;
+    } catch (err) {
+      report.error = err && err.message ? err.message : String(err);
+    }
+    publishGateState();
+    return report;
+  }
+
+  window.__cadcamAssembly = function (spec) {
+    const src = spec || {};
+    if (!assemblyApi) return { error: 'assemblies missing' };
+    if (src.demo === true) showAssembly();
+    if (src.probe === true) return runAssemblyProbe();
+    return assemblyStatus();
+  };
+
+  const partList = document.getElementById('partList');
+  if (partList) {
+    partList.addEventListener('click', function (ev) {
+      const row = ev.target && ev.target.closest ? ev.target.closest('.part-row') : null;
+      if (!row) return;
+      const id = row.getAttribute('data-part-id');
+      if (!id) return;
+      const at = state.assemblyIds.indexOf(id);
+      if (at >= 0) state.assemblyIds.splice(at, 1);
+      else state.assemblyIds.push(id);
+      state.assemblyMessage = '';
+      state.selection = 'item';
+      state.selectedIds = state.assemblyIds.slice();
+      paintAssembly();
+      applyLook();
+    });
+  }
+  const partMaterial = document.getElementById('partMaterial');
+  if (partMaterial) {
+    partMaterial.addEventListener('change', function () {
+      const value = partMaterial.value;
+      if (value !== 'PLA' && value !== 'PETG' && value !== 'TPU') return;
+      const selected = selectedAssemblyBodies();
+      const targets = selected.length ? selected : [];
+      for (let i = 0; i < targets.length; i += 1) targets[i].material = value;
+      state.assemblyMessage = '';
+      if (!state.projectApplying) state.projectDirty = true;
+      paintAssembly();
+      publishGateState();
+    });
+  }
+
   function exportFormat(fmt) {
     if (state.sceneCleared) {
       applyReport(clearedReport());
@@ -7164,7 +7683,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (exportMenu) exportMenu.hidden = true;
       return;
     }
-    const bytes = fmt === '3MF' ? Module.export3mf() : Module.exportStl();
+    let bytes = null;
+    if (fmt === '3MF') {
+      const parts = partsForAssemblyExport();
+      if (parts && parts.length && assemblyApi) {
+        if (state.unitsPass !== true || state.exportUnit !== 'millimeter') {
+          const why = assemblyApi.ERR_UNITS;
+          toast(why);
+          setHint(why);
+          if (exportMenu) exportMenu.hidden = true;
+          return;
+        }
+        const built = assemblyApi.exportAssembly3mf(oc, parts, { units: 'mm' });
+        if (!built.ok || !built.bytes) {
+          const why = (built && built.error) || assemblyApi.ERR_EXPORT;
+          toast(why);
+          setHint(why);
+          if (exportMenu) exportMenu.hidden = true;
+          return;
+        }
+        bytes = built.bytes;
+      } else {
+        bytes = Module.export3mf();
+      }
+    } else {
+      bytes = Module.exportStl();
+    }
     if (exportMenu) exportMenu.hidden = true;
     if (!bytes || !bytes.length) {
       toast('Export blocked');
@@ -7456,6 +8000,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
     } else if (action === 'exportFmt') {
       exportFormat(btn.getAttribute('data-fmt') || 'STL');
+      return;
+    } else if (action === 'combine') {
+      combineSelected();
       return;
     } else if (action === 'delete') {
       deleteSelection();
@@ -8241,6 +8788,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   if (demoName === 'lbracket') {
     loadedQuery = true;
     showLBracket();
+    spherical.radius = fitDistance();
+    updateCamera();
+  } else if (demoName === 'assembly') {
+    loadedQuery = true;
+    showAssembly();
     spherical.radius = fitDistance();
     updateCamera();
   } else if (demoName === 'booleans') {

@@ -704,6 +704,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
         saved = deploy_smoke.run_saveload(cdp, origin)
         if saved:
             return [f"{engine} saveload", *saved[:40]]
+        assembled = deploy_smoke.assembly_problems(cdp, origin)
+        if assembled:
+            return [f"{engine} assembly", *assembled[:40]]
         print(f"PASS phone_smoke {engine}", flush=True)
         return []
     finally:

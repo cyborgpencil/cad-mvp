@@ -1572,7 +1572,7 @@ STAMP_EXPR = r"""
       problems.push('script url');
     }
   }
-  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'undo.mjs', 'selection.mjs', 'viewport-selection.mjs'];
+  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'undo.mjs', 'selection.mjs', 'viewport-selection.mjs', 'assemblies.mjs'];
   var found = {};
   var entries = performance.getEntriesByType('resource');
   for (var e = 0; e < entries.length; e++) {
@@ -3506,6 +3506,135 @@ SAVELOAD_EXPR = r"""
 """
 
 
+ASSEMBLY_LAYOUT_EXPR = r"""
+(function(){
+  var problems = [];
+  var w = window.innerWidth;
+  var h = window.innerHeight;
+  if (w < 380 || w > 420) problems.push('width ' + w);
+  var info = document.querySelector('[data-drawer="inspector"]');
+  var inspector = document.getElementById('inspector');
+  if (!info || !inspector) return JSON.stringify({problems:['missing inspector'], w:w, h:h});
+  if (!inspector.classList.contains('open')) info.click();
+  inspector.classList.add('open');
+  inspector.removeAttribute('inert');
+  function measure(el, name) {
+    if (!el) { problems.push(name + ' missing'); return; }
+    el.scrollIntoView({block:'center', inline:'nearest'});
+    var r = el.getBoundingClientRect();
+    var cx = r.left + r.width / 2;
+    var cy = r.top + r.height / 2;
+    var top = document.elementFromPoint(cx, cy);
+    var hit = top === el || (el.contains && el.contains(top));
+    var on = r.width >= 44 && r.height >= 44 && r.bottom > 0 && r.right > 0 && r.left < w && r.top < h;
+    if (!on || !hit) problems.push(name + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' hit=' + hit + ' on=' + on + ' at ' + (top ? (top.id || top.className || top.tagName) : 'none'));
+  }
+  var rows = document.querySelectorAll('#partList .part-row');
+  if (rows.length < 2) problems.push('rows ' + rows.length);
+  for (var i = 0; i < rows.length; i++) measure(rows[i], 'part ' + i);
+  measure(document.getElementById('combineBtn'), 'combine');
+  measure(document.getElementById('partMaterial'), 'material');
+  return JSON.stringify({problems:problems, w:w, h:h, rows:rows.length, open:inspector.classList.contains('open')});
+})()
+"""
+
+
+def assembly_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Portrait 390x844: parts list and Combine are 44 px, and the probe rolls back."""
+    try:
+        try:
+            set_portrait(cdp)
+        except (RuntimeError, TimeoutError, OSError) as exc:
+            return [f"assembly portrait {exc}"]
+        url = origin + "/?demo=assembly"
+        cdp.events.clear()
+        cdp.urls.clear()
+        cdp.call("Page.navigate", {"url": url})
+        deadline = time.time() + PAGE_TIMEOUT_S
+        last: dict[str, Any] | None = None
+        ready = False
+        while time.time() < deadline:
+            cdp.drain(0.5)
+            payload = eval_state(cdp)
+            notes = smoke_notes(payload)
+            if notes:
+                return [f"assembly {item}" for item in notes[:20]]
+            state = (payload or {}).get("state") if payload else None
+            if not isinstance(state, dict):
+                continue
+            last = state
+            if state.get("demo") == "assembly" and state.get("lastError"):
+                return [f"assembly demo {state.get('lastError')}"]
+            if (
+                state.get("occtReady") is True
+                and state.get("demo") == "assembly"
+                and int(state.get("bodyCount") or 0) >= 2
+            ):
+                cdp.drain(0.4)
+                site = site_problems(cdp.events, origin, cdp.urls)
+                if site:
+                    return [f"assembly {item}" for item in site[:20]]
+                ready = True
+                break
+        if not ready:
+            return [f"assembly timed out {json.dumps(last)[:500]}"]
+        layout_raw, layout_err = eval_expr(cdp, ASSEMBLY_LAYOUT_EXPR)
+        if layout_err or not isinstance(layout_raw, str):
+            return [f"assembly layout {layout_raw or layout_err}"]
+        try:
+            layout = json.loads(layout_raw)
+        except json.JSONDecodeError:
+            return [f"assembly layout {layout_raw[:500]}"]
+        layout_problems = layout.get("problems") if isinstance(layout, dict) else [str(layout_raw)]
+        if not isinstance(layout_problems, list):
+            return [f"assembly layout {layout_raw[:500]}"]
+        if layout_problems:
+            return [f"assembly {item}" for item in layout_problems]
+        raw, err = eval_expr(
+            cdp,
+            "JSON.stringify(window.__cadcamAssembly({probe:true}))",
+            timeout=120,
+        )
+        if err or not isinstance(raw, str):
+            return [f"assembly probe {raw or err}"]
+        try:
+            found = json.loads(raw)
+        except json.JSONDecodeError:
+            return [f"assembly probe {raw[:500]}"]
+        if not isinstance(found, dict):
+            return [f"assembly probe {raw[:500]}"]
+        problems: list[str] = []
+        if found.get("error"):
+            problems.append(f"error {found.get('error')}")
+        if found.get("mixedUnchanged") is not True:
+            problems.append(f"mixed changed {found.get('mixedUnchanged')!r}")
+        if found.get("mixedError") != "These parts use different materials. The model was not changed.":
+            problems.append(f"mixed error {found.get('mixedError')!r}")
+        if found.get("failUnchanged") is not True:
+            problems.append(f"force fail changed {found.get('failUnchanged')!r}")
+        if found.get("failError") != "Combine failed the shape check. The model was not changed.":
+            problems.append(f"force fail error {found.get('failError')!r}")
+        if found.get("combined") is not True:
+            problems.append(f"combined {found.get('combined')!r}")
+        if found.get("combinedMaterial") != "PLA":
+            problems.append(f"material {found.get('combinedMaterial')!r}")
+        if found.get("combinedValid") is not True:
+            problems.append(f"valid {found.get('combinedValid')!r}")
+        if found.get("undoRestored") is not True:
+            problems.append(f"undo {found.get('undoRestored')!r}")
+        if found.get("undoStep") is not True:
+            problems.append("undo step")
+        if problems:
+            return [f"assembly {item}" for item in problems]
+        print("ASSEMBLIES_DONE", flush=True)
+        return []
+    finally:
+        try:
+            set_desktop(cdp)
+        except (RuntimeError, TimeoutError, OSError):
+            pass
+
+
 def run_saveload(cdp: Cdp, origin: str) -> list[str]:
     """Round-trip a box and a cylinder through the project-file hook."""
     url = origin + "/?primitive=box"
@@ -3823,6 +3952,11 @@ def run(omit: list[str]) -> int:
             if saveload_problems:
                 failures.append("saveload")
                 failures.extend(saveload_problems[:40])
+        if not failures:
+            assembly_found = assembly_problems(cdp, origin)
+            if assembly_found:
+                failures.append("assembly")
+                failures.extend(assembly_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

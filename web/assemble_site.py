@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 # Site root. `*.mjs` is every module the page loads, including
-# occt-gate.mjs, occt-primitives.mjs, occt-ops.mjs, project-file.mjs, selection.mjs, and viewport-selection.mjs.
+# occt-gate.mjs, occt-primitives.mjs, occt-ops.mjs, project-file.mjs, selection.mjs, viewport-selection.mjs, and assemblies.mjs.
 ROOT_GLOBS = ("index.html", "cadcam.js", "cadcam.wasm", "*.mjs")
 
 # Staged by web/fetch-libcascade.py. The page imports these paths.
@@ -38,6 +38,7 @@ REQUIRED = (
     "selection.mjs",
     "viewport-selection.mjs",
     "undo.mjs",
+    "assemblies.mjs",
     "dist/init.single.js",
     "dist/opencascade_single.js",
     "dist/opencascade_single.wasm",
@@ -199,7 +200,7 @@ def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
         stamp = build_stamp()
         page = dest / "index.html"
         page.write_text(stamp_page(page.read_text(encoding="utf-8"), stamp), encoding="utf-8")
-        for rel in ("occt-primitives.mjs", "occt-ops.mjs", "project-file.mjs"):
+        for rel in ("occt-primitives.mjs", "occt-ops.mjs", "project-file.mjs", "assemblies.mjs"):
             if rel not in copied:
                 continue
             module = dest / rel

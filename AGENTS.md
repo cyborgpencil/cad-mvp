@@ -41,8 +41,5 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 ## Team rules (Erik, 2026-10-21)
 - Flexibility: roles are defaults, not walls. If an owner is busy, stalled or offline, the next best-fit bot takes over. Say so in the room, read the owner's latest status and files first, and hand the work back cleanly when the owner returns. Safety rules still apply.
 - Research first: before any task, check the repo, docs, earlier work, skills and memory, plus sourced best practices. Post a short plan with sources, then start.
-## Overnight override 2026-10-22 (tonight only, Chief 02:17 MT)
-- HYBRID tooling for tonight only: Grok Build and Cursor cloud agents both write code. Cursor cloud agents take repo feature work (nav cube, save/load, assemblies, new tools), each as its own PR with CI, reviewable by Erik in the morning. Grok Build Pilot keeps Z13-bound work: finishing the phone fix, the gizmo/undo/shading/tooltip batch, local C++/WASM rebuilds, and Acceptance A and B in OrcaSlicer, and writes the Cursor launch prompts for steps 2 and 3 with Doc Steward. The normal Grok Build -> Cursor -> Grok Bots priority returns after tonight.
-- Merge rules: every change lands through a PR. Repo Keeper merges only after CI (ci.yml on pull_request) is green and the secrets/Blink scan passes. Branch protection requires ci.yml. No force-push. No direct pushes to main while a PR is open.
-- Before starting work and before every merge, run git pull --ff-only; if it can't fast-forward, stop and ask Repo Keeper instead of merging or rebasing.
-- Unchanged: units in mm and the OCCT shape-validity check after fillet, chamfer, Boolean and delete. No watertight requirement.
+## Coding tools (Erik, 2026-10-22)
+- Order: Grok Build, then Cursor, then Google Antigravity (third, end of queue, trial). Gemini Code Assist GitHub review app approved; install pending Erik's sign-in. Details: mvp/tooling-priority.md.

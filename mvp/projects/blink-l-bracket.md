@@ -1,5 +1,7 @@
 ﻿# Project 1: Blink camera L-bracket (first end-to-end test case)
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Status: spec draft (Doc Steward, 2026-10-21). Erik picked this part; every dimension he hasn't given is **TBD**. Don't guess values. Ask Erik through the chief.
 
 ## Part

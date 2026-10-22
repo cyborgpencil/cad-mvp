@@ -1,5 +1,7 @@
 # Prompt: Blink L-bracket screw holes, mount disc, and user-picked fillet/chamfer
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Spec: mvp/projects/blink-l-bracket.md. Booleans rules: mvp/booleans.md. Values: web/PROGRESS.md decisions table.
 
 ## Values

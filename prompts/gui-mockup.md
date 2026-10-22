@@ -1,5 +1,7 @@
 # Prompt: clickable GUI mockup (Grok Build)
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Working dir: C:\Dev\cadcam-mvp\mockup\ on Z13. Write nothing outside mockup\.
 Goal: a clickable layout mockup that follows the final decisions in mvp/ui-redesign.md ("Team decisions (final)"), so Erik can give quick feedback. No real geometry and no OCCT. Replace mockup\index.html in place, with no versioned copies.
 Erik approved the design on 2026-10-21. FixGaps (small-gaps fix) stays out; it is TBD for Erik.

@@ -2,7 +2,7 @@
 
 Design-to-print MVP. Requirements and acceptance criteria are in [mvp/requirements.md](mvp/requirements.md).
 
-Units are millimeters, with a fluid inch switch. The first GUI is Qt. A watertight check is required before export.
+Units are millimeters, with a fluid inch switch. The app is one browser WASM build (C++ and OpenCASCADE, WebGL2, hosted on GitHub Pages) for desktop and mobile (Erik, 2026-10-21). The older Qt `solid_view` window is a native test harness only. Export requires the units (mm) check. The OCCT shape-validity check runs after operations and logs failures, but it does not block Export. Watertight checks were dropped (Erik, 2026-10-22).
 
 Licensed under the GNU Lesser General Public License v2.1. See [LICENSE](LICENSE).
 

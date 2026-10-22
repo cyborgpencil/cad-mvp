@@ -1,5 +1,7 @@
 # MVP Test Matrix
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Purpose: prove the OpenCASCADE core and the GUI both work across MVP scope. Every case runs as a CTest case and as a GUI pass on Z13, and every case exports STL and 3MF.
 
 Rules:
@@ -70,7 +72,7 @@ All volume formulas above were re-derived by hand. No corrections were needed.
 | Mesh | Shell count | Connected components of the triangle mesh equal the Shells column. |
 | Mesh | Volume, bbox | Signed-tetrahedron volume and min/max of vertices, compared with the mesh tolerances below. |
 | 3MF | Units | Read the file back with lib3mf and check the model unit is millimeter. Also check the raw XML has `unit="millimeter"`: the spec makes millimeter the default when the attribute is missing, so an explicit attribute is what this test asserts. |
-| Orca | Size | Screenshot of the size readout; must match the BBox column within the mesh bbox tolerance. |
+| Orca | Size | Screenshot of the size readout; must match the BBox column within 0.05 mm per axis (Chief, 2026-10-22 07:06 MT). |
 
 ## Likely failure reasons for tricky rows
 | ID | Why it can fail | Source |
@@ -107,7 +109,7 @@ Mesh setting assumed: linear deflection d = 0.01 mm, angular deflection 0.5 rad,
 | Mesh volume | Curved | mesh value between exact x (1 - 2B) and exact x (1 + 1e-6), where B is the row's chord bound; 2x margin | S2/S6 r 10: B = 4d/3r = 0.13%, band -0.27%. S3 r 10: B = 3d/r = 0.3%, band -0.6%. S4 cone r 10: B <= 0.13%, band -0.27%. S8 hole r 5: the hole shrinks, so volume reads high by up to (4 pi/3)(5)(0.01)(10) = 2.09 mm3 (0.026%); band +0.05%. O7: 40 pi d = 1.26 mm3 (0.005%), band -0.011%. O8: 80 pi d = 2.51 mm3, band -0.021%. O5b: same as O7. |
 | BBox | Planar only | +/- 1e-4 mm per axis | 40.0000 +/- 0.0001 |
 | BBox | Curved | +/- (d + 1e-4) mm per axis; may only shrink | S2: 20 x 20 within 0.0101 mm |
-| Orca size | All | Orca's display rounding (check its readout precision) or the bbox tolerance, whichever is larger | TBD once the first screenshots show the readout precision |
+| Orca size | All | 0.05 mm per axis (Chief, 2026-10-22 07:06 MT; same as mvp/acceptance-a-b.md A6) | 40.00 +/- 0.05 mm |
 
 Notes: the sign rule (curved meshes read low; holes make parts read high) is a cheap extra check. OCCT ignores a linear deflection smaller than the shape tolerance and uses the tolerance instead (Mesh guide), so d must stay above the part's tolerance.
 

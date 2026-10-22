@@ -1,4 +1,6 @@
 # UI redesign: workbench tabs (approved by Erik 2026-10-21; implementation in progress)
+
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
 Erik asked for a friendlier, less plain UI built around process tabs. Erik approved the wireframes on 2026-10-21 and asked for the GUI to be built into the current project; Grok Build is implementing it. It builds on Research Digest's sourced review in research/gui/ui-layout-review.md (Fusion, Onshape, FreeCAD, Blender). Section 2 of mvp/gui-plan.md lists the operations.
 
 ## 1 Layout sketch

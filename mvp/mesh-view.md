@@ -1,7 +1,9 @@
 # Desktop mesh view
 
 **Status**: Built and checked on 2026-10-20
-**Scope**: Qt window over the existing watertight checker. Does not change `mvp/requirements.md`.
+**Scope**: Qt test-harness window over the legacy mesh checker (`check_watertight`). The product GUI is the WASM browser app. Does not change `mvp/requirements.md`.
+
+> Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export.
 
 ## What this is
 
