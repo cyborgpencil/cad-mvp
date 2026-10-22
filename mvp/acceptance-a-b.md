@@ -35,4 +35,3 @@ All mm. 11 parts after the cab is combined into the chassis (Chief and 3T, 07:15
 - Wheel hubs x4 (PLA): Ø16 x 8 cylinders with a Ø4.2 bore.
 - Tires x4 (TPU): ring OD 24, ID 15.6 (0.2 stretch on the Ø16 hub), width 8.
 After the cab Combine the parts list is 11 parts. Combine of a hub with a tire must be refused (mixed materials), which B3 also checks.
-<<<<<<< ours

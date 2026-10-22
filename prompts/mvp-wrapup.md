@@ -42,6 +42,6 @@ Route that information to a log:
 
 ## Report
 - PR link and head.
-- The CTest count, deploy smoke result, and one 390x844 screenshot saved to `C:\Users\cybor\Pictures\cadmvp-shots\` on Z13.
+- The CTest count, deploy smoke result, and one 390x844 screenshot saved to the Z13 staging folder (`cadmvp-shots`) on Z13.
 - Files changed.
 - Any team-chosen values you changed, so Doc Steward can log them in `web/PROGRESS.md`.
