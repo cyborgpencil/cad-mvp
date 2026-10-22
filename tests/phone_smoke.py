@@ -3,7 +3,8 @@
 
 Uses Playwright's iPhone 13 device (390x844) and the portrait checks in
 deploy_smoke.py: overflow, inert panel, one-row toolbar, Info/Tree row,
-Part 1 visible, one search, coverage thresholds, Home, and the 3-hole plate.
+Part 1 visible, one search, coverage thresholds, Home, the nav cube, and
+the 3-hole plate.
 
 Playwright lives in the gitignored builds/pwvenv. When it cannot be
 imported, exit 77. Exit 1 under CI=1 only when a workflow file installs
@@ -431,6 +432,10 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
         portrait = deploy_smoke.run_portrait(cdp, origin)
         if portrait:
             return [f"{engine} portrait", *portrait[:40]]
+        nav = deploy_smoke.nav_cube_problems(cdp)
+        if nav:
+            return [f"{engine} nav cube", *nav[:40]]
+        print("NAVCUBE_DONE", flush=True)
         holes = deploy_smoke.run_portrait_holes(cdp, origin)
         if holes:
             return [f"{engine} portrait_holes", *holes[:40]]
