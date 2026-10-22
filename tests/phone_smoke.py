@@ -690,6 +690,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
             shots = shoot_plate(page, cdp)
             if shots:
                 return [f"{engine} screenshot", *shots]
+        saved = deploy_smoke.run_saveload(cdp, origin)
+        if saved:
+            return [f"{engine} saveload", *saved[:40]]
         print(f"PASS phone_smoke {engine}", flush=True)
         return []
     finally:
