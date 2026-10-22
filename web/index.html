@@ -3028,10 +3028,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return false;
     }
     const point = state.holeFace.frame.point(u, v);
+    const facePoint = toLocalPoint(point, body);
     let cut = null;
     try {
       cut = opsApi.cutHole(oc, body.shape, {
-        face: point,
+        face: facePoint,
         dir: state.holeFace.frame.inward,
         diameterMm: diameter,
         depthMode: state.holeDepthMode,
@@ -3053,6 +3054,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(state.lastError);
       publishGateState();
       return false;
+    }
+    if (body.shapeLocal === true) {
+      const placedView = inspectStored(body, cut.shape);
+      if (!placedView || !placedView.mesh) {
+        dropShape(cut.shape);
+        state.lastError = 'FAIL: hole mesh was rejected. The solid was kept.';
+        toast(state.lastError);
+        setHint(state.lastError);
+        publishGateState();
+        return false;
+      }
+      cut.mesh = placedView.mesh;
+      cut.topology = placedView.topology;
+      cut.gate = placedView.gate;
+      cut.watertight = placedView.watertight;
     }
     const flat = primApi.flattenMesh(cut.mesh);
     if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'hole')) {
@@ -3526,29 +3542,39 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const want = kind === 'cylinder' || kind === 'disc' ? kind : 'box';
     let shape = null;
     let normalized = null;
+    const storeLocal = !!(assemblyApi && typeof assemblyApi.placedCopy === 'function');
     if (want === 'cylinder') {
       normalized = primApi.normalizeCylinder(params);
       const dir = axisDir(normalized.axis);
+      const ox = storeLocal ? 0 : normalized.cx;
+      const oy = storeLocal ? 0 : normalized.cy;
+      const oz = storeLocal ? 0 : normalized.cz;
       shape = opsApi.makeCylinderSolid(oc, normalized.radius, normalized.height, [
-        normalized.cx - dir[0] * normalized.height / 2,
-        normalized.cy - dir[1] * normalized.height / 2,
-        normalized.cz - dir[2] * normalized.height / 2,
+        ox - dir[0] * normalized.height / 2,
+        oy - dir[1] * normalized.height / 2,
+        oz - dir[2] * normalized.height / 2,
       ], dir);
     } else if (want === 'disc') {
       normalized = primApi.normalizeDisc(params);
       const dir = axisDir(normalized.axis);
       const height = normalized.thickness;
+      const ox = storeLocal ? 0 : normalized.cx;
+      const oy = storeLocal ? 0 : normalized.cy;
+      const oz = storeLocal ? 0 : normalized.cz;
       shape = opsApi.makeCylinderSolid(oc, normalized.diameter / 2, height, [
-        normalized.cx - dir[0] * height / 2,
-        normalized.cy - dir[1] * height / 2,
-        normalized.cz - dir[2] * height / 2,
+        ox - dir[0] * height / 2,
+        oy - dir[1] * height / 2,
+        oz - dir[2] * height / 2,
       ], dir);
     } else {
       normalized = primApi.normalizeBox(params);
+      const ox = storeLocal ? 0 : normalized.cx;
+      const oy = storeLocal ? 0 : normalized.cy;
+      const oz = storeLocal ? 0 : normalized.cz;
       shape = opsApi.makeBoxSolid(oc, normalized.sx, normalized.sy, normalized.sz, [
-        normalized.cx - normalized.sx / 2,
-        normalized.cy - normalized.sy / 2,
-        normalized.cz - normalized.sz / 2,
+        ox - normalized.sx / 2,
+        oy - normalized.sy / 2,
+        oz - normalized.sz / 2,
       ]);
     }
     if (!shape) return null;
@@ -3556,7 +3582,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       rxDeg: normalized.rx || 0,
       ryDeg: normalized.ry || 0,
       rzDeg: normalized.rz || 0,
-      origin: [normalized.cx, normalized.cy, normalized.cz]
+      origin: storeLocal ? [0, 0, 0] : [normalized.cx, normalized.cy, normalized.cz]
     };
     if ((rot.rxDeg || rot.ryDeg || rot.rzDeg) && opsApi && typeof opsApi.transformShape === 'function') {
       const rotated = opsApi.transformShape(oc, shape, rot);
@@ -3575,13 +3601,35 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       dropShape(shape);
       shape = rotated.shape;
     }
+    const placement = { x: normalized.cx, y: normalized.cy, z: normalized.cz };
+    let viewShape = shape;
+    let placedOwned = null;
+    if (storeLocal) {
+      const placed = assemblyApi.placedCopy(oc, shape, placement);
+      if (!placed.ok || !placed.shape) {
+        dropShape(shape);
+        return {
+          failed: true,
+          view: {
+            gate: {
+              pass: false,
+              message: 'FAIL: placement was rejected. The last good shape was kept.'
+            }
+          }
+        };
+      }
+      placedOwned = placed.shape;
+      viewShape = placed.shape;
+    }
     let view = null;
     try {
-      view = primApi.inspectSolid(oc, shape);
+      view = primApi.inspectSolid(oc, viewShape);
     } catch (_err) {
+      if (placedOwned) dropShape(placedOwned);
       dropShape(shape);
       return null;
     }
+    if (placedOwned) dropShape(placedOwned);
     if (!view.gate || view.gate.pass !== true || !view.watertight || view.watertight.pass !== true) {
       dropShape(shape);
       return { failed: true, view: view };
@@ -3598,8 +3646,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       watertight: view.watertight,
       features: [],
       material: 'PLA',
-      shapeLocal: false,
-      placement: { x: normalized.cx, y: normalized.cy, z: normalized.cz },
+      shapeLocal: storeLocal,
+      placement: placement,
     };
   }
 
@@ -3887,9 +3935,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       reject('FAIL: pick an edge, then Confirm. The last good shape was kept.');
       return;
     }
+    const localSegments = body.shapeLocal === true
+      ? segments.map(function (seg) {
+        return { a: toLocalPoint(seg.a, body), b: toLocalPoint(seg.b, body) };
+      })
+      : segments;
     let result;
     try {
-      result = opsApi.applyPickedEdgeOp(oc, body.shape, segments, kind, size);
+      result = opsApi.applyPickedEdgeOp(oc, body.shape, localSegments, kind, size);
     } catch (err) {
       reject('FAIL: ' + kind + ' threw ' + (err && err.message ? err.message : String(err)) + ' The last good shape was kept.');
       return;
@@ -3898,6 +3951,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (result && result.shape) dropShape(result.shape);
       reject((result && result.error) || ('FAIL: ' + kind + ' was rejected. The last good shape was kept.'));
       return;
+    }
+    if (body.shapeLocal === true) {
+      const placedView = inspectStored(body, result.shape);
+      if (!placedView || !placedView.mesh) {
+        dropShape(result.shape);
+        reject('FAIL: the new mesh was rejected. The last good shape was kept.');
+        return;
+      }
+      result.mesh = placedView.mesh;
+      result.topology = placedView.topology;
+      result.gate = placedView.gate;
+      result.watertight = placedView.watertight;
     }
     const previous = {
       shape: body.shape,
@@ -3966,7 +4031,30 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishGateState();
       return;
     }
-    const result = opsApi.applyBooleanSolids(oc, which.ui, selected[0].shape, selected[1].shape);
+    function placedOperand(body) {
+      if (!body || !body.shape) return { shape: null, owned: false };
+      if (body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+        const placed = assemblyApi.placedCopy(oc, body.shape, body.placement || { x: 0, y: 0, z: 0 });
+        if (!placed.ok || !placed.shape) return { shape: null, owned: false };
+        return { shape: placed.shape, owned: true };
+      }
+      return { shape: body.shape, owned: false };
+    }
+    const operandA = placedOperand(selected[0]);
+    const operandB = placedOperand(selected[1]);
+    if (!operandA.shape || !operandB.shape) {
+      if (operandA.owned) dropShape(operandA.shape);
+      if (operandB.owned) dropShape(operandB.shape);
+      state.lastError = 'FAIL: Boolean failed. Both inputs were kept.';
+      state.booleanMessage = state.lastError;
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return;
+    }
+    const result = opsApi.applyBooleanSolids(oc, which.ui, operandA.shape, operandB.shape);
+    if (operandA.owned) dropShape(operandA.shape);
+    if (operandB.owned) dropShape(operandB.shape);
     if (!result.ok || !result.shape) {
       if (result.shape) dropShape(result.shape);
       state.lastError = result.error || 'FAIL: Boolean failed. Both inputs were kept.';
@@ -4219,11 +4307,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (typeof params.cz === 'number') params.cz += dz;
   }
 
+  function toLocalPoint(point, body) {
+    if (!body || body.shapeLocal !== true || !point || point.length < 3) return point;
+    const place = body.placement || { x: 0, y: 0, z: 0 };
+    return [
+      point[0] - (Number(place.x) || 0),
+      point[1] - (Number(place.y) || 0),
+      point[2] - (Number(place.z) || 0)
+    ];
+  }
+
+  function inspectStored(body, shape) {
+    if (!shape || !primApi) return null;
+    let viewShape = shape;
+    let placed = null;
+    if (body && body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+      placed = assemblyApi.placedCopy(oc, shape, body.placement || { x: 0, y: 0, z: 0 });
+      if (!placed.ok || !placed.shape) return null;
+      viewShape = placed.shape;
+    }
+    let view = null;
+    try { view = primApi.inspectSolid(oc, viewShape); } catch (_err) { view = null; }
+    if (placed && placed.shape) dropShape(placed.shape);
+    return view;
+  }
+
   function moveOwnedShape(dx, dy, dz) {
     const body = state.bodies.length === 1 ? state.bodies[0] : null;
-    if (body && body.shapeLocal === true && body.placement && assemblyApi && primApi) {
+    if (body && body.shapeLocal === true && body.placement && assemblyApi && typeof assemblyApi.moveLocalPart === 'function' && primApi) {
+      const step = assemblyApi.moveLocalPart(body, dx, dy, dz);
+      if (!step.ok || step.shape !== body.shape) {
+        setHint('FAIL: move was rejected. The solid was kept.');
+        writePosFields();
+        return false;
+      }
       const previous = { x: body.placement.x, y: body.placement.y, z: body.placement.z };
-      body.placement = { x: previous.x + dx, y: previous.y + dy, z: previous.z + dz };
+      body.placement = step.placement;
       shiftParams(body.params, dx, dy, dz);
       const placed = assemblyApi.placedCopy(oc, body.shape, body.placement);
       let view = null;
@@ -4343,7 +4462,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function commitDeletedShape(body, shape, featureIndexes) {
     let view = null;
     try {
-      view = primApi.inspectSolid(oc, shape);
+      view = inspectStored(body, shape);
     } catch (_err) {
       dropShape(shape);
       state.lastError = opsApi.DELETE_FACE_KEPT;
@@ -4536,7 +4655,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(state.lastError);
       return false;
     }
-    const picks = picksFromSelection();
+    const picks = picksFromSelection().map(function (pick) {
+      if (!body || body.shapeLocal !== true) return pick;
+      if (pick.kind === 'vertex') return { kind: 'vertex', p: toLocalPoint(pick.p, body) };
+      return { kind: 'edge', a: toLocalPoint(pick.a, body), b: toLocalPoint(pick.b, body) };
+    });
     if (!picks.length) {
       state.lastError = alone;
       setHint(state.lastError);
@@ -5302,7 +5425,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     let view = null;
     try {
-      view = primApi.inspectSolid(oc, resized.shape);
+      view = inspectStored(body, resized.shape);
     } catch (_err) {
       dropShape(resized.shape);
       state.lastError = 'FAIL: resize check threw. The last good shape was kept.';
@@ -6346,6 +6469,41 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   }
 
+  function placedSolid(body) {
+    if (!body || !body.shape) return { shape: null, owned: false };
+    if (body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+      const placed = assemblyApi.placedCopy(oc, body.shape, body.placement || { x: 0, y: 0, z: 0 });
+      if (placed && placed.ok && placed.shape) return { shape: placed.shape, owned: true };
+    }
+    return { shape: body.shape, owned: false };
+  }
+
+  function projectBodies() {
+    const views = [];
+    const owned = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      const held = placedSolid(body);
+      if (!held.shape || !held.owned) {
+        views.push(body);
+        continue;
+      }
+      owned.push(held.shape);
+      let features = body.features;
+      const place = body.placement || { x: 0, y: 0, z: 0 };
+      if (Array.isArray(body.features) && body.features.length && (place.x || place.y || place.z)) {
+        try {
+          features = JSON.parse(JSON.stringify(body.features));
+          shiftFeaturePoints(features, place.x || 0, place.y || 0, place.z || 0);
+        } catch (_err) {
+          features = body.features;
+        }
+      }
+      views.push(Object.assign({}, body, { shape: held.shape, features: features }));
+    }
+    return { views: views, owned: owned };
+  }
+
   function saveProject(download) {
     const fail = projectApi && projectApi.ERR_SAVE ? projectApi.ERR_SAVE : 'The project could not be saved.';
     if (!projectApi || !oc || typeof projectApi.documentFromBodies !== 'function') {
@@ -6356,7 +6514,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishProjectHook();
       return { ok: false, text: '', error: fail };
     }
-    const written = projectApi.documentFromBodies(oc, state.bodies);
+    const packed = projectBodies();
+    let written = null;
+    try {
+      written = projectApi.documentFromBodies(oc, packed.views);
+    } finally {
+      for (let i = 0; i < packed.owned.length; i += 1) dropShape(packed.owned[i]);
+    }
     if (!written.ok || typeof written.text !== 'string') {
       state.projectError = written.error || fail;
       toast(state.projectError);
@@ -6548,7 +6712,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < state.bodies.length; i += 1) {
       const body = state.bodies[i];
       if (!body || !body.shape) continue;
-      const measured = projectApi.measureShape(oc, body.shape);
+      const held = placedSolid(body);
+      if (!held.shape) continue;
+      const measured = projectApi.measureShape(oc, held.shape);
+      if (held.owned) dropShape(held.shape);
       rows.push({
         name: body.name,
         volumeMm3: measured.volumeMm3,

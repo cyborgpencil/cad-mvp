@@ -1,6 +1,6 @@
 // Assemblies: placements, materials, Combine, and one 3MF object per part.
 // Volumes are BRepGProp. No watertight check. No Blink file.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -226,6 +226,60 @@ if (xml) {
 const inch = asm.exportAssembly3mf(oc, exportParts, { units: 'in' });
 expect('inch export refused', inch.ok === false && inch.error === asm.ERR_UNITS && near(volume(exportBox), boxVol, 1e-6));
 
+function boundsSame(a, b) {
+  if (!a || !b) return false;
+  const keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
+  for (let i = 0; i < keys.length; i += 1) {
+    if (!near(a[keys[i]], b[keys[i]], 1e-6)) return false;
+  }
+  return true;
+}
+
+const primLocal = localBox();
+const primBefore = ops.optimalBounds(oc, primLocal);
+const primPart = {
+  name: 'Box',
+  material: 'PLA',
+  shape: primLocal,
+  shapeLocal: true,
+  placement: { x: 0, y: 0, z: 10 },
+};
+const primStep = asm.moveLocalPart(primPart, 5, 0, 0);
+const primAfter = ops.optimalBounds(oc, primLocal);
+expect(
+  'primitive move keeps the solid',
+  primStep.ok === true && primStep.shape === primLocal && boundsSame(primBefore, primAfter)
+);
+expect(
+  'primitive move placement',
+  !!primStep.placement
+    && near(primStep.placement.x, 5, 1e-9)
+    && near(primStep.placement.y, 0, 1e-9)
+    && near(primStep.placement.z, 10, 1e-9)
+    && near(primPart.placement.x, 0, 1e-9)
+);
+const primPlaced = primStep.ok ? asm.placedCopy(oc, primLocal, primStep.placement) : { ok: false, shape: null };
+const primWorld = primPlaced.ok ? ops.optimalBounds(oc, primPlaced.shape) : null;
+expect(
+  'primitive move shows the new placement',
+  !!primWorld
+    && near(primWorld.xmin, -5, asm.BOUNDS_TOL_MM)
+    && near(primWorld.xmax, 15, asm.BOUNDS_TOL_MM)
+    && near(primWorld.zmin, 0, asm.BOUNDS_TOL_MM)
+    && near(primWorld.zmax, 20, asm.BOUNDS_TOL_MM)
+    && near(volume(primLocal), 8000, asm.VOLUME_TOL_MM3)
+);
+const primAgain = asm.moveLocalPart(primPart, 1, 0, 0);
+expect(
+  'second move keeps the solid',
+  primAgain.ok === true && primAgain.shape === primLocal && boundsSame(primBefore, ops.optimalBounds(oc, primLocal))
+);
+const bakedMove = asm.moveLocalPart({ shape: primLocal, shapeLocal: false, placement: { x: 0, y: 0, z: 10 } }, 4, 0, 0);
+expect('world solid is not a placement move', bakedMove.ok === false && boundsSame(primBefore, ops.optimalBounds(oc, primLocal)));
+const pageSrc = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
+expect('gizmo uses moveLocalPart', pageSrc.indexOf('assemblyApi.moveLocalPart') >= 0);
+expect('ordinary primitive is stored local', pageSrc.indexOf('shapeLocal: storeLocal') >= 0);
+
 release(boxShape);
 release(cylShape);
 release(overlapA);
@@ -241,6 +295,8 @@ release(mixA);
 release(mixB);
 release(exportBox);
 release(exportCyl);
+release(primLocal);
+if (primPlaced.shape) release(primPlaced.shape);
 
 if (failures.length) {
   console.error('FAIL assemblies ' + failures.join(', '));

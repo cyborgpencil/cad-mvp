@@ -139,6 +139,24 @@ export function placedCopy(oc, shape, placement) {
   }
 }
 
+// A move of a local part changes the placement only. The stored solid is the
+// same object, still in its own coordinates.
+export function moveLocalPart(part, dx, dy, dz) {
+  if (!part || part.shapeLocal !== true || !part.shape) {
+    return { ok: false, placement: null, shape: part ? part.shape : null };
+  }
+  const place = placementOf(part);
+  return {
+    ok: true,
+    placement: {
+      x: place.x + (Number(dx) || 0),
+      y: place.y + (Number(dy) || 0),
+      z: place.z + (Number(dz) || 0),
+    },
+    shape: part.shape,
+  };
+}
+
 function placementFor(part) {
   if (part && part.shapeLocal === true) return placementOf(part);
   return { x: 0, y: 0, z: 0 };
