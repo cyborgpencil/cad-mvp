@@ -12,3 +12,5 @@ Follow the tooling-priority skill:
 - Keep work incremental and testable. Re-scope failed attempts back to Grok Build.
 
 Load project rules (AGENTS.md or equivalent) and current requirements before planning.
+
+Project note (cad-mvp, Erik 2026-10-22): Google Antigravity is a third coding option after Grok Build and Cursor (end of queue, trial stage). See mvp/tooling-priority.md, Coding options.

@@ -67,3 +67,8 @@ Confirm the above priority and any constraints on the local development machine 
 - Merge rules: every change lands through a PR. Repo Keeper merges only after CI (ci.yml on pull_request) is green and the secrets/Blink scan passes. Branch protection requires ci.yml. No force-push. No direct pushes to main while a PR is open.
 - Before starting work and before every merge, run git pull --ff-only; if it can't fast-forward, stop and ask Repo Keeper instead of merging or rebasing.
 - Unchanged: units in mm and the OCCT shape-validity check after fillet, chamfer, Boolean and delete. No watertight requirement.
+
+## Coding options (Erik-approved, 2026-10-22)
+Three coding agents, in this order: 1. Grok Build, 2. Cursor, 3. Google Antigravity (end of queue).
+- Antigravity: installed on Z13 (v2.12.2), signed in with the cyborgpencil Google account, which has Google AI Ultra. Use it only after Grok Build and Cursor. First trial: one small wrap-up task in its own git worktree, compared against Grok Build on the same kind of task. Same rules as the others: every change lands through a PR, Repo Keeper merges, units check required, OCCT validity check after ops, no watertight gate, no printer send. Sources: research/cursor-and-tooling.md section 3.
+- Gemini Code Assist (GitHub review app): approved for cyborgpencil/cad-mvp as a second PR reviewer. Install is pending Erik's own sign-in. It does not replace CI or the units/size checks.

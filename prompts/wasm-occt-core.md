@@ -1,5 +1,7 @@
 # Grok Build task: OCCT core to WASM (browser MVP)
 
+> Rule update (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. Units (mm) checks stay and gate Export. The OCCT shape-validity check after operations stays, but a failure is a clean error/revert and never blocks Export. Any watertight gate or watertight test below is superseded by this rule.
+
 Status: ready for Grok Build Pilot. Decisions from Erik, 2026-10-20 10:59-11:04 PM MT.
 
 ## Goal
