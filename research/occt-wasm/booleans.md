@@ -16,8 +16,8 @@
 - `SetNonDestructive(true)`: inputs stay untouched (no tolerance growth or added p-curves). We need this so the user can undo or re-drag.
 - `SimplifyResult()` runs `ShapeUpgrade_UnifySameDomain` and merges split coplanar faces after Fuse. That gives clean faces for fillet/chamfer.
 - Errors: check `HasErrors()` / `HasWarnings()` after `Build()`.
-- Afterwards: `BRepCheck_Analyzer` on the result, `ShapeFix_Shape` if it's invalid, then our watertight + units check before Export.
-- Open solids: OCCT says results "cannot always be guaranteed", so reject open input (our watertight check gates this).
+- Afterwards: `BRepCheck_Analyzer` on the result, `ShapeFix_Shape` if it's invalid, then our units check before Export (watertight dropped, 02:17 rule).
+- Open solids: OCCT says results "cannot always be guaranteed", so reject input that fails `BRepCheck_Analyzer` (no watertight gate since the 02:17 rule).
 - Bound in libcascade 3.1.0 `api-reference.json` (grep, 2026-10-21) [5]: BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_BooleanOperation, SetFuzzyValue, SetGlue, BOPAlgo_GlueShift, BOPAlgo_GlueFull, SetNonDestructive, BOPAlgo_ArgumentAnalyzer, BRepCheck_Analyzer, ShapeFix_Shape, ShapeUpgrade_UnifySameDomain, HasErrors, SimplifyResult, SetUseOBB and SetRunParallel are all present. The grep matched names only; method-to-class binding isn't verified, so test them in a smoke build.
 
 ## Live preview while dragging the disc (single-threaded WASM)
@@ -29,7 +29,7 @@
 
 ## Verdict
 - Preview: Option C (ghost transform) by default. Add manifold-3d mesh CSG only if Erik wants to see the cut or union during drag. Preview is visual only and never exported.
-- Final: exact OCCT Boolean on mouse-up (pointerup) with NonDestructive on, Fuzzy (TBD value), GlueShift only for coplanar contact, then SimplifyResult, BRepCheck/ShapeFix, and the watertight + units gate.
+- Final: exact OCCT Boolean on mouse-up (pointerup) with NonDestructive on, Fuzzy (TBD value), GlueShift only for coplanar contact, then SimplifyResult, BRepCheck/ShapeFix, and the units gate.
 
 ## Failure UX
 - Keep the last valid shape. Never replace it with a failed or invalid result.

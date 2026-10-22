@@ -9,7 +9,7 @@ Checked 2026-10-20.
 - Manifold (elalish/manifold, Apache-2.0, C++ with a WASM build) guarantees manifold output and can merge small defects on import. It's a candidate for the mesh-side check and repair. [6]
 
 ## Pipeline proposal (for Erik to confirm)
-Shape, then BRepCheck, then ShapeFix if invalid, then BRepCheck again, then BRepMesh (check status flags), then an independent watertight check, then export. A failure at any step blocks export.
+Shape, then BRepCheck, then ShapeFix if invalid, then BRepCheck again, then BRepMesh (check status flags), then the units gate, then export. A BRepCheck failure rolls the op back; Export is gated on units only (02:17 rule), and no watertight check blocks it.
 
 ## Gaps / TBD
 - Tessellation tolerances (linear and angular deflection): TBD for Erik.

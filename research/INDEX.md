@@ -5,8 +5,8 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 ## Current Documents
 
 - **MVP**: See `../mvp/requirements.md` (design-to-print scope only).
-- **Solid check**: See `../mvp/solid-check.md` (in-memory triangle watertight gate).
-- **Mesh view**: See `../mvp/mesh-view.md` (desktop window over the watertight checker).
+- **Solid check**: See `../mvp/solid-check.md` (in-memory triangle checker; reports only since the 02:17 rule).
+- **Mesh view**: See `../mvp/mesh-view.md` (desktop window over the triangle checker).
 - **Tooling priority**: See `../mvp/tooling-priority.md` (Grok Build, then Cursor, then Grok Bots).
 - **Get started**: See `../mvp/get-started-with-grok-build.md` (simple first steps).
 - **Tooling skill**: See `../.grok/skills/tooling-priority/SKILL.md` (reusable across projects).
@@ -19,7 +19,7 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 - `freecad/`: Open-source parametric CAD with OCCT kernel, CAM, FEM.
 - `blender/`: Mesh/freeform strengths + STEP addons. (post-MVP background)
 - `adobe/`: 2D vector excellence, textures, 2D-3D bridges. (post-MVP background)
-- `formats/`: STL, 3MF, STEP details, plus `validation.md` (watertight and units checks). (MVP)
+- `formats/`: STL, 3MF, STEP details, plus `validation.md` (units gate and validity checks; watertight dropped, 02:17 rule). (MVP)
 - `ai-mcp/`: Model Context Protocol for first-class AI tools. (MVP; tool list TBD for Erik)
 - `simulations/`: FEA, CAM path, motion types. (post-MVP background)
 - `architecture/`: Kernel, components, performance notes. (MVP scope section conflicts with design-to-print scope; pending Erik.)
@@ -37,7 +37,7 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [occt-wasm/prebuilt-options.md](occt-wasm/prebuilt-options.md): prebuilt OCCT WASM options (libcascade, opencascade.js, occt-import-js, official build) and reuse-vs-build verdict (2026-10-21).
 - [projects/blink-mount.md](projects/blink-mount.md): Blink XT/XT2/Indoor/Outdoor mount specs (official vs measured), US door casing sizes, wood screw pilot/clearance holes for the L-bracket (2026-10-21).
 - [gui/modo-tools.md](gui/modo-tools.md): Modo layout, theme (docs say orange accent; teal hex TBD) and MVP tools (Boolean, Edge Bevel, Work Plane, Action Center, snapping) with mockup restyle notes (2026-10-21).
-- [gui/modo-selection-primitives.md](gui/modo-selection-primitives.md): MVP spec for selection modes (V/E/F/Item), hover vs selected CSS vars (colours TBD; orange vs teal pending Erik), Move gizmo, Box/Cylinder primitives mapped to BRepPrimAPI with watertight and units gates (2026-10-21).
+- [gui/modo-selection-primitives.md](gui/modo-selection-primitives.md): MVP spec for selection modes (V/E/F/Item), hover vs selected CSS vars (colours TBD; orange vs teal pending Erik), Move gizmo, Box/Cylinder primitives mapped to BRepPrimAPI with the units gate and OCCT validity check (2026-10-21; watertight dropped 2026-10-22).
 - [occt-wasm/booleans.md](occt-wasm/booleans.md): why Modo mesh Booleans fail, OCCT 8.0.1 Fuzzy/Glue/NonDestructive/SimplifyResult with libcascade 3.1.0 bindings, live-drag preview (ghost or manifold-3d) and exact OCCT on release (2026-10-21).
 - [gui/booleans-fillet-chamfer.md](gui/booleans-fillet-chamfer.md): MODO MeshFusion strengths/limits (no source says it "failed"; Modo discontinued after 17.1), OCCT MakeFillet/MakeChamfer/Fuse + BRepCheck/FreeBounds gate, libcascade 3.1.0 bindings verified, L-bracket PROPOSAL with dims TBD (2026-10-21).
 - [mobile-touch-cad.md](mobile-touch-cad.md): mobile touch patterns for the CAD viewport: hit sizes (WCAG 24/44 px, HIG 44 pt, Material 48 dp), tap vs drag (Android 8 dp slop), decimal entry in mm, next steps for step 2 gizmo (2026-10-21).

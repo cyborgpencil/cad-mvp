@@ -28,7 +28,7 @@ Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+
 - **E1:** Load a model whose check shows FAIL. Expected: the one Export button (STL/3MF) is disabled, and no other export path exists (no menu item, no shortcut, no quick export). Source: D7, prompt.
 - **E2:** With FAIL. Expected: the gate panel names the failing rule (for example an open edge or a unit mismatch), in the `check_watertight` style of one message per first failing rule. Source: D7, R (Repair section).
 - **E3:** Make the check PASS. Expected: Export is enabled, and both STL and 3MF are offered. Source: D7.
-- **E4:** On every tab, look at the status bar. Expected: it shows units (read-only), watertight PASS/FAIL and volume at all times. Source: D6.
+- **E4:** On every tab, look at the status bar. Expected: it shows units (read-only), the units gate PASS/FAIL and volume at all times. Source: D6.
 - **E5:** Toggle mm/in in the top bar. Expected: the labels and readouts change units. The locked export unit is unchanged (3MF stays `unit="millimeter"` unless Erik decides otherwise). The mockup toggle only changes labels. Source: D6, prompt.
 
 ## 4. Layout
@@ -58,7 +58,7 @@ Erik, 2026-10-21: one responsive WASM app for desktop and phone, in both orienta
 - **R4:** At 844x390, measure the same controls as T1. Expected: each is at least 44 x 44 CSS px. Source: D9 [2].
   - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
   - **Result (restyle): PASS** (Pilot restyle checkpoint, session 01a15dae, 2026-10-21 2:57-3:13 AM MT).
-- **R5:** In both orientations on every tab. Expected: the status bar shows units, watertight PASS/FAIL and volume, not hidden or clipped. Source: D6, E4.
+- **R5:** In both orientations on every tab. Expected: the status bar shows units, the units gate PASS/FAIL and volume, not hidden or clipped. Source: D6, E4.
   - **Result: PASS** (Pilot WASM checkpoint 1, 2026-10-21 ~2:57 AM MT, interim WASM app; screenshots wasm-desktop.png, wasm-portrait.png, wasm-landscape.png).
   - **Result (restyle): PASS** (Pilot restyle checkpoint, session 01a15dae, 2026-10-21 2:57-3:13 AM MT).
 
