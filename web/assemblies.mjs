@@ -313,9 +313,13 @@ function transformAttr(placement) {
   return '1 0 0 0 1 0 0 0 1 ' + xmlNum(place.x) + ' ' + xmlNum(place.y) + ' ' + xmlNum(place.z);
 }
 
-function colorFor(tag) {
+export function materialColor(tag) {
   if (Object.prototype.hasOwnProperty.call(MATERIAL_COLOR, tag)) return MATERIAL_COLOR[tag];
   return '#CCCCCC';
+}
+
+function colorFor(tag) {
+  return materialColor(tag);
 }
 
 function modelXml(objects) {

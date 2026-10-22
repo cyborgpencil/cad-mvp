@@ -839,7 +839,7 @@ def point_expr(selector: str) -> str:
     )
 
 
-def resize_call(cdp: Cdp, spec: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+def resize_call(cdp: Cdp, spec: dict[str, Any], timeout: float = 30) -> tuple[dict[str, Any] | None, str]:
     payload = json.dumps(spec)
     raw, err = eval_expr(
         cdp,
@@ -847,6 +847,7 @@ def resize_call(cdp: Cdp, spec: dict[str, Any]) -> tuple[dict[str, Any] | None, 
         f"if(typeof window.__cadcamResize!=='function') return 'missing';"
         f"return JSON.stringify(window.__cadcamResize({payload}));"
         "})()",
+        timeout=timeout,
     )
     if err or not isinstance(raw, str) or not raw.startswith("{"):
         return None, err or str(raw)
@@ -3677,6 +3678,753 @@ def run_saveload(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+SIZE_GROUP_EXPR = r"""
+(function(){
+  function group(id) {
+    var el = document.getElementById(id);
+    if (!el) return {missing:true, hidden:true, display:'none'};
+    var st = getComputedStyle(el);
+    return {missing:false, hidden: el.hidden === true, display: st.display};
+  }
+  var sheet = document.getElementById('dimPanel');
+  return JSON.stringify({
+    open: !!(sheet && sheet.classList.contains('is-open')),
+    box: group('primBox'),
+    cyl: group('primCyl'),
+    disc: group('primDisc'),
+    bbox: group('primBbox'),
+    cylD: (document.getElementById('cylD') || {}).value || '',
+    cylH: (document.getElementById('cylH') || {}).value || '',
+    sx: (document.getElementById('boxSx') || {}).value || '',
+    sy: (document.getElementById('boxSy') || {}).value || '',
+    sz: (document.getElementById('boxSz') || {}).value || '',
+    bx: (document.getElementById('bboxX') || {}).value || '',
+    by: (document.getElementById('bboxY') || {}).value || '',
+    bz: (document.getElementById('bboxZ') || {}).value || ''
+  });
+})()
+"""
+
+
+def _json_eval(cdp: Cdp, expression: str, timeout: float = 30) -> tuple[dict[str, Any] | None, str]:
+    raw, err = eval_expr(cdp, expression, timeout=timeout)
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return None, err or str(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, raw
+    return data if isinstance(data, dict) else None, ""
+
+
+def _part_row_id(cdp: Cdp, name: str) -> tuple[str, str]:
+    raw, err = eval_expr(
+        cdp,
+        "(function(){"
+        f"var name={json.dumps(name)};"
+        "var rows=document.querySelectorAll('#partList .part-row');"
+        "for(var i=0;i<rows.length;i++){"
+        "var label=rows[i].querySelector('.part-name');"
+        "if(label&&label.textContent===name) return rows[i].getAttribute('data-part-id')||'';"
+        "}"
+        "return '';"
+        "})()",
+    )
+    if err or not isinstance(raw, str):
+        return "", err or str(raw)
+    return raw, ""
+
+
+def _click_part(cdp: Cdp, name: str) -> tuple[str, str]:
+    raw, err = eval_expr(
+        cdp,
+        "(function(){"
+        f"var name={json.dumps(name)};"
+        "var rows=document.querySelectorAll('#partList .part-row');"
+        "for(var i=0;i<rows.length;i++){"
+        "var label=rows[i].querySelector('.part-name');"
+        "if(label&&label.textContent===name){rows[i].click();return rows[i].getAttribute('data-part-id')||'';}"
+        "}"
+        "return '';"
+        "})()",
+    )
+    if err or not isinstance(raw, str) or not raw:
+        return "", err or raw or f"missing part {name}"
+    return raw, ""
+
+
+def _field_open(group: Any) -> bool:
+    return isinstance(group, dict) and group.get("hidden") is False and group.get("display") != "none"
+
+
+def _named_part(status: dict[str, Any], name: str) -> dict[str, Any] | None:
+    parts = status.get("parts")
+    if not isinstance(parts, list):
+        return None
+    for item in parts:
+        if isinstance(item, dict) and item.get("name") == name:
+            return item
+    return None
+
+
+def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Several bodies: the size sheet follows the selected part, and undo covers the resize.
+
+    Repro before the fix: with Box and Cylinder both in the model, selecting either
+    part and opening the size sheet left diameter, height, and Size X/Y/Z hidden.
+    """
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"multi size desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load multi_body_size {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["multi size load", *load_problems[:20]]
+    if loaded.get("demo") != "assembly" or int(loaded.get("bodyCount") or 0) != 2:
+        return [f"multi size scene {loaded.get('demo')!r} bodies {loaded.get('bodyCount')!r}"]
+    opened, open_err = eval_expr(cdp, CLICK_DIM_EXPR)
+    if open_err or opened != "clicked":
+        return [f"multi size sheet {opened or open_err}"]
+    both, both_err = _json_eval(cdp, SIZE_GROUP_EXPR)
+    if both_err or not both:
+        return [f"multi size groups {both_err}"]
+    if both.get("open") is not True:
+        return ["multi size sheet stayed closed"]
+    for key in ("box", "cyl", "disc", "bbox"):
+        if _field_open(both.get(key)):
+            return [f"multi size {key} visible while both parts are selected {both.get(key)}"]
+
+    box_click, box_err = _click_part(cdp, "Cylinder")
+    if box_err:
+        return [f"multi size deselect cylinder {box_err}"]
+    listed, listed_err = _json_eval(cdp, SIZE_GROUP_EXPR)
+    if listed_err or not listed:
+        return [f"multi size box groups {listed_err}"]
+    if not _field_open(listed.get("box")) or _field_open(listed.get("cyl")) or _field_open(listed.get("bbox")):
+        return [f"multi size parts-list box fields {listed}"]
+    if listed.get("sx") != "20" or listed.get("sy") != "20" or listed.get("sz") != "20":
+        return [f"multi size box values {listed.get('sx')!r} {listed.get('sy')!r} {listed.get('sz')!r}"]
+
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    if cyl_err or not cyl_id:
+        return [f"multi size cylinder id {cyl_err or cyl_id!r}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"if(typeof window.__cadcamPickPart!=='function') return 'missing';"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked:
+        return [f"multi size viewport pick {pick_err}"]
+    if picked.get("cyl") is not True or picked.get("box") is not False or picked.get("kind") != "cylinder":
+        return [f"multi size viewport fields {picked}"]
+    shown, shown_err = _json_eval(cdp, SIZE_GROUP_EXPR)
+    if shown_err or not shown:
+        return [f"multi size cyl groups {shown_err}"]
+    if not _field_open(shown.get("cyl")) or _field_open(shown.get("box")):
+        return [f"multi size cylinder fields {shown}"]
+    if shown.get("cylD") != "20" or shown.get("cylH") != "20":
+        return [f"multi size cylinder values {shown.get('cylD')!r} {shown.get('cylH')!r}"]
+
+    locked, lock_err = resize_call(cdp, {"lock": True, "diameter": 30}, timeout=120)
+    if lock_err or not locked:
+        return [f"multi size lock resize {lock_err}"]
+    if locked.get("done") != "RESIZE_DONE" or locked.get("method") != "rebuild" or locked.get("valid") is not True:
+        return [f"multi size lock result {locked.get('done')!r} {locked.get('method')!r} {locked.get('error')!r}"]
+    if int(locked.get("undoDepth") or 0) != 1:
+        return [f"multi size lock depth {locked.get('undoDepth')!r}"]
+    cyl = _named_part(locked, "Cylinder") or {}
+    box = _named_part(locked, "Box") or {}
+    if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 30.0, 1e-6):
+        return [f"multi size lock cylinder {cyl!r}"]
+    if not _near(box.get("sx"), 20.0, 1e-6) or not _near(box.get("sy"), 20.0, 1e-6) or not _near(box.get("sz"), 20.0, 1e-6):
+        return [f"multi size lock box changed {box!r}"]
+    undone, undo_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if undo_err or not undone or int(undone.get("undoDepth") or 0) != 0 or int(undone.get("redoDepth") or 0) != 1:
+        return [f"multi size undo {undo_err or undone}"]
+    cyl = _named_part(undone, "Cylinder") or {}
+    if not _near(cyl.get("radius"), 10.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
+        return [f"multi size undo cylinder {cyl!r}"]
+    redone, redo_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if redo_err or not redone or int(redone.get("undoDepth") or 0) != 1 or int(redone.get("redoDepth") or 0) != 0:
+        return [f"multi size redo {redo_err or redone}"]
+    cyl = _named_part(redone, "Cylinder") or {}
+    if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 30.0, 1e-6):
+        return [f"multi size redo cylinder {cyl!r}"]
+    cleared, clear_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if clear_err or not cleared or int(cleared.get("undoDepth") or 0) != 0:
+        return [f"multi size clear {clear_err or cleared}"]
+
+    unlocked, unlock_err = resize_call(cdp, {"lock": False, "diameter": 30}, timeout=120)
+    if unlock_err or not unlocked:
+        return [f"multi size unlock resize {unlock_err}"]
+    if unlocked.get("method") != "gtransform" or unlocked.get("done") != "RESIZE_DONE" or unlocked.get("ellipse") is not True:
+        return [f"multi size unlock result {unlocked.get('method')!r} {unlocked.get('done')!r} ellipse {unlocked.get('ellipse')!r} {unlocked.get('error')!r}"]
+    cyl = _named_part(unlocked, "Cylinder") or {}
+    box = _named_part(unlocked, "Box") or {}
+    if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
+        return [f"multi size unlock cylinder {cyl!r}"]
+    if not _near(box.get("sx"), 20.0, 1e-6):
+        return [f"multi size unlock box {box!r}"]
+    restored, restore_err = resize_call(cdp, {"undo": True, "lock": True}, timeout=120)
+    if restore_err or not restored or int(restored.get("undoDepth") or 0) != 0:
+        return [f"multi size unlock undo {restore_err or restored}"]
+
+    off, off_err = _click_part(cdp, "Cylinder")
+    if off_err:
+        return [f"multi size clear cylinder {off_err}"]
+    on, on_err = _click_part(cdp, "Box")
+    if on_err:
+        return [f"multi size select box {on_err}"]
+    box_fields, box_fields_err = _json_eval(cdp, SIZE_GROUP_EXPR)
+    if box_fields_err or not box_fields or not _field_open(box_fields.get("box")) or _field_open(box_fields.get("cyl")):
+        return [f"multi size box again {box_fields_err or box_fields}"]
+    widened, wide_err = resize_call(cdp, {"lock": True, "sx": 30}, timeout=120)
+    if wide_err or not widened:
+        return [f"multi size box resize {wide_err}"]
+    if widened.get("method") != "rebuild" or widened.get("done") != "RESIZE_DONE":
+        return [f"multi size box result {widened.get('method')!r} {widened.get('done')!r} {widened.get('error')!r}"]
+    box = _named_part(widened, "Box") or {}
+    cyl = _named_part(widened, "Cylinder") or {}
+    if not _near(box.get("sx"), 30.0, 1e-6) or not _near(box.get("sy"), 30.0, 1e-6) or not _near(box.get("sz"), 30.0, 1e-6):
+        return [f"multi size box lock {box!r}"]
+    if not _near(cyl.get("radius"), 10.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
+        return [f"multi size box touched cylinder {cyl!r}"]
+    box_undo, box_undo_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if box_undo_err or not box_undo or int(box_undo.get("undoDepth") or 0) != 0:
+        return [f"multi size box undo {box_undo_err or box_undo}"]
+    box = _named_part(box_undo, "Box") or {}
+    if not _near(box.get("sx"), 20.0, 1e-6) or not _near(box.get("sy"), 20.0, 1e-6) or not _near(box.get("sz"), 20.0, 1e-6):
+        return [f"multi size box undo values {box!r}"]
+    box_redo, box_redo_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if box_redo_err or not box_redo or int(box_redo.get("undoDepth") or 0) != 1:
+        return [f"multi size box redo {box_redo_err or box_redo}"]
+    box = _named_part(box_redo, "Box") or {}
+    if not _near(box.get("sx"), 30.0, 1e-6) or not _near(box.get("sy"), 30.0, 1e-6) or not _near(box.get("sz"), 30.0, 1e-6):
+        return [f"multi size box redo values {box!r}"]
+
+    added, add_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"primitive\"][data-kind=\"cylinder\"]');"
+        "if(!b) return 'missing'; b.click(); return 'added';})()",
+        timeout=120,
+    )
+    if add_err or added != "added":
+        return [f"multi size add cylinder {added or add_err}"]
+    # Union the box and the original cylinder. The added cylinder stays, so the
+    # Boolean result is resized beside another body.
+    for name in ("Box", "Cylinder"):
+        _clicked, click_err = _click_part(cdp, name)
+        if click_err:
+            return [f"multi size union select {name} {click_err}"]
+    union, union_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"boolean\"][data-op=\"union\"]');"
+        "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click();"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({bodies:s.bodyCount, error:s.lastError||''});})()",
+        timeout=120,
+    )
+    if union_err or not isinstance(union, str) or not union.startswith("{"):
+        return [f"multi size union {union or union_err}"]
+    try:
+        union_state = json.loads(union)
+    except json.JSONDecodeError:
+        return [f"multi size union {union}"]
+    if int(union_state.get("bodies") or 0) != 2 or union_state.get("error"):
+        return [f"multi size union result {union_state}"]
+    bbox, bbox_err = _json_eval(cdp, SIZE_GROUP_EXPR)
+    if bbox_err or not bbox:
+        return [f"multi size bbox groups {bbox_err}"]
+    if not _field_open(bbox.get("bbox")) or _field_open(bbox.get("box")) or _field_open(bbox.get("cyl")):
+        return [f"multi size union fields {bbox}"]
+    try:
+        base_x = float(bbox.get("bx"))
+    except (TypeError, ValueError):
+        return [f"multi size union x {bbox.get('bx')!r}"]
+    scaled, scale_err = resize_call(cdp, {"lock": True, "sx": base_x * 1.5}, timeout=120)
+    if scale_err or not scaled:
+        return [f"multi size union resize {scale_err}"]
+    if scaled.get("method") != "scale" or scaled.get("done") != "RESIZE_DONE" or scaled.get("kind") != "boolean":
+        return [f"multi size union resize result {scaled.get('method')!r} {scaled.get('kind')!r} {scaled.get('error')!r}"]
+    started = {
+        "dx": base_x,
+        "dy": float(bbox.get("by")),
+        "dz": float(bbox.get("bz")),
+    }
+    if not _near(scaled.get("dx"), started["dx"] * 1.5) or not _near(scaled.get("dy"), started["dy"] * 1.5) or not _near(scaled.get("dz"), started["dz"] * 1.5):
+        return [f"multi size union scaled {scaled.get('dx')!r} {scaled.get('dy')!r} {scaled.get('dz')!r} from {started}"]
+    extra = _named_part(scaled, "Cylinder 3") or {}
+    if extra.get("kind") != "cylinder" or not _near(extra.get("radius"), 10.0, 1e-6):
+        return [f"multi size union extra {extra!r}"]
+    union_undo, union_undo_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if union_undo_err or not union_undo or int(union_undo.get("undoDepth") or 0) != int(scaled.get("undoDepth") or 1) - 1:
+        return [f"multi size union undo {union_undo_err or union_undo}"]
+    if not _near(union_undo.get("dx"), started["dx"]) or not _near(union_undo.get("dy"), started["dy"]) or not _near(union_undo.get("dz"), started["dz"]):
+        return [f"multi size union undo size {union_undo.get('dx')!r} {union_undo.get('dy')!r} {union_undo.get('dz')!r}"]
+    union_redo, union_redo_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if union_redo_err or not union_redo or int(union_redo.get("undoDepth") or 0) != int(scaled.get("undoDepth") or 0):
+        return [f"multi size union redo {union_redo_err or union_redo}"]
+    if not _near(union_redo.get("dx"), started["dx"] * 1.5):
+        return [f"multi size union redo size {union_redo.get('dx')!r}"]
+    print("multi body size pass", flush=True)
+    return []
+
+
+MOVE_POS_EXPR = (
+    "(function(){"
+    "var x=document.getElementById('posX');"
+    "var s=window.__cadcamExportState||{};"
+    "return JSON.stringify({"
+    "disabled:!!(x&&x.disabled),"
+    "title:x?x.title:'',"
+    "mm:x&&x.getAttribute('data-mm')!=null?Number(x.getAttribute('data-mm')):null,"
+    "gizmo:s.gizmoVisible===true,"
+    "undo:s.undoDepth||0,"
+    "redo:s.redoDepth||0,"
+    "lastMove:s.lastMove||null,"
+    "error:s.lastError||''"
+    "});})()"
+)
+
+MOVE_DRAG_EXPR = (
+    "(function(){"
+    "if(typeof window.__cadcamGizmoDrag!=='function') return 'missing-drag';"
+    "var plan=window.__cadcamGizmoDrag('x',10);"
+    "if(!plan||!plan.down||!plan.up) return JSON.stringify({error:'no-plan',handle:plan&&plan.handle});"
+    "if(plan.handle!=='x') return JSON.stringify({error:'handle',handle:plan.handle});"
+    "var el=document.getElementById('viewport');"
+    "function fire(type,x,y){"
+    "var ending=type==='pointerup'||type==='pointercancel';"
+    "el.dispatchEvent(new PointerEvent(type,{"
+    "bubbles:true,cancelable:true,pointerId:7,pointerType:'mouse',isPrimary:true,"
+    "button:0,buttons:ending?0:1,clientX:x,clientY:y}));}"
+    "fire('pointerdown',plan.down.x,plan.down.y);"
+    "fire('pointermove',(plan.down.x+plan.up.x)/2,(plan.down.y+plan.up.y)/2);"
+    "fire('pointermove',plan.up.x,plan.up.y);"
+    "fire('pointerup',plan.up.x,plan.up.y);"
+    "var s=window.__cadcamExportState||{};"
+    "var hint=document.getElementById('statusHint');"
+    "return JSON.stringify({handle:plan.handle,"
+    "span:Math.hypot(plan.up.x-plan.down.x,plan.up.y-plan.down.y),"
+    "lastMove:s.lastMove||null,gizmo:s.gizmoVisible===true,"
+    "undo:s.undoDepth||0,redo:s.redoDepth||0,"
+    "hint:hint?hint.textContent:'',error:s.lastError||''});"
+    "})()"
+)
+
+MOVE_FIELD_EXPR = (
+    "(function(){"
+    "var el=document.getElementById('posX');"
+    "if(!el) return JSON.stringify({error:'missing'});"
+    "if(el.disabled) return JSON.stringify({error:'disabled',title:el.title||''});"
+    "var before=Number(el.getAttribute('data-mm'));"
+    "el.value=String(before+10);"
+    "el.dispatchEvent(new Event('change',{bubbles:true}));"
+    "var s=window.__cadcamExportState||{};"
+    "var hint=document.getElementById('statusHint');"
+    "return JSON.stringify({before:before,after:Number(el.getAttribute('data-mm')),"
+    "lastMove:s.lastMove||null,undo:s.undoDepth||0,redo:s.redoDepth||0,"
+    "disabled:!!el.disabled,title:el.title||'',"
+    "hint:hint?hint.textContent:'',error:s.lastError||''});"
+    "})()"
+)
+
+
+def _assembly_doc(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
+    return _json_eval(
+        cdp,
+        "(function(){var a=window.__cadcamAssembly?window.__cadcamAssembly():null;"
+        "return a?JSON.stringify(a):'';})()",
+        timeout=60,
+    )
+
+
+def _asm_part(doc: dict[str, Any] | None, name: str) -> dict[str, Any]:
+    if not doc:
+        return {}
+    return _named_part(doc, name) or {}
+
+
+def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Several bodies: the selected part shows the move gizmo and editable X/Y/Z.
+
+    Repro before the fix: with more than one body, the gizmo stayed hidden and
+    the position fields were disabled, with no message. A plain primitive must
+    update its placement. A Boolean result may bake the translation.
+    """
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"multi move desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load multi_body_move {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["multi move load", *load_problems[:20]]
+    if loaded.get("demo") != "assembly" or int(loaded.get("bodyCount") or 0) != 2:
+        return [f"multi move scene {loaded.get('demo')!r} bodies {loaded.get('bodyCount')!r}"]
+    if loaded.get("gizmoVisible") is not False or loaded.get("posDisabled") is not True:
+        return [f"multi move both selected gizmo {loaded.get('gizmoVisible')!r} disabled {loaded.get('posDisabled')!r}"]
+    both, both_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if both_err or not both:
+        return [f"multi move both fields {both_err}"]
+    if both.get("disabled") is not True or "Select one part" not in str(both.get("title") or ""):
+        return [f"multi move both title {both}"]
+
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    if cyl_err or not cyl_id:
+        return [f"multi move cylinder id {cyl_err or cyl_id!r}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"if(typeof window.__cadcamPickPart!=='function') return 'missing';"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked or picked.get("kind") != "cylinder":
+        return [f"multi move pick {pick_err or picked}"]
+    shown, shown_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if shown_err or not shown:
+        return [f"multi move shown {shown_err}"]
+    if shown.get("gizmo") is not True or shown.get("disabled") is not False or shown.get("title"):
+        return [f"multi move cylinder fields {shown}"]
+    if not _near(shown.get("mm"), 10.0, 0.05):
+        return [f"multi move cylinder x {shown.get('mm')!r}"]
+
+    marked, mark_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(cyl_id)},'keep'):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if mark_err or not marked or marked.get("mark") != "keep":
+        return [f"multi move mark {mark_err or marked}"]
+    dragged, drag_err = _json_eval(cdp, MOVE_DRAG_EXPR, timeout=120)
+    if drag_err or not dragged:
+        return [f"multi move drag {drag_err}"]
+    if dragged.get("error") or dragged.get("handle") != "x":
+        return [f"multi move drag plan {dragged}"]
+    try:
+        span = float(dragged.get("span"))
+    except (TypeError, ValueError):
+        span = 0.0
+    if span < 8:
+        return [f"multi move drag span {dragged.get('span')!r}"]
+    move = dragged.get("lastMove") if isinstance(dragged.get("lastMove"), dict) else {}
+    if move.get("baked") is not False or move.get("shapeSame") is not True:
+        return [f"multi move primitive bake {dragged}"]
+    if int(dragged.get("undo") or 0) != 1:
+        return [f"multi move drag depth {dragged}"]
+    if not _near((move.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move placement {move}"]
+    kept, kept_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(cyl_id)}):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if kept_err or not kept or kept.get("mark") != "keep":
+        return [f"multi move mark lost {kept_err or kept}"]
+    doc, doc_err = _assembly_doc(cdp)
+    if doc_err or not doc:
+        return [f"multi move assembly {doc_err}"]
+    cyl = _asm_part(doc, "Cylinder")
+    box = _asm_part(doc, "Box")
+    if cyl.get("shapeLocal") is not True or not _near((cyl.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move cylinder placed {cyl}"]
+    box_place = box.get("placement") or {}
+    if not _near(box_place.get("x"), 0.0, 0.05) or not _near(box_place.get("z"), 10.0, 0.05):
+        return [f"multi move box moved {box}"]
+
+    undone, undo_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if undo_err or not undone or int(undone.get("undoDepth") or 0) != 0 or int(undone.get("redoDepth") or 0) != 1:
+        return [f"multi move undo {undo_err or undone}"]
+    doc, doc_err = _assembly_doc(cdp)
+    cyl = _asm_part(doc, "Cylinder")
+    if doc_err or not _near((cyl.get("placement") or {}).get("x"), 10.0, 0.05):
+        return [f"multi move undo placement {doc_err or cyl}"]
+    redone, redo_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if redo_err or not redone or int(redone.get("undoDepth") or 0) != 1 or int(redone.get("redoDepth") or 0) != 0:
+        return [f"multi move redo {redo_err or redone}"]
+    doc, doc_err = _assembly_doc(cdp)
+    cyl = _asm_part(doc, "Cylinder")
+    if doc_err or not _near((cyl.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move redo placement {doc_err or cyl}"]
+    cleared, clear_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if clear_err or not cleared or int(cleared.get("undoDepth") or 0) != 0:
+        return [f"multi move clear {clear_err or cleared}"]
+
+    added, add_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"primitive\"][data-kind=\"cylinder\"]');"
+        "if(!b) return 'missing'; b.click(); return 'added';})()",
+        timeout=120,
+    )
+    if add_err or added != "added":
+        return [f"multi move add {added or add_err}"]
+    for name in ("Box", "Cylinder"):
+        _clicked, click_err = _click_part(cdp, name)
+        if click_err:
+            return [f"multi move union select {name} {click_err}"]
+    union, union_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"boolean\"][data-op=\"union\"]');"
+        "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click();"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({bodies:s.bodyCount,gizmo:s.gizmoVisible===true,"
+        "disabled:s.posDisabled===true,error:s.lastError||''});})()",
+        timeout=120,
+    )
+    if union_err or not isinstance(union, str) or not union.startswith("{"):
+        return [f"multi move union {union or union_err}"]
+    try:
+        union_state = json.loads(union)
+    except json.JSONDecodeError:
+        return [f"multi move union {union}"]
+    if int(union_state.get("bodies") or 0) != 2 or union_state.get("error"):
+        return [f"multi move union result {union_state}"]
+    if union_state.get("gizmo") is not True or union_state.get("disabled") is not False:
+        return [f"multi move union gizmo {union_state}"]
+    union_id, union_id_err = _part_row_id(cdp, "Union")
+    if union_id_err or not union_id:
+        return [f"multi move union id {union_id_err or union_id!r}"]
+    planned, plan_err = _json_eval(
+        cdp,
+        "(function(){var p=window.__cadcamGizmoDrag?window.__cadcamGizmoDrag('x',10):null;"
+        "return p?JSON.stringify({handle:p.handle}):'missing';})()",
+    )
+    if plan_err or not planned or planned.get("handle") != "x":
+        return [f"multi move union handle {plan_err or planned}"]
+    stamped, stamp_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(union_id)},'bake'):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if stamp_err or not stamped or stamped.get("mark") != "bake":
+        return [f"multi move union mark {stamp_err or stamped}"]
+    before_doc, before_err = _assembly_doc(cdp)
+    extra_before = _asm_part(before_doc, "Cylinder 3")
+    if before_err or extra_before.get("shapeLocal") is not True:
+        return [f"multi move extra before {before_err or extra_before}"]
+    baked, bake_err = _json_eval(cdp, MOVE_FIELD_EXPR, timeout=120)
+    if bake_err or not baked:
+        return [f"multi move union field {bake_err}"]
+    if baked.get("error") and baked.get("error") != "disabled":
+        return [f"multi move union field error {baked}"]
+    baked_move = baked.get("lastMove") if isinstance(baked.get("lastMove"), dict) else {}
+    if baked_move.get("baked") is not True or baked_move.get("shapeSame") is not False:
+        return [f"multi move union baked {baked}"]
+    if not _near(baked.get("after"), float(baked.get("before") or 0) + 10.0, 0.05):
+        return [f"multi move union x {baked.get('before')!r} -> {baked.get('after')!r}"]
+    gone, gone_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(union_id)}):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if gone_err or not gone or gone.get("mark"):
+        return [f"multi move union mark kept {gone_err or gone}"]
+    after_doc, after_err = _assembly_doc(cdp)
+    extra_after = _asm_part(after_doc, "Cylinder 3")
+    if after_err or not _near((extra_after.get("placement") or {}).get("x"), (extra_before.get("placement") or {}).get("x"), 0.05):
+        return [f"multi move extra shifted {after_err or extra_after}"]
+    union_depth = int(baked.get("undo") or 0)
+
+    extra_id, extra_id_err = _part_row_id(cdp, "Cylinder 3")
+    if extra_id_err or not extra_id:
+        return [f"multi move extra id {extra_id_err or extra_id!r}"]
+    picked_extra, extra_pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(extra_id)}));"
+        "})()",
+    )
+    if extra_pick_err or not picked_extra or picked_extra.get("kind") != "cylinder":
+        return [f"multi move pick extra {extra_pick_err or picked_extra}"]
+    slid, slide_err = _json_eval(cdp, MOVE_FIELD_EXPR, timeout=120)
+    if slide_err or not slid:
+        return [f"multi move extra field {slide_err}"]
+    slid_move = slid.get("lastMove") if isinstance(slid.get("lastMove"), dict) else {}
+    if slid_move.get("baked") is not False or slid_move.get("shapeSame") is not True:
+        return [f"multi move extra bake {slid}"]
+    if not _near((slid_move.get("placement") or {}).get("x"), float((extra_before.get("placement") or {}).get("x") or 0) + 10.0, 0.05):
+        return [f"multi move extra placement {slid_move}"]
+    extra_depth = int(slid.get("undo") or 0)
+    if extra_depth != union_depth + 1:
+        return [f"multi move extra depth {extra_depth} after {union_depth}"]
+
+    back, back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if back_err or not back or int(back.get("undoDepth") or 0) != union_depth:
+        return [f"multi move extra undo {back_err or back}"]
+    doc, doc_err = _assembly_doc(cdp)
+    extra = _asm_part(doc, "Cylinder 3")
+    if doc_err or not _near((extra.get("placement") or {}).get("x"), (extra_before.get("placement") or {}).get("x"), 0.05):
+        return [f"multi move extra undo placement {doc_err or extra}"]
+    again, again_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if again_err or not again or int(again.get("undoDepth") or 0) != extra_depth:
+        return [f"multi move extra redo {again_err or again}"]
+    doc, doc_err = _assembly_doc(cdp)
+    extra = _asm_part(doc, "Cylinder 3")
+    if doc_err or not _near((extra.get("placement") or {}).get("x"), float((extra_before.get("placement") or {}).get("x") or 0) + 10.0, 0.05):
+        return [f"multi move extra redo placement {doc_err or extra}"]
+    back, back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if back_err or not back or int(back.get("undoDepth") or 0) != union_depth:
+        return [f"multi move extra undo again {back_err or back}"]
+    union_back, union_back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if union_back_err or not union_back or int(union_back.get("undoDepth") or 0) != union_depth - 1:
+        return [f"multi move union undo {union_back_err or union_back}"]
+    restored, restored_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if restored_err or not restored or not _near(restored.get("mm"), baked.get("before"), 0.05):
+        return [f"multi move union undo x {restored_err or restored}"]
+    union_fwd, union_fwd_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if union_fwd_err or not union_fwd or int(union_fwd.get("undoDepth") or 0) != union_depth:
+        return [f"multi move union redo {union_fwd_err or union_fwd}"]
+    forwarded, forwarded_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if forwarded_err or not forwarded or not _near(forwarded.get("mm"), float(baked.get("before") or 0) + 10.0, 0.05):
+        return [f"multi move union redo x {forwarded_err or forwarded}"]
+    print("multi body move pass", flush=True)
+    return []
+
+
+def _css_rgb(hex_color: str) -> str:
+    n = int(hex_color[1:], 16)
+    return f"rgb({(n >> 16) & 255}, {(n >> 8) & 255}, {n & 255})"
+
+
+PART_CHIPS_EXPR = (
+    "(function(){"
+    "function chip(name){"
+    "var rows=document.querySelectorAll('#partList .part-row');"
+    "for(var i=0;i<rows.length;i++){"
+    "var label=rows[i].querySelector('.part-name');"
+    "if(!label||label.textContent!==name) continue;"
+    "var el=rows[i].querySelector('.part-chip');"
+    "if(!el) return null;"
+    "return {material:el.getAttribute('data-material')||'',color:el.getAttribute('data-color')||'',"
+    "bg:getComputedStyle(el).backgroundColor||'',title:el.title||'',"
+    "h:rows[i].getBoundingClientRect().height};}"
+    "return null;}"
+    "var mat=document.getElementById('materialChip');"
+    "return JSON.stringify({box:chip('Box'),cyl:chip('Cylinder'),"
+    "swatch:mat?{hidden:mat.hidden===true,material:mat.getAttribute('data-material')||'',"
+    "color:mat.getAttribute('data-color')||'',bg:getComputedStyle(mat).backgroundColor||''}:null});"
+    "})()"
+)
+
+
+def _chip_ok(chip: Any, tag: str, hex_color: str) -> bool:
+    if not isinstance(chip, dict):
+        return False
+    bg = str(chip.get("bg") or "").replace(" ", "")
+    want = _css_rgb(hex_color).replace(" ", "")
+    return (
+        chip.get("material") == tag
+        and str(chip.get("color") or "").upper() == hex_color.upper()
+        and (bg == want or bg == want.replace("rgb(", "rgba(").replace(")", ",1)"))
+        and chip.get("title") == tag
+    )
+
+
+def multi_body_color_problems(cdp: Cdp, origin: str) -> list[str]:
+    """PETG and TPU use their own colours in the parts list and on unselected meshes.
+
+    Repro before the fix: the parts list showed the material name only, and every
+    unselected body used the same blue. PLA, PETG, and TPU already had canonical colours.
+    """
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"multi color desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load multi_body_color {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["multi color load", *load_problems[:20]]
+    chips, chip_err = _json_eval(cdp, PART_CHIPS_EXPR)
+    if chip_err or not chips:
+        return [f"multi color chips {chip_err}"]
+    if not _chip_ok(chips.get("box"), "PLA", "#F4F4F4"):
+        return [f"multi color pla {chips.get('box')}"]
+    if not _chip_ok(chips.get("cyl"), "PETG", "#B9D6F2"):
+        return [f"multi color petg {chips.get('cyl')}"]
+    if chips["box"].get("color") == chips["cyl"].get("color"):
+        return ["multi color pla and petg match"]
+    box_h = float((chips.get("box") or {}).get("h") or 0)
+    if abs(box_h - 44) > 1:
+        return [f"multi color row height {box_h}"]
+    swatch = chips.get("swatch") if isinstance(chips.get("swatch"), dict) else {}
+    if swatch.get("hidden") is not True:
+        return [f"multi color mixed swatch {swatch}"]
+
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    box_id, box_err = _part_row_id(cdp, "Box")
+    if cyl_err or box_err or not cyl_id or not box_id:
+        return [f"multi color ids {cyl_err or box_err}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked:
+        return [f"multi color pick {pick_err or picked}"]
+    changed, change_err = eval_expr(
+        cdp,
+        "(function(){var sel=document.getElementById('partMaterial');"
+        "if(!sel) return 'missing'; sel.value='TPU';"
+        "sel.dispatchEvent(new Event('change',{bubbles:true}));"
+        "return sel.value;})()",
+    )
+    if change_err or changed != "TPU":
+        return [f"multi color set tpu {changed or change_err}"]
+    painted, paint_err = _json_eval(cdp, PART_CHIPS_EXPR)
+    if paint_err or not painted:
+        return [f"multi color after {paint_err}"]
+    if not _chip_ok(painted.get("cyl"), "TPU", "#E7C36A"):
+        return [f"multi color tpu chip {painted.get('cyl')}"]
+    if not _chip_ok(painted.get("box"), "PLA", "#F4F4F4"):
+        return [f"multi color box changed {painted.get('box')}"]
+    one = painted.get("swatch") if isinstance(painted.get("swatch"), dict) else {}
+    if one.get("hidden") is not False or str(one.get("color") or "").upper() != "#E7C36A":
+        return [f"multi color material chip {one}"]
+
+    # Leave the cylinder unselected so its viewport colour is the material, not the selection.
+    picked_box, box_pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(box_id)}));"
+        "})()",
+    )
+    if box_pick_err or not picked_box:
+        return [f"multi color pick box {box_pick_err or picked_box}"]
+    colors, color_err = _json_eval(
+        cdp,
+        "(function(){"
+        "function one(id){return window.__cadcamPartColor?window.__cadcamPartColor(id):null;}"
+        f"return JSON.stringify({{cyl:one({json.dumps(cyl_id)}),box:one({json.dumps(box_id)})}});"
+        "})()",
+    )
+    if color_err or not colors:
+        return [f"multi color meshes {color_err}"]
+    cyl_color = colors.get("cyl") if isinstance(colors.get("cyl"), dict) else {}
+    box_color = colors.get("box") if isinstance(colors.get("box"), dict) else {}
+    if cyl_color.get("selected") is not False or str(cyl_color.get("mesh") or "").upper() != "#E7C36A":
+        return [f"multi color cylinder mesh {cyl_color}"]
+    if str(cyl_color.get("color") or "").upper() != "#E7C36A" or cyl_color.get("tag") != "TPU":
+        return [f"multi color cylinder tag {cyl_color}"]
+    if box_color.get("selected") is not True or str(box_color.get("mesh") or "").upper() != "#FF4FD8":
+        return [f"multi color selected box {box_color}"]
+    if str(box_color.get("color") or "").upper() != "#F4F4F4":
+        return [f"multi color box tag {box_color}"]
+    print("multi body color pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -3957,6 +4705,21 @@ def run(omit: list[str]) -> int:
             if assembly_found:
                 failures.append("assembly")
                 failures.extend(assembly_found[:40])
+        if not failures:
+            size_found = multi_body_size_problems(cdp, origin)
+            if size_found:
+                failures.append("multi_body_size")
+                failures.extend(size_found[:40])
+        if not failures:
+            move_found = multi_body_move_problems(cdp, origin)
+            if move_found:
+                failures.append("multi_body_move")
+                failures.extend(move_found[:40])
+        if not failures:
+            color_found = multi_body_color_problems(cdp, origin)
+            if color_found:
+                failures.append("multi_body_color")
+                failures.extend(color_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

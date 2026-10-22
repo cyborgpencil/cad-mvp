@@ -190,6 +190,12 @@ expect('3mf one object per part', objectCount === 2);
 expect('3mf pla object', xml.indexOf('name="Box"') >= 0 && xml.indexOf('pindex="0"') >= 0);
 expect('3mf petg object', xml.indexOf('name="Cylinder"') >= 0 && xml.indexOf('pindex="1"') >= 0);
 expect('3mf pla base', xml.indexOf('name="PLA"') >= 0 && xml.indexOf('name="PETG"') >= 0 && xml.indexOf('name="TPU"') >= 0);
+expect('material colors differ', asm.MATERIAL_COLOR.PLA !== asm.MATERIAL_COLOR.PETG
+  && asm.MATERIAL_COLOR.PETG !== asm.MATERIAL_COLOR.TPU
+  && asm.MATERIAL_COLOR.PLA !== asm.MATERIAL_COLOR.TPU);
+expect('pla displaycolor', asm.materialColor('PLA') === '#F4F4F4' && xml.indexOf('displaycolor="#F4F4F4"') >= 0);
+expect('petg displaycolor', asm.materialColor('PETG') === '#B9D6F2' && xml.indexOf('displaycolor="#B9D6F2"') >= 0);
+expect('tpu displaycolor', asm.materialColor('TPU') === '#E7C36A' && xml.indexOf('displaycolor="#E7C36A"') >= 0);
 
 function meshBoundsFromXml(block, placement) {
   const vertices = [];
