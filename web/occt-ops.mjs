@@ -198,6 +198,19 @@ function copyOwned(oc, source, trash) {
   return takeDoneShape(oc, copier, 'BRepBuilderAPI_Copy');
 }
 
+// A shape the caller owns. The copier is disposed here. The copy is not.
+export function copyShape(oc, source) {
+  if (!source) return null;
+  const trash = [];
+  try {
+    const copied = copyOwned(oc, source, trash);
+    if (!copied.ok || !copied.shape) return null;
+    return copied.shape;
+  } finally {
+    dispose(trash);
+  }
+}
+
 function shapeList(oc, trash, shape) {
   const Ctor = oc.TopTools_ListOfShape || oc.NCollection_List_TopoDS_Shape;
   if (!Ctor) return null;

@@ -37,6 +37,7 @@ REQUIRED = (
     "project-file.mjs",
     "selection.mjs",
     "viewport-selection.mjs",
+    "undo.mjs",
     "dist/init.single.js",
     "dist/opencascade_single.js",
     "dist/opencascade_single.wasm",
