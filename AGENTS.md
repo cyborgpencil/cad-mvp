@@ -45,7 +45,7 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 - Order: Grok Build, then Cursor, then Google Antigravity (third, end of queue, trial). Gemini Code Assist GitHub review app approved; install pending Erik's sign-in. Details: mvp/tooling-priority.md.
 
 ## Process speed-ups (3T and Chief, 2026-10-22)
-- CI: push builds run only on `main`. Docs-only PRs skip the C++ build through a paths filter, and a small docs job still gives a green check. Pilot writes this; Repo Keeper owns it.
+- CI: push builds run only on `main`. One `build` job checks the changed paths with `git diff`. If only `*.md`, `research/` or `prompts/` changed, it skips the native build and still passes. Any other change runs the full build. A later step, such as trimesh, needs the same code-changed condition. Pilot writes this; Repo Keeper owns it.
 - Docs ride inside the code PR that changes the behavior. With no code PR to ride, docs go into one shared docs PR per wave.
 - `UPDATES.md`: only Repo Keeper edits it, one line per PR at merge time. Code and docs PRs leave it alone.
 - Docs describe `main` only. No "pending" notes for code that hasn't merged.
