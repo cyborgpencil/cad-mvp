@@ -30,6 +30,8 @@ Asserts window.__cadcamExportState.occtReady for:
                         marked data-hscroll; Part 1 is fully visible, min-width 96px
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
+  portrait nav cube     88 px cube, 6 face and 8 corner taps, each face within 1 degree,
+                        clear-view fraction held; prints NAVCUBE_DONE
   portrait inspector    closed right panel is inert, not rendered, not tappable, and not focusable
   /tests/fixtures/lbracket.json, /fixtures/lbracket.json,
   /tests/fixtures/blink.json, and /fixtures/blink.json return 404
@@ -43,6 +45,7 @@ import argparse
 import base64
 import importlib.util
 import json
+import math
 import os
 import shutil
 import socket
@@ -1153,6 +1156,400 @@ def coverage_problems(cdp: Cdp, want_open: bool) -> list[str]:
     print(f"viewport uncovered {ratio_text} ({label})", flush=True)
     problems = found.get("problems") if isinstance(found.get("problems"), list) else [raw]
     return [f"coverage {label}: {item}" for item in problems]
+
+
+FACE_AXES = (
+    ("right", (1.0, 0.0, 0.0)),
+    ("left", (-1.0, 0.0, 0.0)),
+    ("top", (0.0, 1.0, 0.0)),
+    ("bottom", (0.0, -1.0, 0.0)),
+    ("front", (0.0, 0.0, 1.0)),
+    ("back", (0.0, 0.0, -1.0)),
+)
+
+
+def _angle_deg(a: list[float] | tuple[float, ...], b: list[float] | tuple[float, ...]) -> float:
+    dot = float(a[0]) * float(b[0]) + float(a[1]) * float(b[1]) + float(a[2]) * float(b[2])
+    dot = max(-1.0, min(1.0, dot))
+    return math.degrees(math.acos(dot))
+
+
+NAV_OVERLAP_EXPR = r"""
+(function(){
+  function shown(el) {
+    if (!el || el.hidden || (el.closest && el.closest('[hidden]'))) return null;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    return {left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height};
+  }
+  function hit(a, b) {
+    return a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+  }
+  var problems = [];
+  var cube = shown(document.getElementById('viewCube'));
+  var names = ['.vp-bar', '#dimPanel', '#vcHome', '.topbar'];
+  if (!cube) problems.push('view cube missing');
+  else {
+    if (Math.abs(cube.width - 88) > 1 || Math.abs(cube.height - 88) > 1) {
+      problems.push('cube size ' + cube.width.toFixed(1) + 'x' + cube.height.toFixed(1));
+    }
+    for (var i = 0; i < names.length; i++) {
+      var box = shown(document.querySelector(names[i]));
+      if (!box) {
+        problems.push('missing ' + names[i]);
+        continue;
+      }
+      if (hit(cube, box)) problems.push('overlaps ' + names[i]);
+    }
+  }
+  var nav = window.__cadcamNavCube ? window.__cadcamNavCube() : null;
+  if (!nav) problems.push('nav cube api missing');
+  return JSON.stringify({problems:problems, nav:nav});
+})()
+"""
+
+
+def read_nav(cdp: Cdp) -> tuple[dict[str, Any] | None, list[str]]:
+    raw, err = eval_expr(cdp, NAV_OVERLAP_EXPR)
+    if err or not isinstance(raw, str):
+        return None, [f"nav cube {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, [f"nav cube {raw}"]
+    if not isinstance(found, dict):
+        return None, [f"nav cube {raw}"]
+    problems = found.get("problems") if isinstance(found.get("problems"), list) else [raw]
+    nav = found.get("nav")
+    if not isinstance(nav, dict):
+        return None, [str(item) for item in problems] or ["nav cube api missing"]
+    return nav, [str(item) for item in problems]
+
+
+def nav_zone(nav: dict[str, Any], name: str, kind: str) -> dict[str, Any] | None:
+    zones = nav.get("zones")
+    if not isinstance(zones, list):
+        return None
+    for zone in zones:
+        if isinstance(zone, dict) and zone.get("name") == name and zone.get("kind") == kind:
+            return zone
+    return None
+
+
+def nav_zone_problems(nav: dict[str, Any]) -> list[str]:
+    problems: list[str] = []
+    if nav.get("phone") is not True:
+        problems.append(f"phone cube flag {nav.get('phone')!r}")
+    try:
+        size = float(nav.get("size"))
+    except (TypeError, ValueError):
+        size = 0.0
+    if abs(size - 88.0) > 0.5:
+        problems.append(f"cube css {size}")
+    visible = nav.get("visible") if isinstance(nav.get("visible"), dict) else {}
+    try:
+        if abs(float(visible.get("w")) - 88.0) > 1.5 or abs(float(visible.get("h")) - 88.0) > 1.5:
+            problems.append(f"visible cube {visible.get('w')}x{visible.get('h')}")
+    except (TypeError, ValueError):
+        problems.append(f"visible cube {visible!r}")
+    zones = nav.get("zones") if isinstance(nav.get("zones"), list) else []
+    faces = [z for z in zones if isinstance(z, dict) and z.get("kind") == "face"]
+    corners = [z for z in zones if isinstance(z, dict) and z.get("kind") == "corner"]
+    edges = [z for z in zones if isinstance(z, dict) and z.get("kind") == "edge"]
+    if len(faces) != 6:
+        problems.append(f"face zones {len(faces)}")
+    if len(corners) != 8:
+        problems.append(f"corner zones {len(corners)}")
+    if edges:
+        problems.append(f"phone edge zones {len(edges)}")
+    for zone in faces + corners:
+        try:
+            w = float(zone.get("w"))
+            h = float(zone.get("h"))
+        except (TypeError, ValueError):
+            problems.append(f"zone size {zone.get('name')}")
+            continue
+        if w < 44 or h < 44:
+            problems.append(f"{zone.get('name')} hit {w}x{h}")
+        if zone.get("extendsPast") is not True:
+            problems.append(f"{zone.get('name')} hit stays inside the cube")
+    return problems
+
+
+def _sheet_open(cdp: Cdp) -> bool | None:
+    raw, err = eval_expr(
+        cdp,
+        "(function(){var p=document.getElementById('dimPanel');"
+        "return !!(p && !p.hidden && p.classList.contains('is-open'));})()",
+    )
+    if err:
+        return None
+    return raw is True
+
+
+def _set_sheet(cdp: Cdp, want_open: bool) -> list[str]:
+    current = _sheet_open(cdp)
+    if current is want_open:
+        return []
+    toggled, err = eval_expr(cdp, CLICK_DIM_EXPR)
+    if err or toggled != "clicked":
+        return [f"dim toggle {toggled or err}"]
+    deadline = time.time() + 2.0
+    while time.time() < deadline:
+        cdp.drain(0.05)
+        if _sheet_open(cdp) is want_open:
+            return []
+        time.sleep(0.05)
+    return [f"dim sheet did not become {'open' if want_open else 'collapsed'}"]
+
+
+def _wait_snap(
+    cdp: Cdp,
+    axis: tuple[float, float, float],
+    distance: float,
+    label: str,
+) -> list[str]:
+    deadline = time.time() + 1.2
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.03)
+        nav, problems = read_nav(cdp)
+        if problems and nav is None:
+            return [f"{label} {problems[0]}"]
+        if not isinstance(nav, dict):
+            time.sleep(0.03)
+            continue
+        last = nav
+        if nav.get("animating") is True:
+            time.sleep(0.02)
+            continue
+        direction = nav.get("direction")
+        if not isinstance(direction, list) or len(direction) != 3:
+            return [f"{label} direction {direction!r}"]
+        angle = _angle_deg(direction, axis)
+        try:
+            dist = abs(float(nav.get("distance")) - distance)
+            elapsed = float(nav.get("lastSnapMs") or 0)
+            budget = float(nav.get("lastSnapBudget") or 0)
+        except (TypeError, ValueError):
+            return [f"{label} distance {nav.get('distance')!r}"]
+        # The ease is 250 ms. Headless frames can land later; that lateness is not a longer ease.
+        if angle <= 1.0 and dist <= 0.05 and 0 < budget <= 250.0 and elapsed < 500.0:
+            print(
+                f"nav {label}: {angle:.3f} deg, ease {budget:.0f} ms, frame {elapsed:.0f} ms, "
+                f"distance {float(nav.get('distance')):.2f}",
+                flush=True,
+            )
+            return []
+        if budget > 250.0:
+            return [f"{label} snap ease {budget:.0f} ms > 250"]
+        if elapsed >= 500.0:
+            return [f"{label} snap frame {elapsed:.0f} ms"]
+        time.sleep(0.02)
+    direction = (last or {}).get("direction")
+    angle = _angle_deg(direction, axis) if isinstance(direction, list) and len(direction) == 3 else 999.0
+    return [
+        f"{label} off axis {angle:.2f} deg dir {direction!r} "
+        f"animating {(last or {}).get('animating')!r} snap {(last or {}).get('lastSnapMs')!r}"
+    ]
+
+
+def _zone_point(zone: dict[str, Any]) -> tuple[float, float] | list[str]:
+    try:
+        return float(zone["x"]), float(zone["y"])
+    except (KeyError, TypeError, ValueError):
+        return [f"zone point {zone!r}"]
+
+
+def _zone_clear(cdp: Cdp, zone: dict[str, Any], x: float, y: float) -> list[str]:
+    raw, err = eval_expr(
+        cdp,
+        "(function(){"
+        f"var el=document.elementFromPoint({x}, {y});"
+        "if(!el || !el.closest('#viewport')) return 'outside';"
+        "var block=el.closest('button, a, input, .vp-bar, .dim-panel, .topbar, .statusbar');"
+        "return block ? (block.id || block.className || block.tagName) : 'ok';"
+        "})()",
+    )
+    if err or raw != "ok":
+        return [f"{zone.get('name')} tap lands on {raw or err}"]
+    return []
+
+
+def _tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
+    point = _zone_point(zone)
+    if isinstance(point, list):
+        return point
+    x, y = point
+    blocked = _zone_clear(cdp, zone, x, y)
+    if blocked:
+        return blocked
+    touch_tap(cdp, x, y)
+    return []
+
+
+def _double_tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
+    """Two cube pointer-ups 80 ms apart on the page clock.
+
+    A CDP round trip between taps can pass the 320 ms double-tap window, so
+    the second tap becomes another face snap. Both ups stay in one evaluate.
+    """
+    point = _zone_point(zone)
+    if isinstance(point, list):
+        return point
+    x, y = point
+    blocked = _zone_clear(cdp, zone, x, y)
+    if blocked:
+        return blocked
+    fired, err = eval_expr(
+        cdp,
+        "(function(){"
+        "var vp=document.getElementById('viewport');"
+        "if(!vp) return 'missing';"
+        "function fire(type, px, py, buttons){"
+        "vp.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true,"
+        "clientX:px, clientY:py, pointerId:9, pointerType:'touch', button:0,"
+        "buttons:buttons, isPrimary:true}));"
+        "}"
+        f"fire('pointerdown', {x}, {y}, 1);"
+        f"fire('pointerup', {x}, {y}, 0);"
+        "var t0=performance.now();"
+        "while(performance.now()-t0<80){}"
+        f"fire('pointerdown', {x}, {y}, 1);"
+        f"fire('pointerup', {x}, {y}, 0);"
+        "return 'double';"
+        "})()",
+    )
+    if err or fired != "double":
+        return [f"{zone.get('name')} double-tap {fired or err}"]
+    return []
+
+
+def nav_cube_problems(cdp: Cdp) -> list[str]:
+    """390x844. Face snaps land on-axis, corner and home snaps match, clear-view holds."""
+    problems: list[str] = []
+    for want_open in (False, True):
+        sheet_problems = _set_sheet(cdp, want_open)
+        if sheet_problems:
+            return [f"nav sheet {'open' if want_open else 'collapsed'}", *sheet_problems]
+        cdp.drain(0.1)
+        nav, overlap = read_nav(cdp)
+        label = "open" if want_open else "collapsed"
+        if overlap:
+            problems.append(f"nav overlap {label}")
+            problems.extend(overlap)
+            return problems
+        if not isinstance(nav, dict):
+            return ["nav cube missing"]
+        if not want_open:
+            zone_problems = nav_zone_problems(nav)
+            if zone_problems:
+                return zone_problems
+        covered = coverage_problems(cdp, want_open)
+        if covered:
+            return covered
+    home_sheet = _set_sheet(cdp, False)
+    if home_sheet:
+        return home_sheet
+    time.sleep(0.4)
+    nav, overlap = read_nav(cdp)
+    if overlap or not isinstance(nav, dict):
+        return overlap or ["nav cube missing before snaps"]
+    try:
+        distance = float(nav.get("distance"))
+    except (TypeError, ValueError):
+        return [f"nav distance {nav.get('distance')!r}"]
+    if not math.isfinite(distance) or distance < 1e-3:
+        return [f"nav distance {distance}"]
+    for name, axis in FACE_AXES:
+        time.sleep(0.4)
+        fresh, fresh_problems = read_nav(cdp)
+        if fresh_problems or not isinstance(fresh, dict):
+            return [f"{name} zone", *(fresh_problems or ["missing"])]
+        zone = nav_zone(fresh, name, "face")
+        if zone is None:
+            return [f"{name} zone missing"]
+        tapped = _tap_zone(cdp, zone)
+        if tapped:
+            return tapped
+        snapped = _wait_snap(cdp, axis, distance, name)
+        if snapped:
+            return snapped
+    time.sleep(0.4)
+    fresh, fresh_problems = read_nav(cdp)
+    if fresh_problems or not isinstance(fresh, dict):
+        return ["corner zone", *(fresh_problems or ["missing"])]
+    corner = nav_zone(fresh, "trf", "corner")
+    if corner is None:
+        zones = fresh.get("zones") if isinstance(fresh.get("zones"), list) else []
+        corner = next((z for z in zones if isinstance(z, dict) and z.get("kind") == "corner"), None)
+    if not isinstance(corner, dict):
+        return ["corner zone missing"]
+    corner_dir = corner.get("dir")
+    if not isinstance(corner_dir, list) or len(corner_dir) != 3:
+        return [f"corner dir {corner_dir!r}"]
+    tapped = _tap_zone(cdp, corner)
+    if tapped:
+        return tapped
+    corner_axis = (float(corner_dir[0]), float(corner_dir[1]), float(corner_dir[2]))
+    snapped = _wait_snap(cdp, corner_axis, distance, str(corner.get("name") or "corner"))
+    if snapped:
+        return snapped
+    time.sleep(0.4)
+    fresh, fresh_problems = read_nav(cdp)
+    if fresh_problems or not isinstance(fresh, dict):
+        return ["home zone", *(fresh_problems or ["missing"])]
+    home_zone = nav_zone(fresh, "front", "face") or corner
+    if not isinstance(home_zone, dict):
+        return ["home tap zone missing"]
+    home = fresh.get("home")
+    if not isinstance(home, list) or len(home) != 3:
+        return [f"home dir {home!r}"]
+    doubled = _double_tap_zone(cdp, home_zone)
+    if doubled:
+        return doubled
+    snapped = _wait_snap(cdp, (float(home[0]), float(home[1]), float(home[2])), distance, "home")
+    if snapped:
+        return snapped
+    time.sleep(0.4)
+    fresh, fresh_problems = read_nav(cdp)
+    if fresh_problems or not isinstance(fresh, dict):
+        return ["drag", *(fresh_problems or ["missing"])]
+    before = fresh.get("direction")
+    drag_zone = nav_zone(fresh, "front", "face")
+    if not isinstance(before, list) or not isinstance(drag_zone, dict):
+        return ["drag zone missing"]
+    x = float(drag_zone["x"])
+    y = float(drag_zone["y"])
+    dragged, drag_err = eval_expr(
+        cdp,
+        "(function(){"
+        "var vp=document.getElementById('viewport');"
+        "if(!vp) return 'missing';"
+        "function fire(type, x, y, buttons){"
+        "vp.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, clientX:x, clientY:y,"
+        "pointerId:7, pointerType:'touch', button:0, buttons:buttons, isPrimary:true}));"
+        "}"
+        f"fire('pointerdown', {x}, {y}, 1);"
+        f"fire('pointermove', {x + 36}, {y + 18}, 1);"
+        f"fire('pointerup', {x + 36}, {y + 18}, 0);"
+        "return 'dragged';"
+        "})()",
+    )
+    if drag_err or dragged != "dragged":
+        return [f"drag {dragged or drag_err}"]
+    cdp.drain(0.2)
+    after_nav, after_problems = read_nav(cdp)
+    if after_problems or not isinstance(after_nav, dict):
+        return ["drag read", *(after_problems or ["missing"])]
+    after = after_nav.get("direction")
+    if not isinstance(after, list) or _angle_deg(before, after) > 0.5:
+        return [f"drag snapped the view {before!r} -> {after!r}"]
+    if after_nav.get("animating") is True:
+        return ["drag started a snap"]
+    return []
 
 
 STAMP_EXPR = r"""
@@ -2817,6 +3214,13 @@ def run(omit: list[str]) -> int:
             if portrait_problems:
                 failures.append("portrait")
                 failures.extend(portrait_problems[:40])
+        if not failures:
+            nav_problems = nav_cube_problems(cdp)
+            if nav_problems:
+                failures.append("nav cube")
+                failures.extend(nav_problems[:40])
+            else:
+                print("NAVCUBE_DONE", flush=True)
         if not failures:
             hole_problems = run_portrait_holes(cdp, origin)
             if hole_problems:
