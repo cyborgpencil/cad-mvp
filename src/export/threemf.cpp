@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <fstream>
 #include <map>
+#include <queue>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -159,39 +160,77 @@ MeshSolid weld_mesh(const MeshSolid& mesh) {
         }
     }
 
-    using Directed = std::pair<std::uint32_t, std::uint32_t>;
-    std::map<Directed, int> directed;
     for (const auto& triangle : mesh.triangles) {
         if (triangle[0] >= remap.size() || triangle[1] >= remap.size() ||
             triangle[2] >= remap.size()) {
             continue;
         }
-        std::uint32_t a = remap[triangle[0]];
-        std::uint32_t b = remap[triangle[1]];
-        std::uint32_t c = remap[triangle[2]];
+        const std::uint32_t a = remap[triangle[0]];
+        const std::uint32_t b = remap[triangle[1]];
+        const std::uint32_t c = remap[triangle[2]];
         if (a == b || b == c || a == c) {
             continue;
         }
         if (exact_zero_area(out.vertices[a], out.vertices[b], out.vertices[c])) {
             continue;
         }
-        // Same swap as TopAbs_REVERSED faces: (v1, v3, v2) when this winding
-        // would traverse an edge that is already used in this direction.
-        if (directed[{a, b}] > 0 || directed[{b, c}] > 0 || directed[{c, a}] > 0) {
-            const std::uint32_t saved = b;
-            b = c;
-            c = saved;
-            if (a == b || b == c || a == c) {
-                continue;
-            }
-            if (exact_zero_area(out.vertices[a], out.vertices[b], out.vertices[c])) {
-                continue;
+        out.triangles.push_back({a, b, c});
+    }
+
+    using Undirected = std::pair<std::uint32_t, std::uint32_t>;
+    std::map<Undirected, std::vector<std::size_t>> incident;
+    auto undirected = [](std::uint32_t from, std::uint32_t to) {
+        return from < to ? Undirected{from, to} : Undirected{to, from};
+    };
+    for (std::size_t t = 0; t < out.triangles.size(); ++t) {
+        const auto& tri = out.triangles[t];
+        incident[undirected(tri[0], tri[1])].push_back(t);
+        incident[undirected(tri[1], tri[2])].push_back(t);
+        incident[undirected(tri[2], tri[0])].push_back(t);
+    }
+    auto uses_directed = [](const std::array<std::uint32_t, 3>& tri, std::uint32_t from,
+                            std::uint32_t to) {
+        return (tri[0] == from && tri[1] == to) || (tri[1] == from && tri[2] == to) ||
+               (tri[2] == from && tri[0] == to);
+    };
+    auto flip = [&](std::size_t t) {
+        auto& tri = out.triangles[t];
+        const auto saved = tri[1];
+        tri[1] = tri[2];
+        tri[2] = saved;
+    };
+    std::vector<char> seen(out.triangles.size(), 0);
+    for (std::size_t seed = 0; seed < out.triangles.size(); ++seed) {
+        if (seen[seed]) {
+            continue;
+        }
+        std::queue<std::size_t> wait;
+        wait.push(seed);
+        seen[seed] = 1;
+        while (!wait.empty()) {
+            const std::size_t t = wait.front();
+            wait.pop();
+            const auto tri = out.triangles[t];
+            const std::array<std::pair<std::uint32_t, std::uint32_t>, 3> edges = {{
+                {tri[0], tri[1]}, {tri[1], tri[2]}, {tri[2], tri[0]}
+            }};
+            for (const auto& edge : edges) {
+                const auto found = incident.find(undirected(edge.first, edge.second));
+                if (found == incident.end()) {
+                    continue;
+                }
+                for (const std::size_t other : found->second) {
+                    if (other == t || seen[other]) {
+                        continue;
+                    }
+                    if (uses_directed(out.triangles[other], edge.first, edge.second)) {
+                        flip(other);
+                    }
+                    seen[other] = 1;
+                    wait.push(other);
+                }
             }
         }
-        out.triangles.push_back({a, b, c});
-        directed[{a, b}] += 1;
-        directed[{b, c}] += 1;
-        directed[{c, a}] += 1;
     }
     double sum = 0.0;
     for (const auto& triangle : out.triangles) {
@@ -204,10 +243,8 @@ MeshSolid weld_mesh(const MeshSolid& mesh) {
         sum += p.x * cx + p.y * cy + p.z * cz;
     }
     if (sum < 0.0) {
-        for (auto& triangle : out.triangles) {
-            const auto saved = triangle[1];
-            triangle[1] = triangle[2];
-            triangle[2] = saved;
+        for (std::size_t t = 0; t < out.triangles.size(); ++t) {
+            flip(t);
         }
     }
     return out;
