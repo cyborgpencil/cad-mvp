@@ -38,6 +38,9 @@ const { createInstance } = await import(initUrl);
 const { checkOcctGate, closedBoxMesh, openBoxMesh, box20Mesh } = await import(gateUrl);
 const { buildBox, buildCylinder, buildDisc, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, PLACEHOLDER_DISC_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, DISC_DIAMETER_MM, DISC_THICKNESS_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight, TESSELLATION_DEFLECTION_MM, TESSELLATION_ANGULAR, TESSELLATION_RELATIVE, TESSELLATION_CONTROL_SURFACE, TESSELLATION_IN_PARALLEL } = await import(primUrl);
 const ops = await import(opsUrl);
+const projectUrl = pathToFileURL(path.join(root, 'web', 'project-file.mjs')).href;
+const projectFile = await import(projectUrl);
+const { normalizeBox, normalizeCylinder, normalizeDisc } = await import(primUrl);
 const blinkPath = path.join(root, 'tests', 'fixtures', 'blink.mjs');
 const blinkUrl = pathToFileURL(blinkPath).href;
 let blinkMod = null;
@@ -843,6 +846,75 @@ console.log('lbracket mesh ms', bracket.meshTimeMs);
 console.log('lbracket mesh settings', JSON.stringify(bracket.meshSettings));
 console.log('overlap volumes', JSON.stringify(overlapVolumes));
 console.log('demo volumes', JSON.stringify(demoVolumes));
+
+function projectNear(a, b) {
+  return typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= 0.01;
+}
+
+function releaseProjectShape(shape) {
+  if (shape && typeof shape.delete === 'function') {
+    try { shape.delete(); } catch (_err) { /* already released */ }
+  }
+}
+
+const projectBoxParams = normalizeBox(null);
+const projectCylParams = normalizeCylinder({ cx: 10, cy: 0, cz: 10, radius: 10, height: 20, axis: 'Z' });
+const projectBox = ops.makeBoxSolid(oc, projectBoxParams.sx, projectBoxParams.sy, projectBoxParams.sz, [
+  projectBoxParams.cx - projectBoxParams.sx / 2,
+  projectBoxParams.cy - projectBoxParams.sy / 2,
+  projectBoxParams.cz - projectBoxParams.sz / 2,
+]);
+const projectDir = projectCylParams.axis === 'X' ? [1, 0, 0] : projectCylParams.axis === 'Y' ? [0, 1, 0] : [0, 0, 1];
+const projectCyl = ops.makeCylinderSolid(oc, projectCylParams.radius, projectCylParams.height, [
+  projectCylParams.cx - projectDir[0] * projectCylParams.height / 2,
+  projectCylParams.cy - projectDir[1] * projectCylParams.height / 2,
+  projectCylParams.cz - projectDir[2] * projectCylParams.height / 2,
+], projectDir);
+const projectBodies = [
+  { name: 'Box', kind: 'box', params: projectBoxParams, shape: projectBox, material: 'default', features: [] },
+  { name: 'Cylinder', kind: 'cylinder', params: projectCylParams, shape: projectCyl, material: 'default', features: [] },
+];
+const projectWritten = projectBox && projectCyl ? projectFile.documentFromBodies(oc, projectBodies) : { ok: false, error: 'shape' };
+expect('project save', projectWritten.ok === true && typeof projectWritten.text === 'string');
+if (projectWritten.ok) {
+  const projectDoc = JSON.parse(projectWritten.text);
+  expect('project units mm', projectDoc.units === 'mm' && projectDoc.version === 1 && projectDoc.parts.length === 2);
+  const projectParsed = projectFile.parseProject(projectWritten.text);
+  expect('project parse', projectParsed.ok === true);
+  const projectLoaded = projectParsed.ok ? projectFile.loadShapes(oc, projectParsed.doc, { normalizeBox, normalizeCylinder, normalizeDisc }, ops) : { ok: false, parts: [] };
+  expect('project load ' + (projectLoaded.error || ''), projectLoaded.ok === true && projectLoaded.parts.length === 2);
+  if (projectLoaded.ok) {
+    const originals = [projectBox, projectCyl];
+    for (let pi = 0; pi < projectLoaded.parts.length; pi += 1) {
+      const part = projectLoaded.parts[pi];
+      expect('project source ' + part.name, part.source === 'parameters');
+      const before = projectFile.measureShape(oc, originals[pi]);
+      const after = projectFile.measureShape(oc, part.shape);
+      expect('project volume ' + part.name + ' ' + after.volumeMm3, projectNear(before.volumeMm3, after.volumeMm3));
+      ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'].forEach(function (key) {
+        expect('project bound ' + part.name + ' ' + key, projectNear(before.bounds[key], after.bounds[key]));
+      });
+      releaseProjectShape(part.shape);
+    }
+    expect('project box volume', projectNear(projectFile.measureShape(oc, projectBox).volumeMm3, 8000));
+  }
+  const featured = JSON.parse(projectWritten.text);
+  featured.parts[0].features = ['fillet'];
+  const featuredLoaded = projectFile.loadShapes(oc, projectFile.parseProject(JSON.stringify(featured)).doc, { normalizeBox, normalizeCylinder }, ops);
+  expect('project feature fallback', featuredLoaded.ok === true && featuredLoaded.parts[0].source === 'brep');
+  if (featuredLoaded.ok) {
+    featuredLoaded.parts.forEach(function (part) { releaseProjectShape(part.shape); });
+  }
+}
+expect('project empty', projectFile.parseProject('').ok === false && projectFile.parseProject('   ').error === projectFile.ERR_EMPTY);
+expect('project corrupt', projectFile.parseProject('{not json').error === projectFile.ERR_READ);
+const projectInches = projectWritten.ok ? JSON.parse(projectWritten.text) : { units: 'mm', version: 1, parts: [] };
+projectInches.units = 'in';
+expect('project wrong units', projectFile.parseProject(JSON.stringify(projectInches)).error === projectFile.ERR_UNITS);
+delete projectInches.units;
+expect('project missing units', projectFile.parseProject(JSON.stringify(projectInches)).error === projectFile.ERR_UNITS);
+releaseProjectShape(projectBox);
+releaseProjectShape(projectCyl);
 
 if (failures !== 0) {
   console.error(failures + ' failed');
