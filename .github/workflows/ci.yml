@@ -149,6 +149,15 @@ jobs:
           cmake -S . -B builds/native -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build builds/native
           ctest --test-dir builds/native --output-on-failure
+      - name: Export check (trimesh)
+        if: steps.changes.outputs.code == 'true'
+        # CTest's export case writes under the temp directory and deletes it.
+        # export_box writes builds/export/box.stl and box.3mf from the repo root.
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/trimesh-check"
+          "${RUNNER_TEMP}/trimesh-check/bin/pip" install -r tools/requirements.txt
+          ./builds/native/export_box
+          "${RUNNER_TEMP}/trimesh-check/bin/python" tools/check_export.py builds/export/box.stl builds/export/box.3mf --expect-size 20 20 20 --expect-volume 8000
       - name: Docs-only skip notice
         if: always() && steps.changes.outputs.code == 'false'
         run: echo "docs-only change, native build skipped"
