@@ -23,6 +23,8 @@ Asserts window.__cadcamExportState.occtReady for:
                         no page-level horizontal scroll; visible buttons and the status
                         line stay inside the width; the sheet and toolbar do not scroll
                         sideways unless marked data-hscroll
+  portrait holes        three countersunk holes on a plate; volumes logged; same overflow checks
+  portrait inspector    closed right panel is inert, not rendered, not tappable, and not focusable
   /tests/fixtures/lbracket.json, /fixtures/lbracket.json,
   /tests/fixtures/blink.json, and /fixtures/blink.json return 404
 
@@ -941,6 +943,179 @@ def portrait_fit_problems(cdp: Cdp) -> list[str]:
     return [str(item) for item in found]
 
 
+SHEET_HIT_EXPR = r"""
+(function(){
+  var vp = document.getElementById('viewport');
+  var panel = document.getElementById('dimPanel');
+  if (!window.__holeTapProbe && vp) {
+    window.__holeTapProbe = [];
+    function note(ev) {
+      var list = window.__holeTapProbe;
+      if (!list || list.length > 30) return;
+      var t = ev.target;
+      list.push(ev.type + ' btn=' + ev.button + ' pt=' + ev.pointerType + ' ' + Math.round(ev.clientX) + ',' + Math.round(ev.clientY) + ' ' + (t ? (t.id || t.tagName) : ''));
+    }
+    vp.addEventListener('pointerdown', note, true);
+    vp.addEventListener('pointerup', note, true);
+  }
+  if (window.__holeTapProbe) window.__holeTapProbe.length = 0;
+  if (panel) {
+    panel.style.visibility = 'hidden';
+    panel.style.pointerEvents = 'none';
+  }
+  var face = (window.__cadcamExportState || {}).facePick;
+  if (!face || !vp) return JSON.stringify({pts:[]});
+  var pts = [];
+  function add(x, y) {
+    x = Math.round(Number(x));
+    y = Math.round(Number(y));
+    if (!isFinite(x) || !isFinite(y)) return;
+    var el = document.elementFromPoint(x, y);
+    var blocked = !!(el && el.closest && el.closest('button, a, input, textarea, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar, .vc-home'));
+    var onView = !!(el && (el.id === 'canvas' || el.id === 'viewport' || (vp.contains(el) && !blocked)));
+    pts.push({x:x, y:y, onView:onView, id: el ? (el.id || el.tagName) : 'none'});
+  }
+  add(face.x, face.y);
+  add(Number(face.x) - 64, face.y);
+  add(Number(face.x) + 64, face.y);
+  add(face.x, Number(face.y) - 28);
+  return JSON.stringify({pts:pts, faceId:face.id, z:face.z});
+})()
+"""
+
+
+RESTORE_SHEET_EXPR = r"""
+(function(){
+  var panel = document.getElementById('dimPanel');
+  if (panel) {
+    panel.style.visibility = '';
+    panel.style.pointerEvents = '';
+  }
+  return 'restored';
+})()
+"""
+
+
+def synth_tap_expr(x: float, y: float) -> str:
+    return (
+        "(function(){"
+        "var vp=document.getElementById('viewport');"
+        "if(!vp) return 'missing';"
+        f"var x={float(x):.2f}, y={float(y):.2f};"
+        "var down={bubbles:true,cancelable:true,clientX:x,clientY:y,button:0,buttons:1,pointerId:1,pointerType:'touch',isPrimary:true};"
+        "vp.dispatchEvent(new PointerEvent('pointerdown', down));"
+        "var up={bubbles:true,cancelable:true,clientX:x,clientY:y,button:0,buttons:0,pointerId:1,pointerType:'touch',isPrimary:true};"
+        "vp.dispatchEvent(new PointerEvent('pointerup', up));"
+        "return 'sent';"
+        "})()"
+    )
+
+
+INSPECTOR_CLOSED_EXPR = r"""
+(function(){
+  var inspector = document.getElementById('inspector');
+  var problems = [];
+  if (!inspector) return JSON.stringify(['missing inspector']);
+  if (inspector.classList.contains('open')) problems.push('inspector open');
+  if (!inspector.hasAttribute('inert')) problems.push('missing inert');
+  var st = getComputedStyle(inspector);
+  if (st.visibility !== 'hidden') problems.push('visibility ' + st.visibility);
+  var buttons = inspector.querySelectorAll('button, input, a, select, textarea');
+  if (!buttons.length) problems.push('no inspector controls');
+  var iw = window.innerWidth;
+  var ih = window.innerHeight;
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    var r = b.getBoundingClientRect();
+    var bst = getComputedStyle(b);
+    var notRendered = bst.visibility === 'hidden' || bst.display === 'none' || (r.width < 0.5 && r.height < 0.5);
+    if (!notRendered) {
+      var name = b.id || b.getAttribute('data-action') || String(i);
+      problems.push('rendered ' + name + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+    }
+    var cx = Math.min(iw - 2, Math.max(2, r.left + Math.max(r.width, 0) / 2));
+    var cy = Math.min(ih - 2, Math.max(2, r.top + Math.min(Math.max(r.height, 0) / 2, 24)));
+    var hit = document.elementFromPoint(cx, cy);
+    if (hit && inspector.contains(hit)) problems.push('tap ' + (b.id || b.getAttribute('data-action') || i));
+    try { b.focus(); } catch (err) {}
+    if (document.activeElement === b) problems.push('focused ' + (b.id || b.getAttribute('data-action') || i));
+  }
+  for (var y = 4; y < ih; y += 36) {
+    var edge = document.elementFromPoint(iw - 2, y);
+    if (edge && inspector.contains(edge)) problems.push('edge ' + y);
+  }
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def closed_inspector_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, INSPECTOR_CLOSED_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"closed inspector {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"closed inspector {raw}"]
+    if not isinstance(found, list):
+        return [f"closed inspector {raw}"]
+    return [str(item) for item in found]
+
+
+def num_text(value: float) -> str:
+    text = f"{float(value):.6f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def reveal_expr(selector: str) -> str:
+    return (
+        "(function(){"
+        f"var el=document.querySelector('{selector}');"
+        "if(!el) return 'missing';"
+        "el.scrollIntoView({block:'center',inline:'nearest'});"
+        "return 'shown';"
+        "})()"
+    )
+
+
+def field_text(cdp: Cdp, field: str) -> tuple[str, str]:
+    return eval_expr(
+        cdp,
+        "(function(){"
+        f"var el=document.getElementById('{field}');"
+        "return el?String(el.value):'missing';"
+        "})()",
+    )
+
+
+def wait_hole_state(
+    cdp: Cdp,
+    origin: str,
+    ready_fn,
+    timeout: float,
+    label: str,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    deadline = time.time() + timeout
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.3)
+        problems = site_problems(cdp.events, origin, cdp.urls)
+        payload = eval_state(cdp)
+        problems.extend(smoke_notes(payload))
+        if problems:
+            return last, problems
+        state = (payload or {}).get("state") if payload else None
+        if isinstance(state, dict):
+            last = state
+            if state.get("lastError"):
+                return state, [str(state.get("lastError"))]
+            if ready_fn(state):
+                return state, []
+        time.sleep(0.15)
+    return last, [f"{label} timed out", json.dumps(last)]
+
+
 def portrait_layout_ok(state: dict[str, Any], expanded: bool) -> list[str]:
     layout = state.get("layout") or {}
     problems: list[str] = []
@@ -972,6 +1147,7 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
     except (RuntimeError, TimeoutError, OSError) as exc:
         return [f"portrait emulation failed: {exc}"]
     problems: list[str] = []
+    inspector_checked = False
     for spec in PORTRAIT:
         kind = str(spec["kind"])
         url = origin + "/"
@@ -981,6 +1157,13 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             problems.append(f"portrait {kind} load")
             problems.extend(load_problems[:20])
             return problems
+        if not inspector_checked:
+            inspector_checked = True
+            closed = closed_inspector_problems(cdp)
+            if closed:
+                problems.append(f"portrait {kind} closed inspector")
+                problems.extend(closed)
+                return problems
         raw, err = eval_expr(cdp, toolbar_point_expr(kind))
         if err or not isinstance(raw, str) or not raw.startswith("{"):
             problems.append(f"portrait {kind} toolbar {raw or err}")
@@ -1138,6 +1321,285 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         )
     return problems
 
+
+def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
+    """390x844. Resize a box into the plate, tap its top face, cut three countersunk holes."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"portrait holes emulation failed: {exc}"]
+    url = origin + "/"
+    print(f"load portrait_holes {url}", flush=True)
+    _loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["portrait holes load", *load_problems[:20]]
+    raw, err = eval_expr(cdp, toolbar_point_expr("box"))
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return [f"portrait holes toolbar {raw or err}"]
+    box = json.loads(raw)
+    touch_tap(cdp, float(box["x"]), float(box["y"]))
+    created, wait_problems = wait_portrait(cdp, origin, "box", {"sx": 20.0}, PAGE_TIMEOUT_S)
+    if wait_problems or not isinstance(created, dict):
+        return ["portrait holes create", *wait_problems[:20]]
+    defaults = created.get("holeDefaults") or {}
+    try:
+        plate_sx = float(defaults["plateSx"])
+        plate_sy = float(defaults["plateSy"])
+        plate_sz = float(defaults["plateSz"])
+        diameter = float(defaults["diameterMm"])
+        cs_diameter = float(defaults["countersinkDiameterMm"])
+        angle = float(defaults["countersinkAngleDeg"])
+    except (KeyError, TypeError, ValueError):
+        return [f"portrait holes defaults {defaults!r}"]
+    positions = defaults.get("positions")
+    if not isinstance(positions, list) or len(positions) != 3:
+        return [f"portrait holes positions {positions!r}"]
+    expand_problems = tap_selector(cdp, "#dimToggle", "portrait holes expand")
+    if expand_problems:
+        return expand_problems
+    edits = (
+        ("boxSx", plate_sx),
+        ("boxSy", plate_sy),
+        ("boxSz", plate_sz),
+        ("primCz", plate_sz / 2),
+    )
+    for field, value in edits:
+        edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(value)))
+        if edit_err or edited != "edited":
+            return [f"portrait holes {field} {edited or edit_err}"]
+    plate, plate_problems = wait_portrait(
+        cdp,
+        origin,
+        "box",
+        {"sx": plate_sx, "sy": plate_sy, "sz": plate_sz, "cz": plate_sz / 2},
+        PAGE_TIMEOUT_S,
+        extra={"dimSheetOpen": True},
+    )
+    if plate_problems or not isinstance(plate, dict):
+        return ["portrait holes plate", *plate_problems[:20]]
+    open_fit = portrait_fit_problems(cdp)
+    if open_fit:
+        return ["portrait holes expanded overflow", *open_fit]
+    collapse = tap_selector(cdp, "#dimToggle", "portrait holes collapse")
+    if collapse:
+        return collapse
+    collapsed, collapse_problems = wait_portrait(
+        cdp,
+        origin,
+        "box",
+        {"sx": plate_sx, "sy": plate_sy, "sz": plate_sz},
+        PAGE_TIMEOUT_S,
+        extra={"dimSheetOpen": False},
+    )
+    if collapse_problems or not isinstance(collapsed, dict):
+        return ["portrait holes collapse wait", *collapse_problems[:20]]
+    shut_fit = portrait_fit_problems(cdp)
+    if shut_fit:
+        return ["portrait holes collapsed overflow", *shut_fit]
+    topped, top_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"view\"][data-view=\"top\"]');"
+        "if(!b)return 'missing';b.click();return 'clicked';})()",
+    )
+    if top_err or topped != "clicked":
+        return [f"portrait holes top view {topped or top_err}"]
+    time.sleep(0.7)
+    for _zoom in range(5):
+        zoomed, zoom_err = eval_expr(
+            cdp,
+            "(function(){var b=document.querySelector('[data-action=\"zoomstep\"]');"
+            "if(!b)return 'missing';b.click();return 'clicked';})()",
+        )
+        if zoom_err or zoomed != "clicked":
+            return [f"portrait holes zoom {zoomed or zoom_err}"]
+    time.sleep(0.2)
+    hole_button = tap_selector(cdp, '#touchToolbar [data-action="holeTool"]', "portrait holes tool")
+    if hole_button:
+        return hole_button
+    armed, arm_problems = wait_hole_state(
+        cdp,
+        origin,
+        lambda state: state.get("holeTool") is True and state.get("selectionMode") == "face",
+        15,
+        "portrait holes arm",
+    )
+    if arm_problems or not isinstance(armed, dict):
+        return ["portrait holes arm", *arm_problems[:20]]
+    points_raw, points_err = eval_expr(cdp, SHEET_HIT_EXPR)
+    try:
+        if points_err or not isinstance(points_raw, str) or not points_raw.startswith("{"):
+            return [f"portrait holes face points {points_raw or points_err}"]
+        try:
+            hit_plan = json.loads(points_raw)
+        except json.JSONDecodeError:
+            return [f"portrait holes face points {points_raw}"]
+        face_points = hit_plan.get("pts") if isinstance(hit_plan, dict) else None
+        if not isinstance(face_points, list) or not face_points:
+            return [f"portrait holes face points {points_raw}"]
+        faced: dict[str, Any] | None = None
+        face_problems: list[str] = []
+
+        def accept_face(point: dict[str, Any]) -> bool:
+            nonlocal faced, face_problems
+            faced, face_problems = wait_hole_state(
+                cdp,
+                origin,
+                lambda state: state.get("holeFaceReady") is True,
+                1.2,
+                "portrait holes face",
+            )
+            if isinstance(faced, dict) and faced.get("holeFaceReady") is True and not face_problems:
+                return True
+            faced = None
+            return False
+
+        for point in face_points:
+            if not isinstance(point, dict) or point.get("onView") is not True:
+                continue
+            touch_tap(cdp, float(point["x"]), float(point["y"]))
+            if accept_face(point):
+                break
+        if not isinstance(faced, dict):
+            for point in face_points:
+                if not isinstance(point, dict) or point.get("onView") is not True:
+                    continue
+                sent, sent_err = eval_expr(cdp, synth_tap_expr(float(point["x"]), float(point["y"])))
+                if sent_err or sent != "sent":
+                    face_problems = [f"portrait holes synth {sent or sent_err}", *face_problems]
+                    break
+                if accept_face(point):
+                    break
+        if not isinstance(faced, dict):
+            probe, _probe_err = eval_expr(cdp, "JSON.stringify(window.__holeTapProbe||[])")
+            return ["portrait holes face", *face_problems[:8], points_raw, str(probe or "")]
+    finally:
+        eval_expr(cdp, RESTORE_SHEET_EXPR)
+    reopen = tap_selector(cdp, "#dimToggle", "portrait holes sheet")
+    if reopen:
+        return reopen
+    shown, shown_err = eval_expr(cdp, reveal_expr("#holeApply"))
+    if shown_err or shown != "shown":
+        return [f"portrait holes reveal {shown or shown_err}"]
+    for field, want in (("holeDia", diameter), ("holeCsDia", cs_diameter), ("holeCsAng", angle)):
+        text, text_err = field_text(cdp, field)
+        if text_err or not text:
+            return [f"portrait holes {field} {text or text_err}"]
+        try:
+            got = float(text)
+        except ValueError:
+            return [f"portrait holes {field} {text}"]
+        if abs(got - want) > 1e-6:
+            return [f"portrait holes {field} {got} want {want}"]
+    if faced.get("holeDepthMode") != "through" or faced.get("holeCountersink") is not True:
+        return [f"portrait holes mode {faced.get('holeDepthMode')!r} countersink {faced.get('holeCountersink')!r}"]
+    done: dict[str, Any] | None = None
+    for index, uv in enumerate(positions):
+        if not isinstance(uv, (list, tuple)) or len(uv) < 2:
+            return [f"portrait holes uv {uv!r}"]
+        for field, value in (("holeU", float(uv[0])), ("holeV", float(uv[1]))):
+            edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(value)))
+            if edit_err or edited != "edited":
+                return [f"portrait holes {field} {edited or edit_err}"]
+        shown, shown_err = eval_expr(cdp, reveal_expr("#holeApply"))
+        if shown_err or shown != "shown":
+            return [f"portrait holes reveal {shown or shown_err}"]
+        cut = tap_selector(cdp, "#holeApply", "portrait holes cut")
+        if cut:
+            return cut
+        want_count = index + 1
+        done, cut_problems = wait_hole_state(
+            cdp,
+            origin,
+            lambda state, count=want_count: (
+                int(state.get("holeCount") or 0) == count
+                and state.get("occtGate") is True
+                and state.get("gateOcct") == "PASS"
+                and state.get("watertight") is True
+                and state.get("unitsPass") is True
+                and int(state.get("bodyCount") or 0) == 1
+            ),
+            PAGE_TIMEOUT_S,
+            f"portrait holes cut {want_count}",
+        )
+        if cut_problems or not isinstance(done, dict):
+            return [f"portrait holes cut {want_count}", *cut_problems[:20]]
+    if not isinstance(done, dict):
+        return ["portrait holes no result"]
+    hole_log = done.get("holeLog") or []
+    if not isinstance(hole_log, list) or len(hole_log) != 3:
+        return [f"portrait holes log {hole_log!r}"]
+    try:
+        volume_before = float(hole_log[0]["volumeBefore"])
+        volume_after = float(hole_log[-1]["volumeAfter"])
+    except (KeyError, TypeError, ValueError):
+        return [f"portrait holes volumes {hole_log!r}"]
+    if not volume_after < volume_before:
+        return [f"portrait holes volume {volume_before} -> {volume_after}"]
+    for index, entry in enumerate(hole_log):
+        if not isinstance(entry, dict):
+            return [f"portrait holes entry {index}"]
+        if entry.get("countersink") is not True or entry.get("depthMode") != "through":
+            return [f"portrait holes entry {index} {entry!r}"]
+        if abs(float(entry.get("diameterMm") or 0) - diameter) > 1e-6:
+            return [f"portrait holes diameter {entry.get('diameterMm')!r}"]
+        if abs(float(entry.get("countersinkDiameterMm") or 0) - cs_diameter) > 1e-6:
+            return [f"portrait holes countersink {entry.get('countersinkDiameterMm')!r}"]
+        if abs(float(entry.get("countersinkAngleDeg") or 0) - angle) > 1e-6:
+            return [f"portrait holes angle {entry.get('countersinkAngleDeg')!r}"]
+        if abs(float(entry.get("u") or 0) - float(positions[index][0])) > 1e-6:
+            return [f"portrait holes u {entry.get('u')!r}"]
+        if abs(float(entry.get("v") or 0) - float(positions[index][1])) > 1e-6:
+            return [f"portrait holes v {entry.get('v')!r}"]
+        if abs(float(entry.get("depthMm") or 0) - plate_sz) > 0.2:
+            return [f"portrait holes depth {entry.get('depthMm')!r}"]
+        if not float(entry.get("volumeAfter") or 0) < float(entry.get("volumeBefore") or 0):
+            return [f"portrait holes step volume {entry!r}"]
+    print(
+        "portrait_holes: plate "
+        f"{plate_sx:g}x{plate_sy:g}x{plate_sz:g} mm, "
+        f"diameter {diameter:g} mm, countersink {cs_diameter:g} mm, angle {angle:g} deg, "
+        f"volume {volume_before:.3f} -> {volume_after:.3f} mm3, "
+        f"fit {defaults.get('fit')!r}",
+        flush=True,
+    )
+    hole_fit = portrait_fit_problems(cdp)
+    if hole_fit:
+        return ["portrait holes open overflow", *hole_fit]
+    measured, measure_err = eval_expr(cdp, TARGET_EXPR)
+    if measure_err or not isinstance(measured, str):
+        return [f"portrait holes targets {measured or measure_err}"]
+    sizes = json.loads(measured)
+    if int(sizes.get("n") or 0) < 12 or sizes.get("bad"):
+        return [f"portrait holes targets {measured}"]
+    scrolled, scroll_err = eval_expr(
+        cdp,
+        "(function(){var panel=document.getElementById('dimPanel');"
+        "if(panel) panel.scrollTop=0;"
+        "var toggle=document.getElementById('dimToggle');"
+        "if(toggle&&toggle.scrollIntoView) toggle.scrollIntoView({block:'nearest',inline:'nearest'});"
+        "return toggle?'top':'missing';})()",
+    )
+    if scroll_err or scrolled != "top":
+        return [f"portrait holes hide scroll {scrolled or scroll_err}"]
+    close_sheet = tap_selector(cdp, "#dimToggle", "portrait holes hide")
+    if close_sheet:
+        return close_sheet
+    hidden, hide_problems = wait_hole_state(
+        cdp,
+        origin,
+        lambda state: state.get("dimSheetOpen") is False and int(state.get("holeCount") or 0) == 3,
+        PAGE_TIMEOUT_S,
+        "portrait holes hide",
+    )
+    if hide_problems or not isinstance(hidden, dict):
+        return ["portrait holes hide", *hide_problems[:12]]
+    hidden_fit = portrait_fit_problems(cdp)
+    if hidden_fit:
+        return ["portrait holes hidden overflow", *hidden_fit]
+    closed = closed_inspector_problems(cdp)
+    if closed:
+        return ["portrait holes closed inspector", *closed]
+    return []
 
 
 def click_boolean(cdp: Cdp, op: str) -> str:
@@ -1415,6 +1877,11 @@ def run(omit: list[str]) -> int:
             if portrait_problems:
                 failures.append("portrait")
                 failures.extend(portrait_problems[:40])
+        if not failures:
+            hole_problems = run_portrait_holes(cdp, origin)
+            if hole_problems:
+                failures.append("portrait_holes")
+                failures.extend(hole_problems[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

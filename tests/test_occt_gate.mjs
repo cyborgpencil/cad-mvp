@@ -45,7 +45,12 @@ if (existsSync(blinkPath)) {
   try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
 }
 const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
-const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES } = await import(viewUrl);
+const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles } = await import(viewUrl);
+const blinkJsonPath = path.join(root, 'tests', 'fixtures', 'blink.json');
+let blinkFile = null;
+if (existsSync(blinkJsonPath)) {
+  try { blinkFile = JSON.parse(readFileSync(blinkJsonPath, 'utf8')); } catch (_err) { blinkFile = null; }
+}
 
 let failures = 0;
 
@@ -453,6 +458,131 @@ expect('resize volume ' + (resized.params.sx * resized.params.sy * resized.param
 const resizedStl = writeCheckedStl('prim-box-resized.stl', resized.mesh, { xmin: -12, ymin: -10, zmin: 0, xmax: 12, ymax: 10, zmax: 20 }, 0.05);
 console.log('prim-box-resized triangles', resizedStl.triangles, 'bytes', resizedStl.bytes);
 
+const plateSx = ops.PLATE_SX_MM;
+const plateSy = ops.PLATE_SY_MM;
+const plateSz = ops.PLATE_SZ_MM;
+const plateShape = ops.makeBoxSolid(oc, plateSx, plateSy, plateSz, [-plateSx / 2, -plateSy / 2, 0]);
+expect('plate solid', !!plateShape);
+const plateView = plateShape ? inspectSolid(oc, plateShape) : null;
+expect('plate gate', !!plateView && plateView.gate.pass === true && plateView.watertight.pass === true && plateView.units === 'mm');
+let plateFace = null;
+let plateFaceZ = -Infinity;
+const plateFaces = plateView && plateView.topology ? plateView.topology.faces : [];
+for (let fi = 0; fi < plateFaces.length; fi += 1) {
+  const centroid = plateFaces[fi].centroid;
+  if (centroid && centroid[2] > plateFaceZ) {
+    plateFaceZ = centroid[2];
+    plateFace = plateFaces[fi];
+  }
+}
+const plateFrame = plateFace
+  ? faceFrameFromTriangles(plateView.mesh.vertices, plateView.mesh.triangles, plateFace.tris, [0, 0, plateSz / 2])
+  : null;
+expect('plate frame', !!plateFrame);
+if (plateFrame) {
+  expect('plate frame origin', Math.abs(plateFrame.origin[0] + plateSx / 2) <= 0.2
+    && Math.abs(plateFrame.origin[1] + plateSy / 2) <= 0.2
+    && Math.abs(plateFrame.origin[2] - plateSz) <= 0.2);
+  expect('plate inward', Math.abs(plateFrame.inward[0]) <= 1e-6 && Math.abs(plateFrame.inward[1]) <= 1e-6 && plateFrame.inward[2] < -0.9);
+  const plateSpots = ops.PLATE_HOLE_UV_MM;
+  for (let pi = 0; pi < plateSpots.length; pi += 1) {
+    const at = plateFrame.point(plateSpots[pi][0], plateSpots[pi][1]);
+    expect('plate spot ' + pi, Math.abs(at[0] - (-plateSx / 2 + plateSpots[pi][0])) <= 0.2
+      && Math.abs(at[1] - (-plateSy / 2 + plateSpots[pi][1])) <= 0.2
+      && Math.abs(at[2] - plateSz) <= 0.2);
+  }
+}
+const plateVolume = plateSx * plateSy * plateSz;
+const badHole = plateShape && plateFrame ? ops.cutHole(oc, plateShape, {
+  face: plateFrame.point(ops.PLATE_HOLE_UV_MM[0][0], ops.PLATE_HOLE_UV_MM[0][1]),
+  dir: plateFrame.inward,
+  diameterMm: 0,
+  depthMode: 'through',
+  countersink: true,
+  countersinkDiameterMm: ops.HOLE_COUNTERSINK_DIAMETER_MM,
+  countersinkAngleDeg: ops.HOLE_COUNTERSINK_ANGLE_DEG,
+}) : { ok: true, kept: false, shape: {}, error: 'missing' };
+expect('bad diameter kept', badHole.ok === false && badHole.kept === true && badHole.shape === null && String(badHole.error).indexOf('kept') !== -1);
+expect('bad diameter volume', !!plateShape && Math.abs(ops.solidVolumeMm3(oc, plateShape) - plateVolume) <= 1e-3);
+let holedShape = plateShape;
+let plateBefore = 0;
+let plateAfter = 0;
+if (plateFrame && plateShape) {
+  for (let hi = 0; hi < ops.PLATE_HOLE_UV_MM.length; hi += 1) {
+    const uv = ops.PLATE_HOLE_UV_MM[hi];
+    const cut = ops.cutHole(oc, holedShape, {
+      face: plateFrame.point(uv[0], uv[1]),
+      dir: plateFrame.inward,
+      diameterMm: ops.HOLE_DIAMETER_MM,
+      depthMode: 'through',
+      depthMm: 0,
+      countersink: true,
+      countersinkDiameterMm: ops.HOLE_COUNTERSINK_DIAMETER_MM,
+      countersinkAngleDeg: ops.HOLE_COUNTERSINK_ANGLE_DEG,
+    });
+    expect('plate hole ' + (hi + 1) + ' ' + (cut.error || ''), cut.ok === true && !!cut.shape && cut.units === 'mm');
+    expect('plate hole ' + (hi + 1) + ' gate', cut.ok === true && cut.gate && cut.gate.pass === true && cut.watertight && cut.watertight.pass === true);
+    expect('plate hole ' + (hi + 1) + ' depth', cut.ok === true && Math.abs(cut.depthMm - plateSz) <= 0.05);
+    if (!cut.ok || !cut.shape) break;
+    if (hi === 0) plateBefore = cut.volumeBefore;
+    plateAfter = cut.volumeAfter;
+    console.log('plate hole', hi + 1, 'volume', cut.volumeBefore, '->', cut.volumeAfter, 'depth', cut.depthMm, 'countersink height', cut.countersinkHeightMm);
+    if (holedShape !== plateShape) holedShape.delete();
+    holedShape = cut.shape;
+  }
+}
+const oneHole = ops.holeRemovedVolumeMm3({
+  diameterMm: ops.HOLE_DIAMETER_MM,
+  depthMm: plateSz,
+  countersink: true,
+  countersinkDiameterMm: ops.HOLE_COUNTERSINK_DIAMETER_MM,
+  countersinkAngleDeg: ops.HOLE_COUNTERSINK_ANGLE_DEG,
+});
+const plateWant = plateVolume - oneHole * ops.PLATE_HOLE_UV_MM.length;
+expect('plate volume ' + plateAfter + ' want ' + plateWant, plateBefore > 0 && Math.abs(plateBefore - plateVolume) <= 1e-3 && Math.abs(plateAfter - plateWant) <= 0.5);
+expect('plate input kept', !!plateShape && Math.abs(ops.solidVolumeMm3(oc, plateShape) - plateVolume) <= 1e-3);
+const plateBounds = {
+  xmin: -plateSx / 2,
+  ymin: -plateSy / 2,
+  zmin: 0,
+  xmax: plateSx / 2,
+  ymax: plateSy / 2,
+  zmax: plateSz,
+};
+if (holedShape && holedShape !== plateShape) {
+  const holedView = inspectSolid(oc, holedShape);
+  const plateStl = writeCheckedStl('prim-plate-holes.stl', holedView.mesh, plateBounds, 0.2);
+  console.log('prim-plate-holes triangles', plateStl.triangles, 'bytes', plateStl.bytes);
+}
+console.log(
+  'plate holes diameter', ops.HOLE_DIAMETER_MM,
+  'countersink', ops.HOLE_COUNTERSINK_DIAMETER_MM,
+  'angle', ops.HOLE_COUNTERSINK_ANGLE_DEG,
+  'plate', plateSx, plateSy, plateSz,
+  'volume', plateBefore, '->', plateAfter,
+  'fit', ops.HOLE_FIT
+);
+const blindBox = ops.makeBoxSolid(oc, 20, 20, 10, [-10, -10, 0]);
+const blindCut = blindBox ? ops.cutHole(oc, blindBox, {
+  face: [0, 0, 10],
+  dir: [0, 0, -1],
+  diameterMm: ops.HOLE_DIAMETER_MM,
+  depthMode: 'blind',
+  depthMm: ops.HOLE_BLIND_DEPTH_MM,
+  countersink: false,
+}) : { ok: false, error: 'missing', volumeAfter: 0 };
+const blindWant = 20 * 20 * 10 - ops.holeRemovedVolumeMm3({
+  diameterMm: ops.HOLE_DIAMETER_MM,
+  depthMm: ops.HOLE_BLIND_DEPTH_MM,
+  countersink: false,
+});
+expect('blind hole ' + (blindCut.error || ''), blindCut.ok === true && Math.abs(blindCut.volumeAfter - blindWant) <= 0.5);
+expect('blind input kept', !!blindBox && Math.abs(ops.solidVolumeMm3(oc, blindBox) - 4000) <= 1e-3);
+if (blindCut.shape) blindCut.shape.delete();
+if (blindBox) blindBox.delete();
+if (holedShape && holedShape !== plateShape) holedShape.delete();
+if (plateShape) plateShape.delete();
+
 const pageSrc = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
 expect('no bracket demo in the page', pageSrc.indexOf('demo=blink') === -1 && pageSrc.indexOf('buildBlink') === -1);
 expect('disc hook', pageSrc.indexOf("primKind === 'disc'") !== -1);
@@ -460,25 +590,38 @@ expect('touch toolbar', pageSrc.indexOf('id="touchToolbar"') !== -1);
 expect('decimal keypad', pageSrc.indexOf('inputmode="decimal"') !== -1);
 expect('gizmo switch', pageSrc.indexOf('id="gizmoSwitch"') !== -1 && pageSrc.indexOf('data-mode="rotate"') !== -1 && pageSrc.indexOf('data-mode="scale"') !== -1);
 expect('portrait sheet', pageSrc.indexOf('id="dimToggle"') !== -1 && pageSrc.indexOf('id="dimBody"') !== -1 && pageSrc.indexOf('primRz') !== -1);
+expect('hole tool', pageSrc.indexOf('id="holeApply"') !== -1 && pageSrc.indexOf('id="holeDia"') !== -1 && pageSrc.indexOf('data-action="holeTool"') !== -1);
+expect('hole defaults on the page', pageSrc.indexOf('value="4.5"') !== -1 && pageSrc.indexOf('value="9.5"') !== -1 && pageSrc.indexOf('value="82"') !== -1);
+expect('closed inspector hidden', pageSrc.indexOf('.inspector:not(.open)') !== -1 && pageSrc.indexOf('visibility: hidden') !== -1);
 expect('tap slop in page', pageSrc.indexOf('tapSlopPx()') !== -1);
 expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);
 
-if (blinkMod) {
+if (blinkMod && blinkFile) {
   const blinkPlan = blinkMod.blinkHolePlan(null);
+  const blinkSpec = blinkMod.blinkSpec(null);
+  const legCount = Number(blinkFile.legHoleCount);
+  const discCount = Number(blinkFile.discHoleCount);
+  const specKeys = ['legLengthMm', 'uprightHeightMm', 'legWidthMm', 'thicknessMm', 'discAlongMm', 'discAcrossMm', 'discDiameterMm', 'discThicknessMm'];
+  let specMatch = Number.isFinite(legCount) && Number.isFinite(discCount);
+  for (let si = 0; si < specKeys.length; si += 1) {
+    if (Number(blinkSpec[specKeys[si]]) !== Number(blinkFile[specKeys[si]])) specMatch = false;
+  }
+  const specOffsets = blinkSpec.legHoleOffsetsMm || [];
+  const fileOffsets = Array.isArray(blinkFile.legHoleOffsetsMm) ? blinkFile.legHoleOffsetsMm : [];
+  const offsetMatch = specOffsets.length === fileOffsets.length && specOffsets.every(function (value, index) {
+    return Number(value) === Number(fileOffsets[index]);
+  });
+  expect('fixture sizes match the local file', specMatch && offsetMatch);
   expect('drop log empty', blinkPlan.dropped.length === 0);
   const keptCountersink = blinkPlan.kept.filter(function (hole) { return hole.kind === 'countersink'; });
-  expect('six countersinks', keptCountersink.length === 6);
-  expect('three horizontal countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'horizontal'; }).length === 3);
-  expect('three vertical countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'vertical' && hole.kind === 'countersink'; }).length === 3);
-  expect('two disc screws', blinkPlan.discHoles.length === 2 && blinkPlan.discHoles[0].fit.indexOf('Erik to measure') !== -1);
-  expect('eight through-holes planned', keptCountersink.length + blinkPlan.discHoles.length === 8);
+  expect('countersink count', keptCountersink.length === legCount * 2);
+  expect('horizontal countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'horizontal'; }).length === legCount);
+  expect('vertical countersinks', blinkPlan.kept.filter(function (hole) { return hole.leg === 'vertical' && hole.kind === 'countersink'; }).length === legCount);
+  expect('disc screws', blinkPlan.discHoles.length === discCount && blinkPlan.discHoles[0].fit.indexOf('Erik to measure') !== -1);
+  expect('through-holes planned', keptCountersink.length + blinkPlan.discHoles.length === legCount * 2 + discCount);
   const clearance = blinkMod.countersinkClearance(null);
   expect('countersink clearance ' + clearance.failures.join('; '), clearance.pass === true);
-  const blinkSpec = blinkMod.blinkSpec(null);
-  expect('fixture legs 60', blinkSpec.legLengthMm === 60 && blinkSpec.uprightHeightMm === 60 && blinkSpec.legWidthMm === 20 && blinkSpec.thicknessMm === 4);
-  expect('fixture holes 11 23 35', blinkSpec.legHoleOffsetsMm.join(',') === '11,23,35');
-  expect('fixture disc 50', blinkSpec.discAlongMm === 50 && blinkSpec.discAcrossMm === 10 && blinkSpec.discDiameterMm === 18 && blinkSpec.discThicknessMm === 4);
-  expect('edge defaults', ops.EDGE_FILLET_RADIUS_MM === 2 && ops.EDGE_CHAMFER_DISTANCE_MM === 0.5 && blinkSpec.userFilletRadiusMm === 2 && blinkSpec.userChamferMm === 0.5);
+  expect('edge defaults', ops.EDGE_FILLET_RADIUS_MM === blinkSpec.userFilletRadiusMm && ops.EDGE_CHAMFER_DISTANCE_MM === blinkSpec.userChamferMm);
 
   const blinkWant = blinkMod.expectedBlinkVolume(null);
   const blinkBounds = blinkMod.expectedBlinkBounds(null);
@@ -494,8 +637,8 @@ if (blinkMod) {
   expect('blink fuse glue off', blink.log[0].glue === false);
   expect('blink disc glue on', blink.log[2].glue === true && blink.log[2].step === 'disc');
   expect('blink holes glue off', blink.log.filter(function (item) { return item.step === 'hole'; }).every(function (item) { return item.glue === false && item.pass === true; }));
-  expect('blink eight hole steps', blink.log.filter(function (item) { return item.step === 'hole' && item.pass; }).length === 8);
-  expect('blink through count', blink.throughHoles === 8 && blink.droppedHoles.length === 0);
+  expect('blink hole steps', blink.log.filter(function (item) { return item.step === 'hole' && item.pass; }).length === legCount * 2 + discCount);
+  expect('blink through count', blink.throughHoles === legCount * 2 + discCount && blink.droppedHoles.length === 0);
   const blinkClass = blinkMod.classifyBlinkHoles(oc, blink.shape, null);
   expect('blink holes through ' + blinkClass.message, blinkClass.pass === true);
   if (!blinkClass.pass) console.error(blinkClass.failures.join('\n'));

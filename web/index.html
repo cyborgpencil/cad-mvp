@@ -582,6 +582,17 @@
     background: var(--active-fill);
     border-color: var(--active-border);
   }
+  .hole-apply {
+    width: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: var(--active-fill);
+    border: 1px solid var(--active-border);
+    color: var(--ink);
+    font-weight: 650;
+  }
   .dim-panel {
     position: absolute;
     z-index: 6;
@@ -1038,6 +1049,10 @@
     .browser { left: 0; transform: translateX(-105%); }
     .inspector { right: 0; left: auto; transform: translateX(105%); }
     .browser.open, .inspector.open { transform: none; }
+    .inspector:not(.open) {
+      visibility: hidden;
+      pointer-events: none;
+    }
     .vp-bar {
       left: 8px;
       right: 8px;
@@ -1175,6 +1190,7 @@
     .dim-panel.is-open {
       bottom: 8px;
       max-height: 40%;
+      overflow-y: auto;
     }
     .vp-bar {
       flex-wrap: wrap;
@@ -1267,6 +1283,7 @@
   <symbol id="i-line" viewBox="0 0 24 24"><path d="M5 18 19 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-rect" viewBox="0 0 24 24"><path d="M6 7h12v10H6z" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-hole" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-arc" viewBox="0 0 24 24"><path d="M5 16a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-poly" viewBox="0 0 24 24"><path d="M12 4 20 10l-3 9H7L4 10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-fillet" viewBox="0 0 24 24"><path d="M6 18V11a5 5 0 0 1 5-5h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
@@ -1401,6 +1418,7 @@
         <button type="button" class="tool-btn" data-action="primitive" data-kind="box" data-tool="Box" title="Box"><svg class="ico"><use href="#i-box"></use></svg><span>Box</span></button>
         <button type="button" class="tool-btn" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder"><svg class="ico"><use href="#i-cyl"></use></svg><span>Cylinder</span></button>
         <button type="button" class="tool-btn" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc"><svg class="ico"><use href="#i-circle"></use></svg><span>Disc</span></button>
+        <button type="button" class="tool-btn" data-action="holeTool" data-tool="Hole" title="Hole. Tap a face, then set the position, diameter, and depth."><svg class="ico"><use href="#i-hole"></use></svg><span>Hole</span></button>
         <button type="button" class="tool-btn" data-tool="Extrude (Push/Pull)" title="Extrude (Push/Pull)"><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
@@ -1513,6 +1531,7 @@
         <button type="button" class="touch-tool" data-action="primitive" data-kind="box" data-tool="Box" title="Box">Box</button>
         <button type="button" class="touch-tool" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder">Cylinder</button>
         <button type="button" class="touch-tool" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
+        <button type="button" class="touch-tool" data-action="holeTool" data-tool="Hole" title="Hole">Hole</button>
       </nav>
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
@@ -1558,6 +1577,25 @@
           <div class="dim-row"><span class="dim-label">Rot X °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRx" data-delta="-15" data-unit="deg" data-tool="Rotate X minus" aria-label="Rotate X minus">−</button><input id="primRx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate X degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRx" data-delta="15" data-unit="deg" data-tool="Rotate X plus" aria-label="Rotate X plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Rot Y °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="-15" data-unit="deg" data-tool="Rotate Y minus" aria-label="Rotate Y minus">−</button><input id="primRy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Y degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="15" data-unit="deg" data-tool="Rotate Y plus" aria-label="Rotate Y plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Rot Z °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="-15" data-unit="deg" data-tool="Rotate Z minus" aria-label="Rotate Z minus">−</button><input id="primRz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Z degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="15" data-unit="deg" data-tool="Rotate Z plus" aria-label="Rotate Z plus">+</button></div>
+        </div>
+        <div id="holeFields" hidden>
+          <div class="dim-row"><span class="dim-label">Edge U</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="-1" data-unit="mm" data-tool="Edge U minus" aria-label="Edge U minus">−</button><input id="holeU" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge U mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="1" data-unit="mm" data-tool="Edge U plus" aria-label="Edge U plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Edge V</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="-1" data-unit="mm" data-tool="Edge V minus" aria-label="Edge V minus">−</button><input id="holeV" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge V mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="1" data-unit="mm" data-tool="Edge V plus" aria-label="Edge V plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Diameter</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeDia" data-delta="-1" data-unit="mm" data-tool="Hole diameter minus" aria-label="Hole diameter minus">−</button><input id="holeDia" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="4.5" aria-label="Hole diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeDia" data-delta="1" data-unit="mm" data-tool="Hole diameter plus" aria-label="Hole diameter plus">+</button></div>
+          <div class="axis-row" role="group" aria-label="Hole depth">
+            <button type="button" class="is-on" data-action="holeDepth" data-depth="through" data-tool="Through hole" aria-pressed="true">Through</button>
+            <button type="button" data-action="holeDepth" data-depth="blind" data-tool="Blind hole" aria-pressed="false">Blind</button>
+          </div>
+          <div class="dim-row" id="holeDepthRow"><span class="dim-label">Depth</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeDepth" data-delta="-1" data-unit="mm" data-tool="Hole depth minus" aria-label="Hole depth minus">−</button><input id="holeDepth" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="6" disabled aria-label="Hole depth mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeDepth" data-delta="1" data-unit="mm" data-tool="Hole depth plus" aria-label="Hole depth plus">+</button></div>
+          <div class="axis-row" role="group" aria-label="Countersink">
+            <button type="button" class="is-on" id="holeCsBtn" data-action="holeCs" data-tool="Countersink" aria-pressed="true">Countersink</button>
+          </div>
+          <div id="holeCsFields">
+            <div class="dim-row"><span class="dim-label">CS dia</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeCsDia" data-delta="-1" data-unit="mm" data-tool="Countersink diameter minus" aria-label="Countersink diameter minus">−</button><input id="holeCsDia" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="9.5" aria-label="Countersink diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeCsDia" data-delta="1" data-unit="mm" data-tool="Countersink diameter plus" aria-label="Countersink diameter plus">+</button></div>
+            <div class="dim-row"><span class="dim-label">Angle °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeCsAng" data-delta="-1" data-unit="deg" data-step="1" data-tool="Countersink angle minus" aria-label="Countersink angle minus">−</button><input id="holeCsAng" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="82" aria-label="Countersink angle degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeCsAng" data-delta="1" data-unit="deg" data-step="1" data-tool="Countersink angle plus" aria-label="Countersink angle plus">+</button></div>
+          </div>
+          <button type="button" class="hole-apply" id="holeApply" data-action="applyHole" data-tool="Cut hole" title="Cut one hole">Cut hole</button>
+          <p class="fine dim-note">Millimetres from the face edges. A tap snaps to 1 mm. Typed values stay as typed. 4.5 mm and 9.5 mm at 82° are a #8 wood screw, unverified fit. 90° is the metric ISO angle.</p>
         </div>
         <p class="fine dim-note">Millimetres and degrees. Snap 1 mm and 15 deg on by default. Steppers 1 mm or 15 deg; long press 400 ms for 0.1 mm or 1 deg. A rejected edit keeps the last solid.</p>
         </div>
@@ -1810,6 +1848,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     { name: 'Box', tab: 'model', action: 'primitive', kind: 'box' },
     { name: 'Cylinder', tab: 'model', action: 'primitive', kind: 'cylinder' },
     { name: 'Disc', tab: 'model', action: 'primitive', kind: 'disc' },
+    { name: 'Hole', tab: 'model', action: 'holeTool' },
     { name: 'Extrude (Push/Pull)', tab: 'model' },
     { name: 'Inset', tab: 'model' },
     { name: 'Fillet', tab: 'model', action: 'armEdge', op: 'fillet' },
@@ -1905,6 +1944,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     snap: true,
     gizmoMode: 'move',
     dimSheetOpen: false,
+    holeTool: false,
+    holeFace: null,
+    holeDepthMode: 'through',
+    holeCountersink: true,
+    holeLog: [],
     dimStepFromPointer: false,
     section: false,
     measure: false,
@@ -2020,6 +2064,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   const overlays = viewApi.makeOverlays(THREE);
   for (let oi = 0; oi < overlays.nodes.length; oi += 1) scene.add(overlays.nodes[oi]);
   let gizmoDrag = null;
+  let lastPick = null;
 
   const sketchPts = [
     new THREE.Vector3(-10, 20.08, -10),
@@ -2231,6 +2276,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   }
 
   function gizmoShouldShow() {
+    if (state.holeTool) return false;
     if (state.bodies.length > 1) return false;
     if (state.preview) return true;
     if (state.selection === 'item' && state.selectedIds.length > 0) return true;
@@ -2383,14 +2429,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const disc = document.getElementById('primDisc');
     if (!host || !box || !cyl || !disc) return;
     const prim = state.primitive;
-    host.hidden = !prim;
+    const holeFields = document.getElementById('holeFields');
+    host.hidden = !prim && !state.holeTool;
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     disc.hidden = !prim || prim.kind !== 'disc';
-    if (prim) {
+    if (holeFields) holeFields.hidden = !state.holeTool;
+    if (prim || state.holeTool) {
       state.writingFields = true;
       const title = document.getElementById('primTitle');
-      if (title) title.textContent = primitiveLabel(prim.kind);
+      if (title) title.textContent = state.holeTool ? 'Hole' : primitiveLabel(prim.kind);
+    }
+    if (prim) {
+      state.writingFields = true;
       document.getElementById('primCx').value = String(prim.params.cx);
       document.getElementById('primCy').value = String(prim.params.cy);
       document.getElementById('primCz').value = String(prim.params.cz);
@@ -2415,11 +2466,205 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       if (rz) rz.value = String(prim.params.rz || 0);
       state.writingFields = false;
     }
+    paintHoleChrome();
     host.classList.toggle('is-open', !isPortraitSheet() || state.dimSheetOpen === true);
     const toggle = document.getElementById('dimToggle');
     if (toggle) toggle.setAttribute('aria-expanded', host.classList.contains('is-open') ? 'true' : 'false');
     layoutDimSheet();
     publishGateState();
+  }
+
+  function paintHoleChrome() {
+    const through = state.holeDepthMode !== 'blind';
+    const depthButtons = document.querySelectorAll('[data-action="holeDepth"]');
+    for (let i = 0; i < depthButtons.length; i += 1) {
+      const on = depthButtons[i].getAttribute('data-depth') === (through ? 'through' : 'blind');
+      depthButtons[i].classList.toggle('is-on', on);
+      depthButtons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    const cs = document.getElementById('holeCsBtn');
+    if (cs) {
+      cs.classList.toggle('is-on', state.holeCountersink === true);
+      cs.setAttribute('aria-pressed', state.holeCountersink ? 'true' : 'false');
+    }
+    const depth = document.getElementById('holeDepth');
+    if (depth) depth.disabled = through;
+    const csFields = document.getElementById('holeCsFields');
+    if (csFields) csFields.hidden = state.holeCountersink !== true;
+    const tools = document.querySelectorAll('[data-action="holeTool"]');
+    for (let i = 0; i < tools.length; i += 1) {
+      tools[i].classList.toggle('is-on', state.holeTool === true);
+      tools[i].setAttribute('aria-pressed', state.holeTool ? 'true' : 'false');
+    }
+  }
+
+  function rememberHoleFace(faceId, hitPoint, fromTap) {
+    if (!state.holeTool) return false;
+    const meshCad = state.meshCad;
+    const topo = state.topology;
+    if (!meshCad || !topo || !viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') return false;
+    let face = null;
+    for (let i = 0; i < topo.faces.length; i += 1) {
+      if (topo.faces[i].id === faceId) face = topo.faces[i];
+    }
+    if (!face) return false;
+    const centre = state.bodies.length === 1 ? bodyCentroid(state.bodies[0]) : [0, 0, 0];
+    const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
+    if (!frame) {
+      const why = 'That face is not planar. The solid was kept.';
+      state.lastError = why;
+      toast(why);
+      setHint(why);
+      publishGateState();
+      return false;
+    }
+    state.holeFace = { id: faceId, frame: frame };
+    state.lastError = '';
+    if (fromTap && hitPoint) {
+      const uv = frame.uvOf(hitPoint);
+      const u = snapOn() ? snapMm(uv.u) : uv.u;
+      const v = snapOn() ? snapMm(uv.v) : uv.v;
+      const uEl = document.getElementById('holeU');
+      const vEl = document.getElementById('holeV');
+      if (uEl) uEl.value = String(Math.round(u * 1000) / 1000);
+      if (vEl) vEl.value = String(Math.round(v * 1000) / 1000);
+    }
+    setHint('Hole face. Position is millimetres from the face edges.');
+    publishGateState();
+    return true;
+  }
+
+  function applyHole() {
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (!body || !body.shape || !opsApi || typeof opsApi.cutHole !== 'function' || !primApi) {
+      state.lastError = 'FAIL: hole needs one solid. The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    if (!state.holeFace || !state.holeFace.frame) {
+      state.lastError = 'FAIL: tap a face first. The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    const u = readField('holeU');
+    const v = readField('holeV');
+    const diameter = readField('holeDia');
+    const depth = readField('holeDepth');
+    const csDia = readField('holeCsDia');
+    const angle = readField('holeCsAng');
+    if (u == null || v == null || diameter == null || (state.holeCountersink && (csDia == null || angle == null))) {
+      state.lastError = 'FAIL: hole values must be numbers. The typed values and the solid were kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    if (state.holeDepthMode === 'blind' && depth == null) {
+      state.lastError = 'FAIL: blind depth must be a number. The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    const point = state.holeFace.frame.point(u, v);
+    let cut = null;
+    try {
+      cut = opsApi.cutHole(oc, body.shape, {
+        face: point,
+        dir: state.holeFace.frame.inward,
+        diameterMm: diameter,
+        depthMode: state.holeDepthMode,
+        depthMm: depth,
+        countersink: state.holeCountersink === true,
+        countersinkDiameterMm: csDia,
+        countersinkAngleDeg: angle
+      });
+    } catch (err) {
+      state.lastError = 'FAIL: hole threw ' + (err && err.message ? err.message : String(err)) + ' The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    if (!cut || !cut.ok || !cut.shape) {
+      state.lastError = (cut && cut.error) || 'FAIL: hole failed. The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    const flat = primApi.flattenMesh(cut.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'hole')) {
+      dropShape(cut.shape);
+      state.lastError = 'FAIL: hole mesh was rejected. The solid was kept.';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
+    }
+    dropShape(body.shape);
+    body.shape = cut.shape;
+    body.mesh = cut.mesh;
+    body.topology = cut.topology;
+    body.gate = cut.gate;
+    body.watertight = cut.watertight;
+    state.topology = cut.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = cut.gate;
+    state.holeLog.push({
+      u: u,
+      v: v,
+      diameterMm: diameter,
+      depthMode: state.holeDepthMode,
+      depthMm: cut.depthMm,
+      countersink: state.holeCountersink === true,
+      countersinkDiameterMm: state.holeCountersink ? csDia : 0,
+      countersinkAngleDeg: state.holeCountersink ? angle : 0,
+      volumeBefore: cut.volumeBefore,
+      volumeAfter: cut.volumeAfter,
+      plateSx: body.params && body.params.sx ? body.params.sx : 0,
+      plateSy: body.params && body.params.sy ? body.params.sy : 0,
+      plateSz: body.params && body.params.sz ? body.params.sz : 0,
+      fit: opsApi.HOLE_FIT || 'unverified fit'
+    });
+    state.lastError = '';
+    state.booleanOp = '';
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    const note = 'Hole ' + state.holeLog.length + '. Volume ' + cut.volumeBefore.toFixed(3) + ' -> ' + cut.volumeAfter.toFixed(3) + ' mm3';
+    setHint(note);
+    toast(note);
+    publishGateState();
+    return true;
+  }
+
+  function upwardFacePick() {
+    const topo = state.topology;
+    if (!topo || !topo.faces || !topo.faces.length) return null;
+    let best = null;
+    let bestZ = -Infinity;
+    for (let i = 0; i < topo.faces.length; i += 1) {
+      const face = topo.faces[i];
+      const c = face.centroid;
+      if (!c || !(c[2] > bestZ)) continue;
+      bestZ = c[2];
+      best = face;
+    }
+    if (!best || !best.centroid) return null;
+    const s = screenOfCad(best.centroid);
+    const box = viewport.getBoundingClientRect();
+    return {
+      x: box.left + s.x,
+      y: box.top + s.y,
+      id: best.id,
+      z: best.centroid[2]
+    };
   }
 
   function captureMeshCad() {
@@ -3457,8 +3702,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       }
       return best;
     }
-    if (!hit || hit.faceIndex == null || !topo.triFace) return null;
-    return topo.triFace[hit.faceIndex] || null;
+    if (!hit || hit.faceIndex == null || !topo.triFace) {
+      lastPick = null;
+      return null;
+    }
+    const faceId = topo.triFace[hit.faceIndex] || null;
+    if (faceId && hit.point) {
+      const local = mesh.worldToLocal(hit.point.clone());
+      lastPick = { id: faceId, point: [local.x, local.z, local.y] };
+    } else {
+      lastPick = null;
+    }
+    return faceId;
   }
 
   function updateHover(ev) {
@@ -3700,6 +3955,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function onPrimitiveCommit() {
     if (state.writingFields || !state.primitive) return;
+    if (state.holeLog && state.holeLog.length) {
+      const why = 'The solid already has holes. The solid was kept.';
+      toast(why);
+      setHint(why);
+      paintPrimFields();
+      return;
+    }
     const cx = readField('primCx');
     const cy = readField('primCy');
     const cz = readField('primCz');
@@ -3744,8 +4006,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       : (fine ? (viewApi && viewApi.STEPPER_FINE_MM) || 0.1 : (viewApi && viewApi.STEPPER_MM) || 1);
     const field = document.getElementById(dimId);
     const current = readField(dimId);
-    if (!field || current == null) return false;
-    field.value = String(Math.round((current + sign * step) * 1000) / 1000);
+    if (!field || current == null || field.disabled) return false;
+    const custom = Number(btn.getAttribute('data-step'));
+    const used = custom > 0 ? (fine && unit === 'deg' ? 1 : custom) : step;
+    const fineStep = fine && !(custom > 0) ? step : used;
+    field.value = String(Math.round((current + sign * (fine ? fineStep : used)) * 1000) / 1000);
+    if (dimId.indexOf('hole') === 0) return true;
     onPrimitiveCommit();
     return true;
   }
@@ -3852,6 +4118,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     home.style.top = margin + 'px';
     home.style.right = (margin + cubeCss + 8) + 'px';
     layoutDimSheet();
+    syncClosedPanels();
   }
 
   function resize() {
@@ -4196,7 +4463,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       snap: state.snap === true,
       dimSheetOpen: state.dimSheetOpen === true,
       layout: layoutRects(),
-      gizmoHandles: gizmoHandleState()
+      gizmoHandles: gizmoHandleState(),
+      holeTool: state.holeTool === true,
+      holeFaceReady: !!(state.holeFace && state.holeFace.frame),
+      holeDepthMode: state.holeDepthMode || 'through',
+      holeCountersink: state.holeCountersink === true,
+      holeCount: state.holeLog.length,
+      holeLog: state.holeLog.slice(),
+      facePick: upwardFacePick(),
+      holeDefaults: opsApi ? {
+        diameterMm: opsApi.HOLE_DIAMETER_MM,
+        countersinkDiameterMm: opsApi.HOLE_COUNTERSINK_DIAMETER_MM,
+        countersinkAngleDeg: opsApi.HOLE_COUNTERSINK_ANGLE_DEG,
+        blindDepthMm: opsApi.HOLE_BLIND_DEPTH_MM,
+        plateSx: opsApi.PLATE_SX_MM,
+        plateSy: opsApi.PLATE_SY_MM,
+        plateSz: opsApi.PLATE_SZ_MM,
+        positions: opsApi.PLATE_HOLE_UV_MM,
+        fit: opsApi.HOLE_FIT
+      } : null
     };
   }
 
@@ -4367,6 +4652,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     return (vis[target] ? 'Show ' : 'Hide ') + NODE_LABELS[target];
   }
 
+  function syncClosedPanels() {
+    const narrow = isNarrow();
+    const inspector = document.getElementById('inspector');
+    if (!inspector) return;
+    const closed = narrow && !inspector.classList.contains('open');
+    if (closed) inspector.setAttribute('inert', '');
+    else inspector.removeAttribute('inert');
+  }
+
   function setDrawer(which, open) {
     if (!isNarrow()) return;
     document.getElementById('browser').classList.toggle('open', open && which === 'browser');
@@ -4374,12 +4668,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const any = document.getElementById('browser').classList.contains('open')
       || document.getElementById('inspector').classList.contains('open');
     document.getElementById('backdrop').hidden = !any;
+    syncClosedPanels();
   }
 
   function closeDrawers() {
     document.getElementById('browser').classList.remove('open');
     document.getElementById('inspector').classList.remove('open');
     document.getElementById('backdrop').hidden = true;
+    syncClosedPanels();
   }
 
   function closePopups() {
@@ -4592,6 +4888,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       state.snap = !state.snap;
       message = state.snap ? 'Snapping: On' : 'Snapping: Off';
       applyLook();
+    } else if (action === 'holeTool') {
+      state.holeTool = !state.holeTool;
+      if (state.holeTool) {
+        state.selection = 'face';
+        state.selectedIds = [];
+        state.hoverId = null;
+        state.holeFace = null;
+        message = 'Hole: tap a face';
+      } else {
+        message = 'Hole off';
+      }
+      paintPrimFields();
+      applyLook();
+    } else if (action === 'holeDepth') {
+      state.holeDepthMode = btn.getAttribute('data-depth') === 'blind' ? 'blind' : 'through';
+      paintHoleChrome();
+      publishGateState();
+      message = state.holeDepthMode === 'blind' ? 'Blind hole' : 'Through hole';
+    } else if (action === 'holeCs') {
+      state.holeCountersink = !state.holeCountersink;
+      paintHoleChrome();
+      publishGateState();
+      message = state.holeCountersink ? 'Countersink on' : 'Countersink off';
+    } else if (action === 'applyHole') {
+      applyHole();
+      message = state.lastError || ('Hole ' + state.holeLog.length);
     } else if (action === 'select') {
       const mode = btn.getAttribute('data-mode') || 'item';
       const normalized = mode === 'body' ? 'item' : mode;
@@ -4998,7 +5320,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     if (g && g.pid === ev.pointerId) {
       if (g.type === 'gizmo') commitGizmoDrag(g.moved);
       else if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
-      else if (g.type === 'orbit' && !g.moved && ev.button === 0) {
+      else if (g.type === 'orbit' && !g.moved && g.button === 0 && (ev.button === 0 || ev.pointerType === 'touch')) {
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
         const next = selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
           shift: ev.shiftKey,
@@ -5006,6 +5328,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
         });
         state.selectedIds = next.ids;
         state.hoverId = null;
+        if (state.holeTool && state.selection === 'face' && next.ids.length === 1 && lastPick && lastPick.id === next.ids[0]) {
+          rememberHoleFace(next.ids[0], lastPick.point, true);
+        }
         refreshAnchor();
         applyLook();
         const label = state.selection === 'item' ? 'Item' : cap(state.selection);

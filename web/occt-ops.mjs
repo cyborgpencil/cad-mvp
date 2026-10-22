@@ -1194,6 +1194,28 @@ export function meshVolumeMm3(mesh) {
 export const EDGE_FILLET_RADIUS_MM = 2;
 export const EDGE_CHAMFER_DISTANCE_MM = 0.5;
 
+// Hole tool. Team choice, 2026-10-21. 4.5 mm and 9.5 mm are a #8 wood screw
+// clearance and countersink, tagged unverified fit. 82 degrees is the #8
+// flat-head angle. 90 degrees is the metric ISO countersink angle and stays editable.
+export const HOLE_DIAMETER_MM = 4.5;
+export const HOLE_COUNTERSINK_DIAMETER_MM = 9.5;
+export const HOLE_COUNTERSINK_ANGLE_DEG = 82;
+export const HOLE_BLIND_DEPTH_MM = 6;
+export const HOLE_FIT = 'unverified fit';
+// Plate for the portrait hole test. A flat box, not an Erik measurement.
+export const PLATE_SX_MM = 80;
+export const PLATE_SY_MM = 40;
+export const PLATE_SZ_MM = 6;
+// Three countersunk holes, millimetres from the face-edge corner. Team choice.
+export const PLATE_HOLE_UV_MM = Object.freeze([
+  Object.freeze([20, 20]),
+  Object.freeze([40, 20]),
+  Object.freeze([60, 20]),
+]);
+// Cutter overlap outside the face so the Boolean crosses it. The section on
+// the face is still the countersink diameter, and the included angle is unchanged.
+export const HOLE_CUTTER_PAD_MM = 0.05;
+
 function addScaled(point, dir, scale) {
   return [
     point[0] + dir[0] * scale,
@@ -1279,6 +1301,201 @@ export function makeCountersunkThroughHole(oc, options) {
     return null;
   }
   return fused.shape;
+}
+
+export function countersinkHeightMm(holeDiameterMm, countersinkDiameterMm, angleDeg) {
+  const r1 = Number(countersinkDiameterMm) / 2;
+  const r2 = Number(holeDiameterMm) / 2;
+  const half = (Number(angleDeg) / 2) * Math.PI / 180;
+  if (!(r1 > r2) || !(half > 0) || !(half < Math.PI / 2)) return 0;
+  const height = (r1 - r2) / Math.tan(half);
+  return height > 0 ? height : 0;
+}
+
+// Removed volume of one hole. The countersink is the cone frustum
+// BRepPrimAPI_MakeCone(R1, R2, H) with H = (R1-R2)/tan(angle/2), plus the
+// drill below that frustum. depthMm is the hole depth inside the solid.
+export function holeRemovedVolumeMm3(spec) {
+  const src = spec || {};
+  const radius = Number(src.diameterMm) / 2;
+  const depth = Number(src.depthMm);
+  if (!(radius > 0) || !(depth > 0)) return 0;
+  if (src.countersink !== true) return Math.PI * radius * radius * depth;
+  const r1 = Number(src.countersinkDiameterMm) / 2;
+  const height = countersinkHeightMm(src.diameterMm, src.countersinkDiameterMm, src.countersinkAngleDeg);
+  if (!(r1 > radius) || !(height > 0)) return 0;
+  const used = Math.min(height, depth);
+  const rAt = r1 + (radius - r1) * (used / height);
+  const frustum = (Math.PI * used / 3) * (r1 * r1 + r1 * rAt + rAt * rAt);
+  const rest = Math.PI * radius * radius * Math.max(0, depth - used);
+  return frustum + rest;
+}
+
+function unitDir(dir) {
+  if (!dir) return null;
+  const len = Math.hypot(Number(dir[0]), Number(dir[1]), Number(dir[2]));
+  if (!(len > 1e-12)) return null;
+  return [dir[0] / len, dir[1] / len, dir[2] / len];
+}
+
+function holeFail(error, volumeBefore) {
+  const text = error && error.indexOf('kept') === -1 ? error + ' The solid was kept.' : (error || 'FAIL: hole failed. The solid was kept.');
+  return {
+    ok: false,
+    shape: null,
+    kept: true,
+    error: text,
+    volumeBefore: volumeBefore || 0,
+    volumeAfter: volumeBefore || 0,
+    depthMm: 0,
+    countersinkHeightMm: 0,
+    units: 'mm',
+  };
+}
+
+function ownedCopy(oc, shape) {
+  const trash = [];
+  const copied = copyOwned(oc, shape, trash);
+  const kept = copied.ok ? copied.shape : null;
+  const rest = [];
+  for (let i = 0; i < trash.length; i += 1) {
+    if (trash[i] !== kept) rest.push(trash[i]);
+  }
+  dispose(rest);
+  return kept;
+}
+
+// Distance along dir from the face point to the far intersection.
+// The line starts 1 mm outside the face. Returns 0 when the solid is not pierced.
+function measureThroughMm(oc, shape, face, dir) {
+  const back = 1;
+  const trash = [];
+  try {
+    const origin = track(trash, new oc.gp_Pnt(
+      face[0] - dir[0] * back,
+      face[1] - dir[1] * back,
+      face[2] - dir[2] * back
+    ));
+    const gpDir = track(trash, new oc.gp_Dir(dir[0], dir[1], dir[2]));
+    const line = track(trash, new oc.gp_Lin(origin, gpDir));
+    const inter = track(trash, new oc.BRepIntCurveSurface_Inter());
+    inter.Init(shape, line, 1e-6);
+    let maxW = -Infinity;
+    let guard = 0;
+    while (inter.More() && guard < 64) {
+      guard += 1;
+      const w = Number(inter.W());
+      if (Number.isFinite(w) && w > maxW) maxW = w;
+      inter.Next();
+    }
+    if (!(maxW > back)) return 0;
+    return maxW - back;
+  } catch (_err) {
+    return 0;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// One parametric hole. The countersink cone is
+// BRepPrimAPI_MakeCone(R1 = countersink dia/2, R2 = hole dia/2, H = (R1-R2)/tan(angle/2)).
+// A 0.05 mm start outside the face keeps that angle and that face section.
+// The cone is fused with the drill, then one cutShapes runs. A failed or empty
+// result is deleted. The caller's shape is not an argument of the Boolean.
+export function cutHole(oc, shape, spec) {
+  const src = spec || {};
+  const face = src.face;
+  const dir = unitDir(src.dir);
+  const diameter = Number(src.diameterMm);
+  const radius = diameter / 2;
+  const countersink = src.countersink === true;
+  const csDia = Number(src.countersinkDiameterMm);
+  const angle = Number(src.countersinkAngleDeg);
+  const depthMode = src.depthMode === 'blind' ? 'blind' : 'through';
+  if (!shape || !face || face.length < 3 || !dir) {
+    return holeFail('FAIL: hole needs one solid and a face point.');
+  }
+  if (!(radius > 0)) return holeFail('FAIL: hole diameter must be a positive number of millimetres.');
+  if (countersink) {
+    if (!(csDia / 2 > radius)) return holeFail('FAIL: countersink diameter must be larger than the hole.');
+    if (!(angle > 0) || !(angle < 180)) return holeFail('FAIL: countersink angle must be between 0 and 180 degrees.');
+  }
+  let volumeBefore = 0;
+  try {
+    volumeBefore = solidVolumeMm3(oc, shape);
+  } catch (err) {
+    return holeFail('FAIL: hole volume threw ' + explain(oc, err));
+  }
+  let depth = Number(src.depthMm);
+  if (depthMode === 'through') {
+    depth = measureThroughMm(oc, shape, face, dir);
+    if (!(depth > 0)) return holeFail('FAIL: could not measure a through depth.', volumeBefore);
+  } else if (!(depth > 0)) {
+    return holeFail('FAIL: blind depth must be a positive number of millimetres.', volumeBefore);
+  }
+  const csHeight = countersink ? countersinkHeightMm(diameter, csDia, angle) : 0;
+  if (countersink && !(csHeight > 0)) return holeFail('FAIL: countersink height is not positive.', volumeBefore);
+  if (countersink && depth + 1e-6 < csHeight) {
+    return holeFail('FAIL: the hole is shorter than the countersink.', volumeBefore);
+  }
+  const pad = HOLE_CUTTER_PAD_MM;
+  const start = addScaled(face, dir, -pad);
+  const cylLen = depth + (depthMode === 'through' ? pad * 2 : pad);
+  const cylinder = makeCylinderSolid(oc, radius, cylLen, start, dir);
+  if (!cylinder) return holeFail('FAIL: the hole drill was not built.', volumeBefore);
+  let tool = cylinder;
+  if (countersink) {
+    const half = (angle / 2) * Math.PI / 180;
+    const r1 = csDia / 2;
+    const cone = makeConeSolid(oc, r1 + pad * Math.tan(half), radius, csHeight + pad, start, dir);
+    if (!cone) {
+      releaseShape(cylinder);
+      return holeFail('FAIL: the countersink cone was not built.', volumeBefore);
+    }
+    const fused = fuseShapes(oc, cone, cylinder);
+    releaseShape(cone);
+    releaseShape(cylinder);
+    if (!fused.ok || !fused.shape) {
+      if (fused.shape) releaseShape(fused.shape);
+      return holeFail(fused.error || 'FAIL: the countersink fuse failed.', volumeBefore);
+    }
+    tool = fused.shape;
+  }
+  const base = ownedCopy(oc, shape);
+  if (!base) {
+    releaseShape(tool);
+    return holeFail('FAIL: the solid could not be copied.', volumeBefore);
+  }
+  const cut = cutShapes(oc, base, tool);
+  releaseShape(base);
+  releaseShape(tool);
+  if (!cut.ok || !cut.shape) {
+    if (cut.shape) releaseShape(cut.shape);
+    return holeFail(cut.error || 'FAIL: the hole cut failed.', volumeBefore);
+  }
+  const gated = checkSolidGate(oc, cut.shape);
+  if (!gated.pass || !(gated.volume + 1e-6 < volumeBefore)) {
+    releaseShape(cut.shape);
+    const why = gated.pass ? 'FAIL: the hole did not remove material.' : (gated.error || 'FAIL: the hole failed the gate.');
+    return holeFail(why, volumeBefore);
+  }
+  return {
+    ok: true,
+    shape: cut.shape,
+    kept: false,
+    error: '',
+    volumeBefore: volumeBefore,
+    volumeAfter: gated.volume,
+    depthMm: depth,
+    countersinkHeightMm: csHeight,
+    units: 'mm',
+    gate: gated.view.gate,
+    watertight: gated.view.watertight,
+    mesh: gated.view.mesh,
+    topology: gated.view.topology,
+    bounds: gated.bounds,
+    solids: gated.solids,
+  };
 }
 
 export function checkSolidGate(oc, shape) {

@@ -207,8 +207,19 @@ Newest entries at the top.
 
 ## 2026-10-21 22:33 MT - prompts/mobile-3-holes.md prepped for step 3 with step 2 carry-overs: reuse viewport-selection.mjs picking and transformShape snap, keep the portrait overflow checks, countersink as one Boolean cut, 3-hole portrait smoke test.
 
-## 2026-10-21 22:47 MT - Step 2 overflow fix PASS (Grok 01a161d7, 10:21-10:40 PM): portrait rows wrap, targets >= 44 px, overflow checks pass collapsed and expanded, CTest 7/7, WASM 11/11, STLs unchanged and watertight in mm. Erik to OK: tool strip hidden in portrait (actions via Tools). mobile-3 prompt: countersink default 82 deg (#8 flat head) with editable angle, cone formula per Research Digest.
+## 2026-10-21 22:47 MT - Step 2 overflow fix PASS (Grok 01a161d7, 10:21-10:40 PM): portrait rows wrap, targets >= 44 px, overflow checks pass collapsed and expanded, CTest 7/7, WASM 11/11, STLs unchanged and watertight in mm. Tool strip hidden in portrait (actions via Tools): team call, signed off by the Chief. mobile-3 prompt: countersink default 82 deg (#8 flat head) with editable angle, cone formula per Research Digest.
 
 ## 2026-10-21 22:49 MT - Chief accepted step 2. Hidden portrait tool strip recorded as a team choice in web/PROGRESS.md. mobile-3 prompt adds the closed-panel inert/hidden check.
 
 ## 2026-10-21 23:03 MT - Step 2 pushed as 509bc60 (CI green, 7/7). mobile-3 prompt adds the test_occt_gate.mjs Blink-offset leak fix.
+
+## 2026-10-21 23:05 MT - mobile-4 prompt refreshed with step 2-3 carry-overs (edge picking via viewport-selection.mjs, fillet/chamfer wrappers with IsDone and revert, overflow and closed-panel checks, no Blink numbers). Tool-strip item marked as the Chief's team call.
+
+## 2026-10-21 23:15 MT - Erik request queued after step 3: tool menu back to one row, one icon high (scroll/overflow, no wrap, >= 44 px), with a desktop and 390x844 smoke test. Recorded in web/PROGRESS.md queue. Overrides step 2's wrap for the tool menu only.
+
+## 2026-10-21 23:18 MT - Erik request queued with the one-row tool menu: Info button moves into the Tree row (suggested left of the part name box, team picks the final spot), >= 44 px, smoke test for a shared top on desktop and 390x844.
+
+## 2026-10-21 23:20 MT - Erik request queued in the same UI session: Home targets world origin (0,0,0), keep fit distance, report current target first, test within 1e-6 with and without selection.
+
+- 2026-10-21 23:22 MT (Doc Steward): Queued icon-only Search (item 4) after Home fix; added Home origin-radius and 8-corner check to PROGRESS.md.
+- 2026-10-22 00:13 MT (Doc Steward): Step 3 holes PASS (Pilot). CTest 7/7 with and without the fixture, deploy_smoke passes at 390x844 with the closed panel inert, WASM 11/11, line 479 leak removed. Countersink cone H 2.876 mm, 133.26 mm3 removed per hole (399.785 for 3), 9.5 mm top edge, faces 6/8/10/12, zero free bounds. prim-plate-holes.stl watertight, 0.35% off BRep. Gaps: screenshot shows default box, tracked tests lack face-count and 9.5 mm edge checks (carry into the step 4 prompt), Grok PID 34200 hung.

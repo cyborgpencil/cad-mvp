@@ -485,3 +485,146 @@ export function dragPlaneNormal(kind, cameraDir) {
   const len = Math.hypot(nx, ny, nz) || 1;
   return [nx / len, ny / len, nz / len];
 }
+
+function vsub(a, b) {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function vadd(a, b) {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function vscale(a, s) {
+  return [a[0] * s, a[1] * s, a[2] * s];
+}
+
+function vdot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function vcross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function vnorm(a) {
+  const len = Math.hypot(a[0], a[1], a[2]);
+  if (!(len > 1e-12)) return null;
+  return [a[0] / len, a[1] / len, a[2] / len];
+}
+
+// Planar face frame for the hole tool. Distances are millimetres from the
+// two edges that meet at the minimum-u, minimum-v corner. u prefers +X, then
+// +Y, then +Z. The outward normal points away from bodyCentre. Team choice,
+// 2026-10-21. A face that is not planar within 0.08 mm returns null.
+export function faceFrameFromTriangles(vertices, triangles, triList, bodyCentre) {
+  const ids = [];
+  const seen = new Set();
+  const list = triList || [];
+  for (let i = 0; i < list.length; i += 1) {
+    const tri = triangles[list[i]];
+    if (!tri) continue;
+    for (let k = 0; k < 3; k += 1) {
+      const id = tri[k];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  if (ids.length < 3) return null;
+  const points = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    const p = vertices[ids[i]];
+    if (!p) return null;
+    points.push(p);
+  }
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const tri = triangles[list[i]];
+    if (!tri) continue;
+    const a = vertices[tri[0]];
+    const b = vertices[tri[1]];
+    const c = vertices[tri[2]];
+    if (!a || !b || !c) continue;
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    nx += uy * vz - uz * vy;
+    ny += uz * vx - ux * vz;
+    nz += ux * vy - uy * vx;
+  }
+  let outward = vnorm([nx, ny, nz]);
+  if (!outward) return null;
+  let sx = 0;
+  let sy = 0;
+  let sz = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    sx += points[i][0];
+    sy += points[i][1];
+    sz += points[i][2];
+  }
+  const mid = [sx / points.length, sy / points.length, sz / points.length];
+  const centre = bodyCentre || mid;
+  if (vdot(vsub(centre, mid), outward) > 0) outward = vscale(outward, -1);
+  let worst = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const dist = Math.abs(vdot(vsub(points[i], mid), outward));
+    if (dist > worst) worst = dist;
+  }
+  if (worst > 0.08) return null;
+  const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  let bestI = 0;
+  let bestAbs = 2;
+  for (let i = 0; i < axes.length; i += 1) {
+    const ad = Math.abs(vdot(axes[i], outward));
+    if (ad < bestAbs - 1e-9) {
+      bestAbs = ad;
+      bestI = i;
+    }
+  }
+  let u = vnorm(vsub(axes[bestI], vscale(outward, vdot(axes[bestI], outward))));
+  if (!u) return null;
+  if (vdot(u, axes[bestI]) < 0) u = vscale(u, -1);
+  const v = vnorm(vcross(outward, u));
+  if (!v) return null;
+  const ref = points[0];
+  let umin = Infinity;
+  let umax = -Infinity;
+  let vmin = Infinity;
+  let vmax = -Infinity;
+  for (let i = 0; i < points.length; i += 1) {
+    const d = vsub(points[i], ref);
+    const uu = vdot(d, u);
+    const vv = vdot(d, v);
+    if (uu < umin) umin = uu;
+    if (uu > umax) umax = uu;
+    if (vv < vmin) vmin = vv;
+    if (vv > vmax) vmax = vv;
+  }
+  const origin = vadd(ref, vadd(vscale(u, umin), vscale(v, vmin)));
+  const inward = vscale(outward, -1);
+  return {
+    origin: origin,
+    u: u,
+    v: v,
+    outward: outward,
+    inward: inward,
+    uSpan: umax - umin,
+    vSpan: vmax - vmin,
+    point: function (uMm, vMm) {
+      return vadd(origin, vadd(vscale(u, Number(uMm) || 0), vscale(v, Number(vMm) || 0)));
+    },
+    uvOf: function (p) {
+      const d = vsub(p, origin);
+      return { u: vdot(d, u), v: vdot(d, v) };
+    },
+  };
+}
