@@ -3925,7 +3925,7 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
         "(function(){var b=document.querySelector('[data-action=\"boolean\"][data-op=\"union\"]');"
         "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click();"
         "var s=window.__cadcamExportState||{};"
-        "return JSON.stringify({bodies:s.bodyCount, error:s.lastError||s.booleanMessage||''});})()",
+        "return JSON.stringify({bodies:s.bodyCount, error:s.lastError||''});})()",
         timeout=120,
     )
     if union_err or not isinstance(union, str) or not union.startswith("{"):
@@ -4176,7 +4176,7 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
         "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click();"
         "var s=window.__cadcamExportState||{};"
         "return JSON.stringify({bodies:s.bodyCount,gizmo:s.gizmoVisible===true,"
-        "disabled:s.posDisabled===true,error:s.lastError||s.booleanMessage||''});})()",
+        "disabled:s.posDisabled===true,error:s.lastError||''});})()",
         timeout=120,
     )
     if union_err or not isinstance(union, str) or not union.startswith("{"):
