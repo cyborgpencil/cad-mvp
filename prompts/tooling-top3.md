@@ -25,7 +25,7 @@ Goal: a test-side export check on every PR (MIT, `pip install` in CI).
 Scope: a Python check run by CI on exported STL/3MF: bounds and volume for size, plus an explicit `unit="millimeter"` assertion on 3MF. Do not use `is_watertight` as a gate (watertight dropped). Repair helpers: out of scope.
 Steps:
 1. Research first: trimesh docs (trimesh.org/trimesh.html) and the existing ci.yml; post a plan.
-2. Add the script as `tools/check_export.py` (units, bounds, volume and empty-mesh checks; watertight is not a gate) and a step after Native CTest in the existing `build` job (Repo Keeper to confirm).
+2. Add the script as `tools/check_export.py` (units, bounds, volume and empty-mesh checks; watertight is not a gate) and a step after Native CTest in the existing `build` job (approved).
 3. Run it against current export fixtures (default 20 mm cube; others TBD).
 4. trimesh version pin: `trimesh==5.1.1`.
 Checks: units assertion present and failing on a non-mm file; bounds within the matrix tolerance; CI green; no printer send.
