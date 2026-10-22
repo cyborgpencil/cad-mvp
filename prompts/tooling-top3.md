@@ -36,7 +36,7 @@ Goal: prove exports slice, using `--slice 0`, `--export-3mf`, `--export-statisti
 Scope: external tool only (AGPL-3.0; never linked into the app). Profiles must be passed with `--load-settings` and `--load-filaments`. Run on Z13 first; CI use = TBD.
 Steps:
 1. Research first: orcaslicer.com/wiki/cli (cli_actions, cli_misc, cli_mode); post a plan.
-2. Locate the installed Orca CLI on Z13 (path TBD) and the profile JSONs matching the acceptance profiles (Ermo X1C, Bambu 0.20 mm Standard, Bambu PLA Basic, stock TPU 95A; export paths TBD).
+2. Use the installed Orca CLI on Z13 at `C:\Program Files\OrcaSlicer\orca-slicer.exe` (version not stamped on the exe; TBD). User profiles live under `%APPDATA%\OrcaSlicer\user\<account-id>\` (subfolders `machine`, `process`, `filament`, `physical_printer`; a `default` folder also exists). Pick the JSONs matching the acceptance profiles (Ermo X1C, Bambu 0.20 mm Standard, Bambu PLA Basic, stock TPU 95A); never commit real user paths or the account id.
 3. Slice the acceptance exports into `builds\orca\` with `--export-statistics`.
 4. Add a wrapper script under `tools/` (name TBD).
 Checks: units check on the input files; sliced size matches within 0.05 mm per axis; statistics JSON written; no printer send and no network printer settings.
