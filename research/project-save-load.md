@@ -8,11 +8,6 @@ What the file stores, from the code: `PROJECT_VERSION` 1, `units` "mm", and per 
 6. P6 edit after reload: resize, move and delete one body each, then undo and redo all three. Undo stops at the loaded state; the edits made after the reload undo and redo as normal.
 7. P7 bad files: loading an empty file, a file with `"units": "in"`, and a file with version 2 each shows the matching message and leaves the model untouched.
 Pass means P1 through P7 all pass. Ruling (3T and Chief, 2026-10-22 08:46 MT): `.cadmvp` saves no undo history; loading clears the undo stack, the same as most CAD apps.
-=======
-## Wrap-up additions (Erik 2026-10-22 08:40 MT)
-- For A (Blink bracket) and B (11-part truck), take Orca screenshots of every sliced plate. Stage them on Z13 in C:\Users\cybor\Pictures\cadmvp-shots\, then copy them to /workspace/cad-mvp-updates/shots. Don't send anything to the printer.
-- Project file check: save each model as .cadmvp, reload it in a fresh tab, and confirm every body, its edits and its material tags come back, with the same bounding box and volume tolerances as above. Fix any gaps before sign-off.
->>>>>>> theirs
 
 Source: `web/project-file.mjs` on main `e970aba` (PR #2). Run by Pilot on the live build after wrap-up; gaps go to 3T as a Cursor fix.
 
