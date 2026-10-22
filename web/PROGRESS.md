@@ -305,6 +305,40 @@ PASS, not committed. CTest with CI=1: 7/7 passed (`occt_gate` Passed). `deploy_s
 - 2026-10-22 — UI session 3: the blank WebKit 3D view was #occtBanner leaving the flex column when the OCCT gate passed. The viewport grew, ResizeObserver called renderer.setSize, and headless WebKit stopped compositing the canvas. The framebuffer still held the plate (WebGL2, no context loss). The banner is now an overlay, and setSize is skipped when the buffer already matches. Phone smoke canvas check failed before the change and passed after in WebKit and Chromium. Title tooltips clear on pointerup, touchend, and blur. Create is a bottom sheet at 390x844 and a popover at 1440x900.
 - 03:38 WebKit blank view was our bug and is fixed; pixel check stays a hard failure (Pilot, per Chief's 02:49 ruling). Push pending Chief go.
 - 03:39 Push approved (Chief, 3T final). Screenshot cleanup and Dimensions-box check go in the next Grok batch after the gizmo bug, before undo/redo. Pilot logs start/done/end times per run and investigates the post-done-marker hang (Chief).
+## Project file save/load (2026-10-22)
+
+BREP symbols in the prebuilt libcascade 3.1.0 (`builds/libcascade/dist/opencascade_single.js.symbols`, plus a runtime probe):
+
+- `BRepTools` is exported to JavaScript.
+- The linked `Write` symbol is the file-path overload `BRepTools::Write(TopoDS_Shape const&, char const*, bool, bool, TopTools_FormatVersion, Message_ProgressRange const&)`. A box write returned true. The text starts with `DBRep_DrawableShape` and contains `CASCADE Topology`.
+- File-path `BRepTools::Read(TopoDS_Shape&, char const*, BRep_Builder const&, Message_ProgressRange const&)` is exported. The probe read the box back and `IsNull` was false.
+- The `std::ostream` / `std::istream` overloads of `Write` and `Read` are not in the symbol map.
+- `cadcam.wasm` does not link OCCT, so a `std::stringstream` wrapper cannot be compiled into that module.
+
+The binding is `web/project-file.mjs`. It calls those file-path methods, copies the BREP text out with `FS.readFile`, and `FS.unlink`s the temporary file. The `.cadmvp` document is plain JSON and stores that text. This is the binding the prebuild can actually call. It is flagged for Erik review. It is not a stringstream binding, and the stored file is not a virtual path.
+
+Team choices for the format and the load path (not Erik measurements):
+
+- `version` is the number `1`. Any other value, including `"1"`, is an error.
+- The extension is `.cadmvp`. The top-level `units` field is always `"mm"`.
+- Each part has `name`, `placement` `{x,y,z}` in millimetres, `material`, `primitive` (`{kind, parameters}` or null), `features` (an array), and `shape` (BREP text that contains `CASCADE Topology`).
+- `placement` is taken from `params.cx/cy/cz`, or 0 when those are missing. On load, `placement` is copied onto `cx/cy/cz` before a parameter rebuild.
+- Missing `material` is saved as `"default"`.
+- Parameter rebuild runs for `box`, `cylinder`, and `disc` only when `features` is empty. A non-empty `features` list, or any other kind, keeps the BREP text. A rebuilt shape that fails `checkOcctShape` falls back to BREP. A failed BREP validity check rejects the whole file.
+- BREP write flags: triangles on, normals off, `TopTools_FormatVersion_CURRENT`.
+- The round-trip box is `BRepBndLib::AddOptimal` with `useTriangulation` false and `useShapeTolerance` false.
+- An empty `parts` array is a valid empty project. `replaceMesh` rejects an empty index list, so the viewer hides the solid and the previous kernel mesh is left unloaded from the screen. An empty file, bad JSON, a missing or non-`mm` `units` field, or an unknown version is an error and does not change the model.
+- Load does not change the mm/inch display toggle. Save reads millimetre parameters and the OCCT shape, not the displayed numbers.
+- The download name is the document name with characters outside `[A-Za-z0-9._-]` replaced by `_`, plus `.cadmvp`. The blob type is `application/json`.
+- The file input `accept` is `.cadmvp,application/json,text/plain` so iOS can see the file. The control is a label with the input at opacity 0, `font-size: 16px`, and no `capture`. The File menu stays open until a file is chosen.
+- Confirm runs after a successful parse. Dirty model: "Replace the current model? Unsaved changes will be lost." Clean model: "Replace the current model with this file?" Cancel leaves the model unchanged.
+- A successful load calls the real `window.__cadcamClearUndo` from the gizmo batch. That function runs `commandStack.clear()` in `web/undo.mjs` and frees the before/after snapshots. Save/load does not install a no-op over it. Undo and redo buttons still call `doUndo` and `doRedo`.
+- Save uses an `<a download>` blob. `showSaveFilePicker` is not used; it is not available on iOS Safari.
+
+Manual iPhone file-picker check: not run on a physical device. Playwright WebKit is not iOS Safari. `tests/phone_smoke.py` covers the 44 px Save and Load controls, the hidden-input rule (`display` is not `none`), and the same hook round trip as `tests/deploy_smoke.py`.
+
+Error strings: empty file "This file is empty. The model was not changed."; unreadable file "This file could not be read. The model was not changed."; units "This file is not in millimetres. The model was not changed."; version "This file version is not supported. The model was not changed."; shape "A part failed the shape check. The model was not changed."; save "The project could not be saved."; cancel "Load cancelled. The model was not changed."
+
 - 04:31 Phone fix + ci.yml on main (d8d04df); ci.yml green on main; docs in 57e6d47. Branch protection on main requires CI build check, admin enforcement off (Repo Keeper). Nav cube launch cleared (3T).
 
 - 04:33 MT (Chief): undo/redo is built in the gizmo batch (before and after snapshot command stack, Ctrl+Z/Ctrl+Y, a drag counts as one step, load clears the stack), and resize and delete launch after it merges. Unlocked GTransform resize is in scope, with the ellipse note, validity check plus rollback, and lock on by default. The trash icon goes in the property sheet header (44 px or more, shown only when something is selected), and Del also deletes on desktop. The face-delete fixture is a 40x20x10 box with a 6 mm hole, built in the test and not from Blink.

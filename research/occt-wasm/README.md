@@ -27,6 +27,10 @@ Updated 2026-10-20 (MT). Kernel = OpenCASCADE (Erik, 2026-10-20 11:00 PM MT). Ta
 
 Fallback: if the iPhone load fails when the module starts, rebuild with a lower `MAXIMUM_MEMORY` (for example 512 MB), or use `IMPORTED_MEMORY` to set the max at runtime. [15] Phone checks Grok can't run are marked unverified for Erik.
 
+## BREP text in libcascade 3.1.0 (2026-10-22)
+
+The prebuilt single-threaded module exports file-path `BRepTools.Write` and `BRepTools.Read`. A runtime probe wrote a box to MEMFS and read it back. The `std::ostream` and `std::istream` overloads are not in `opencascade_single.js.symbols`. `web/project-file.mjs` uses the file-path calls, copies the BREP text into the `.cadmvp` JSON, and deletes the temporary file. `cadcam.wasm` still does not link OCCT.
+
 ## Next steps (Grok Build first)
 1. Native: add `vcpkg.json` with `opencascade` 8.0.1; CMake `find_package(OpenCASCADE)`; spike = box -> BRepCheck -> BRepMesh -> STL, ctest passes on Z13.
 2. WASM: install emsdk (user-level, no removals), build OCCT 8.0.1 static with only ModelingData/ModelingAlgorithms/Mesh modules, link the same core, record wasm size raw + brotli.
