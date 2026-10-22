@@ -955,10 +955,38 @@
   .phone-tabbar {
     display: none;
     flex: none;
+    flex-wrap: nowrap;
     background: var(--top);
     border-top: 1px solid var(--line-strong);
   }
   .phone-tabs { display: flex; flex: 1; min-width: 0; }
+  .modify-shelf {
+    display: flex;
+    flex: none;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 8px;
+    background: var(--panel);
+    border-top: 1px solid var(--line-strong);
+    scrollbar-width: none;
+  }
+  .modify-shelf::-webkit-scrollbar { display: none; }
+  .modify-shelf button {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+  }
+  .desk-bottom { display: none; flex: none; }
   /* Stay out of the flex column. Hiding the banner on a passing OCCT gate
      must not change #viewport, or WebKit drops the presented WebGL layer. */
   .interim-banner {
@@ -1200,6 +1228,8 @@
       padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
       align-items: stretch;
     }
+    .phone-tabs { display: contents; }
+    .desk-bottom { display: none !important; }
     .phone-tabbar .tab {
       flex: 1;
       border-bottom: 0;
@@ -1327,6 +1357,17 @@
     .vp-cluster { display: contents; }
     .vc-home { z-index: 8; }
   }
+  @media (min-width: 821px) {
+    .desk-bottom {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 52px;
+      padding: 0 8px;
+      background: var(--top);
+      border-top: 1px solid var(--line-strong);
+    }
+  }
   @media (max-height: 520px) {
     .interim-banner { min-height: 28px; padding: 2px 8px; }
     .toolbox .export-tools.tools,
@@ -1447,6 +1488,7 @@
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 15l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-tools" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-modify" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="9" cy="7" r="2.1" fill="currentColor"/><circle cx="15" cy="12" r="2.1" fill="currentColor"/><circle cx="8" cy="17" r="2.1" fill="currentColor"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-union" viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-cut" viewBox="0 0 24 24"><rect x="4" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14 6h6v12h-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.4 2"/></symbol>
@@ -1464,7 +1506,6 @@
 </svg>
 
 <div id="app">
-  <div class="interim-banner" id="occtBanner" role="status">Interim build: OCCT check pending</div>
   <header class="topbar">
     <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree">Tree</button>
     <div class="brand">
@@ -1484,10 +1525,7 @@
           <input id="projectFile" type="file" accept=".cadmvp,application/json,text/plain" tabindex="-1" aria-label="Choose a .cadmvp project">
         </label>
         <button type="button" data-tool="Import STL">Import STL</button>
-        <button type="button" data-action="loadFixture" data-fixture="closed_box" data-tool="Load closed box">Load closed box</button>
-        <button type="button" data-action="loadFixture" data-fixture="open_box" data-tool="Load open box">Load open box</button>
-        <button type="button" data-action="loadFixture" data-fixture="box20" data-tool="Load 20 mm box">Load 20 mm box</button>
-        <button type="button" data-action="loadFixture" data-fixture="flipped_box" data-tool="Load flipped box">Load flipped box</button>
+        <button type="button" data-action="downloadLog" data-tool="Download log">Download log</button>
       </div>
     </div>
     <button type="button" class="icon-btn hide-tight" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
@@ -1585,25 +1623,22 @@
     <div class="tools panel export-tools" data-panel="export" hidden>
       <div class="gate">
         <div class="gate-col">
-          <div class="gate-title">Watertight + units check</div>
+          <div class="gate-title">Units</div>
           <div class="gate-rows">
-            <span>Watertight</span><span class="badge" id="gateTight">…</span>
             <span>Units</span><span class="badge" id="gateUnits">…</span>
-            <span>OCCT</span><span class="badge fail" id="gateOcct">PENDING</span>
             <span>Export unit</span><span id="gateUnitLocked">millimeter (locked for export)</span>
-            <span>Volume</span><span id="gateVol" data-mm="0" data-kind="vol">…</span>
           </div>
-          <p class="gate-reason" id="gateReason">Export blocked: the OCCT check is pending.</p>
+          <p class="gate-reason" id="gateReason">Checking units.</p>
         </div>
         <div class="gate-actions">
           <div class="export-wrap">
-            <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Export blocked: the OCCT check is pending.">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
+            <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Checking units.">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
             <div class="menu" id="exportMenu" hidden>
               <button type="button" data-action="exportFmt" data-fmt="STL" data-tool="Export STL">STL</button>
               <button type="button" data-action="exportFmt" data-fmt="3MF" data-tool="Export 3MF">3MF</button>
             </div>
           </div>
-          <p class="fine">One export path. STL and 3MF stay off until occtGate, watertight, and units all pass.</p>
+          <p class="fine">One export path. STL and 3MF stay off until the units check passes.</p>
         </div>
       </div>
     </div>
@@ -1623,7 +1658,7 @@
         <button type="button" class="branch-name" data-tool="Sketches">Sketches</button>
         <div class="row">
           <button type="button" class="node" data-action="node" data-node="sketch" data-tool="Sketch1">Sketch1</button>
-          <button type="button" class="mini eye" data-action="visible" data-target="sketch" data-tool="Hide Sketch1" title="Hide Sketch1" aria-pressed="true" aria-label="Toggle Sketch1 visibility"><svg class="ico on"><use href="#i-eye"></use></svg><svg class="ico off"><use href="#i-eyeoff"></use></svg></button>
+          <button type="button" class="mini eye is-off" data-action="visible" data-target="sketch" data-tool="Show Sketch1" title="Show Sketch1" aria-pressed="false" aria-label="Toggle Sketch1 visibility"><svg class="ico on"><use href="#i-eye"></use></svg><svg class="ico off"><use href="#i-eyeoff"></use></svg></button>
         </div>
       </div>
       <div class="branch">
@@ -1832,14 +1867,32 @@
 
   <footer class="statusbar">
     <span class="stat">Units <b id="statusUnits">mm</b></span>
-    <span class="stat">Watertight <span class="badge" id="statusTight">…</span></span>
-    <span class="stat">Volume <b id="statusVol" data-mm="0" data-kind="vol">…</b></span>
     <span class="hint" id="statusHint">Loading checks…</span>
     <span id="buildStamp" class="build-stamp"></span>
   </footer>
 
+  <div id="modifyShelf" class="modify-shelf" data-hscroll hidden>
+    <button type="button" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move">Move</button>
+    <button type="button" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate">Rotate</button>
+    <button type="button" data-action="gizmoMode" data-mode="scale" data-tool="Resize" title="Resize">Resize</button>
+    <button type="button" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet">Fillet</button>
+    <button type="button" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer">Chamfer</button>
+    <button type="button" data-action="confirmEdge" data-tool="Confirm" title="Confirm">Confirm</button>
+    <button type="button" class="bool-op" data-action="boolean" data-op="union" data-tool="Union" title="Union" disabled aria-disabled="true">Union</button>
+    <button type="button" class="bool-op" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut" disabled aria-disabled="true">Cut</button>
+    <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
+    <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
+  </div>
+  <div class="desk-bottom" aria-label="Create and modify">
+    <button type="button" class="tool-btn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
+    <button type="button" class="tool-btn" id="modifyDesktop" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg><span>Modify</span></button>
+  </div>
+
   <nav class="phone-tabbar" aria-label="Workbench">
+    <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
+    <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
     <button type="button" class="tab" id="createBtn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg>Create</button>
+    <button type="button" class="tab" id="modifyBtn" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg>Modify</button>
     <div class="phone-tabs" role="tablist">
     <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
@@ -2096,7 +2149,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     'Union': { title: 'Union', sub: 'Boolean. 1 with 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
     'Cut': { title: 'Cut', sub: 'Boolean. 1 minus 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
     'Intersect': { title: 'Intersect', sub: 'Boolean. Shared solid of 1 and 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
-    'Check shape': { title: 'Check shape', sub: 'check_watertight' },
+    'Check shape': { title: 'Check shape', sub: 'Shape check' },
     'Find open edges': { title: 'Find open edges', sub: 'Boundary edges from the checker' },
     'Auto-heal': { title: 'Auto-heal', sub: 'repair_manifold' },
     'Mesh repair': { title: 'Mesh repair', sub: 'repair_manifold' }
@@ -2163,12 +2216,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     depthMm: 0,
     heightMm: 0,
     watertightMessage: '',
+    freeEdges: null,
+    exactVolume: false,
     unitsMessage: '',
     failReason: 'Loading checks',
     activeTool: '',
     searchIndex: 0
   };
-  const vis = { body: true, sketch: true, xz: true, xy: false, yz: false };
+  const vis = { body: true, sketch: false, xz: true, xy: false, yz: false };
 
   const viewport = document.getElementById('viewport');
   const canvas = document.getElementById('canvas');
@@ -3236,7 +3291,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     applyLook();
     state.projectBlank = false;
     if (!state.projectApplying) state.projectDirty = true;
-    setHint(built.gate.pass ? (built.watertight.pass ? built.gate.message : built.watertight.message) : built.gate.message);
+    setHint(userStatus());
     publishProjectHook();
     return built.gate.pass === true && built.watertight.pass === true;
     } catch (err) {
@@ -3321,9 +3376,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       syncFromKernel();
       refreshAnchor();
       applyLook();
-      const shown = state.lastError
-        || (!built.watertight.pass ? built.watertight.message : (built.gate.message || ''));
-      setHint(shown);
+      setHint(state.lastError || userStatus());
       if (state.lastError) toast(state.lastError);
       return built.pass === true && built.watertight.pass === true && built.gate.pass === true;
     } catch (err) {
@@ -3419,14 +3472,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const body = state.bodies[i];
       if (!body.gate || body.gate.pass !== true) {
         return body.gate || { pass: false, valid: false, freeEdges: -1, message: 'FAIL: OCCT gate failed.' };
-      }
-      if (!body.watertight || body.watertight.pass !== true) {
-        return {
-          pass: false,
-          valid: true,
-          freeEdges: -1,
-          message: body.watertight.message || 'FAIL: mesh is not watertight.',
-        };
       }
     }
     return {
@@ -5990,7 +6035,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       rows.push(['Snapping', state.snap ? 'On' : 'Off']);
     }
     if (state.tab === 'export' || state.tab === 'repair') {
-      rows.push(['Watertight', state.watertight ? 'PASS' : 'FAIL']);
       rows.push(['Export unit', 'millimeter']);
     }
     for (let i = 0; i < rows.length; i++) {
@@ -6019,42 +6063,121 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     el.classList.toggle('fail', !pass);
   }
 
-  function meshAndUnitsPass() {
-    return state.watertight === true && state.unitsPass === true;
+  function userStatus() {
+    if (state.sceneCleared) return 'Nothing to export.';
+    if (state.unitsPass !== true) return state.unitsMessage || state.failReason || 'Export blocked until units pass.';
+    return state.unit === 'in' ? 'Units: inch' : 'Units: mm';
   }
 
   function recomputeExport() {
-    state.exportAllowed = state.occtGate === true && meshAndUnitsPass();
+    state.exportAllowed = state.sceneCleared !== true && state.unitsPass === true;
   }
 
   function exportBlockText() {
-    if (state.occtReady !== true) return 'Export blocked: the OCCT check is pending.';
-    if (state.occtGate !== true) return state.occtMessage || 'Export blocked: the OCCT check failed.';
-    return (state.failReason || 'Checks have not passed') + ' Export stays blocked until watertight and units both pass.';
+    if (state.sceneCleared) return 'Nothing to export.';
+    if (state.unitsPass !== true) return state.unitsMessage || state.failReason || 'Export blocked until units pass.';
+    return '';
+  }
+
+  function exactMeasures() {
+    if (!oc || !opsApi || typeof opsApi.solidVolumeMm3 !== 'function' || !state.bodies.length) return null;
+    let volume = 0;
+    let xmin = Infinity;
+    let ymin = Infinity;
+    let zmin = Infinity;
+    let xmax = -Infinity;
+    let ymax = -Infinity;
+    let zmax = -Infinity;
+    let any = false;
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const shape = state.bodies[i] && state.bodies[i].shape;
+      if (!shape) continue;
+      try {
+        const vol = opsApi.solidVolumeMm3(oc, shape);
+        if (Number.isFinite(vol)) volume += vol;
+        if (typeof opsApi.optimalBounds !== 'function') continue;
+        const bounds = opsApi.optimalBounds(oc, shape);
+        if (!bounds) continue;
+        any = true;
+        xmin = Math.min(xmin, bounds.xmin);
+        ymin = Math.min(ymin, bounds.ymin);
+        zmin = Math.min(zmin, bounds.zmin);
+        xmax = Math.max(xmax, bounds.xmax);
+        ymax = Math.max(ymax, bounds.ymax);
+        zmax = Math.max(zmax, bounds.zmax);
+      } catch (_err) { /* skip a shape that cannot be measured */ }
+    }
+    if (!any) return null;
+    return {
+      volumeMm3: volume,
+      bbox: { dx: xmax - xmin, dy: ymax - ymin, dz: zmax - zmin }
+    };
+  }
+
+  function applyExactVolume() {
+    const exact = exactMeasures();
+    if (!exact) {
+      state.exactVolume = false;
+      state.bboxMm = null;
+      return;
+    }
+    state.volumeMm3 = exact.volumeMm3;
+    state.bboxMm = exact.bbox;
+    state.exactVolume = true;
+  }
+
+  const cadLogLines = [];
+  let lastCadSig = '';
+  window.__cadcamLogText = '';
+  function cadLog(message, warn) {
+    const line = new Date().toISOString() + ' [cadmvp] ' + message;
+    cadLogLines.push(line);
+    window.__cadcamLogText = cadLogLines.join('\n') + '\n';
+    if (warn) console.warn('[cadmvp] ' + message);
+    else console.info('[cadmvp] ' + message);
+  }
+
+  function logCadChecks() {
+    const occtLabel = state.occtReady !== true ? 'PENDING' : (state.occtGate ? 'PASS' : 'FAIL');
+    const unitsLabel = state.unitsPass ? 'PASS' : 'FAIL';
+    const edges = Number.isFinite(state.freeEdges) ? String(state.freeEdges) : 'n/a';
+    const vol = state.exactVolume && Number.isFinite(state.volumeMm3)
+      ? Number(state.volumeMm3).toFixed(6) + ' mm3'
+      : 'unavailable';
+    const bb = state.bboxMm
+      ? Number(state.bboxMm.dx).toFixed(6) + ' x ' + Number(state.bboxMm.dy).toFixed(6) + ' x ' + Number(state.bboxMm.dz).toFixed(6)
+      : 'unavailable';
+    const parts = [
+      'OCCT ' + occtLabel + ' freeEdges=' + edges + (state.occtMessage ? ' ' + state.occtMessage : ''),
+      'units ' + unitsLabel + ' ' + (state.unit || 'mm') + (state.unitsMessage ? ' ' + state.unitsMessage : ''),
+      'volume ' + vol,
+      'bbox ' + bb
+    ];
+    if (state.lastError) parts.push('error ' + state.lastError);
+    if (state.booleanMessage) parts.push('op ' + state.booleanMessage);
+    const sig = parts.join('\n');
+    if (sig === lastCadSig) return;
+    lastCadSig = sig;
+    for (let i = 0; i < parts.length; i += 1) {
+      const warn = parts[i].indexOf('FAIL') !== -1 || parts[i].indexOf('error ') === 0;
+      cadLog(parts[i], warn);
+    }
   }
 
   function paintExport() {
     recomputeExport();
-    setBadge('statusTight', state.watertight);
-    setBadge('gateTight', state.watertight);
+    applyExactVolume();
     setBadge('gateUnits', state.unitsPass);
-    const occtEl = document.getElementById('gateOcct');
-    if (occtEl) {
-      if (state.occtReady !== true) occtEl.textContent = 'PENDING';
-      else occtEl.textContent = state.occtGate ? 'PASS' : 'FAIL';
-      occtEl.classList.toggle('pass', state.occtReady === true && !!state.occtGate);
-      occtEl.classList.toggle('fail', !(state.occtReady === true && state.occtGate));
-    }
-    paintBanner();
+    logCadChecks();
     publishGateState();
     const blocked = exportBlockText();
     const reason = document.getElementById('gateReason');
     if (reason) {
       if (state.exportAllowed) {
-        reason.textContent = (state.watertightMessage + ' ' + state.unitsMessage).trim();
+        reason.textContent = 'Units pass. Export unit is millimeter.';
         reason.classList.add('ok');
       } else {
-        reason.textContent = blocked;
+        reason.textContent = blocked || 'Export blocked until units pass.';
         reason.classList.remove('ok');
       }
     }
@@ -6062,7 +6185,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (btn) {
       btn.disabled = !state.exportAllowed;
       btn.setAttribute('aria-disabled', state.exportAllowed ? 'false' : 'true');
-      btn.title = state.exportAllowed ? 'Export STL or 3MF' : blocked;
+      btn.title = state.exportAllowed ? 'Export STL or 3MF' : (blocked || 'Export blocked until units pass.');
     }
     if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
   }
@@ -6094,6 +6217,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.occtReady = true;
     state.occtGate = false;
     state.occtMessage = 'Nothing to export.';
+    state.freeEdges = null;
+    state.exactVolume = false;
+    state.bboxMm = null;
     state.shapeGate = null;
     state.topology = null;
   }
@@ -6117,7 +6243,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       volNodes[i].setAttribute('data-mm', String(state.volumeMm3));
     }
     paintExport();
-    setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+    setHint(userStatus());
   }
 
   function replaceBody() {
@@ -6171,12 +6297,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     ]);
     corners.geometry.dispose();
     corners.geometry = cornersGeo;
-    const yTop = maxY + Math.max(dy * 0.01, 0.02);
-    sketch.geometry.dispose();
-    sketch.geometry = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(minX, yTop, minZ), new THREE.Vector3(maxX, yTop, minZ),
-      new THREE.Vector3(maxX, yTop, maxZ), new THREE.Vector3(minX, yTop, maxZ)
-    ]);
     shadow.position.set(cx, 0.03, cz);
     shadow.scale.set(Math.max(dx, 1) / 20, 1, Math.max(dz, 1) / 20);
     state.boundsCad = {
@@ -6213,8 +6333,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return name + ext;
   }
 
-  function downloadText(text, filename) {
-    const blob = new Blob([text], { type: 'application/json' });
+  function downloadText(text, filename, mime) {
+    window.__cadcamLastDownload = { name: filename, text: String(text || '') };
+    const blob = new Blob([text], { type: mime || 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -6472,9 +6593,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function publishGateState() {
-    const banner = document.getElementById('occtBanner');
     const btn = document.getElementById('exportBtn');
-    const occtEl = document.getElementById('gateOcct');
+    const gateLabel = state.occtReady !== true ? 'PENDING' : (state.occtGate ? 'PASS' : 'FAIL');
+    const shelf = document.getElementById('modifyShelf');
     window.__cadcamExportState = {
       fixture: Module.fixtureName(),
       occtReady: state.occtReady === true,
@@ -6483,9 +6604,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       watertight: state.watertight === true,
       unitsPass: state.unitsPass === true,
       exportAllowed: state.exportAllowed === true,
-      bannerHidden: !!(banner && banner.hidden),
+      bannerHidden: true,
       exportDisabled: !!(btn && btn.disabled),
-      gateOcct: occtEl ? occtEl.textContent : '',
+      gateOcct: gateLabel,
+      volumeMm3: state.volumeMm3,
+      bboxMm: state.bboxMm,
+      exactVolume: state.exactVolume === true,
+      logText: window.__cadcamLogText || '',
+      modifyOpen: !!(shelf && shelf.hidden !== true),
       selectionMode: state.selection,
       selectionCount: state.selectedIds.length,
       selectionAll: state.selection !== 'item' && state.selectedIds.length === 0,
@@ -6574,8 +6700,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.occtReady = true;
       state.occtGate = state.shapeGate.pass === true;
       state.occtMessage = state.shapeGate.message || '';
+      state.freeEdges = Number.isFinite(state.shapeGate.freeEdges) ? state.shapeGate.freeEdges : null;
       paintExport();
-      setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+      setHint(userStatus());
       return;
     }
     if (!oc || !gateApi || typeof gateApi.checkOcctGate !== 'function') {
@@ -6590,8 +6717,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.occtReady = true;
     state.occtGate = result.pass === true;
     state.occtMessage = result.message || '';
+    state.freeEdges = Number.isFinite(result.freeEdges) ? result.freeEdges : null;
     paintExport();
-    setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+    setHint(userStatus());
   }
 
   function syncFromKernel() {
@@ -6803,12 +6931,36 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     menu.style.width = width + 'px';
   }
 
+  let modifyUserSet = false;
+
+  function phoneWidth() {
+    return window.matchMedia('(max-width: 820px)').matches;
+  }
+
+  function setModifyOpen(open, fromUser) {
+    const shelf = document.getElementById('modifyShelf');
+    if (!shelf) return;
+    shelf.hidden = open !== true;
+    const buttons = document.querySelectorAll('[data-action="modifyShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    if (fromUser) modifyUserSet = true;
+    publishGateState();
+  }
+
+  function applyModifyDefault() {
+    if (modifyUserSet) return;
+    setModifyOpen(!phoneWidth(), false);
+  }
+
   function toggleCreateMenu(opener) {
     const menu = document.getElementById('createMenu');
     if (!menu) return;
     const willOpen = menu.hidden === true;
     closePopups();
     if (!willOpen) return;
+    setModifyOpen(false, true);
     menu.hidden = false;
     const openers = document.querySelectorAll('[data-action="createMenu"]');
     for (let i = 0; i < openers.length; i += 1) {
@@ -7055,6 +7207,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'createMenu') {
       toggleCreateMenu(btn);
       message = 'Create';
+    } else if (action === 'modifyShelf') {
+      const shelf = document.getElementById('modifyShelf');
+      const willOpen = !shelf || shelf.hidden === true;
+      closeCreateMenu();
+      setModifyOpen(willOpen, true);
+      message = willOpen ? 'Modify' : 'Modify closed';
+    } else if (action === 'downloadLog') {
+      downloadText(window.__cadcamLogText || '', 'cadmvp-log.txt', 'text/plain');
+      message = 'Download log';
     } else if (action === 'closeSheet') {
       toolsSheet.hidden = true;
       message = 'Close tools menu';
@@ -7090,7 +7251,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (!state.projectApplying) state.projectDirty = true;
         publishProjectHook();
         message = 'Loaded ' + Module.fixtureName();
-        setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
+        setHint(userStatus());
       }
     } else if (action === 'saveProject') {
       saveProject(true);
@@ -7899,6 +8060,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') {
       const searchWasOpen = !searchDlg.hidden;
+      if (window.matchMedia('(min-width: 821px)').matches) setModifyOpen(false, true);
       closePopups();
       closeDrawers();
       if (searchWasOpen && searchBtn) searchBtn.focus();
@@ -8007,6 +8169,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.documentElement.setAttribute('data-orientation', portrait ? 'portrait' : 'landscape');
     resize();
     placeSearch();
+    applyModifyDefault();
   }
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', placeSearch);
@@ -8016,6 +8179,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const orientMedia = window.matchMedia('(orientation: portrait)');
   if (orientMedia.addEventListener) orientMedia.addEventListener('change', onViewportChange);
   else if (orientMedia.addListener) orientMedia.addListener(onViewportChange);
+  const phoneMedia = window.matchMedia('(max-width: 820px)');
+  if (phoneMedia.addEventListener) phoneMedia.addEventListener('change', onViewportChange);
+  else if (phoneMedia.addListener) phoneMedia.addListener(onViewportChange);
   if (window.screen.orientation && screen.orientation.addEventListener) {
     screen.orientation.addEventListener('change', onViewportChange);
   }
@@ -8054,35 +8220,52 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   applyLook();
   const params = new URLSearchParams(window.location.search);
   const wanted = params.get('fixture');
+  const primKind = params.get('primitive');
+  const demoName = params.get('demo');
+  const pairName = params.get('pair');
+  let loadedQuery = false;
   if (wanted && Module.loadFixture(wanted)) {
+    loadedQuery = true;
     state.sceneCleared = false;
     syncFromKernel();
     spherical.radius = fitDistance();
     updateCamera();
   }
-  const primKind = params.get('primitive');
   if (primKind === 'box' || primKind === 'cylinder' || primKind === 'disc') {
+    loadedQuery = true;
     const asked = params.get('select') || 'item';
     createPrimitive(primKind, null, asked, false);
     spherical.radius = fitDistance();
     updateCamera();
   }
-  if (params.get('demo') === 'lbracket') {
+  if (demoName === 'lbracket') {
+    loadedQuery = true;
     showLBracket();
     spherical.radius = fitDistance();
     updateCamera();
-  } else if (params.get('demo') === 'booleans') {
+  } else if (demoName === 'booleans') {
+    loadedQuery = true;
     showBooleanDemo(params.get('op') || '');
     spherical.radius = fitDistance();
     updateCamera();
-  } else if (params.get('pair') === 'overlap' || params.get('pair') === 'disjoint') {
-    const shift = params.get('pair') === 'disjoint'
+  } else if (pairName === 'overlap' || pairName === 'disjoint') {
+    loadedQuery = true;
+    const shift = pairName === 'disjoint'
       ? (opsApi && opsApi.BOOLEAN_DISJOINT_SHIFT_MM ? opsApi.BOOLEAN_DISJOINT_SHIFT_MM : 40)
       : (opsApi && opsApi.BOOLEAN_OVERLAP_SHIFT_MM ? opsApi.BOOLEAN_OVERLAP_SHIFT_MM : 10);
     showPair(shift);
     spherical.radius = fitDistance();
     updateCamera();
   }
+  if (!loadedQuery) {
+    createPrimitive('box', null, 'item', false);
+    if (typeof window.__cadcamClearUndo === 'function') window.__cadcamClearUndo();
+    state.projectDirty = false;
+    publishProjectHook();
+    spherical.radius = fitDistance();
+    updateCamera();
+  }
+  applyModifyDefault();
   const startTab = params.get('tab');
   if (startTab === 'sketch' || startTab === 'model' || startTab === 'repair' || startTab === 'export') setTab(startTab);
   else setTab('model');
