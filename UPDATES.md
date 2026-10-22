@@ -146,3 +146,5 @@ Newest entries at the top.
 - Next: Pilot adds #include <cmath>; Repo Keeper pushes and confirms occt_gate shows Passed (no Skipped or Not Run line, since SKIP_RETURN_CODE 77 counts as skipped). L-bracket waits.
 
 - 2026-10-21 18:10 MT: GCC include fix ready, not yet committed (Grok session 01a160ed, 6:05-6:09 PM MT). Adds <cmath>/<cstddef> to tests/test_create.cpp, plus missing <cstddef>/<cstdint> includes in 8 src files (include lines only). Erik to review the src/ diffs as core. Z13 CTest with CI=1: 7/7 pass incl. occt_gate; deploy_smoke pass. Pending: Repo Keeper commit+push, Linux CI must show occt_gate Passed (not Skipped). L-bracket session starts after green.
+
+- 2026-10-21 18:12 MT: 27e54d5 pushed (GCC include fix). Linux CI run 39698121674: GCC build OK, occt_gate Passed 1.13 s (no Skipped/Not Run), 7/7 tests, site deployed. Release gate cleared; L-bracket session unblocked. Erik review of include-only src/ diffs still pending.
