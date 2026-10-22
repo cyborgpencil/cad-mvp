@@ -4,7 +4,7 @@ Single-threaded Emscripten build of the existing mesh checks, plus the libcascad
 
 `src/solid/watertight.cpp`, `src/units/units.cpp`, and `src/model/repair.cpp` are not edited. The gate in `src/export/gate.cpp` calls `export_units` (units lock); its older `check_watertight` call is legacy and is no longer an Export requirement. Volume is the triple sum from `mvp/solid-check.md` divided by 6, shown as a readout only.
 
-Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export.
+Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export. Code status (dd22dce): pending. `src/export/gate.cpp:93` still requires `watertight_pass && units_pass`, `src/export/export_files.cpp` still writes only after `check_watertight`, and `tests/deploy_smoke.py` still asserts watertight; removal is a separate C++ commit for Erik to review.
 
 ## Native tests
 
