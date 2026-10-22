@@ -1,7 +1,10 @@
 #include "export_files.hpp"
 
+#include "gate.hpp"
 #include "stl.hpp"
 #include "threemf.hpp"
+
+#include <iostream>
 
 namespace {
 
@@ -41,6 +44,12 @@ ExportAttempt export_mesh_if_closed(const MeshSolid& mesh, const std::filesystem
     attempt.check = check_watertight(mesh);
     attempt.stl_path = directory / "box.stl";
     attempt.threemf_path = directory / "box.3mf";
+
+    const GateReport report = evaluate_export_gate(mesh, UnitLock{});
+    if (!report.mesh_pass) {
+        std::cerr << report.mesh_message << '\n';
+        return attempt;
+    }
 
     std::error_code error;
     std::filesystem::create_directories(directory, error);

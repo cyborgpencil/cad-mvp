@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-22
 
+- Export gate: a mesh with no triangles, or a signed volume at or below 1e-9 mm3, is refused. The sentence is `FAIL: mesh has no triangles.` or `FAIL: mesh has zero volume.` Units still win when they fail. Watertight stays informational. An inside-out shell has negative volume and is blocked. `flipped_box()` reverses one face and still exports. `cadcam.wasm` does not link OCCT.
 - Move gizmo: an ordinary box, cylinder, or disc keeps a local solid. A drag updates its placement in millimetres and does not bake the translation into the solid. Save and the project measure use the placed copy, so the box and cylinder reload at the same world bounds. The assemblies test covers that the stored bounds stay put and the placed bounds move. No `src/export` change.
 - Assemblies: flat parts list (name, own solid, placement in mm, material PLA/PETG/TPU with PLA the default). Combine fuses same-material parts after an OCCT validity check and is one undo step; mixed materials and a forced failure leave the model unchanged. Export writes one 3MF, unit millimeter, one mesh object per part. The .cadmvp format is unchanged. No watertight check. No src/ or bindings change. Portrait 390×844 smoke checks the parts list and Combine at 44 px.
 - Merged main `3457bd9` (nav cube, type-in resize, project save/load) into the selection-delete branch. Delete stays one undo step on `web/undo.mjs` and sits beside resize and save/load. `sceneCleared` and `projectBlank` both hide the viewer. No `src/` or bindings change.

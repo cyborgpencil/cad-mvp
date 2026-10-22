@@ -6,6 +6,7 @@
 #include "threemf.hpp"
 #include "watertight.hpp"
 
+#include <emscripten.h>
 #include <emscripten/bind.h>
 
 #include <cstdint>
@@ -49,9 +50,10 @@ std::string read_bytes(const std::filesystem::path& path) {
 
 emscripten::val export_file(bool stl) {
     const GateReport report = evaluate_export_gate(g_mesh, g_lock);
-    // Units are the only export gate. Watertight and the OCCT check do not
-    // block the file write. An empty mesh still does.
-    if (!report.units_pass || g_mesh.triangles.empty()) {
+    // Units plus a non-empty, positive-volume mesh. Watertight stays informational.
+    // console.warn, not console.error: smoke tests treat console errors as failures.
+    if (!report.export_allowed) {
+        EM_ASM({ console.warn(UTF8ToString($0)); }, report.block_reason.c_str());
         return emscripten::val::null();
     }
     const char* path = stl ? "/cadcam_export.stl" : "/cadcam_export.3mf";
@@ -192,6 +194,8 @@ EMSCRIPTEN_BINDINGS(cadcam) {
         .field("watertightMessage", &GateReport::watertight_message)
         .field("unitsPass", &GateReport::units_pass)
         .field("unitsMessage", &GateReport::units_message)
+        .field("meshPass", &GateReport::mesh_pass)
+        .field("meshMessage", &GateReport::mesh_message)
         .field("exportUnit", &GateReport::export_unit)
         .field("displayUnit", &GateReport::display_unit)
         .field("volumeMm3", &GateReport::volume_mm3)

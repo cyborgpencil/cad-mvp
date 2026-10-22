@@ -34,14 +34,21 @@ double mesh_volume_mm3(const MeshSolid& mesh) {
 }
 
 std::string export_block_reason(bool /*watertight_pass*/, const std::string& /*watertight_message*/,
-                                bool units_pass, const std::string& units_message) {
+                                bool units_pass, const std::string& units_message, bool mesh_pass,
+                                const std::string& mesh_message) {
     if (!units_pass) {
         return units_message;
+    }
+    if (!mesh_pass) {
+        return mesh_message;
     }
     return {};
 }
 
 namespace {
+
+// Signed volume at or below this is treated as degenerate (zero or inside-out).
+constexpr double kMinExportVolumeMm3 = 1e-9;
 
 void mesh_extents(const MeshSolid& mesh, double& width, double& depth, double& height) {
     width = 0.0;
@@ -84,9 +91,20 @@ GateReport evaluate_export_gate(const MeshSolid& mesh, const UnitLock& lock) {
                                              : "FAIL: export unit is not millimeter.";
     report.display_unit = lock.display() == DisplayUnit::Inch ? "in" : "mm";
     report.volume_mm3 = mesh_volume_mm3(mesh);
+    if (mesh.triangles.empty()) {
+        report.mesh_pass = false;
+        report.mesh_message = "FAIL: mesh has no triangles.";
+    } else if (report.volume_mm3 <= kMinExportVolumeMm3) {
+        report.mesh_pass = false;
+        report.mesh_message = "FAIL: mesh has zero volume.";
+    } else {
+        report.mesh_pass = true;
+        report.mesh_message = "PASS: mesh has volume.";
+    }
     mesh_extents(mesh, report.width_mm, report.depth_mm, report.height_mm);
     report.block_reason = export_block_reason(report.watertight_pass, report.watertight_message,
-                                              report.units_pass, report.units_message);
-    report.export_allowed = report.units_pass;
+                                              report.units_pass, report.units_message, report.mesh_pass,
+                                              report.mesh_message);
+    report.export_allowed = report.units_pass && report.mesh_pass;
     return report;
 }
