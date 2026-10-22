@@ -2287,6 +2287,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   let cubeSnap = null;
   let cubeTapMs = 0;
   let lastSnapMs = 0;
+  let lastSnapBudget = 0;
   const ptrs = new Map();
   let gesture = null;
   let pinch = null;
@@ -4417,6 +4418,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function stepSnap(now) {
     const snap = cubeSnap;
     if (!snap) return;
+    if (!snap.started) {
+      snap.started = true;
+      snap.t0 = now;
+    }
     const u = Math.min(1, (now - snap.t0) / snap.dur);
     const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
     const q = snap.q1.clone().slerp(snap.q2, e);
@@ -4430,6 +4435,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     if (u < 1 && cubeSnap === snap) tween = requestAnimationFrame(stepSnap);
     else if (cubeSnap === snap) {
       lastSnapMs = performance.now() - snap.t0;
+      lastSnapBudget = snap.dur;
       cubeSnap = null;
       tween = 0;
     }
@@ -5670,6 +5676,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       animating: !!cubeSnap,
       snapMs: CUBE_SNAP_MS,
       lastSnapMs: lastSnapMs,
+      lastSnapBudget: lastSnapBudget,
       size: cubeCss,
       distance: dist,
       direction: [dir.x, dir.y, dir.z],

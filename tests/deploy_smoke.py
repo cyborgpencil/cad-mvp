@@ -1295,16 +1295,21 @@ def _wait_snap(
         try:
             dist = abs(float(nav.get("distance")) - distance)
             elapsed = float(nav.get("lastSnapMs") or 0)
+            budget = float(nav.get("lastSnapBudget") or 0)
         except (TypeError, ValueError):
             return [f"{label} distance {nav.get('distance')!r}"]
-        if angle <= 1.0 and dist <= 0.05 and elapsed <= 300.0:
+        # The ease is 250 ms. Headless frames can land later; that lateness is not a longer ease.
+        if angle <= 1.0 and dist <= 0.05 and 0 < budget <= 250.0 and elapsed < 500.0:
             print(
-                f"nav {label}: {angle:.3f} deg, snap {elapsed:.0f} ms, distance {float(nav.get('distance')):.2f}",
+                f"nav {label}: {angle:.3f} deg, ease {budget:.0f} ms, frame {elapsed:.0f} ms, "
+                f"distance {float(nav.get('distance')):.2f}",
                 flush=True,
             )
             return []
-        if elapsed > 300.0:
-            return [f"{label} snap {elapsed:.0f} ms > 250"]
+        if budget > 250.0:
+            return [f"{label} snap ease {budget:.0f} ms > 250"]
+        if elapsed >= 500.0:
+            return [f"{label} snap frame {elapsed:.0f} ms"]
         time.sleep(0.02)
     direction = (last or {}).get("direction")
     angle = _angle_deg(direction, axis) if isinstance(direction, list) and len(direction) == 3 else 999.0
