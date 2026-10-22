@@ -4419,6 +4419,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
         if (sizeInput) sizeInput.value = '2';
         confirmPickedEdge();
         const filleted = state.bodies[0];
+        const featureCount = filleted && filleted.features ? filleted.features.length : 0;
         const filletDepth = commandStack.depth();
         let removed = false;
         const edges = filleted && filleted.topology ? filleted.topology.edges : [];
@@ -4435,12 +4436,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
           ? healed.topology.faces.filter(function (face) { return face.surface === 'GeomAbs_Cylinder'; }).length
           : -1;
         report.fillet = {
-          ok: removed && !!(healed && healed.gate && healed.gate.valid === true) && cylinders === 0 && !!(filleted && filleted.features && filleted.features.length),
+          ok: removed && !!(healed && healed.gate && healed.gate.valid === true) && cylinders === 0 && featureCount > 0,
           valid: !!(healed && healed.gate && healed.gate.valid === true),
           cylinderFaces: cylinders,
           undoStep: commandStack.depth() === filletDepth + 1,
           error: removed ? '' : (state.lastError || 'fillet delete failed'),
-          featureFaces: filleted && filleted.features ? filleted.features.length : 0
+          featureFaces: featureCount
         };
       }
     } catch (err) {
