@@ -83,13 +83,24 @@ int main() {
 
     const std::filesystem::path bad_dir = fresh_dir("bad-size");
     const ExportAttempt bad_size = export_mesh_if_closed(box_mm(0.0, 20.0, 20.0), bad_dir);
-    expect("bad size does not write", !bad_size.wrote && !bad_size.check.pass);
-    expect("bad size leaves directory", !std::filesystem::exists(bad_dir));
+    expect("bad size check fails", !bad_size.check.pass);
+    expect("bad size writes", bad_size.wrote);
+    expect("bad size stl exists", std::filesystem::is_regular_file(bad_size.stl_path));
+    expect("bad size 3mf exists", std::filesystem::is_regular_file(bad_size.threemf_path));
 
     const std::filesystem::path open_dir = fresh_dir("open");
     const ExportAttempt open = export_mesh_if_closed(open_box(), open_dir);
-    expect("open box does not write", !open.wrote && !open.check.pass);
-    expect("open box leaves directory", !std::filesystem::exists(open_dir));
+    expect("open box check fails", !open.check.pass);
+    expect("open box writes", open.wrote);
+    expect("open box stl exists", std::filesystem::is_regular_file(open.stl_path));
+    expect("open box 3mf exists", std::filesystem::is_regular_file(open.threemf_path));
+
+    const std::filesystem::path flipped_dir = fresh_dir("flipped");
+    const ExportAttempt flipped = export_mesh_if_closed(flipped_box(), flipped_dir);
+    expect("flipped box check fails", !flipped.check.pass);
+    expect("flipped box writes", flipped.wrote);
+    expect("flipped box stl exists", std::filesystem::is_regular_file(flipped.stl_path));
+    expect("flipped box 3mf exists", std::filesystem::is_regular_file(flipped.threemf_path));
 
     std::error_code error;
     std::filesystem::remove_all(std::filesystem::temp_directory_path() / "cadcam-mvp-export", error);

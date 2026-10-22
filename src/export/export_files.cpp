@@ -41,9 +41,6 @@ ExportAttempt export_mesh_if_closed(const MeshSolid& mesh, const std::filesystem
     attempt.check = check_watertight(mesh);
     attempt.stl_path = directory / "box.stl";
     attempt.threemf_path = directory / "box.3mf";
-    if (!attempt.check.pass) {
-        return attempt;
-    }
 
     std::error_code error;
     std::filesystem::create_directories(directory, error);

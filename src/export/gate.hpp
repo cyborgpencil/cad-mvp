@@ -6,9 +6,9 @@
 #include <string>
 
 // Export gate for the WASM page and the native test.
-// Watertight PASS/FAIL is check_watertight, unchanged.
+// Watertight PASS/FAIL is check_watertight, still computed and reported.
 // Volume is the documented triple sum divided by 6 (mvp/solid-check.md).
-// The export unit comes from ExportUnitRecord and stays millimeter.
+// Export is allowed when the export unit is millimeter (Erik, 2026-10-22).
 
 struct GateReport {
     bool watertight_pass = false;
@@ -31,8 +31,8 @@ bool export_units_pass(const char* storage, const char* threemf, const char* stl
 // Signed tetrahedron volume in the same coordinates as the mesh (millimeters).
 double mesh_volume_mm3(const MeshSolid& mesh);
 
-// First failing rule wins: the watertight sentence, else the units sentence.
-// Empty when both pass.
+// Units sentence when units fail. Empty when units pass.
+// Watertight arguments stay on the signature and are ignored.
 std::string export_block_reason(bool watertight_pass, const std::string& watertight_message,
                                 bool units_pass, const std::string& units_message);
 

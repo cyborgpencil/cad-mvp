@@ -33,11 +33,8 @@ double mesh_volume_mm3(const MeshSolid& mesh) {
     return sum / 6.0;
 }
 
-std::string export_block_reason(bool watertight_pass, const std::string& watertight_message,
+std::string export_block_reason(bool /*watertight_pass*/, const std::string& /*watertight_message*/,
                                 bool units_pass, const std::string& units_message) {
-    if (!watertight_pass) {
-        return watertight_message;
-    }
     if (!units_pass) {
         return units_message;
     }
@@ -90,6 +87,6 @@ GateReport evaluate_export_gate(const MeshSolid& mesh, const UnitLock& lock) {
     mesh_extents(mesh, report.width_mm, report.depth_mm, report.height_mm);
     report.block_reason = export_block_reason(report.watertight_pass, report.watertight_message,
                                               report.units_pass, report.units_message);
-    report.export_allowed = report.watertight_pass && report.units_pass;
+    report.export_allowed = report.units_pass;
     return report;
 }

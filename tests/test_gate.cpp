@@ -44,13 +44,15 @@ int main() {
     expect("null unit fails", !export_units_pass(nullptr, "millimeter", "millimeter"));
 
     const std::string units_fail = "FAIL: export unit is not millimeter.";
-    expect_text("watertight blocks first",
-                export_block_reason(false, "FAIL: edge (4,5) is shared by 1 triangle (need 2).", false, units_fail),
-                "FAIL: edge (4,5) is shared by 1 triangle (need 2).");
+    const std::string watertight_fail = "FAIL: edge (4,5) is shared by 1 triangle (need 2).";
+    const std::string units_ok = "PASS: export unit is millimeter.";
+    expect_text("units block ignores watertight fail",
+                export_block_reason(false, watertight_fail, false, units_fail), units_fail);
     expect_text("units block when solid passes",
                 export_block_reason(true, "PASS", false, units_fail), units_fail);
-    expect("both pass clears the block",
-           export_block_reason(true, "PASS", true, "PASS: export unit is millimeter.").empty());
+    expect("units pass clears the block", export_block_reason(true, "PASS", true, units_ok).empty());
+    expect("watertight fail does not block",
+           export_block_reason(false, watertight_fail, true, units_ok).empty());
 
     UnitLock lock;
     const GateReport closed = evaluate_export_gate(closed_box(), lock);
@@ -77,8 +79,9 @@ int main() {
     const GateReport open = evaluate_export_gate(open_box(), UnitLock{});
     expect("open fails watertight", !open.watertight_pass);
     expect("open units still pass", open.units_pass);
-    expect("open export blocked", !open.export_allowed);
-    expect_text("open reason", open.block_reason, "FAIL: edge (4,5) is shared by 1 triangle (need 2).");
+    expect("open export allowed", open.export_allowed);
+    expect("open block empty", open.block_reason.empty());
+    expect_text("open watertight sentence", open.watertight_message, watertight_fail);
     expect_exact("open volume times 6", open.volume_mm3 * 6.0, 4.0);
 
     const GateReport box = evaluate_export_gate(box_mm(20.0, 20.0, 20.0), UnitLock{});
@@ -87,13 +90,18 @@ int main() {
     expect_exact("20 mm width", box.width_mm, 20.0);
 
     const GateReport empty = evaluate_export_gate(MeshSolid{}, UnitLock{});
-    expect("empty blocked", !empty.export_allowed && !empty.watertight_pass);
+    expect("empty watertight fails", !empty.watertight_pass);
+    expect("empty units pass", empty.units_pass);
+    expect("empty export allowed", empty.export_allowed);
     expect_exact("empty volume", empty.volume_mm3, 0.0);
-    expect("empty names the rule", empty.block_reason.find("no triangles") != std::string::npos);
+    expect("empty block empty", empty.block_reason.empty());
+    expect("empty names the rule", empty.watertight_message.find("no triangles") != std::string::npos);
 
     const GateReport flipped = evaluate_export_gate(flipped_box(), UnitLock{});
-    expect("flipped blocked", !flipped.export_allowed);
-    expect("flipped names the winding", flipped.block_reason.find("wound the same way") != std::string::npos);
+    expect("flipped watertight fails", !flipped.watertight_pass);
+    expect("flipped export allowed", flipped.export_allowed);
+    expect("flipped block empty", flipped.block_reason.empty());
+    expect("flipped names the winding", flipped.watertight_message.find("wound the same way") != std::string::npos);
 
     if (g_failures != 0) {
         std::cerr << g_failures << " failed\n";
