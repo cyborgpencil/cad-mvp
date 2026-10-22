@@ -736,11 +736,11 @@ PORTRAIT = (
 )
 
 
-def eval_expr(cdp: Cdp, expression: str) -> tuple[Any, str]:
+def eval_expr(cdp: Cdp, expression: str, timeout: float = 30) -> tuple[Any, str]:
     result = cdp.call(
         "Runtime.evaluate",
         {"expression": expression, "returnByValue": True},
-        timeout=30,
+        timeout=timeout,
     )
     if result.get("exceptionDetails"):
         detail = result.get("exceptionDetails") or {}
@@ -839,6 +839,43 @@ def point_expr(selector: str) -> str:
         "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height});"
         "})()"
     )
+
+
+def resize_call(cdp: Cdp, spec: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    payload = json.dumps(spec)
+    raw, err = eval_expr(
+        cdp,
+        "(function(){"
+        f"if(typeof window.__cadcamResize!=='function') return 'missing';"
+        f"return JSON.stringify(window.__cadcamResize({payload}));"
+        "})()",
+    )
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return None, err or str(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, raw
+    if not isinstance(data, dict):
+        return None, raw
+    return data, ""
+
+
+def _near(value: Any, want: float, tol: float = 0.01) -> bool:
+    try:
+        return abs(float(value) - want) < tol
+    except (TypeError, ValueError):
+        return False
+
+
+UNLOCK_EXPR = (
+    "(function(){"
+    "var b=document.getElementById('lockProportions');"
+    "if(!b) return 'missing';"
+    "if(b.getAttribute('aria-pressed')==='true') b.click();"
+    "return b.getAttribute('aria-pressed')==='false' ? 'off' : 'on';"
+    "})()"
+)
 
 
 def edit_expr(field: str, value: str) -> str:
@@ -1538,7 +1575,7 @@ STAMP_EXPR = r"""
       problems.push('script url');
     }
   }
-  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'selection.mjs', 'viewport-selection.mjs'];
+  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'undo.mjs', 'selection.mjs', 'viewport-selection.mjs'];
   var found = {};
   var entries = performance.getEntriesByType('resource');
   for (var e = 0; e < entries.length; e++) {
@@ -2339,6 +2376,10 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             problems.append("portrait box scale mode wait")
             problems.extend(scale_wait[:20])
             return problems
+        unlocked, unlock_err = eval_expr(cdp, UNLOCK_EXPR)
+        if unlock_err or unlocked != "off":
+            problems.append(f"portrait box unlock {unlocked or unlock_err}")
+            return problems
         size_typed, size_err = eval_expr(cdp, edit_expr("boxSy", "22"))
         if size_err or size_typed != "edited":
             problems.append(f"portrait box scale type {size_typed or size_err}")
@@ -2408,6 +2449,9 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     expand_problems = tap_selector(cdp, "#dimToggle", "portrait holes expand")
     if expand_problems:
         return expand_problems
+    unlocked, unlock_err = eval_expr(cdp, UNLOCK_EXPR)
+    if unlock_err or unlocked != "off":
+        return [f"portrait holes unlock {unlocked or unlock_err}"]
     edits = (
         ("boxSx", plate_sx),
         ("boxSy", plate_sy),
@@ -2752,6 +2796,384 @@ def assert_fixture_urls_404(origin: str) -> list[str]:
     return problems
 
 
+def run_type_in_resize(cdp: Cdp, origin: str) -> list[str]:
+    """Typed mm resize: one undo step, inch display, lock, ellipse note, rollback."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"resize emulation failed: {exc}"]
+    url = origin + "/?primitive=box"
+    print(f"load type_in_resize {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["resize load", *load_problems[:20]]
+    opened, open_err = eval_expr(cdp, CLICK_DIM_EXPR)
+    if open_err or opened != "clicked":
+        return [f"resize dim sheet {opened or open_err}"]
+    measured, measure_err = eval_expr(
+        cdp,
+        "(function(){"
+        "var b=document.getElementById('lockProportions');"
+        "if(!b) return 'missing';"
+        "var st=getComputedStyle(b);"
+        "var r=b.getBoundingClientRect();"
+        "return JSON.stringify({w:r.width,h:r.height,display:st.display,visibility:st.visibility});"
+        "})()",
+    )
+    if measure_err or not isinstance(measured, str) or not measured.startswith("{"):
+        return [f"resize lock target {measured or measure_err}"]
+    box = json.loads(measured)
+    if box.get("display") == "none" or box.get("visibility") == "hidden":
+        return [f"resize lock hidden {measured}"]
+    if float(box.get("w") or 0) < 44 or float(box.get("h") or 0) < 44:
+        return [f"resize lock target {box.get('w')}x{box.get('h')}"]
+    fresh, fresh_err = resize_call(cdp, {})
+    if fresh_err or not fresh:
+        return [f"resize status {fresh_err}"]
+    if fresh.get("lock") is not True or fresh.get("ellipse") is not False:
+        return [f"resize lock default {fresh.get('lock')!r} ellipse {fresh.get('ellipse')!r}"]
+    if int(fresh.get("undoDepth") or 0) != 0 or not _near(fresh.get("dx"), 20.0):
+        return [f"resize fresh {fresh.get('dx')!r} undo {fresh.get('undoDepth')!r}"]
+    unlocked, unlock_err = resize_call(cdp, {"lock": False})
+    if unlock_err or not unlocked:
+        return [f"resize unlock {unlock_err}"]
+    if unlocked.get("ellipse") is not True or unlocked.get("ellipseText") != "Circles may become ellipses.":
+        return [f"resize ellipse {unlocked.get('ellipseText')!r} shown {unlocked.get('ellipse')!r}"]
+    if int(unlocked.get("undoDepth") or 0) != 0 or not _near((unlocked.get("params") or {}).get("sx"), 20.0, 1e-6):
+        return [f"resize unlock changed the solid {unlocked}"]
+    one, one_err = resize_call(cdp, {"sx": 30, "lock": False})
+    if one_err or not one:
+        return [f"resize 30 {one_err}"]
+    if one.get("done") != "RESIZE_DONE" or one.get("method") != "gtransform" or one.get("valid") is not True:
+        return [f"resize 30 result {one.get('done')!r} {one.get('method')!r} valid {one.get('valid')!r} {one.get('error')!r}"]
+    if int(one.get("undoDepth") or 0) != 1:
+        return [f"resize 30 undo depth {one.get('undoDepth')!r}"]
+    if not _near(one.get("dx"), 30.0) or not _near(one.get("dy"), 20.0) or not _near(one.get("dz"), 20.0):
+        return [f"resize 30 bbox {one.get('dx')!r} {one.get('dy')!r} {one.get('dz')!r}"]
+    if not _near((one.get("params") or {}).get("sx"), 30.0, 1e-6):
+        return [f"resize 30 stored sx {(one.get('params') or {}).get('sx')!r}"]
+    back, back_err = resize_call(cdp, {"undo": True})
+    if back_err or not back:
+        return [f"resize undo {back_err}"]
+    if int(back.get("undoDepth") or 0) != 0 or not _near(back.get("dx"), 20.0):
+        return [f"resize undo restored {back.get('dx')!r} depth {back.get('undoDepth')!r}"]
+    if not _near((back.get("params") or {}).get("sx"), 20.0, 1e-6):
+        return [f"resize undo stored {(back.get('params') or {}).get('sx')!r}"]
+    locked, locked_err = resize_call(cdp, {"lock": True, "sx": 30})
+    if locked_err or not locked:
+        return [f"resize lock on {locked_err}"]
+    if locked.get("method") != "rebuild" or locked.get("done") != "RESIZE_DONE":
+        return [f"resize lock method {locked.get('method')!r} {locked.get('done')!r} {locked.get('error')!r}"]
+    params = locked.get("params") or {}
+    if not _near(locked.get("dx"), 30.0) or not _near(locked.get("dy"), 30.0) or not _near(locked.get("dz"), 30.0):
+        return [f"resize lock bbox {locked.get('dx')!r} {locked.get('dy')!r} {locked.get('dz')!r}"]
+    if not _near(params.get("sx"), 30.0, 1e-6) or not _near(params.get("sy"), 30.0, 1e-6) or not _near(params.get("sz"), 30.0, 1e-6):
+        return [f"resize lock params {params!r}"]
+    restored, restored_err = resize_call(cdp, {"undo": True})
+    if restored_err or not restored or int(restored.get("undoDepth") or 0) != 0:
+        return [f"resize lock undo {restored_err or restored}"]
+    inches, inch_err = resize_call(cdp, {"unit": "in", "lock": False})
+    if inch_err or not inches:
+        return [f"resize inches {inch_err}"]
+    if inches.get("unit") != "in" or int(inches.get("undoDepth") or 0) != 0:
+        return [f"resize inches unit {inches.get('unit')!r} depth {inches.get('undoDepth')!r}"]
+    if not _near((inches.get("params") or {}).get("sx"), 20.0, 1e-9):
+        return [f"resize inches stored {(inches.get('params') or {}).get('sx')!r}"]
+    typed, typed_err = resize_call(cdp, {"field": "boxSx", "text": "1"})
+    if typed_err or not typed:
+        return [f"resize inch type {typed_err}"]
+    stored = (typed.get("params") or {}).get("sx")
+    try:
+        stored_mm = float(stored)
+    except (TypeError, ValueError):
+        return [f"resize inch stored {stored!r}"]
+    if abs(stored_mm - 25.4) >= 1e-9 or abs(stored_mm - 508.0) < 1 or abs(stored_mm - 645.16) < 1:
+        return [f"resize inch stored {stored_mm}"]
+    if typed.get("method") != "gtransform" or int(typed.get("undoDepth") or 0) != 1:
+        return [f"resize inch method {typed.get('method')!r} depth {typed.get('undoDepth')!r}"]
+    millimetres, mm_err = resize_call(cdp, {"unit": "mm"})
+    if mm_err or not millimetres:
+        return [f"resize back to mm {mm_err}"]
+    if millimetres.get("unit") != "mm" or abs(float((millimetres.get("params") or {}).get("sx")) - stored_mm) >= 1e-9:
+        return [f"resize mm drift {millimetres.get('unit')!r} {(millimetres.get('params') or {}).get('sx')!r}"]
+    if int(millimetres.get("undoDepth") or 0) != 1:
+        return [f"resize mm switch depth {millimetres.get('undoDepth')!r}"]
+    cleared, clear_err = resize_call(cdp, {"undo": True})
+    if clear_err or not cleared or int(cleared.get("undoDepth") or 0) != 0:
+        return [f"resize inch undo {clear_err or cleared}"]
+    depth = 0
+    for spec, label in (
+        ({"sx": 0, "lock": False}, "zero"),
+        ({"sx": -4, "lock": False}, "negative"),
+        ({"field": "boxSx", "text": ""}, "blank"),
+        ({"sx": 30, "lock": False, "forceInvalid": True}, "invalid-gtransform"),
+        ({"sx": 30, "lock": True, "forceInvalid": True}, "invalid-rebuild"),
+    ):
+        failed, fail_err = resize_call(cdp, spec)
+        if fail_err or not failed:
+            return [f"resize {label} {fail_err}"]
+        if failed.get("rolledBack") is not True or int(failed.get("undoDepth") or 0) != depth:
+            return [f"resize {label} rollback {failed.get('rolledBack')!r} depth {failed.get('undoDepth')!r}"]
+        if "kept" not in str(failed.get("error") or ""):
+            return [f"resize {label} error {failed.get('error')!r}"]
+        if not _near((failed.get("params") or {}).get("sx"), 20.0, 1e-6) or not _near(failed.get("dx"), 20.0):
+            return [f"resize {label} changed {failed.get('dx')!r} {(failed.get('params') or {}).get('sx')!r}"]
+        if label == "blank" and "Enter a number" not in str(failed.get("error")):
+            return [f"resize blank error {failed.get('error')!r}"]
+        if label in {"zero", "negative"} and "greater than zero" not in str(failed.get("error")):
+            return [f"resize {label} error {failed.get('error')!r}"]
+    cut_url = origin + "/?demo=booleans&op=cut"
+    print(f"load type_in_resize_cut {cut_url}", flush=True)
+    cut, cut_problems = wait_for_case(cdp, origin, cut_url, PAGE_TIMEOUT_S)
+    if cut_problems or not isinstance(cut, dict):
+        return ["resize cut load", *cut_problems[:20]]
+    before, before_err = resize_call(cdp, {"lock": True})
+    if before_err or not before:
+        return [f"resize cut status {before_err}"]
+    if before.get("kind") != "boolean" or before.get("primitiveKind"):
+        return [f"resize cut kind {before.get('kind')!r} primitive {before.get('primitiveKind')!r}"]
+    try:
+        dx0 = float(before["dx"])
+        dy0 = float(before["dy"])
+        dz0 = float(before["dz"])
+    except (KeyError, TypeError, ValueError):
+        return [f"resize cut bbox {before.get('dx')!r} {before.get('dy')!r} {before.get('dz')!r}"]
+    if dx0 <= 0 or dy0 <= 0 or dz0 <= 0:
+        return [f"resize cut bbox {dx0} {dy0} {dz0}"]
+    scaled, scale_err = resize_call(cdp, {"lock": True, "sx": float(dx0) * 1.5})
+    if scale_err or not scaled:
+        return [f"resize cut scale {scale_err}"]
+    if scaled.get("method") != "scale" or scaled.get("done") != "RESIZE_DONE" or scaled.get("valid") is not True:
+        return [f"resize cut scale result {scaled.get('method')!r} {scaled.get('done')!r} {scaled.get('error')!r}"]
+    if not _near(scaled.get("dx"), float(dx0) * 1.5) or not _near(scaled.get("dy"), float(dy0) * 1.5) or not _near(scaled.get("dz"), float(dz0) * 1.5):
+        return [f"resize cut scaled bbox {scaled.get('dx')!r} {scaled.get('dy')!r} {scaled.get('dz')!r}"]
+    widened, wide_err = resize_call(cdp, {"undo": True, "lock": False})
+    if wide_err or not widened:
+        return [f"resize cut undo {wide_err}"]
+    if int(widened.get("undoDepth") or 0) != 0 or widened.get("ellipse") is not True:
+        return [f"resize cut unlocked {widened.get('undoDepth')!r} ellipse {widened.get('ellipse')!r}"]
+    try:
+        base_x = float(widened["dx"])
+        base_y = float(widened["dy"])
+        base_z = float(widened["dz"])
+    except (KeyError, TypeError, ValueError):
+        return [f"resize cut restored bbox {widened.get('dx')!r} {widened.get('dy')!r} {widened.get('dz')!r}"]
+    stretched, stretch_err = resize_call(cdp, {"lock": False, "sx": base_x * 1.25})
+    if stretch_err or not stretched:
+        return [f"resize cut gtransform {stretch_err}"]
+    if stretched.get("method") != "gtransform" or stretched.get("ellipse") is not True or stretched.get("valid") is not True:
+        return [f"resize cut gtransform result {stretched.get('method')!r} ellipse {stretched.get('ellipse')!r} {stretched.get('error')!r}"]
+    if not _near(stretched.get("dx"), base_x * 1.25) or not _near(stretched.get("dy"), base_y) or not _near(stretched.get("dz"), base_z):
+        return [f"resize cut stretched {stretched.get('dx')!r} {stretched.get('dy')!r} {stretched.get('dz')!r}"]
+    print(
+        "type_in_resize: 30 mm bbox, one undo, inch 25.4, lock, ellipse note, rollback, cut scale",
+        flush=True,
+    )
+    return []
+
+
+SAVELOAD_BUTTONS_EXPR = r"""
+(function () {
+  var problems = [];
+  function closeMenu() {
+    var menu = document.getElementById('fileMenu');
+    var btn = document.getElementById('fileBtn');
+    if (menu && !menu.hidden && btn) btn.click();
+  }
+  try {
+    var menu = document.getElementById('fileMenu');
+    var fileBtn = document.getElementById('fileBtn');
+    if (!menu || !fileBtn) problems.push('file menu missing');
+    else {
+      fileBtn.click();
+      if (menu.hidden) problems.push('file menu stayed closed');
+      ['saveProjectBtn', 'loadProjectBtn'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) { problems.push('missing ' + id); return; }
+        var r = el.getBoundingClientRect();
+        if (r.width < 44 || r.height < 44) problems.push(id + ' size ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+        if (r.left < -0.5 || r.top < -0.5 || r.right > window.innerWidth + 0.5 || r.bottom > window.innerHeight + 0.5) {
+          problems.push(id + ' offscreen ' + r.left.toFixed(1) + ',' + r.top.toFixed(1) + ' ' + r.right.toFixed(1) + ',' + r.bottom.toFixed(1) + ' view ' + window.innerWidth + 'x' + window.innerHeight);
+        }
+      });
+      var input = document.getElementById('projectFile');
+      if (!input || input.type !== 'file') problems.push('file input missing');
+      else if (getComputedStyle(input).display === 'none') problems.push('file input display none');
+      closeMenu();
+      if (!menu.hidden) problems.push('file menu stayed open');
+    }
+  } catch (err) {
+    problems.push('buttons ' + (err && err.message ? err.message : String(err)));
+    closeMenu();
+  }
+  return JSON.stringify({ problems: problems });
+})()
+"""
+
+
+SAVELOAD_EXPR = r"""
+(function () {
+  var problems = [];
+  var clears = 0;
+  function near(a, b) {
+    return typeof a === 'number' && typeof b === 'number' && isFinite(a) && isFinite(b) && Math.abs(a - b) <= 0.01;
+  }
+  var hook = window.__cadcamProject;
+  if (!hook || typeof hook.preparePair !== 'function') {
+    problems.push('missing project hook');
+    return JSON.stringify({ problems: problems, clears: clears });
+  }
+  try {
+    var pair = hook.preparePair();
+    if (!pair || pair.ok !== true) {
+      problems.push('pair ' + (pair && pair.error ? pair.error : 'failed'));
+      return JSON.stringify({ problems: problems, clears: clears });
+    }
+    var before = hook.measures();
+    if (!before || before.length !== pair.count) problems.push('measure count ' + (before && before.length));
+    var box = null;
+    for (var i = 0; i < before.length; i += 1) {
+      if (before[i].name.indexOf('Box') === 0) box = before[i];
+    }
+    if (!box || !near(box.volumeMm3, 8000)) problems.push('box volume ' + (box && box.volumeMm3));
+    var saved = hook.saveText();
+    if (!saved || saved.ok !== true) {
+      problems.push('save ' + (saved && saved.error ? saved.error : 'failed'));
+      return JSON.stringify({ problems: problems, clears: clears });
+    }
+    var doc = JSON.parse(saved.text);
+    if (doc.units !== 'mm') problems.push('file units ' + doc.units);
+    if (doc.version !== 1) problems.push('file version ' + doc.version);
+    if (!doc.parts || doc.parts.length !== before.length) problems.push('file parts');
+    var prevClear = window.__cadcamClearUndo;
+    var clearOk = true;
+    window.__cadcamClearUndo = function () {
+      clears += 1;
+      var result = typeof prevClear === 'function' ? prevClear() : false;
+      if (result !== true) clearOk = false;
+      return result;
+    };
+    var loaded = hook.loadText(saved.text, true);
+    if (!loaded || loaded.ok !== true) problems.push('load ' + (loaded && loaded.error ? loaded.error : 'failed'));
+    if (clears !== 1) problems.push('clearUndo after load ' + clears);
+    if (!clearOk) problems.push('clearUndo did not reset the undo stack');
+    var published = window.__cadcamExportState || {};
+    if (published.undoDepth !== 0 || published.redoDepth !== 0) problems.push('undo depth ' + published.undoDepth + '/' + published.redoDepth);
+    var after = hook.measures();
+    if (!after || after.length !== before.length) problems.push('reload count');
+    else {
+      for (var n = 0; n < before.length; n += 1) {
+        if (after[n].name !== before[n].name) problems.push('name ' + before[n].name + ' vs ' + after[n].name);
+        if (after[n].source !== 'parameters') problems.push('source ' + after[n].name + ' ' + after[n].source);
+        if (!near(after[n].volumeMm3, before[n].volumeMm3)) problems.push('volume ' + after[n].name + ' ' + after[n].volumeMm3);
+        var keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
+        for (var k = 0; k < keys.length; k += 1) {
+          var key = keys[k];
+          if (!after[n].bounds || !near(after[n].bounds[key], before[n].bounds[key])) {
+            problems.push('bound ' + after[n].name + ' ' + key);
+          }
+        }
+      }
+    }
+    var inchBtn = document.querySelector('[data-action="units"][data-unit="in"]');
+    if (!inchBtn) problems.push('inch button missing');
+    else inchBtn.click();
+    if (hook.unit() !== 'in') problems.push('display unit ' + hook.unit());
+    var inchSaved = hook.saveText();
+    if (!inchSaved || inchSaved.ok !== true) problems.push('inch save');
+    else {
+      var inchDoc = JSON.parse(inchSaved.text);
+      if (inchDoc.units !== 'mm') problems.push('inch file units ' + inchDoc.units);
+      var inchLoaded = hook.loadText(inchSaved.text, true);
+      if (!inchLoaded || inchLoaded.ok !== true) problems.push('inch load');
+      if (hook.unit() !== 'in') problems.push('unit changed on load ' + hook.unit());
+      var inchAfter = hook.measures();
+      if (!inchAfter || inchAfter.length !== before.length) problems.push('inch count');
+      else {
+        for (var m = 0; m < before.length; m += 1) {
+          if (!near(inchAfter[m].volumeMm3, before[m].volumeMm3)) problems.push('inch drift ' + inchAfter[m].name + ' ' + inchAfter[m].volumeMm3);
+        }
+      }
+    }
+    if (clears !== 2) problems.push('clearUndo after inch load ' + clears);
+    var names = hook.measures().map(function (row) { return row.name; });
+    var volumes = hook.measures().map(function (row) { return row.volumeMm3; });
+    hook.setDirty(true);
+    function unchanged(label, result) {
+      if (!result || result.unchanged !== true || result.ok !== false) problems.push(label + ' result');
+      var now = hook.measures();
+      if (now.length !== names.length) problems.push(label + ' count');
+      for (var u = 0; u < names.length; u += 1) {
+        if (!now[u] || now[u].name !== names[u] || !near(now[u].volumeMm3, volumes[u])) problems.push(label + ' model');
+      }
+      if (hook.dirty() !== true) problems.push(label + ' dirty');
+    }
+    unchanged('corrupt', hook.loadText('{not json', true));
+    unchanged('empty', hook.loadText('', true));
+    unchanged('blank', hook.loadText('   ', true));
+    var badUnits = JSON.parse(saved.text);
+    badUnits.units = 'in';
+    unchanged('units', hook.loadText(JSON.stringify(badUnits), true));
+    var missingUnits = JSON.parse(saved.text);
+    delete missingUnits.units;
+    unchanged('missing units', hook.loadText(JSON.stringify(missingUnits), true));
+    var beforeCancel = clears;
+    unchanged('cancel', hook.loadText(saved.text, false));
+    if (clears !== beforeCancel) problems.push('cancel cleared undo');
+    if (clears !== 2) problems.push('clearUndo final ' + clears);
+    if (!clearOk) problems.push('clearUndo final did not reset the undo stack');
+    var endState = window.__cadcamExportState || {};
+    if (endState.undoDepth !== 0 || endState.redoDepth !== 0) problems.push('undo depth final ' + endState.undoDepth + '/' + endState.redoDepth);
+  } catch (err2) {
+    problems.push(err2 && err2.message ? err2.message : String(err2));
+  }
+  return JSON.stringify({ problems: problems, clears: clears });
+})()
+"""
+
+
+def run_saveload(cdp: Cdp, origin: str) -> list[str]:
+    """Round-trip a box and a cylinder through the project-file hook."""
+    url = origin + "/?primitive=box"
+    _state, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["saveload load", *load_problems[:20]]
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"saveload portrait {exc}"]
+    time.sleep(0.3)
+    button_raw, button_err = eval_expr(cdp, SAVELOAD_BUTTONS_EXPR)
+    if button_err or not isinstance(button_raw, str):
+        return [f"saveload buttons {button_raw or button_err}"]
+    try:
+        button_found = json.loads(button_raw)
+    except json.JSONDecodeError:
+        return [f"saveload buttons {button_raw[:500]}"]
+    button_problems = button_found.get("problems") if isinstance(button_found, dict) else [str(button_raw)]
+    if not isinstance(button_problems, list):
+        return [f"saveload buttons {button_raw[:500]}"]
+    if button_problems:
+        return [f"saveload {item}" for item in button_problems]
+    cover = coverage_problems(cdp, False)
+    if cover:
+        return [f"saveload {item}" for item in cover]
+    raw, err = eval_expr(cdp, SAVELOAD_EXPR, timeout=180)
+    if err or not isinstance(raw, str):
+        return [f"saveload eval {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"saveload json {raw[:500]}"]
+    problems = found.get("problems") if isinstance(found, dict) else [str(raw)]
+    if not isinstance(problems, list):
+        return [f"saveload {raw[:500]}"]
+    if problems:
+        return [f"saveload {item}" for item in problems]
+    print("saveload pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -3006,6 +3428,16 @@ def run(omit: list[str]) -> int:
             if hole_problems:
                 failures.append("portrait_holes")
                 failures.extend(hole_problems[:40])
+        if not failures:
+            resize_problems = run_type_in_resize(cdp, origin)
+            if resize_problems:
+                failures.append("type_in_resize")
+                failures.extend(resize_problems[:40])
+        if not failures:
+            saveload_problems = run_saveload(cdp, origin)
+            if saveload_problems:
+                failures.append("saveload")
+                failures.extend(saveload_problems[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

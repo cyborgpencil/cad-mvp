@@ -13,6 +13,7 @@
 // deleted while an algorithm still holds them. The copy (copyGeom true) is
 // what later steps keep.
 
+import { checkOcctShape } from './occt-gate.mjs';
 import { inspectSolid } from './occt-primitives.mjs';
 
 // App defaults. Team choice (Erik 7:00 PM MT), not a sourced spec.
@@ -503,6 +504,184 @@ export function transformShape(oc, shape, spec) {
       error: 'FAIL: BRepBuilderAPI_Transform threw ' + explain(oc, err) + ' The last good shape was kept.',
       kept: true,
     };
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Exact geometry box. useTriangulation false, useShapeTolerance false so the
+// box is not padded by the shape tolerance (BRepBndLib.Add does pad).
+// libcascade 3.1.0: AddOptimal(shape, box, useTriangulation, useShapeTolerance).
+export function optimalBounds(oc, shape) {
+  if (!oc || !shape) return null;
+  const trash = [];
+  try {
+    const box = track(trash, new oc.Bnd_Box());
+    oc.BRepBndLib.AddOptimal(shape, box, false, false);
+    if (typeof box.IsVoid === 'function' && box.IsVoid()) return null;
+    const bounds = {
+      xmin: box.GetXMin(),
+      ymin: box.GetYMin(),
+      zmin: box.GetZMin(),
+      xmax: box.GetXMax(),
+      ymax: box.GetYMax(),
+      zmax: box.GetZMax(),
+    };
+    const values = [bounds.xmin, bounds.ymin, bounds.zmin, bounds.xmax, bounds.ymax, bounds.zmax];
+    if (!values.every(function (n) { return Number.isFinite(n); })) return null;
+    return bounds;
+  } catch (_err) {
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+function mulMat(a, b) {
+  const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (let r = 0; r < 3; r += 1) {
+    for (let c = 0; c < 3; c += 1) {
+      out[r][c] = a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c];
+    }
+  }
+  return out;
+}
+
+function transposeMat(m) {
+  return [
+    [m[0][0], m[1][0], m[2][0]],
+    [m[0][1], m[1][1], m[2][1]],
+    [m[0][2], m[1][2], m[2][2]],
+  ];
+}
+
+function matVec(m, v) {
+  return [
+    m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+    m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+    m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+  ];
+}
+
+// Same XYZ order as transformShape: R = Rz * Ry * Rx, degrees.
+function eulerMatrixDeg(rxDeg, ryDeg, rzDeg) {
+  const rx = (Number(rxDeg) || 0) * Math.PI / 180;
+  const ry = (Number(ryDeg) || 0) * Math.PI / 180;
+  const rz = (Number(rzDeg) || 0) * Math.PI / 180;
+  const cx = Math.cos(rx);
+  const sx = Math.sin(rx);
+  const cy = Math.cos(ry);
+  const sy = Math.sin(ry);
+  const cz = Math.cos(rz);
+  const sz = Math.sin(rz);
+  const rotX = [[1, 0, 0], [0, cx, -sx], [0, sx, cx]];
+  const rotY = [[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]];
+  const rotZ = [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]];
+  return mulMat(rotZ, mulMat(rotY, rotX));
+}
+
+function resizeFail(method, error) {
+  const text = error && error.indexOf('kept') >= 0 ? error : (error + ' The last good shape was kept.');
+  return {
+    ok: false,
+    shape: null,
+    kept: true,
+    rolledBack: true,
+    method: method,
+    error: text,
+    valid: false,
+  };
+}
+
+// Locked uniform scale uses gp_Trsf.SetScale and BRepBuilderAPI_Transform.
+// Unlocked resize uses gp_GTrsf and BRepBuilderAPI_GTransform about origin,
+// in the body's local axes (euler is the same XYZ rotation as transformShape).
+// factors are multiplicative. The input shape is not modified. A failed
+// analyzer or a throw drops the new shape and reports rollback.
+export function resizeShape(oc, shape, spec) {
+  const src = spec || {};
+  const factors = Array.isArray(src.factors) ? src.factors : [1, 1, 1];
+  const fx = Number(factors[0]);
+  const fy = Number(factors[1]);
+  const fz = Number(factors[2]);
+  const origin = Array.isArray(src.origin) ? src.origin : [0, 0, 0];
+  const euler = Array.isArray(src.euler) ? src.euler : [0, 0, 0];
+  const uniform = src.uniform === true;
+  const method = uniform ? 'scale' : 'gtransform';
+  if (!shape) return resizeFail(method, 'FAIL: resize needs a shape.');
+  if (!(fx > 0) || !(fy > 0) || !(fz > 0) || !Number.isFinite(fx) || !Number.isFinite(fy) || !Number.isFinite(fz)) {
+    return resizeFail(method, 'FAIL: size must be greater than zero.');
+  }
+  if (Math.abs(fx - 1) <= 1e-12 && Math.abs(fy - 1) <= 1e-12 && Math.abs(fz - 1) <= 1e-12) {
+    return { ok: true, shape: null, skipped: true, kept: true, rolledBack: false, method: method, error: '', valid: true };
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    let algo = null;
+    let label = '';
+    if (uniform) {
+      const pnt = track(trash, new oc.gp_Pnt(Number(origin[0]) || 0, Number(origin[1]) || 0, Number(origin[2]) || 0));
+      const trsf = track(trash, new oc.gp_Trsf());
+      trsf.SetScale(pnt, fx);
+      algo = track(trash, new oc.BRepBuilderAPI_Transform(shape, trsf, true, false));
+      label = 'BRepBuilderAPI_Transform';
+    } else {
+      const world = eulerMatrixDeg(euler[0], euler[1], euler[2]);
+      const local = [[fx, 0, 0], [0, fy, 0], [0, 0, fz]];
+      const linear = mulMat(world, mulMat(local, transposeMat(world)));
+      const centre = [Number(origin[0]) || 0, Number(origin[1]) || 0, Number(origin[2]) || 0];
+      const moved = matVec(linear, centre);
+      const shift = [centre[0] - moved[0], centre[1] - moved[1], centre[2] - moved[2]];
+      const gtrsf = track(trash, new oc.gp_GTrsf());
+      for (let r = 0; r < 3; r += 1) {
+        for (let c = 0; c < 3; c += 1) gtrsf.SetValue(r + 1, c + 1, linear[r][c]);
+        gtrsf.SetValue(r + 1, 4, shift[r]);
+      }
+      algo = track(trash, new oc.BRepBuilderAPI_GTransform(shape, gtrsf, true));
+      label = 'BRepBuilderAPI_GTransform';
+    }
+    const taken = takeDoneShape(oc, algo, label);
+    if (!taken.ok || !taken.shape) {
+      return resizeFail(method, taken.error || ('FAIL: ' + label + ' was rejected.'));
+    }
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok || !copied.shape) {
+      return resizeFail(method, copied.error || 'FAIL: resize copy failed.');
+    }
+    owned = copied.shape;
+    let check = null;
+    try {
+      check = checkOcctShape(oc, owned);
+    } catch (err) {
+      releaseShape(owned);
+      owned = null;
+      return resizeFail(method, 'FAIL: BRepCheck_Analyzer threw ' + explain(oc, err));
+    }
+    if (src.forceInvalid === true || !check || check.valid !== true || check.pass !== true) {
+      releaseShape(owned);
+      owned = null;
+      const why = src.forceInvalid === true
+        ? 'FAIL: OCCT BRepCheck_Analyzer is not valid.'
+        : ((check && check.message) || 'FAIL: OCCT BRepCheck_Analyzer is not valid.');
+      return resizeFail(method, why);
+    }
+    const keptShape = owned;
+    owned = null;
+    return {
+      ok: true,
+      shape: keptShape,
+      kept: false,
+      rolledBack: false,
+      method: method,
+      error: '',
+      valid: true,
+      check: check,
+    };
+  } catch (err) {
+    releaseShape(owned);
+    return resizeFail(method, 'FAIL: ' + (uniform ? 'BRepBuilderAPI_Transform' : 'BRepBuilderAPI_GTransform') + ' threw ' + explain(oc, err));
   } finally {
     dispose(trash);
   }

@@ -305,6 +305,40 @@ PASS, not committed. CTest with CI=1: 7/7 passed (`occt_gate` Passed). `deploy_s
 - 2026-10-22 — UI session 3: the blank WebKit 3D view was #occtBanner leaving the flex column when the OCCT gate passed. The viewport grew, ResizeObserver called renderer.setSize, and headless WebKit stopped compositing the canvas. The framebuffer still held the plate (WebGL2, no context loss). The banner is now an overlay, and setSize is skipped when the buffer already matches. Phone smoke canvas check failed before the change and passed after in WebKit and Chromium. Title tooltips clear on pointerup, touchend, and blur. Create is a bottom sheet at 390x844 and a popover at 1440x900.
 - 03:38 WebKit blank view was our bug and is fixed; pixel check stays a hard failure (Pilot, per Chief's 02:49 ruling). Push pending Chief go.
 - 03:39 Push approved (Chief, 3T final). Screenshot cleanup and Dimensions-box check go in the next Grok batch after the gizmo bug, before undo/redo. Pilot logs start/done/end times per run and investigates the post-done-marker hang (Chief).
+## Project file save/load (2026-10-22)
+
+BREP symbols in the prebuilt libcascade 3.1.0 (`builds/libcascade/dist/opencascade_single.js.symbols`, plus a runtime probe):
+
+- `BRepTools` is exported to JavaScript.
+- The linked `Write` symbol is the file-path overload `BRepTools::Write(TopoDS_Shape const&, char const*, bool, bool, TopTools_FormatVersion, Message_ProgressRange const&)`. A box write returned true. The text starts with `DBRep_DrawableShape` and contains `CASCADE Topology`.
+- File-path `BRepTools::Read(TopoDS_Shape&, char const*, BRep_Builder const&, Message_ProgressRange const&)` is exported. The probe read the box back and `IsNull` was false.
+- The `std::ostream` / `std::istream` overloads of `Write` and `Read` are not in the symbol map.
+- `cadcam.wasm` does not link OCCT, so a `std::stringstream` wrapper cannot be compiled into that module.
+
+The binding is `web/project-file.mjs`. It calls those file-path methods, copies the BREP text out with `FS.readFile`, and `FS.unlink`s the temporary file. The `.cadmvp` document is plain JSON and stores that text. This is the binding the prebuild can actually call. It is flagged for Erik review. It is not a stringstream binding, and the stored file is not a virtual path.
+
+Team choices for the format and the load path (not Erik measurements):
+
+- `version` is the number `1`. Any other value, including `"1"`, is an error.
+- The extension is `.cadmvp`. The top-level `units` field is always `"mm"`.
+- Each part has `name`, `placement` `{x,y,z}` in millimetres, `material`, `primitive` (`{kind, parameters}` or null), `features` (an array), and `shape` (BREP text that contains `CASCADE Topology`).
+- `placement` is taken from `params.cx/cy/cz`, or 0 when those are missing. On load, `placement` is copied onto `cx/cy/cz` before a parameter rebuild.
+- Missing `material` is saved as `"default"`.
+- Parameter rebuild runs for `box`, `cylinder`, and `disc` only when `features` is empty. A non-empty `features` list, or any other kind, keeps the BREP text. A rebuilt shape that fails `checkOcctShape` falls back to BREP. A failed BREP validity check rejects the whole file.
+- BREP write flags: triangles on, normals off, `TopTools_FormatVersion_CURRENT`.
+- The round-trip box is `BRepBndLib::AddOptimal` with `useTriangulation` false and `useShapeTolerance` false.
+- An empty `parts` array is a valid empty project. `replaceMesh` rejects an empty index list, so the viewer hides the solid and the previous kernel mesh is left unloaded from the screen. An empty file, bad JSON, a missing or non-`mm` `units` field, or an unknown version is an error and does not change the model.
+- Load does not change the mm/inch display toggle. Save reads millimetre parameters and the OCCT shape, not the displayed numbers.
+- The download name is the document name with characters outside `[A-Za-z0-9._-]` replaced by `_`, plus `.cadmvp`. The blob type is `application/json`.
+- The file input `accept` is `.cadmvp,application/json,text/plain` so iOS can see the file. The control is a label with the input at opacity 0, `font-size: 16px`, and no `capture`. The File menu stays open until a file is chosen.
+- Confirm runs after a successful parse. Dirty model: "Replace the current model? Unsaved changes will be lost." Clean model: "Replace the current model with this file?" Cancel leaves the model unchanged.
+- A successful load calls the real `window.__cadcamClearUndo` from the gizmo batch. That function runs `commandStack.clear()` in `web/undo.mjs` and frees the before/after snapshots. Save/load does not install a no-op over it. Undo and redo buttons still call `doUndo` and `doRedo`.
+- Save uses an `<a download>` blob. `showSaveFilePicker` is not used; it is not available on iOS Safari.
+
+Manual iPhone file-picker check: not run on a physical device. Playwright WebKit is not iOS Safari. `tests/phone_smoke.py` covers the 44 px Save and Load controls, the hidden-input rule (`display` is not `none`), and the same hook round trip as `tests/deploy_smoke.py`.
+
+Error strings: empty file "This file is empty. The model was not changed."; unreadable file "This file could not be read. The model was not changed."; units "This file is not in millimetres. The model was not changed."; version "This file version is not supported. The model was not changed."; shape "A part failed the shape check. The model was not changed."; save "The project could not be saved."; cancel "Load cancelled. The model was not changed."
+
 - 04:31 Phone fix + ci.yml on main (d8d04df); ci.yml green on main; docs in 57e6d47. Branch protection on main requires CI build check, admin enforcement off (Repo Keeper). Nav cube launch cleared (3T).
 
 - 04:33 MT (Chief): undo/redo is built in the gizmo batch (before and after snapshot command stack, Ctrl+Z/Ctrl+Y, a drag counts as one step, load clears the stack), and resize and delete launch after it merges. Unlocked GTransform resize is in scope, with the ellipse note, validity check plus rollback, and lock on by default. The trash icon goes in the property sheet header (44 px or more, shown only when something is selected), and Del also deletes on desktop. The face-delete fixture is a 40x20x10 box with a 6 mm hole, built in the test and not from Blink.
@@ -318,3 +352,5 @@ PASS, not committed. CTest with CI=1: 7/7 passed (`occt_gate` Passed). `deploy_s
 - 07:03 MT (Chief): the landing order is PR #1, PR #2, resize, delete, then Pilot's next batch (approved plan: diagnose volume first, then the plate outline, phone Undo/Redo, and gizmo_drag_smoke in CTest for 8/8), which starts after delete merges. Each lands only after a rebase onto the latest main and a green build. Everything goes through a PR, Repo Keeper's own commits included, with no direct pushes to main.
 - 07:06 MT (Chief/3T): Acceptance tests use the Ermo X1C profile, the stock Bambu 0.20 mm Standard process, Bambu PLA Basic, and stock TPU 95A (3T's call; the Chief had said Generic TPU), with no printer send. Orca bounding box within 0.05 mm per axis, exact volume within 0.01. Assemblies: material tags PLA/PETG/TPU (default PLA), mixed-material Combine refused, one 3MF with one object per part. Tooling split per Research Digest. Truck parts (team-chosen 07:10, mm): chassis 80x30x6 with two Ø4.4 axle holes, cab 30x30x25 combined into the chassis, 2 axles Ø4x44, 4 PLA hubs Ø16x8 with a Ø4.2 bore, 4 TPU tires OD24/ID15.6x8. That's 12 parts against the Chief's ~8, the minimum for the required parts.
 - 07:15 MT (Chief/3T): The truck is final at 11 parts, with the cab combined into the chassis. The TPU profile is final as stock TPU 95A (3T rejected Generic TPU). Merge order: PR #1, then PR #3, then the docs PR.
+- 2026-10-22 — Type-in resize: lock on by default. A locked primitive rebuilds from its own parameters (box L×W×H, cylinder diameter×height, disc diameter×thickness) and scales every size by the first changed field. A locked non-primitive uses gp_Trsf.SetScale about the AddOptimal centre (BRepBndLib.AddOptimal with useTriangulation false and useShapeTolerance false). Lock off, on any body, uses BRepBuilderAPI_GTransform in the body's local axes and shows "Circles may become ellipses." Every resize runs BRepCheck_Analyzer; an invalid result or a throw drops the new shape and keeps the last good one, with no undo step. A successful resize is one step on the gizmo command stack in web/undo.mjs. Stored lengths stay millimetres; the inch toggle only changes the field text (MM_PER_IN 25.4). Zero, negative, or blank is a clean error and does not resize. A body with holes is resized from its bounding box so the holes stay. No src/ or bindings.cpp change. Smoke: window.__cadcamResize in deploy_smoke and phone_smoke.
+- 08:02 MT (Chief): Pilot's next batch also removes the Watertight FAIL badge from the open_box demo, because watertight checks were dropped. The units check stays visible.

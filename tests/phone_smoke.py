@@ -680,6 +680,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
         holes = deploy_smoke.run_portrait_holes(cdp, origin)
         if holes:
             return [f"{engine} portrait_holes", *holes[:40]]
+        resized = deploy_smoke.run_type_in_resize(cdp, origin)
+        if resized:
+            return [f"{engine} type_in_resize", *resized[:40]]
         pixels = canvas_pixel_problems(page, engine)
         if pixels:
             return [f"{engine} canvas", *pixels]
@@ -687,6 +690,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
             shots = shoot_plate(page, cdp)
             if shots:
                 return [f"{engine} screenshot", *shots]
+        saved = deploy_smoke.run_saveload(cdp, origin)
+        if saved:
+            return [f"{engine} saveload", *saved[:40]]
         print(f"PASS phone_smoke {engine}", flush=True)
         return []
     finally:
