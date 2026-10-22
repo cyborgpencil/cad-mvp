@@ -1,9 +1,12 @@
+# One workflow reports the required "build" check.
+# Docs-only diffs (*.md, research/**, prompts/**) skip the native steps.
+# workflow_dispatch, a missing push base, or an all-zero before sha always builds.
 name: CI (build and test, no deploy)
 
 on:
   pull_request:
   push:
-    branches-ignore: [main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,34 +21,126 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changes
+        name: Detect non-docs changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          is_docs() {
+            case "$1" in
+              *.md|research/*|prompts/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          classify() {
+            local f
+            code=false
+            while IFS= read -r f; do
+              [ -z "${f}" ] && continue
+              if ! is_docs "${f}"; then
+                code=true
+                return 0
+              fi
+            done <<< "${files}"
+          }
+
+          code=true
+          files=""
+          compared=false
+
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "workflow_dispatch: code=true"
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            if [ -z "${BASE_SHA}" ] || [ -z "${HEAD_SHA}" ]; then
+              echo "pull_request base or head sha missing: code=true"
+            elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null || ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+              echo "pull_request sha not in checkout: code=true"
+            else
+              files="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
+              compared=true
+              classify
+            fi
+          elif [ "${EVENT_NAME}" = "push" ]; then
+            before_bad=false
+            if [ -z "${BEFORE_SHA}" ]; then
+              before_bad=true
+            else
+              case "${BEFORE_SHA}" in
+                *[!0]*) ;;
+                *) before_bad=true ;;
+              esac
+            fi
+            if [ "${before_bad}" = "true" ]; then
+              echo "push before is all zeros or missing: code=true"
+            elif ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null || ! git cat-file -e "${SHA}^{commit}" 2>/dev/null; then
+              echo "push before or sha not in checkout: code=true"
+            else
+              files="$(git diff --name-only "${BEFORE_SHA}" "${SHA}")"
+              compared=true
+              classify
+            fi
+          else
+            echo "event ${EVENT_NAME}: code=true"
+          fi
+
+          echo "changed files:"
+          if [ "${compared}" = "true" ]; then
+            if [ -n "${files}" ]; then
+              printf '%s\n' "${files}"
+            else
+              echo "(none)"
+            fi
+          else
+            echo "(not compared)"
+          fi
+          echo "decision: code=${code}"
+          echo "code=${code}" >> "${GITHUB_OUTPUT}"
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.code == 'true'
         with:
           node-version: "22"
       - name: Install Ninja and the native C++ toolchain
+        if: steps.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y ninja-build g++ cmake
       - uses: mymindstorm/setup-emsdk@v14
+        if: steps.changes.outputs.code == 'true'
         with:
           version: latest
       - name: Build cadcam.js and cadcam.wasm (single-threaded, see web/BUILD.md)
+        if: steps.changes.outputs.code == 'true'
         run: |
           emcmake cmake -S web -B builds/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build builds/wasm
           test -f web/cadcam.js && test -f web/cadcam.wasm
       - name: Fetch libcascade 3.1.0 single-threaded WASM
+        if: steps.changes.outputs.code == 'true'
         run: |
           python3 web/fetch-libcascade.py
           test -f web/dist/opencascade_single.wasm
           test -f web/occt-gate.mjs
       - name: Assemble site
+        if: steps.changes.outputs.code == 'true'
         # web/assemble_site.py is the only file list. tests/deploy_smoke.py calls it too.
         run: python3 web/assemble_site.py _site
       - name: Install Chrome for the deploy smoke test
+        if: steps.changes.outputs.code == 'true'
         run: |
           curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt-get update
           sudo apt-get install -y /tmp/chrome.deb
           google-chrome --version
       - name: Native CTest
+        if: steps.changes.outputs.code == 'true'
         # Before upload. occt_gate and deploy_smoke run here, once, and a
         # failure blocks the Pages artifact. CI=true forbids those skips.
         env:
@@ -54,3 +149,6 @@ jobs:
           cmake -S . -B builds/native -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build builds/native
           ctest --test-dir builds/native --output-on-failure
+      - name: Docs-only skip notice
+        if: always() && steps.changes.outputs.code == 'false'
+        run: echo "docs-only change, native build skipped"
