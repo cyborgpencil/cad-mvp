@@ -3,6 +3,10 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-22
+
+- Type-in resize. The dimension sheet edits a box, cylinder (diameter × height), or disc in millimetres, and any other body from its AddOptimal bounding box. Lock proportions is on by default; turning it off shows "Circles may become ellipses." and resizes with BRepBuilderAPI_GTransform. A locked non-primitive uses a uniform scale. Each successful resize is one undo step on the existing command stack. An invalid solid rolls back and is not an undo step. Inch display converts at the field only. No `src/` or `web/bindings.cpp` edits.
+
 ## 2026-10-21
 
 - Portrait 390: the dimension mode row, primitive toolbar, mm/in toggle, and status line wrap inside the screen. The narrow tool strip's actions stay on the Tools sheet. Touch targets stay at least 44×44. No `src/` edits. No commit.
