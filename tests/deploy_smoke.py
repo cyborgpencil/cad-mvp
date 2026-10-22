@@ -1319,12 +1319,14 @@ def _wait_snap(
     ]
 
 
-def _tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
+def _zone_point(zone: dict[str, Any]) -> tuple[float, float] | list[str]:
     try:
-        x = float(zone["x"])
-        y = float(zone["y"])
+        return float(zone["x"]), float(zone["y"])
     except (KeyError, TypeError, ValueError):
         return [f"zone point {zone!r}"]
+
+
+def _zone_clear(cdp: Cdp, zone: dict[str, Any], x: float, y: float) -> list[str]:
     raw, err = eval_expr(
         cdp,
         "(function(){"
@@ -1336,7 +1338,55 @@ def _tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
     )
     if err or raw != "ok":
         return [f"{zone.get('name')} tap lands on {raw or err}"]
+    return []
+
+
+def _tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
+    point = _zone_point(zone)
+    if isinstance(point, list):
+        return point
+    x, y = point
+    blocked = _zone_clear(cdp, zone, x, y)
+    if blocked:
+        return blocked
     touch_tap(cdp, x, y)
+    return []
+
+
+def _double_tap_zone(cdp: Cdp, zone: dict[str, Any]) -> list[str]:
+    """Two cube pointer-ups 80 ms apart on the page clock.
+
+    A CDP round trip between taps can pass the 320 ms double-tap window, so
+    the second tap becomes another face snap. Both ups stay in one evaluate.
+    """
+    point = _zone_point(zone)
+    if isinstance(point, list):
+        return point
+    x, y = point
+    blocked = _zone_clear(cdp, zone, x, y)
+    if blocked:
+        return blocked
+    fired, err = eval_expr(
+        cdp,
+        "(function(){"
+        "var vp=document.getElementById('viewport');"
+        "if(!vp) return 'missing';"
+        "function fire(type, px, py, buttons){"
+        "vp.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true,"
+        "clientX:px, clientY:py, pointerId:9, pointerType:'touch', button:0,"
+        "buttons:buttons, isPrimary:true}));"
+        "}"
+        f"fire('pointerdown', {x}, {y}, 1);"
+        f"fire('pointerup', {x}, {y}, 0);"
+        "var t0=performance.now();"
+        "while(performance.now()-t0<80){}"
+        f"fire('pointerdown', {x}, {y}, 1);"
+        f"fire('pointerup', {x}, {y}, 0);"
+        "return 'double';"
+        "})()",
+    )
+    if err or fired != "double":
+        return [f"{zone.get('name')} double-tap {fired or err}"]
     return []
 
 
@@ -1420,13 +1470,9 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
     home = fresh.get("home")
     if not isinstance(home, list) or len(home) != 3:
         return [f"home dir {home!r}"]
-    first = _tap_zone(cdp, home_zone)
-    if first:
-        return first
-    time.sleep(0.08)
-    second = _tap_zone(cdp, home_zone)
-    if second:
-        return second
+    doubled = _double_tap_zone(cdp, home_zone)
+    if doubled:
+        return doubled
     snapped = _wait_snap(cdp, (float(home[0]), float(home[1]), float(home[2])), distance, "home")
     if snapped:
         return snapped

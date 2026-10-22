@@ -5,7 +5,8 @@ Newest entries at the top.
 
 ## 2026-10-22
 
-- Phone nav cube on the existing `#viewCube`: 88 px, top-right, safe-area inset, 6 face and 8 corner taps at 44 px extending past the cube, edge taps desktop-only, double-tap home iso, ViewHelper-style orbit snap in 250 ms. Smoke checks in `tests/deploy_smoke.py` and `tests/phone_smoke.py` (phone_smoke still exits 77 when Playwright is missing). Units stay mm. No `src/` or bindings edits. Recorded in `web/PROGRESS.md`.
+- Nav-cube smoke double-tap is two pointer-ups 80 ms apart inside one page turn. A CDP round trip between taps was missing the 320 ms window and leaving the camera on the first face.
+- Phone nav cube on the existing `#viewCube`: 88 px, top-right, safe-area inset, 6 face and 8 corner taps at 44 px extending past the cube, edge taps desktop-only, double-tap home iso, ViewHelper-style orbit snap eased over 250 ms at the current orbit distance. The smoke check accepts a late headless frame. Checks live in `tests/deploy_smoke.py` and `tests/phone_smoke.py` (phone_smoke still exits 77 when Playwright is missing). Units stay mm. No `src/` or bindings edits. Recorded in `web/PROGRESS.md`.
 
 ## 2026-10-21
 
