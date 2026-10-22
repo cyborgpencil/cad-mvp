@@ -34,12 +34,18 @@ export const PLACEHOLDER_CYLINDER_MM = Object.freeze({
   axis: 'Z',
 });
 
-// TBD. Linear deflection passed to BRepMesh_IncrementalMesh so the solid
-// can be drawn and sent through the mesh watertight check. Not a Sides control.
-export const TESSELLATION_DEFLECTION_MM = 0.5;
-
-// TBD. Angular deflection in radians for the same mesher call.
-export const TESSELLATION_ANGULAR = 0.5;
+// Mesh defaults. Team proposal, sourced from the OCCT Mesh user guide
+// (https://dev.opencascade.org/doc/overview/html/occt_user_guides__mesh.html).
+// Team choice, 2026-10-21. Confirmed on IMeshTools_Parameters in
+// libcascade 3.1.0 types.d.ts: Deflection, Relative, Angle,
+// ControlSurfaceDeflection, InParallel. The same object is passed to
+// BRepMesh_IncrementalMesh(shape, parameters). Display and export both
+// use tessellate(), so they share these values. Not a Sides control.
+export const TESSELLATION_DEFLECTION_MM = 0.05;
+export const TESSELLATION_ANGULAR = 0.2;
+export const TESSELLATION_RELATIVE = false;
+export const TESSELLATION_CONTROL_SURFACE = true;
+export const TESSELLATION_IN_PARALLEL = false;
 
 // Weld grid for tessellation vertices that the mesher emits twice, once per face.
 // Same order as the sewing tolerance in occt-gate.mjs. Not a picked MODO value.
@@ -233,18 +239,67 @@ export function checkMeshWatertight(mesh) {
   };
 }
 
+function nowMs() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') return performance.now();
+  return Date.now();
+}
+
 function tessellate(oc, shape, trash) {
-  const mesher = track(trash, new oc.BRepMesh_IncrementalMesh(
-    shape,
-    TESSELLATION_DEFLECTION_MM,
-    false,
-    TESSELLATION_ANGULAR,
-    false
-  ));
+  const started = nowMs();
+  let mesher = null;
+  let meshPath = 'IMeshTools_Parameters';
+  const parameters = track(trash, new oc.IMeshTools_Parameters());
+  parameters.Relative = TESSELLATION_RELATIVE;
+  parameters.Deflection = TESSELLATION_DEFLECTION_MM;
+  parameters.Angle = TESSELLATION_ANGULAR;
+  parameters.ControlSurfaceDeflection = TESSELLATION_CONTROL_SURFACE;
+  parameters.InParallel = TESSELLATION_IN_PARALLEL;
+  try {
+    mesher = track(trash, new oc.BRepMesh_IncrementalMesh(shape, parameters));
+  } catch (_err) {
+    // Closest constructor if the parameters object is rejected:
+    // (shape, linear deflection, isRelative, angular deflection, isInParallel).
+    meshPath = 'constructor(linDeflection, isRelative, angDeflection, isInParallel)';
+    mesher = track(trash, new oc.BRepMesh_IncrementalMesh(
+      shape,
+      TESSELLATION_DEFLECTION_MM,
+      TESSELLATION_RELATIVE,
+      TESSELLATION_ANGULAR,
+      TESSELLATION_IN_PARALLEL
+    ));
+  }
   try {
     if (typeof mesher.Perform === 'function') mesher.Perform();
   } catch (_err) {
     // The constructor already meshes on this build.
+  }
+  let meshSettings = {
+    Relative: TESSELLATION_RELATIVE,
+    Deflection: TESSELLATION_DEFLECTION_MM,
+    Angle: TESSELLATION_ANGULAR,
+    ControlSurfaceDeflection: TESSELLATION_CONTROL_SURFACE,
+    InParallel: TESSELLATION_IN_PARALLEL,
+    path: meshPath,
+  };
+  try {
+    if (mesher && typeof mesher.Parameters === 'function') {
+      const echoed = mesher.Parameters();
+      if (echoed) {
+        meshSettings = {
+          Relative: echoed.Relative,
+          Deflection: echoed.Deflection,
+          Angle: echoed.Angle,
+          ControlSurfaceDeflection: echoed.ControlSurfaceDeflection,
+          InParallel: echoed.InParallel,
+          path: meshPath,
+        };
+        if (echoed !== parameters && typeof echoed.delete === 'function') {
+          try { echoed.delete(); } catch (_drop) { /* already released */ }
+        }
+      }
+    }
+  } catch (_err) {
+    // The values passed in are still the ones the constructor received.
   }
   const rawVertices = [];
   const rawTris = [];
@@ -290,6 +345,9 @@ function tessellate(oc, shape, trash) {
   }
   const welded = weldMesh(rawVertices, { tris: rawTris, faceTris: Array.from({ length: faceCount.n }, function () { return []; }) });
   if (signedVolume(welded.vertices, welded.triangles) < 0) flipTriangles(welded.triangles);
+  welded.meshTimeMs = nowMs() - started;
+  welded.meshSettings = meshSettings;
+  welded.meshPath = meshPath;
   return welded;
 }
 
@@ -421,6 +479,9 @@ export function inspectSolid(oc, shape) {
       watertight: watertight,
       mesh: { vertices: mesh.vertices, triangles: mesh.triangles },
       topology: topology,
+      meshTimeMs: mesh.meshTimeMs || 0,
+      meshSettings: mesh.meshSettings || null,
+      meshPath: mesh.meshPath || '',
     };
   } finally {
     dispose(trash);
@@ -440,6 +501,9 @@ function finish(oc, shape, trash, kind, params) {
     watertight: watertight,
     mesh: { vertices: mesh.vertices, triangles: mesh.triangles },
     topology: topology,
+    meshTimeMs: mesh.meshTimeMs || 0,
+    meshSettings: mesh.meshSettings || null,
+    meshPath: mesh.meshPath || '',
   };
 }
 

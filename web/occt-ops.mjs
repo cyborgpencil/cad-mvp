@@ -615,7 +615,353 @@ export function buildLBracket(oc, overrides) {
     topology: inspected.topology,
     params: spec,
     bounds: expectedLBracketBounds(spec),
+    meshTimeMs: inspected.meshTimeMs || 0,
+    meshSettings: inspected.meshSettings || null,
+    meshPath: inspected.meshPath || '',
   };
+}
+
+// Interactive Booleans. Team choice, 2026-10-21.
+// Two 20 mm boxes. The first uses the box primitive centre (0, 0, 10).
+// The second is shifted +10 mm on X, so the overlap is 10 x 20 x 20 mm.
+// Cut is the first body minus the second. A 40 mm shift leaves a gap.
+// The demo cuts a Z cylinder (diameter 10 mm, height 30 mm, same centre)
+// through that box. Volume tolerance for the boxes is 1e-3 mm³.
+// The cylinder demo uses 1e-2 mm³. An absolute volume at or below 1e-4 mm³
+// is empty. Bounding boxes from BRepBndLib.Add (exact geometry) use 1e-3 mm.
+export const BOOLEAN_BOX_EDGE_MM = 20;
+export const BOOLEAN_OVERLAP_SHIFT_MM = 10;
+export const BOOLEAN_DISJOINT_SHIFT_MM = 40;
+export const BOOLEAN_VOLUME_TOL_MM3 = 1e-3;
+export const BOOLEAN_CURVE_VOLUME_TOL_MM3 = 1e-2;
+export const BOOLEAN_BOUNDS_TOL_MM = 1e-3;
+export const BOOLEAN_EMPTY_VOLUME_MM3 = 1e-4;
+export const BOOLEAN_DEMO_CYLINDER_DIAMETER_MM = 10;
+export const BOOLEAN_DEMO_CYLINDER_HEIGHT_MM = 30;
+export const BOOLEAN_DEMO_OP = 'cut';
+
+export function booleanBoxCentre(shiftX) {
+  return {
+    cx: num(shiftX, 0),
+    cy: 0,
+    cz: 10,
+  };
+}
+
+export function booleanBoxOrigin(shiftX) {
+  const centre = booleanBoxCentre(shiftX);
+  const half = BOOLEAN_BOX_EDGE_MM / 2;
+  return [centre.cx - half, centre.cy - half, centre.cz - half];
+}
+
+export function expectedOverlapVolumes() {
+  const box = BOOLEAN_BOX_EDGE_MM * BOOLEAN_BOX_EDGE_MM * BOOLEAN_BOX_EDGE_MM;
+  const overlap = BOOLEAN_OVERLAP_SHIFT_MM * BOOLEAN_BOX_EDGE_MM * BOOLEAN_BOX_EDGE_MM;
+  return {
+    union: box * 2 - overlap,
+    cut: box - overlap,
+    intersect: overlap,
+  };
+}
+
+export function expectedOverlapBounds(op) {
+  const half = BOOLEAN_BOX_EDGE_MM / 2;
+  const shift = BOOLEAN_OVERLAP_SHIFT_MM;
+  const y0 = -half;
+  const y1 = half;
+  const z0 = 0;
+  const z1 = BOOLEAN_BOX_EDGE_MM;
+  if (op === 'union') {
+    return { xmin: -half, ymin: y0, zmin: z0, xmax: -half + BOOLEAN_BOX_EDGE_MM + shift, ymax: y1, zmax: z1 };
+  }
+  if (op === 'cut') {
+    return { xmin: -half, ymin: y0, zmin: z0, xmax: -half + shift, ymax: y1, zmax: z1 };
+  }
+  return { xmin: -half + shift, ymin: y0, zmin: z0, xmax: half, ymax: y1, zmax: z1 };
+}
+
+export function expectedDemoVolumes() {
+  const radius = BOOLEAN_DEMO_CYLINDER_DIAMETER_MM / 2;
+  const cylinder = Math.PI * radius * radius * BOOLEAN_DEMO_CYLINDER_HEIGHT_MM;
+  const inside = Math.PI * radius * radius * BOOLEAN_BOX_EDGE_MM;
+  const box = BOOLEAN_BOX_EDGE_MM * BOOLEAN_BOX_EDGE_MM * BOOLEAN_BOX_EDGE_MM;
+  return {
+    union: box + cylinder - inside,
+    cut: box - inside,
+    intersect: inside,
+  };
+}
+
+export function expectedDemoBounds(op) {
+  const half = BOOLEAN_BOX_EDGE_MM / 2;
+  const radius = BOOLEAN_DEMO_CYLINDER_DIAMETER_MM / 2;
+  const zBox0 = 0;
+  const zBox1 = BOOLEAN_BOX_EDGE_MM;
+  const zCyl0 = 10 - BOOLEAN_DEMO_CYLINDER_HEIGHT_MM / 2;
+  const zCyl1 = 10 + BOOLEAN_DEMO_CYLINDER_HEIGHT_MM / 2;
+  if (op === 'union') {
+    return { xmin: -half, ymin: -half, zmin: zCyl0, xmax: half, ymax: half, zmax: zCyl1 };
+  }
+  if (op === 'intersect') {
+    return { xmin: -radius, ymin: -radius, zmin: zBox0, xmax: radius, ymax: radius, zmax: zBox1 };
+  }
+  return { xmin: -half, ymin: -half, zmin: zBox0, xmax: half, ymax: half, zmax: zBox1 };
+}
+
+export function normalizeBooleanOp(op) {
+  const name = String(op || '').toLowerCase();
+  if (name === 'union' || name === 'fuse') return { ui: 'union', kind: 'fuse' };
+  if (name === 'cut') return { ui: 'cut', kind: 'cut' };
+  if (name === 'intersect' || name === 'common') return { ui: 'intersect', kind: 'common' };
+  return null;
+}
+
+export function makeCylinderSolid(oc, radius, height, base, direction) {
+  if (!(radius > 0) || !(height > 0)) return null;
+  const at = base || [0, 0, 0];
+  const dir = direction || [0, 0, 1];
+  const trash = [];
+  let owned = null;
+  try {
+    const origin = track(trash, new oc.gp_Pnt(at[0], at[1], at[2]));
+    const gpDir = track(trash, new oc.gp_Dir(dir[0], dir[1], dir[2]));
+    const axes = track(trash, new oc.gp_Ax2(origin, gpDir));
+    const maker = track(trash, new oc.BRepPrimAPI_MakeCylinder(axes, radius, height));
+    try {
+      maker.Build();
+    } catch (_err) {
+      return null;
+    }
+    const taken = takeDoneShape(oc, maker, 'BRepPrimAPI_MakeCylinder');
+    if (!taken.ok) return null;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) return null;
+    owned = copied.shape;
+    return owned;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+export function solidVolumeMm3(oc, shape) {
+  const trash = [];
+  try {
+    const props = track(trash, new oc.GProp_GProps());
+    oc.BRepGProp.VolumeProperties(shape, props, true, false, false);
+    return props.Mass();
+  } finally {
+    dispose(trash);
+  }
+}
+
+export function solidBounds(oc, shape) {
+  const trash = [];
+  try {
+    const box = track(trash, new oc.Bnd_Box());
+    oc.BRepBndLib.Add(shape, box, false);
+    return {
+      xmin: box.GetXMin(),
+      ymin: box.GetYMin(),
+      zmin: box.GetZMin(),
+      xmax: box.GetXMax(),
+      ymax: box.GetYMax(),
+      zmax: box.GetZMax(),
+    };
+  } finally {
+    dispose(trash);
+  }
+}
+
+function countSolids(oc, shape) {
+  const explorer = new oc.TopExp_Explorer(shape, oc.TopAbs_ShapeEnum.TopAbs_SOLID);
+  let count = 0;
+  try {
+    while (explorer.More()) {
+      count += 1;
+      explorer.Next();
+    }
+  } finally {
+    explorer.delete();
+  }
+  return count;
+}
+
+function emptyBoolean(error) {
+  return {
+    ok: false,
+    op: '',
+    shape: null,
+    error: error,
+    kept: true,
+    inputsKept: true,
+    units: 'mm',
+    volumeMm3: 0,
+    bounds: null,
+    gate: { pass: false, valid: false, freeEdges: -1, message: error },
+    watertight: { pass: false, message: 'FAIL: mesh has no triangles.' },
+    mesh: { vertices: [], triangles: [] },
+    topology: { source: 'occt', vertices: [], edges: [], faces: [], triFace: [] },
+    meshTimeMs: 0,
+  };
+}
+
+// One Boolean on exactly two shapes. Reuses fuseShapes, cutShapes, commonShapes.
+// Shape() is not called unless IsDone() is true. A failed or empty result is
+// deleted here. The caller keeps both inputs.
+export function applyBooleanSolids(oc, op, shapeA, shapeB) {
+  const which = normalizeBooleanOp(op);
+  if (!which) return emptyBoolean('FAIL: Boolean op must be union, cut, or intersect. Both inputs were kept.');
+  const made = which.kind === 'cut'
+    ? cutShapes(oc, shapeA, shapeB)
+    : which.kind === 'common'
+      ? commonShapes(oc, shapeA, shapeB)
+      : fuseShapes(oc, shapeA, shapeB);
+  if (!made.ok || !made.shape) {
+    return emptyBoolean((made.error || ('FAIL: ' + which.ui + ' failed.')) + ' Both inputs were kept.');
+  }
+  let view = null;
+  try {
+    view = inspectSolid(oc, made.shape);
+  } catch (err) {
+    releaseShape(made.shape);
+    return emptyBoolean('FAIL: ' + which.ui + ' gate threw ' + explain(oc, err) + ' Both inputs were kept.');
+  }
+  let volume = 0;
+  let solids = 0;
+  try {
+    volume = solidVolumeMm3(oc, made.shape);
+    solids = countSolids(oc, made.shape);
+  } catch (err) {
+    releaseShape(made.shape);
+    return emptyBoolean('FAIL: ' + which.ui + ' volume threw ' + explain(oc, err) + ' Both inputs were kept.');
+  }
+  const units = unitsLockGate();
+  const triangles = view.mesh && view.mesh.triangles ? view.mesh.triangles.length : 0;
+  const empty = !(volume > BOOLEAN_EMPTY_VOLUME_MM3) || solids < 1 || triangles < 1;
+  const pass = !empty && view.gate.pass === true && view.watertight.pass === true && units.pass === true;
+  if (!pass) {
+    releaseShape(made.shape);
+    let error = '';
+    if (empty) error = 'FAIL: ' + which.ui + ' result is empty.';
+    else if (view.gate.pass !== true) error = view.gate.message || ('FAIL: ' + which.ui + ' failed the OCCT gate.');
+    else if (view.watertight.pass !== true) error = view.watertight.message || ('FAIL: ' + which.ui + ' mesh is not watertight.');
+    else error = units.message || 'FAIL: units are not millimetres.';
+    if (error.indexOf('kept') === -1) error += ' Both inputs were kept.';
+    return {
+      ok: false,
+      op: which.ui,
+      shape: null,
+      error: error,
+      kept: true,
+      inputsKept: true,
+      units: 'mm',
+      volumeMm3: volume,
+      bounds: null,
+      gate: view.gate,
+      watertight: view.watertight,
+      mesh: view.mesh,
+      topology: view.topology,
+      meshTimeMs: view.meshTimeMs || 0,
+    };
+  }
+  let bounds = null;
+  try {
+    bounds = solidBounds(oc, made.shape);
+  } catch (err) {
+    releaseShape(made.shape);
+    return emptyBoolean('FAIL: ' + which.ui + ' bounds threw ' + explain(oc, err) + ' Both inputs were kept.');
+  }
+  return {
+    ok: true,
+    op: which.ui,
+    shape: made.shape,
+    error: '',
+    kept: false,
+    inputsKept: true,
+    units: 'mm',
+    volumeMm3: volume,
+    bounds: bounds,
+    gate: view.gate,
+    watertight: view.watertight,
+    mesh: view.mesh,
+    topology: view.topology,
+    meshTimeMs: view.meshTimeMs || 0,
+    meshSettings: view.meshSettings || null,
+    meshPath: view.meshPath || '',
+  };
+}
+
+function releasePair(shapeA, shapeB) {
+  releaseShape(shapeA);
+  releaseShape(shapeB);
+}
+
+export function buildOverlapBoolean(oc, op, shiftX) {
+  const which = normalizeBooleanOp(op);
+  if (!which) return emptyBoolean('FAIL: Boolean op must be union, cut, or intersect.');
+  const move = num(shiftX, BOOLEAN_OVERLAP_SHIFT_MM);
+  const shapeA = makeBoxSolid(oc, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, booleanBoxOrigin(0));
+  const shapeB = makeBoxSolid(oc, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, booleanBoxOrigin(move));
+  if (!shapeA || !shapeB) {
+    releasePair(shapeA, shapeB);
+    return emptyBoolean('FAIL: Boolean boxes were not built.');
+  }
+  let beforeA = 0;
+  let beforeB = 0;
+  try {
+    beforeA = solidVolumeMm3(oc, shapeA);
+    beforeB = solidVolumeMm3(oc, shapeB);
+  } catch (_err) {
+    beforeA = 0;
+    beforeB = 0;
+  }
+  const applied = applyBooleanSolids(oc, which.ui, shapeA, shapeB);
+  if (!applied.ok) {
+    let kept = false;
+    try {
+      const afterA = solidVolumeMm3(oc, shapeA);
+      const afterB = solidVolumeMm3(oc, shapeB);
+      const viewA = inspectSolid(oc, shapeA);
+      const viewB = inspectSolid(oc, shapeB);
+      kept = Math.abs(afterA - beforeA) <= BOOLEAN_VOLUME_TOL_MM3
+        && Math.abs(afterB - beforeB) <= BOOLEAN_VOLUME_TOL_MM3
+        && viewA.gate.pass === true && viewA.watertight.pass === true
+        && viewB.gate.pass === true && viewB.watertight.pass === true;
+    } catch (_err) {
+      kept = false;
+    }
+    applied.inputsKept = kept;
+    releasePair(shapeA, shapeB);
+    return applied;
+  }
+  releasePair(shapeA, shapeB);
+  applied.inputsKept = false;
+  return applied;
+}
+
+export function buildBooleanDemo(oc, op) {
+  const which = normalizeBooleanOp(op || BOOLEAN_DEMO_OP);
+  if (!which) return emptyBoolean('FAIL: Boolean op must be union, cut, or intersect.');
+  const box = makeBoxSolid(oc, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, BOOLEAN_BOX_EDGE_MM, booleanBoxOrigin(0));
+  const baseZ = 10 - BOOLEAN_DEMO_CYLINDER_HEIGHT_MM / 2;
+  const cylinder = makeCylinderSolid(
+    oc,
+    BOOLEAN_DEMO_CYLINDER_DIAMETER_MM / 2,
+    BOOLEAN_DEMO_CYLINDER_HEIGHT_MM,
+    [0, 0, baseZ],
+    [0, 0, 1]
+  );
+  if (!box || !cylinder) {
+    releasePair(box, cylinder);
+    return emptyBoolean('FAIL: Boolean demo solids were not built.');
+  }
+  const applied = applyBooleanSolids(oc, which.ui, box, cylinder);
+  releasePair(box, cylinder);
+  return applied;
 }
 
 export function binaryStlBytes(mesh) {

@@ -14,6 +14,10 @@ Asserts window.__cadcamExportState.occtReady for:
   ?fixture=open_box     OCCT gate FAIL, Export locked
   ?primitive=box&select=face   OCCT ready, one face selected
   ?demo=lbracket        final L-bracket OCCT gate PASS (app defaults)
+  ?demo=booleans        box minus cylinder, OCCT gate PASS
+  ?demo=booleans&op=    union, cut, and intersect each PASS
+  ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
+  /?fixture=closed_box  plain 4 key selects the whole body
   /tests/fixtures/lbracket.json and /fixtures/lbracket.json return 404
 
 Exit 77 (CTest skip) only when the browser or libcascade is missing and
@@ -464,10 +468,34 @@ CASES = (
         "query": "/?demo=lbracket",
         "expect": "occtReady, gate PASS on the final bracket",
     },
+    {
+        "name": "booleans",
+        "query": "/?demo=booleans",
+        "expect": "box minus cylinder, gate PASS",
+        "op": "cut",
+    },
+    {
+        "name": "booleans_union",
+        "query": "/?demo=booleans&op=union",
+        "expect": "box union cylinder, gate PASS",
+        "op": "union",
+    },
+    {
+        "name": "booleans_intersect",
+        "query": "/?demo=booleans&op=intersect",
+        "expect": "box intersect cylinder, gate PASS",
+        "op": "intersect",
+    },
+    {
+        "name": "hotkey4",
+        "query": "/?fixture=closed_box",
+        "expect": "plain 4 selects the whole body",
+        "hotkey": True,
+    },
 )
 
 
-def check_case(name: str, state: dict[str, Any]) -> list[str]:
+def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[str]:
     problems: list[str] = []
     if state.get("occtReady") is not True:
         problems.append(f"{name}: occtReady is not true")
@@ -509,6 +537,21 @@ def check_case(name: str, state: dict[str, Any]) -> list[str]:
         steps = [item.get("step") for item in (state.get("opLog") or []) if item.get("pass")]
         if steps != ["fuse", "fillet", "chamfer"]:
             problems.append(f"{name}: op log {steps!r}")
+    elif name.startswith("booleans"):
+        if state.get("demo") != "booleans":
+            problems.append(f"{name}: demo {state.get('demo')!r}")
+        if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
+            problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
+        if state.get("watertight") is not True:
+            problems.append(f"{name}: watertight is not true")
+        if state.get("unitsPass") is not True:
+            problems.append(f"{name}: units are not locked")
+        if state.get("exportAllowed") is not True:
+            problems.append(f"{name}: Export is not enabled")
+        if state.get("lastError"):
+            problems.append(f"{name}: lastError {state.get('lastError')!r}")
+        if state.get("booleanOp") != expected_op:
+            problems.append(f"{name}: booleanOp {state.get('booleanOp')!r}, want {expected_op!r}")
     return problems
 
 
@@ -626,6 +669,85 @@ def wait_for_page(port: int) -> str:
                 return str(page["webSocketDebuggerUrl"])
         time.sleep(0.2)
     raise SystemExit("CDP did not expose a page target")
+
+
+def press_plain_4(cdp: Cdp) -> None:
+    """Press the plain 4 key. Alt is not held, so this is Item select, not Export."""
+    cdp.call(
+        "Runtime.evaluate",
+        {
+            "expression": (
+                "(function(){"
+                "var el=document.activeElement;"
+                "if(el&&el.blur) el.blur();"
+                "var vp=document.getElementById('viewport');"
+                "if(vp&&vp.focus) vp.focus();"
+                "return document.activeElement?document.activeElement.tagName:'';"
+                "})()"
+            ),
+            "returnByValue": True,
+        },
+    )
+    for kind in ("keyDown", "keyUp"):
+        cdp.call(
+            "Input.dispatchKeyEvent",
+            {
+                "type": kind,
+                "key": "4",
+                "code": "Digit4",
+                "windowsVirtualKeyCode": 52,
+                "nativeVirtualKeyCode": 52,
+                "text": "4" if kind == "keyDown" else "",
+                "modifiers": 0,
+            },
+        )
+
+
+def click_boolean(cdp: Cdp, op: str) -> str:
+    expression = (
+        "(function(){"
+        f"var b=document.querySelector('[data-action=\"boolean\"][data-op=\"{op}\"]');"
+        "if(!b) return 'missing';"
+        "if(b.disabled) return 'disabled';"
+        "b.click();"
+        "return 'clicked';"
+        "})()"
+    )
+    result = cdp.call(
+        "Runtime.evaluate",
+        {"expression": expression, "returnByValue": True},
+        timeout=30,
+    )
+    remote = result.get("result") or {}
+    value = remote.get("value")
+    return str(value) if value is not None else ""
+
+
+def wait_boolean(
+    cdp: Cdp, origin: str, op: str, timeout: float
+) -> tuple[dict[str, Any] | None, list[str]]:
+    deadline = time.time() + timeout
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.5)
+        problems = site_problems(cdp.events, origin, cdp.urls)
+        payload = eval_state(cdp)
+        problems.extend(smoke_notes(payload))
+        state = (payload or {}).get("state") if payload else None
+        if isinstance(state, dict):
+            last = state
+            ready = (
+                state.get("booleanOp") == op
+                and state.get("occtGate") is True
+                and not state.get("lastError")
+            )
+            if ready or state.get("lastError"):
+                if state.get("lastError"):
+                    problems.append(str(state.get("lastError")))
+                return state, problems
+        elif problems:
+            return last, problems
+    return last, [f"timed out waiting for boolean {op}", json.dumps(last)]
 
 
 def response_count(events: list[dict[str, Any]], origin: str) -> int:
@@ -758,7 +880,24 @@ def run(omit: list[str]) -> int:
                     failures.append(f"... {len(problems) - 40} more")
                 break
             assert state is not None
-            case_problems = check_case(case["name"], state)
+            if case.get("hotkey"):
+                press_plain_4(cdp)
+                cdp.drain(0.4)
+                keyed = eval_state(cdp)
+                if keyed and isinstance(keyed.get("state"), dict):
+                    state = keyed["state"]
+                problems = site_problems(cdp.events, origin, cdp.urls)
+                problems.extend(smoke_notes(keyed))
+                if state.get("selectionMode") != "item" or int(state.get("selectionCount") or 0) < 1:
+                    problems.append(
+                        f"hotkey4: expected Item mode and a selected body, "
+                        f"got mode {state.get('selectionMode')!r} count {state.get('selectionCount')!r}"
+                    )
+                if problems:
+                    failures.append(f"{case['name']} ({elapsed:.1f}s)")
+                    failures.extend(problems[:40])
+                    break
+            case_problems = check_case(case["name"], state, str(case.get("op") or ""))
             shown = json.dumps(state, separators=(",", ":"))
             print(f"{case['name']}={shown}", flush=True)
             print(
@@ -770,6 +909,63 @@ def run(omit: list[str]) -> int:
                 failures.extend(case_problems)
                 failures.append(shown)
                 break
+        if not failures:
+            for op in ("union", "cut", "intersect"):
+                url = origin + "/?pair=overlap"
+                print(f"load boolean_{op} {url}", flush=True)
+                started = time.time()
+                state, problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+                if problems or not isinstance(state, dict):
+                    failures.append(f"boolean_{op} load")
+                    failures.extend(problems[:40])
+                    break
+                press_plain_4(cdp)
+                cdp.drain(0.4)
+                keyed = eval_state(cdp)
+                problems = site_problems(cdp.events, origin, cdp.urls)
+                problems.extend(smoke_notes(keyed))
+                keyed_state = (keyed or {}).get("state") if keyed else None
+                if not isinstance(keyed_state, dict):
+                    problems.append(f"boolean_{op}: no state after the 4 key")
+                else:
+                    state = keyed_state
+                    if state.get("selectionMode") != "item" or int(state.get("selectionCount") or 0) < 2:
+                        problems.append(
+                            f"boolean_{op}: expected two selected bodies after 4, "
+                            f"mode {state.get('selectionMode')!r} count {state.get('selectionCount')!r}"
+                        )
+                    order = state.get("selectionOrder") or []
+                    if len(order) < 2:
+                        problems.append(f"boolean_{op}: selection order {order!r}")
+                if problems:
+                    failures.append(f"boolean_{op} select")
+                    failures.extend(problems[:40])
+                    break
+                clicked = click_boolean(cdp, op)
+                if clicked != "clicked":
+                    failures.append(f"boolean_{op}: button {clicked}")
+                    break
+                done, problems = wait_boolean(cdp, origin, op, PAGE_TIMEOUT_S)
+                elapsed = time.time() - started
+                if not isinstance(done, dict):
+                    problems.append(f"boolean_{op}: no result state")
+                else:
+                    print(f"boolean_{op}={json.dumps(done, separators=(',', ':'))}", flush=True)
+                    if done.get("occtGate") is not True or done.get("gateOcct") != "PASS":
+                        problems.append(f"boolean_{op}: gate {done.get('gateOcct')!r}")
+                    if done.get("watertight") is not True or done.get("unitsPass") is not True:
+                        problems.append(f"boolean_{op}: watertight or units failed")
+                    if done.get("exportAllowed") is not True:
+                        problems.append(f"boolean_{op}: Export is not enabled")
+                    if int(done.get("bodyCount") or 0) != 1:
+                        problems.append(f"boolean_{op}: bodyCount {done.get('bodyCount')!r}")
+                    if done.get("booleanOp") != op:
+                        problems.append(f"boolean_{op}: op {done.get('booleanOp')!r}")
+                if problems:
+                    failures.append(f"boolean_{op} ({elapsed:.1f}s)")
+                    failures.extend(problems[:40])
+                    break
+                print(f"boolean_{op}: gate PASS, {elapsed:.1f}s", flush=True)
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

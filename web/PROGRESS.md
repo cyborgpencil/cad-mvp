@@ -158,3 +158,35 @@ Overlap is 4 mm, the same as the thickness, so the upright is 4 mm stock, the tw
 
 `tests/fixtures/lbracket.json` matches these values (thickness 4). The node test builds `builds/export/lbracket.stl` from the app defaults and checks that STL for a 40×20×40 mm watertight box. `web/assemble_site.py` does not copy `tests/` or `tests/fixtures/` into the site. The deploy smoke test requires `/tests/fixtures/lbracket.json` and `/fixtures/lbracket.json` to return 404, and requires `?demo=lbracket` to pass the gate with op log `fuse,fillet,chamfer`.
 
+## Interactive Booleans (2026-10-21)
+
+Done in `web/occt-ops.mjs`, `web/occt-primitives.mjs`, `web/index.html`, `tests/test_occt_gate.mjs`, and `tests/deploy_smoke.py`. No `src/` edit. No commit and no push. Banner text and the Export enable rule are unchanged. Union, Cut, and Intersect call the existing `fuseShapes`, `cutShapes`, and `commonShapes` wrappers. `Shape()` is still skipped unless `IsDone()` is true. A failed or empty result is deleted and both inputs stay in the scene.
+
+The user selects whole bodies with hotkey 4 (Item). The order is shown as `1` target and `2` tool on the Boolean label, the Items row, and viewport badges. Cut is body 1 minus body 2. The toolbar buttons stay disabled unless exactly two bodies are selected, and the enabled or active state uses the existing `.is-on` and `:disabled` button styles. The result replaces those two bodies. There is no undo stack, no history tree, and no Boolean of three or more bodies.
+
+`?demo=booleans` cuts a Z cylinder (diameter 10 mm, height 30 mm, same centre as the box) from the 20 mm box. `?demo=booleans&op=union|cut|intersect` selects the op. `?pair=overlap` leaves the two boxes in the scene so the buttons can run the op.
+
+## App defaults — Booleans and mesh
+
+Boolean values are a team choice, 2026-10-21. Mesh values are a team proposal, sourced from the OCCT Mesh user guide (https://dev.opencascade.org/doc/overview/html/occt_user_guides__mesh.html), and the same team choice date. Confirmed field names in libcascade 3.1.0 `IMeshTools_Parameters`: `Relative`, `Deflection`, `Angle`, `ControlSurfaceDeflection`, `InParallel`. They are passed to `BRepMesh_IncrementalMesh(shape, parameters)`. Display and export both use that call.
+
+| What | Value |
+| --- | --- |
+| `BOOLEAN_BOX_EDGE_MM` | 20 mm, centred on the existing box primitive `(0, 0, 10)` |
+| `BOOLEAN_OVERLAP_SHIFT_MM` | 10 mm on X. Overlap is 10 × 20 × 20 mm |
+| Overlap volumes | Union 12000 mm³, Cut 4000 mm³, Intersect 4000 mm³. Tolerance `BOOLEAN_VOLUME_TOL_MM3` = 1e-3 mm³ |
+| Overlap bounds tolerance | `BOOLEAN_BOUNDS_TOL_MM` = 1e-3 mm (`BRepBndLib.Add`, exact geometry) |
+| `BOOLEAN_DISJOINT_SHIFT_MM` | 40 mm. Intersect is empty, reported, and both inputs are kept |
+| Empty result | volume ≤ `BOOLEAN_EMPTY_VOLUME_MM3` (1e-4 mm³), or no solid, or no triangles |
+| `BOOLEAN_DEMO_CYLINDER_DIAMETER_MM` | 10 mm |
+| `BOOLEAN_DEMO_CYLINDER_HEIGHT_MM` | 30 mm, axis Z, same centre as the box |
+| `BOOLEAN_DEMO_OP` | `cut` (box minus cylinder) |
+| Demo curve volume tolerance | `BOOLEAN_CURVE_VOLUME_TOL_MM3` = 1e-2 mm³ |
+| `TESSELLATION_RELATIVE` | `false` (`IMeshTools_Parameters.Relative`) |
+| `TESSELLATION_DEFLECTION_MM` | 0.05 mm (`IMeshTools_Parameters.Deflection`) |
+| `TESSELLATION_ANGULAR` | 0.2 rad (`IMeshTools_Parameters.Angle`) |
+| `TESSELLATION_CONTROL_SURFACE` | `true` (`IMeshTools_Parameters.ControlSurfaceDeflection`) |
+| `TESSELLATION_IN_PARALLEL` | `false` (`IMeshTools_Parameters.InParallel`) |
+
+Re-export of `builds/export/lbracket.stl` with those mesh settings: 92 triangles, 4684 bytes, final tessellation 5.2 ms (CTest `occt_gate`, 2026-10-21). Node also writes `builds/export/boolean-union.stl`, `boolean-cut.stl`, `boolean-intersect.stl`, and `boolean-demo.stl`. The demo cut STL was 268 triangles and 13484 bytes, watertight, millimetre header, box bounds.
+

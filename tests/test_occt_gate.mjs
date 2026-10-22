@@ -36,7 +36,7 @@ const viewUrl = pathToFileURL(path.join(root, 'web', 'viewport-selection.mjs')).
 
 const { createInstance } = await import(initUrl);
 const { checkOcctGate, closedBoxMesh, openBoxMesh, box20Mesh } = await import(gateUrl);
-const { buildBox, buildCylinder, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight } = await import(primUrl);
+const { buildBox, buildCylinder, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLINDER_MM, BOX_EDGE_MM, CYLINDER_DIAMETER_MM, CYLINDER_HEIGHT_MM, SPHERE_DIAMETER_MM, inspectSolid, checkMeshWatertight, TESSELLATION_DEFLECTION_MM, TESSELLATION_ANGULAR, TESSELLATION_RELATIVE, TESSELLATION_CONTROL_SURFACE, TESSELLATION_IN_PARALLEL } = await import(primUrl);
 const ops = await import(opsUrl);
 const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX } = await import(selUrl);
 const { threeDeltaToCad, GIZMO_AXIS_THREE } = await import(viewUrl);
@@ -256,6 +256,124 @@ expect('stl zmax', Math.abs(stlBounds.zmax - want.zmax) <= boundTol);
 expect('stl bbox 40x20x40', Math.abs((stlBounds.xmax - stlBounds.xmin) - 40) <= boundTol
   && Math.abs((stlBounds.ymax - stlBounds.ymin) - 20) <= boundTol
   && Math.abs((stlBounds.zmax - stlBounds.zmin) - 40) <= boundTol);
+
+expect('mesh deflection 0.05', TESSELLATION_DEFLECTION_MM === 0.05);
+expect('mesh angle 0.2', TESSELLATION_ANGULAR === 0.2);
+expect('mesh relative false', TESSELLATION_RELATIVE === false);
+expect('mesh control surface', TESSELLATION_CONTROL_SURFACE === true);
+expect('mesh not parallel', TESSELLATION_IN_PARALLEL === false);
+expect('box mesh path', box.meshPath === 'IMeshTools_Parameters');
+expect('box mesh deflection readback', box.meshSettings && Math.abs(box.meshSettings.Deflection - 0.05) < 1e-9);
+expect('box mesh angle readback', box.meshSettings && Math.abs(box.meshSettings.Angle - 0.2) < 1e-9);
+expect('box mesh relative readback', box.meshSettings && box.meshSettings.Relative === false);
+expect('box mesh control readback', box.meshSettings && box.meshSettings.ControlSurfaceDeflection === true);
+expect('box mesh parallel readback', box.meshSettings && box.meshSettings.InParallel === false);
+
+function nearBounds(name, got, want, tol) {
+  const keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    expect(name + ' ' + key + ' ' + (got ? got[key] : 'none'), !!got && Math.abs(got[key] - want[key]) <= tol);
+  }
+}
+
+function writeCheckedStl(fileName, mesh, wantBounds, boundsTol) {
+  const filePath = path.join(stlDir, fileName);
+  writeFileSync(filePath, ops.binaryStlBytes(mesh));
+  const bytes = readFileSync(filePath);
+  const header = bytes.subarray(0, 80).toString('latin1');
+  expect(fileName + ' millimeters', header.indexOf('millimeter') !== -1 && header.indexOf('solid') !== 0);
+  const count = bytes.readUInt32LE(80);
+  expect(fileName + ' size', bytes.length === 84 + count * 50 && count === mesh.triangles.length && count > 0);
+  const vertices = [];
+  const triangles = [];
+  let offset = 84;
+  for (let tri = 0; tri < count; tri += 1) {
+    offset += 12;
+    const corners = [];
+    for (let k = 0; k < 3; k += 1) {
+      corners.push(vertices.length);
+      vertices.push([
+        bytes.readFloatLE(offset),
+        bytes.readFloatLE(offset + 4),
+        bytes.readFloatLE(offset + 8),
+      ]);
+      offset += 12;
+    }
+    offset += 2;
+    triangles.push(corners);
+  }
+  const map = new Map();
+  const welded = [];
+  function wid(p) {
+    const key = Math.round(p[0] * 1e4) + '|' + Math.round(p[1] * 1e4) + '|' + Math.round(p[2] * 1e4);
+    const found = map.get(key);
+    if (found !== undefined) return found;
+    const id = welded.length;
+    welded.push(p);
+    map.set(key, id);
+    return id;
+  }
+  const weldedTris = triangles.map(function (tri) {
+    return [wid(vertices[tri[0]]), wid(vertices[tri[1]]), wid(vertices[tri[2]])];
+  });
+  const tight = checkMeshWatertight({ vertices: welded, triangles: weldedTris });
+  expect(fileName + ' watertight ' + tight.message, tight.pass === true);
+  nearBounds(fileName, ops.meshBounds({ vertices: welded, triangles: weldedTris }), wantBounds, boundsTol);
+  return { triangles: count, bytes: bytes.length };
+}
+
+const overlapVolumes = ops.expectedOverlapVolumes();
+const overlapOps = ['union', 'cut', 'intersect'];
+const overlapFiles = {
+  union: 'boolean-union.stl',
+  cut: 'boolean-cut.stl',
+  intersect: 'boolean-intersect.stl',
+};
+for (let oi = 0; oi < overlapOps.length; oi += 1) {
+  const opName = overlapOps[oi];
+  const made = ops.buildOverlapBoolean(oc, opName, ops.BOOLEAN_OVERLAP_SHIFT_MM);
+  expect(opName + ' ok', made.ok === true && made.shape);
+  expect(opName + ' gate', made.gate.pass === true && made.watertight.pass === true && made.units === 'mm');
+  expect(opName + ' volume ' + made.volumeMm3, Math.abs(made.volumeMm3 - overlapVolumes[opName]) <= ops.BOOLEAN_VOLUME_TOL_MM3);
+  nearBounds(opName + ' bounds', made.bounds, ops.expectedOverlapBounds(opName), ops.BOOLEAN_BOUNDS_TOL_MM);
+  if (made.ok && made.mesh) writeCheckedStl(overlapFiles[opName], made.mesh, ops.expectedOverlapBounds(opName), 0.05);
+  if (made.shape) made.shape.delete();
+}
+
+for (let repeat = 0; repeat < 3; repeat += 1) {
+  const again = ops.buildOverlapBoolean(oc, 'union', ops.BOOLEAN_OVERLAP_SHIFT_MM);
+  expect('repeat union ' + repeat, again.ok === true && Math.abs(again.volumeMm3 - overlapVolumes.union) <= ops.BOOLEAN_VOLUME_TOL_MM3);
+  if (again.shape) again.shape.delete();
+}
+
+const disjoint = ops.buildOverlapBoolean(oc, 'intersect', ops.BOOLEAN_DISJOINT_SHIFT_MM);
+expect('disjoint intersect fails', disjoint.ok === false && disjoint.shape === null);
+expect('disjoint message', typeof disjoint.error === 'string' && disjoint.error.indexOf('empty') !== -1 && disjoint.error.indexOf('kept') !== -1);
+expect('disjoint inputs kept', disjoint.inputsKept === true);
+
+const demoVolumes = ops.expectedDemoVolumes();
+const demoOps = ['union', 'cut', 'intersect'];
+for (let di = 0; di < demoOps.length; di += 1) {
+  const opName = demoOps[di];
+  const demo = ops.buildBooleanDemo(oc, opName);
+  expect('demo ' + opName + ' ok', demo.ok === true && demo.op === opName);
+  expect('demo ' + opName + ' gate', demo.gate.pass === true && demo.watertight.pass === true && demo.units === 'mm');
+  expect('demo ' + opName + ' volume ' + demo.volumeMm3, Math.abs(demo.volumeMm3 - demoVolumes[opName]) <= ops.BOOLEAN_CURVE_VOLUME_TOL_MM3);
+  nearBounds('demo ' + opName, demo.bounds, ops.expectedDemoBounds(opName), ops.BOOLEAN_BOUNDS_TOL_MM);
+  if (opName === 'cut' && demo.mesh) {
+    const demoStl = writeCheckedStl('boolean-demo.stl', demo.mesh, ops.expectedDemoBounds('cut'), 0.05);
+    console.log('boolean-demo triangles', demoStl.triangles, 'bytes', demoStl.bytes);
+  }
+  if (demo.shape) demo.shape.delete();
+}
+
+console.log('lbracket triangles', bracket.mesh.triangles.length);
+console.log('lbracket stl bytes', stlBytes.length);
+console.log('lbracket mesh ms', bracket.meshTimeMs);
+console.log('lbracket mesh settings', JSON.stringify(bracket.meshSettings));
+console.log('overlap volumes', JSON.stringify(overlapVolumes));
+console.log('demo volumes', JSON.stringify(demoVolumes));
 
 if (failures !== 0) {
   console.error(failures + ' failed');

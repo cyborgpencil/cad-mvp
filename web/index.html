@@ -257,6 +257,22 @@
     color: var(--ink);
     box-shadow: none;
   }
+  .tool-btn:disabled { opacity: 0.38; }
+  .bool-badges { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .bool-badge {
+    position: absolute;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: var(--sel-color);
+    color: #1a1020;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    transform: translate(-50%, -130%);
+  }
   .tool-btn.wide { width: 92px; }
   .finish-bar {
     display: flex;
@@ -1040,6 +1056,7 @@
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 15l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-union" viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-cut" viewBox="0 0 24 24"><rect x="4" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14 6h6v12h-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.4 2"/></symbol>
+  <symbol id="i-intersect" viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="10" width="10" height="10" fill="currentColor" opacity=".45" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 12.5 11 15.5 16.5 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-open" viewBox="0 0 24 24"><path d="M7 7h10v10H7z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 12h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-heal" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="8" y="8" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
@@ -1149,9 +1166,10 @@
         <button type="button" class="tool-btn" data-tool="Scale" title="Scale"><svg class="ico"><use href="#i-scale"></use></svg><span>Scale</span></button>
       </div><div class="group-label">Transform</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Union" title="Union"><svg class="ico"><use href="#i-union"></use></svg><span>Union</span></button>
-        <button type="button" class="tool-btn" data-tool="Cut" title="Cut"><svg class="ico"><use href="#i-cut"></use></svg><span>Cut</span></button>
-      </div><div class="group-label">Boolean</div></div>
+        <button type="button" class="tool-btn" id="boolUnion" data-action="boolean" data-op="union" data-tool="Union" title="Union. 1 with 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-union"></use></svg><span>Union</span></button>
+        <button type="button" class="tool-btn" id="boolCut" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut. 1 minus 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-cut"></use></svg><span>Cut</span></button>
+        <button type="button" class="tool-btn" id="boolIntersect" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect. Shared volume of 1 and 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-intersect"></use></svg><span>Intersect</span></button>
+      </div><div class="group-label" id="boolOrder">1 = target, 2 = tool</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" id="snapBtn" data-action="snap" data-tool="Snapping" title="Snapping" aria-pressed="false"><svg class="ico"><use href="#i-snap"></use></svg><span>Snap</span></button>
       </div><div class="group-label">Snap</div></div>
@@ -1239,6 +1257,7 @@
         <div><b id="hudName">Body1</b></div>
         <div><span id="hudSize">…</span> · <span id="viewLabel">Iso</span></div>
       </div>
+      <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View">
         <div class="vp-cluster" role="group" aria-label="Select">
@@ -1517,8 +1536,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     { name: 'Rotate', tab: 'model' },
     { name: 'Scale', tab: 'model' },
     { name: 'Snapping', tab: 'model', action: 'snap' },
-    { name: 'Union', tab: 'model' },
-    { name: 'Cut', tab: 'model' },
+    { name: 'Union', tab: 'model', action: 'boolean', op: 'union' },
+    { name: 'Cut', tab: 'model', action: 'boolean', op: 'cut' },
+    { name: 'Intersect', tab: 'model', action: 'boolean', op: 'intersect' },
     { name: 'Check shape', tab: 'repair', action: 'checkShape' },
     { name: 'Find open edges', tab: 'repair', action: 'findOpen' },
     { name: 'Auto-heal', tab: 'repair', action: 'autoHeal' },
@@ -1563,8 +1583,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     'Grab': { title: 'Grab', sub: 'Model tool', kv: [['Axis', 'free']] },
     'Rotate': { title: 'Rotate', sub: 'Model tool', kv: [['Angle', '15°']] },
     'Scale': { title: 'Scale', sub: 'Model tool', kv: [['Factor', '1.0']] },
-    'Union': { title: 'Union', sub: 'Boolean', kv: [['Bodies', '2']] },
-    'Cut': { title: 'Cut', sub: 'Boolean', kv: [['Bodies', '2']] },
+    'Union': { title: 'Union', sub: 'Boolean. 1 with 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
+    'Cut': { title: 'Cut', sub: 'Boolean. 1 minus 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
+    'Intersect': { title: 'Intersect', sub: 'Boolean. Shared solid of 1 and 2.', kv: [['Bodies', '2'], ['Order', '1 then 2']] },
     'Check shape': { title: 'Check shape', sub: 'check_watertight' },
     'Find open edges': { title: 'Find open edges', sub: 'Boundary edges from the checker' },
     'Auto-heal': { title: 'Auto-heal', sub: 'repair_manifold' },
@@ -1585,6 +1606,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     opLog: [],
     lastError: '',
     demo: '',
+    bodies: [],
+    bodySeq: 0,
+    booleanOp: '',
+    booleanMessage: '',
     anchor: { x: 0, y: 0, z: 0 },
     boundsCad: { cx: 0, cy: 0, cz: 0 },
     writingFields: false,
@@ -1692,6 +1717,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   corners.visible = false;
   mesh.add(corners);
   scene.add(mesh);
+  const bodyRoot = new THREE.Group();
+  bodyRoot.visible = false;
+  scene.add(bodyRoot);
 
   const gizmo = viewApi.makeGizmo(THREE);
   const handles = gizmo.group;
@@ -1881,6 +1909,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   }
 
   function gizmoShouldShow() {
+    if (state.bodies.length > 1) return false;
+    if (state.bodies.length === 1 && !state.primitive) return false;
     if (state.preview) return true;
     if (state.selection === 'item') return state.selectedIds.length > 0;
     return true;
@@ -2092,7 +2122,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function setSelectionMode(mode) {
     if (mode !== 'vertex' && mode !== 'edge' && mode !== 'face' && mode !== 'item') return;
     state.selection = mode;
-    state.selectedIds = mode === 'item' ? ['item'] : [];
+    if (mode === 'item' && state.bodies.length > 1) {
+      state.selectedIds = state.bodies.map(function (body) { return body.id; });
+    } else {
+      state.selectedIds = mode === 'item' ? ['item'] : [];
+    }
     state.hoverId = null;
     refreshAnchor();
     applyLook();
@@ -2122,13 +2156,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       setHint('Mesh replace is not in this wasm build.');
       return false;
     }
-    const built = kind === 'cylinder' ? primApi.buildCylinder(oc, params) : primApi.buildBox(oc, params);
+    const owned = makeOwned(kind, params);
+    if (owned && owned.failed) {
+      state.shapeGate = owned.view.gate;
+      setHint((owned.view.gate && owned.view.gate.message) || 'Primitive mesh was rejected.');
+      paintExport();
+      return false;
+    }
+    const built = owned && owned.shape
+      ? { kind: owned.kind, params: owned.params, gate: owned.gate, watertight: owned.watertight, mesh: owned.mesh, topology: owned.topology }
+      : (kind === 'cylinder' ? primApi.buildCylinder(oc, params) : primApi.buildBox(oc, params));
     const flat = primApi.flattenMesh(built.mesh);
     if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, kind)) {
+      if (owned && owned.shape) dropShape(owned.shape);
       state.shapeGate = built.gate;
       setHint(built.gate.message || 'Primitive mesh was rejected.');
       paintExport();
       return false;
+    }
+    if (owned && owned.shape) {
+      clearOwnedBodies();
+      state.bodySeq += 1;
+      owned.id = 'b' + state.bodySeq;
+      owned.name = kind === 'cylinder' ? 'Cylinder' : 'Box';
+      state.bodies = [owned];
+    } else {
+      clearOwnedBodies();
     }
     const kept = keepSelection ? state.selectedIds.slice() : null;
     state.primitive = { kind: built.kind, params: built.params };
@@ -2139,7 +2192,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     if (kept) state.selectedIds = kept;
     else selectFromQuery(selectMode, built.topology);
     state.activeTool = kind === 'cylinder' ? 'Cylinder' : 'Box';
+    state.booleanOp = '';
     syncFromKernel();
+    mountBodyMeshes();
     refreshAnchor();
     paintPrimFields();
     applyLook();
@@ -2185,7 +2240,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function showLBracket() {
     try {
+      clearOwnedBodies();
       state.demo = 'lbracket';
+      state.booleanOp = '';
+      state.booleanMessage = '';
       state.opLog = [];
       state.lastError = '';
       if (!oc || !opsApi || typeof opsApi.buildLBracket !== 'function') {
@@ -2236,8 +2294,481 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
   }
 
+  function dropShape(shape) {
+    if (!shape || typeof shape.delete !== 'function') return;
+    try { shape.delete(); } catch (_err) { /* already released */ }
+  }
+
+  function clearOwnedBodies() {
+    for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
+    state.bodies = [];
+    mountBodyMeshes();
+  }
+
+  function disposeObject3D(obj) {
+    const drop = [];
+    obj.traverse(function (node) { drop.push(node); });
+    for (let i = 0; i < drop.length; i += 1) {
+      const node = drop[i];
+      if (node.geometry && node.geometry.dispose) node.geometry.dispose();
+      const material = node.material;
+      if (!material || material === bodyMat || material === edgeMat) continue;
+      if (Array.isArray(material)) {
+        for (let m = 0; m < material.length; m += 1) {
+          if (material[m] && material[m] !== bodyMat && material[m] !== edgeMat && material[m].dispose) material[m].dispose();
+        }
+      } else if (material.dispose) {
+        material.dispose();
+      }
+    }
+  }
+
+  function geometryFromCad(meshData) {
+    const vertices = meshData && meshData.vertices ? meshData.vertices : [];
+    const triangles = meshData && meshData.triangles ? meshData.triangles : [];
+    const xyz = new Float32Array(vertices.length * 3);
+    for (let i = 0; i < vertices.length; i += 1) {
+      xyz[i * 3] = vertices[i][0];
+      xyz[i * 3 + 1] = vertices[i][2];
+      xyz[i * 3 + 2] = vertices[i][1];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(xyz, 3));
+    const indices = [];
+    for (let i = 0; i < triangles.length; i += 1) {
+      indices.push(triangles[i][0], triangles[i][1], triangles[i][2]);
+    }
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  function mountBodyMeshes() {
+    while (bodyRoot.children.length) {
+      const child = bodyRoot.children[0];
+      bodyRoot.remove(child);
+      disposeObject3D(child);
+    }
+    if (state.bodies.length < 2) {
+      bodyRoot.visible = false;
+      return;
+    }
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      const geo = geometryFromCad(body.mesh);
+      const material = bodyMat.clone();
+      const solid = new THREE.Mesh(geo, material);
+      solid.userData.bodyId = body.id;
+      const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
+      solid.add(wire);
+      bodyRoot.add(solid);
+    }
+    bodyRoot.visible = true;
+  }
+
+  function combineBodyMeshes(bodies) {
+    const vertices = [];
+    const triangles = [];
+    for (let i = 0; i < bodies.length; i += 1) {
+      const meshData = bodies[i].mesh || { vertices: [], triangles: [] };
+      const base = vertices.length;
+      for (let v = 0; v < meshData.vertices.length; v += 1) vertices.push(meshData.vertices[v]);
+      for (let t = 0; t < meshData.triangles.length; t += 1) {
+        const tri = meshData.triangles[t];
+        triangles.push([tri[0] + base, tri[1] + base, tri[2] + base]);
+      }
+    }
+    return { vertices: vertices, triangles: triangles };
+  }
+
+  function sceneGate() {
+    if (!state.bodies.length) return null;
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      if (!body.gate || body.gate.pass !== true) {
+        return body.gate || { pass: false, valid: false, freeEdges: -1, message: 'FAIL: OCCT gate failed.' };
+      }
+      if (!body.watertight || body.watertight.pass !== true) {
+        return {
+          pass: false,
+          valid: true,
+          freeEdges: -1,
+          message: body.watertight.message || 'FAIL: mesh is not watertight.',
+        };
+      }
+    }
+    return {
+      pass: true,
+      valid: true,
+      freeEdges: 0,
+      message: 'PASS: OCCT BRepCheck_Analyzer is valid and ShapeAnalysis_FreeBounds found 0 free edges.',
+    };
+  }
+
+  function makeOwned(kind, params) {
+    if (!oc || !primApi || !opsApi || typeof opsApi.makeBoxSolid !== 'function') return null;
+    let shape = null;
+    let normalized = null;
+    if (kind === 'cylinder') {
+      normalized = primApi.normalizeCylinder(params);
+      const dir = normalized.axis === 'X' ? [1, 0, 0] : normalized.axis === 'Y' ? [0, 1, 0] : [0, 0, 1];
+      shape = opsApi.makeCylinderSolid(oc, normalized.radius, normalized.height, [
+        normalized.cx - dir[0] * normalized.height / 2,
+        normalized.cy - dir[1] * normalized.height / 2,
+        normalized.cz - dir[2] * normalized.height / 2,
+      ], dir);
+    } else {
+      normalized = primApi.normalizeBox(params);
+      shape = opsApi.makeBoxSolid(oc, normalized.sx, normalized.sy, normalized.sz, [
+        normalized.cx - normalized.sx / 2,
+        normalized.cy - normalized.sy / 2,
+        normalized.cz - normalized.sz / 2,
+      ]);
+    }
+    if (!shape) return null;
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, shape);
+    } catch (_err) {
+      dropShape(shape);
+      return null;
+    }
+    if (!view.gate || view.gate.pass !== true || !view.watertight || view.watertight.pass !== true) {
+      dropShape(shape);
+      return { failed: true, view: view };
+    }
+    return {
+      id: '',
+      name: kind === 'cylinder' ? 'Cylinder' : 'Box',
+      kind: kind === 'cylinder' ? 'cylinder' : 'box',
+      params: normalized,
+      shape: shape,
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight,
+    };
+  }
+
+  function orderedBodies() {
+    const out = [];
+    if (!state.bodies.length) return out;
+    if (state.bodies.length === 1 && state.selectedIds.indexOf('item') >= 0) {
+      out.push(state.bodies[0]);
+      return out;
+    }
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      for (let b = 0; b < state.bodies.length; b += 1) {
+        if (state.bodies[b].id === id) out.push(state.bodies[b]);
+      }
+    }
+    return out;
+  }
+
+  function bodyCentroid(body) {
+    const vertices = body && body.mesh ? body.mesh.vertices : [];
+    if (!vertices.length) return [0, 0, 0];
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    for (let i = 0; i < vertices.length; i += 1) {
+      sx += vertices[i][0];
+      sy += vertices[i][1];
+      sz += vertices[i][2];
+    }
+    return [sx / vertices.length, sy / vertices.length, sz / vertices.length];
+  }
+
+  function paintOrderBadges() {
+    const host = document.getElementById('boolBadges');
+    if (!host) return;
+    const selected = orderedBodies();
+    if (state.selection !== 'item' || state.bodies.length < 2 || !selected.length) {
+      host.innerHTML = '';
+      return;
+    }
+    let html = '';
+    for (let i = 0; i < selected.length && i < 2; i += 1) {
+      const at = screenOfCad(bodyCentroid(selected[i]));
+      html += '<span class="bool-badge" style="left:' + at.x.toFixed(1) + 'px;top:' + at.y.toFixed(1) + 'px">' + (i + 1) + '</span>';
+    }
+    host.innerHTML = html;
+  }
+
+  function paintBooleanChrome() {
+    const selected = orderedBodies();
+    const two = state.selection === 'item' && selected.length === 2;
+    const buttons = document.querySelectorAll('[data-action="boolean"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      const on = state.activeTool === buttons[i].getAttribute('data-tool') && two;
+      buttons[i].disabled = !two;
+      buttons[i].setAttribute('aria-disabled', two ? 'false' : 'true');
+      buttons[i].classList.toggle('is-on', on);
+    }
+    const note = document.getElementById('boolOrder');
+    if (note) {
+      let text = '1 = target, 2 = tool';
+      if (selected.length === 1) text = '1 ' + selected[0].name + ' · pick the tool';
+      else if (selected.length >= 2) {
+        text = '1 ' + selected[0].name + ' · 2 ' + selected[1].name;
+        if (selected.length > 2) text += ' · exactly 2';
+      }
+      note.textContent = text;
+    }
+    const nodeBtn = document.querySelector('[data-action="node"][data-node="body"]');
+    if (nodeBtn) {
+      if (state.bodies.length > 1 && selected.length) {
+        nodeBtn.textContent = selected.map(function (body, index) { return (index + 1) + ' ' + body.name; }).join(' · ');
+      } else if (state.bodies.length === 1) nodeBtn.textContent = state.bodies[0].name;
+      else nodeBtn.textContent = 'Body1';
+    }
+  }
+
+  function installBodiesAndSync(fixtureName) {
+    const combined = combineBodyMeshes(state.bodies);
+    state.shapeGate = sceneGate();
+    state.topology = state.bodies.length === 1 ? state.bodies[0].topology : null;
+    state.topologySource = 'occt';
+    state.hoverId = null;
+    if (state.bodies.length === 1 && (state.bodies[0].kind === 'box' || state.bodies[0].kind === 'cylinder')) {
+      state.primitive = { kind: state.bodies[0].kind, params: state.bodies[0].params };
+    } else {
+      state.primitive = null;
+    }
+    const flat = primApi.flattenMesh(combined);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, fixtureName || 'bodies')) {
+      state.lastError = 'FAIL: the scene mesh was rejected.';
+      publishGateState();
+      setHint(state.lastError);
+      return false;
+    }
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    return !!(state.shapeGate && state.shapeGate.pass === true);
+  }
+
+  function addAnotherBody(kind) {
+    const shift = (opsApi && opsApi.BOOLEAN_OVERLAP_SHIFT_MM ? opsApi.BOOLEAN_OVERLAP_SHIFT_MM : 10) * state.bodies.length;
+    const params = kind === 'cylinder'
+      ? { cx: shift, cy: 0, cz: 10, radius: 10, height: 20, axis: 'Z' }
+      : { cx: shift, cy: 0, cz: 10, sx: 20, sy: 20, sz: 20 };
+    const owned = makeOwned(kind, params);
+    if (!owned || owned.failed || !owned.shape) {
+      const why = owned && owned.view
+        ? (owned.view.gate && owned.view.gate.message) || 'FAIL: could not add the body.'
+        : 'FAIL: could not add the body.';
+      toast(why);
+      setHint(why);
+      return false;
+    }
+    if (state.bodies.length === 1 && state.bodies[0].name.indexOf(' ') < 0) {
+      state.bodies[0].name = state.bodies[0].name + ' 1';
+    }
+    state.bodySeq += 1;
+    owned.id = 'b' + state.bodySeq;
+    owned.name = (kind === 'cylinder' ? 'Cylinder' : 'Box') + ' ' + (state.bodies.length + 1);
+    state.bodies.push(owned);
+    state.selection = 'item';
+    state.selectedIds = [];
+    state.demo = state.demo === 'lbracket' ? '' : state.demo;
+    const ok = installBodiesAndSync('bodies');
+    setHint(ok
+      ? 'Added ' + owned.name + '. 1 is the target and 2 is the tool.'
+      : (state.lastError || 'FAIL: could not show both bodies.'));
+    return ok;
+  }
+
+  function showPair(shiftX) {
+    clearOwnedBodies();
+    state.demo = 'pair';
+    state.booleanOp = '';
+    state.booleanMessage = '';
+    state.lastError = '';
+    state.primitive = null;
+    const first = makeOwned('box', null);
+    const second = makeOwned('box', { cx: shiftX, cy: 0, cz: 10, sx: 20, sy: 20, sz: 20 });
+    if (!first || !second || first.failed || second.failed || !first.shape || !second.shape) {
+      if (first && first.shape) dropShape(first.shape);
+      if (second && second.shape) dropShape(second.shape);
+      state.lastError = 'FAIL: could not build the two boxes.';
+      publishGateState();
+      setHint(state.lastError);
+      return false;
+    }
+    state.bodySeq += 1;
+    first.id = 'b' + state.bodySeq;
+    first.name = 'Box 1';
+    state.bodySeq += 1;
+    second.id = 'b' + state.bodySeq;
+    second.name = 'Box 2';
+    state.bodies = [first, second];
+    state.selection = 'item';
+    state.selectedIds = [];
+    state.activeTool = '';
+    const ok = installBodiesAndSync('bodies');
+    setHint(ok
+      ? 'Two bodies. Press 4 or pick them. 1 is the target and 2 is the tool.'
+      : (state.lastError || 'FAIL: the two boxes did not pass the gate.'));
+    return ok;
+  }
+
+  function showBooleanDemo(op) {
+    clearOwnedBodies();
+    state.demo = 'booleans';
+    state.opLog = [];
+    state.lastError = '';
+    state.booleanOp = '';
+    state.booleanMessage = '';
+    state.primitive = null;
+    if (!oc || !opsApi || typeof opsApi.buildBooleanDemo !== 'function') {
+      state.lastError = 'FAIL: Boolean ops are not loaded.';
+      publishGateState();
+      setHint(state.lastError);
+      return false;
+    }
+    const which = opsApi.normalizeBooleanOp(op || opsApi.BOOLEAN_DEMO_OP);
+    if (!which) {
+      state.lastError = 'FAIL: Boolean op must be union, cut, or intersect.';
+      publishGateState();
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    const built = opsApi.buildBooleanDemo(oc, which.ui);
+    if (!built.ok || !built.shape) {
+      if (built.shape) dropShape(built.shape);
+      state.lastError = built.error || 'FAIL: Boolean demo failed.';
+      state.booleanMessage = state.lastError;
+      publishGateState();
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    state.bodySeq += 1;
+    const name = which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut';
+    state.bodies = [{
+      id: 'b' + state.bodySeq,
+      name: name,
+      kind: 'boolean',
+      params: null,
+      shape: built.shape,
+      mesh: built.mesh,
+      topology: built.topology,
+      gate: built.gate,
+      watertight: built.watertight,
+    }];
+    state.booleanOp = built.op;
+    state.booleanMessage = built.gate && built.gate.message ? built.gate.message : '';
+    state.selection = 'item';
+    state.selectedIds = ['item'];
+    state.activeTool = name;
+    const ok = installBodiesAndSync('booleans');
+    const shown = state.lastError || state.booleanMessage;
+    setHint(shown);
+    if (!ok) toast(state.lastError || 'FAIL: Boolean demo mesh was rejected.');
+    return ok && built.gate.pass === true && built.watertight.pass === true && !state.lastError;
+  }
+
+  function applySceneBoolean(op) {
+    if (!oc || !opsApi || typeof opsApi.applyBooleanSolids !== 'function') {
+      state.lastError = 'FAIL: Boolean ops are not loaded.';
+      state.booleanMessage = state.lastError;
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return;
+    }
+    const which = opsApi.normalizeBooleanOp(op);
+    const selected = orderedBodies();
+    if (!which) {
+      state.lastError = 'FAIL: Boolean op must be union, cut, or intersect.';
+      state.booleanMessage = state.lastError;
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return;
+    }
+    if (selected.length !== 2) {
+      state.booleanMessage = 'Select exactly two bodies. 1 is the target and 2 is the tool.';
+      toast(state.booleanMessage);
+      setHint(state.booleanMessage);
+      publishGateState();
+      return;
+    }
+    const result = opsApi.applyBooleanSolids(oc, which.ui, selected[0].shape, selected[1].shape);
+    if (!result.ok || !result.shape) {
+      if (result.shape) dropShape(result.shape);
+      state.lastError = result.error || 'FAIL: Boolean failed. Both inputs were kept.';
+      state.booleanMessage = state.lastError;
+      state.booleanOp = '';
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      paintBooleanChrome();
+      return;
+    }
+    const dropIds = {};
+    dropIds[selected[0].id] = true;
+    dropIds[selected[1].id] = true;
+    const kept = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (!dropIds[state.bodies[i].id]) kept.push(state.bodies[i]);
+    }
+    state.bodySeq += 1;
+    const name = which.ui === 'union' ? 'Union' : which.ui === 'intersect' ? 'Intersect' : 'Cut';
+    const resultBody = {
+      id: 'b' + state.bodySeq,
+      name: name,
+      kind: 'boolean',
+      params: null,
+      shape: result.shape,
+      mesh: result.mesh,
+      topology: result.topology,
+      gate: result.gate,
+      watertight: result.watertight,
+    };
+    const nextBodies = kept.concat([resultBody]);
+    const flat = primApi.flattenMesh(combineBodyMeshes(nextBodies));
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, result.op)) {
+      dropShape(result.shape);
+      state.lastError = 'FAIL: Boolean mesh was rejected. Both inputs were kept.';
+      state.booleanMessage = state.lastError;
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return;
+    }
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (dropIds[state.bodies[i].id]) dropShape(state.bodies[i].shape);
+    }
+    state.bodies = nextBodies;
+    state.booleanOp = result.op;
+    state.lastError = '';
+    state.booleanMessage = result.gate && result.gate.message ? result.gate.message : '';
+    state.activeTool = name;
+    state.selection = 'item';
+    state.selectedIds = state.bodies.length === 1 ? ['item'] : [resultBody.id];
+    state.shapeGate = sceneGate();
+    state.topology = state.bodies.length === 1 ? result.topology : null;
+    state.topologySource = 'occt';
+    state.primitive = null;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    toast(name);
+    setHint(state.booleanMessage);
+  }
+
   function translateBody(dx, dy, dz) {
     if (!dx && !dy && !dz) return;
+    if (state.bodies.length && !state.primitive) {
+      setHint('The Boolean result stays put in this build.');
+      return;
+    }
     if (state.primitive) {
       const next = Object.assign({}, state.primitive.params);
       next.cx += dx;
@@ -2313,6 +2844,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const mode = state.selection;
     const topo = state.topology;
     pointerNdc(clientX, clientY);
+    if (state.bodies.length > 1 && mode === 'item') {
+      const bodyHits = raycaster.intersectObjects(bodyRoot.children, false);
+      if (!bodyHits.length) return null;
+      return bodyHits[0].object.userData.bodyId || null;
+    }
     const meshHits = raycaster.intersectObject(mesh, false);
     const hit = meshHits.length ? meshHits[0] : null;
     if (mode === 'item') return hit ? 'item' : null;
@@ -2794,7 +3330,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       bootNote: window.__cadcamBootNote || '',
       demo: state.demo || '',
       lastError: state.lastError || '',
-      opLog: state.opLog || []
+      opLog: state.opLog || [],
+      booleanOp: state.booleanOp || '',
+      booleanMessage: state.booleanMessage || '',
+      bodyCount: state.bodies.length,
+      selectionOrder: orderedBodies().map(function (body) { return body.id; })
     };
   }
 
@@ -2841,8 +3381,33 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function applyLook() {
     const mode = state.display;
     const showBody = vis.body;
-    mesh.visible = showBody && mode !== 'wire';
-    edges.visible = showBody && mode !== 'shaded';
+    const multi = state.bodies.length > 1;
+    mesh.visible = showBody && mode !== 'wire' && !multi;
+    edges.visible = showBody && mode !== 'shaded' && !multi;
+    bodyRoot.visible = showBody && multi;
+    if (multi) {
+      const picked = {};
+      const selectedNow = orderedBodies();
+      for (let bi = 0; bi < selectedNow.length; bi += 1) picked[selectedNow[bi].id] = true;
+      let sel = '#ff4fd8';
+      try {
+        const raw = getComputedStyle(document.documentElement).getPropertyValue('--sel-color').trim();
+        if (raw) sel = raw;
+      } catch (_err) { /* keep the fallback */ }
+      for (let bi = 0; bi < bodyRoot.children.length; bi += 1) {
+        const child = bodyRoot.children[bi];
+        const on = !!picked[child.userData.bodyId];
+        child.visible = mode !== 'wire';
+        if (child.material && child.material.color) {
+          child.material.color.set(on ? sel : 0x5aa4d6);
+          if (child.material.emissive) {
+            child.material.emissive.set(on ? sel : 0x000000);
+            child.material.emissiveIntensity = on ? 0.25 : 0;
+          }
+        }
+        if (child.children[0]) child.children[0].visible = mode !== 'shaded';
+      }
+    }
     corners.visible = false;
     bodyMat.wireframe = false;
     if (mode === 'xray') {
@@ -2903,6 +3468,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
     updateInspector();
     updateGate();
+    paintBooleanChrome();
   }
 
   function selectNode(node) {
@@ -3043,6 +3609,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     if (item.hint) fake.setAttribute('data-hint', item.hint);
     if (item.fmt) fake.setAttribute('data-fmt', item.fmt);
     if (item.kind) fake.setAttribute('data-kind', item.kind);
+    if (item.op) fake.setAttribute('data-op', item.op);
     runAction(fake);
   }
 
@@ -3119,11 +3686,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       message = state.unit === 'mm' ? 'Units: mm' : 'Units: inch';
     } else if (action === 'loadFixture') {
       const name = btn.getAttribute('data-fixture') || '';
+      clearOwnedBodies();
       state.primitive = null;
       state.shapeGate = null;
       state.topologySource = 'mesh';
       state.selectedIds = [];
       state.hoverId = null;
+      state.booleanOp = '';
+      state.booleanMessage = '';
+      state.demo = '';
       if (!Module.loadFixture(name)) {
         message = 'Unknown fixture';
         setHint(message);
@@ -3148,8 +3719,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       setHint(message);
     } else if (action === 'primitive') {
       const kind = btn.getAttribute('data-kind') === 'cylinder' ? 'cylinder' : 'box';
-      createPrimitive(kind, null, state.selection === 'item' ? 'item' : state.selection, false);
+      if (state.bodies.length >= 1) addAnotherBody(kind);
+      else createPrimitive(kind, null, state.selection === 'item' ? 'item' : state.selection, false);
       message = kind === 'cylinder' ? 'Cylinder' : 'Box';
+    } else if (action === 'boolean') {
+      applySceneBoolean(btn.getAttribute('data-op') || '');
+      return;
     } else if (action === 'cylAxis') {
       const axis = btn.getAttribute('data-axis') || 'Z';
       if (state.primitive && state.primitive.kind === 'cylinder') {
@@ -3397,6 +3972,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     renderer.render(vcScene, vcCam);
     renderer.setScissorTest(false);
     document.getElementById('viewLabel').textContent = viewCaption();
+    paintOrderBadges();
   }
 
   viewport.addEventListener('pointerdown', function (ev) {
@@ -3674,6 +4250,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   }
   if (params.get('demo') === 'lbracket') {
     showLBracket();
+    spherical.radius = fitDistance();
+    updateCamera();
+  } else if (params.get('demo') === 'booleans') {
+    showBooleanDemo(params.get('op') || '');
+    spherical.radius = fitDistance();
+    updateCamera();
+  } else if (params.get('pair') === 'overlap' || params.get('pair') === 'disjoint') {
+    const shift = params.get('pair') === 'disjoint'
+      ? (opsApi && opsApi.BOOLEAN_DISJOINT_SHIFT_MM ? opsApi.BOOLEAN_DISJOINT_SHIFT_MM : 40)
+      : (opsApi && opsApi.BOOLEAN_OVERLAP_SHIFT_MM ? opsApi.BOOLEAN_OVERLAP_SHIFT_MM : 10);
+    showPair(shift);
     spherical.radius = fitDistance();
     updateCamera();
   }
