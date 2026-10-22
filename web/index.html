@@ -718,6 +718,22 @@
     justify-content: flex-end;
     color: var(--muted);
   }
+  .delete-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--tab-bg);
+    color: var(--ink);
+    padding: 0;
+  }
+  .delete-btn[hidden] { display: none !important; }
   .gizmo-switch {
     display: flex;
     gap: 4px;
@@ -1612,6 +1628,7 @@
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
           <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
+          <button type="button" class="delete-btn" id="deleteBtn" data-action="delete" data-tool="Delete" aria-label="Delete" title="Delete" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1 2h4v2H4V6h4l1-2zM6 9h12l-1 11H7L6 9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
           <span class="dim-unit">mm</span>
         </div>
         <nav id="gizmoSwitch" class="gizmo-switch" aria-label="Transform">
@@ -2041,6 +2058,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     unit: 'mm',
     selection: 'item',
     selectedIds: [],
+    sceneCleared: false,
     hoverId: null,
     topology: null,
     topologySource: 'mesh',
@@ -2601,16 +2619,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     if (!host || !box || !cyl || !disc) return;
     const prim = state.primitive;
     const holeFields = document.getElementById('holeFields');
-    host.hidden = !prim && !state.holeTool;
+    const selected = state.selectedIds.length > 0;
+    host.hidden = !prim && !state.holeTool && !selected;
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     disc.hidden = !prim || prim.kind !== 'disc';
     if (holeFields) holeFields.hidden = !state.holeTool;
+    const title = document.getElementById('primTitle');
     if (prim || state.holeTool) {
       state.writingFields = true;
-      const title = document.getElementById('primTitle');
       if (title) title.textContent = state.holeTool ? 'Hole' : primitiveLabel(prim.kind);
+    } else if (title && selected) {
+      title.textContent = 'Selection';
     }
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (deleteBtn) deleteBtn.hidden = !selected;
     if (prim) {
       state.writingFields = true;
       document.getElementById('primCx').value = String(prim.params.cx);
@@ -2804,6 +2827,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     });
     state.lastError = '';
     state.booleanOp = '';
+    state.sceneCleared = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
@@ -3009,6 +3033,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     else selectFromQuery(selectMode, built.topology);
     state.activeTool = primitiveLabel(built.kind);
     state.booleanOp = '';
+    state.sceneCleared = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
@@ -3094,6 +3119,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
         toast(state.lastError);
         return false;
       }
+      state.sceneCleared = false;
       syncFromKernel();
       refreshAnchor();
       applyLook();
@@ -3294,6 +3320,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       topology: view.topology,
       gate: view.gate,
       watertight: view.watertight,
+      features: [],
     };
   }
 
@@ -3378,7 +3405,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     state.topology = state.bodies.length === 1 ? state.bodies[0].topology : null;
     state.topologySource = 'occt';
     state.hoverId = null;
-    if (state.bodies.length === 1 && (state.bodies[0].kind === 'box' || state.bodies[0].kind === 'cylinder' || state.bodies[0].kind === 'disc')) {
+    if (state.bodies.length === 1 && state.bodies[0].params && (state.bodies[0].kind === 'box' || state.bodies[0].kind === 'cylinder' || state.bodies[0].kind === 'disc')) {
       state.primitive = { kind: state.bodies[0].kind, params: state.bodies[0].params };
     } else {
       state.primitive = null;
@@ -3391,6 +3418,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       setHint(state.lastError);
       return false;
     }
+    state.sceneCleared = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
@@ -3608,8 +3636,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     state.hoverId = null;
     const partName = state.demo || 'part';
     const ok = installBodiesAndSync(partName);
-    if (ok) dropShape(previous.shape);
-    else {
+    if (ok) {
+      dropShape(previous.shape);
+      if (result.featureFaces && result.featureFaces.length) {
+        body.features = (body.features || []).concat([{ kind: kind, faces: result.featureFaces }]);
+      }
+    } else {
       dropShape(result.shape);
       body.shape = previous.shape;
       body.mesh = previous.mesh;
@@ -3709,6 +3741,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     state.topology = state.bodies.length === 1 ? result.topology : null;
     state.topologySource = 'occt';
     state.primitive = null;
+    state.sceneCleared = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
@@ -3761,11 +3794,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
         mesh: body.mesh || null,
         topology: body.topology || null,
         gate: body.gate || null,
-        watertight: body.watertight || null
+        watertight: body.watertight || null,
+        features: cloneData(body.features || [])
       });
     }
     const kernel = copyKernelMesh();
     return {
+      sceneCleared: state.sceneCleared === true,
       bodies: bodies,
       primitive: state.primitive ? { kind: state.primitive.kind, params: cloneData(state.primitive.params) } : null,
       holeLog: cloneData(state.holeLog) || [],
@@ -3814,10 +3849,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
         mesh: src.mesh,
         topology: src.topology,
         gate: src.gate,
-        watertight: src.watertight
+        watertight: src.watertight,
+        features: cloneData(src.features || [])
       });
     }
     state.bodies = next;
+    state.sceneCleared = snap.sceneCleared === true;
     state.primitive = snap.primitive ? { kind: snap.primitive.kind, params: cloneData(snap.primitive.params) } : null;
     state.holeLog = cloneData(snap.holeLog) || [];
     state.selection = snap.selection;
@@ -3829,7 +3866,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     state.booleanOp = snap.booleanOp || '';
     state.booleanMessage = snap.booleanMessage || '';
     state.demo = snap.demo || '';
-    if (snap.positions && snap.indices && typeof Module.replaceMesh === 'function') {
+    if (!state.sceneCleared && snap.positions && snap.indices && snap.indices.length && typeof Module.replaceMesh === 'function') {
       const positions = new snap.positions.constructor(snap.positions);
       const indices = new snap.indices.constructor(snap.indices);
       Module.replaceMesh(positions, indices, snap.fixture || Module.fixtureName());
@@ -3929,12 +3966,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     body.gate = view.gate;
     body.watertight = view.watertight;
     shiftParams(body.params, dx, dy, dz);
+    shiftFeaturePoints(body.features, dx, dy, dz);
     if (state.primitive && state.primitive.params && state.primitive.params !== body.params) {
       shiftParams(state.primitive.params, dx, dy, dz);
     }
     state.topology = view.topology;
     state.topologySource = 'occt';
     state.shapeGate = view.gate;
+    state.sceneCleared = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
@@ -3942,6 +3981,474 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     publishGateState();
     return true;
   }
+
+  function shiftFeaturePoints(features, dx, dy, dz) {
+    const list = features || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const faces = list[i] && list[i].faces ? list[i].faces : [];
+      for (let f = 0; f < faces.length; f += 1) {
+        const point = faces[f] && faces[f].point;
+        if (!point || point.length < 3) continue;
+        point[0] += dx;
+        point[1] += dy;
+        point[2] += dz;
+      }
+    }
+  }
+
+  function dropFeatureIndexes(body, indexes) {
+    if (!body || !body.features || !indexes || !indexes.length) return;
+    const gone = {};
+    for (let i = 0; i < indexes.length; i += 1) gone[indexes[i]] = true;
+    const next = [];
+    for (let i = 0; i < body.features.length; i += 1) {
+      if (!gone[i]) next.push(body.features[i]);
+    }
+    body.features = next;
+  }
+
+  function finishDelete(message) {
+    console.log(message);
+    setHint(message);
+  }
+
+  function commitDeletedShape(body, shape, featureIndexes) {
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, shape);
+    } catch (_err) {
+      dropShape(shape);
+      state.lastError = opsApi.DELETE_FACE_KEPT;
+      setHint(state.lastError);
+      return false;
+    }
+    if (!view || !view.gate || view.gate.valid !== true) {
+      dropShape(shape);
+      state.lastError = opsApi.DELETE_FACE_KEPT;
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    const flat = primApi.flattenMesh(view.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'delete')) {
+      dropShape(shape);
+      state.lastError = 'FAIL: the new mesh was rejected. The model was not changed.';
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    dropShape(body.shape);
+    body.shape = shape;
+    body.mesh = view.mesh;
+    body.topology = view.topology;
+    body.gate = view.gate;
+    body.watertight = view.watertight;
+    dropFeatureIndexes(body, featureIndexes);
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    state.sceneCleared = false;
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.lastError = '';
+    state.primitive = null;
+    if (body.params && (body.kind === 'box' || body.kind === 'cylinder' || body.kind === 'disc')) {
+      state.primitive = { kind: body.kind, params: body.params };
+    }
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    finishDelete(opsApi.DELETE_DONE);
+    return true;
+  }
+
+  function deleteSelectedBodies() {
+    const chosen = orderedBodies();
+    if (!chosen.length) {
+      setHint('Select a body to delete.');
+      return false;
+    }
+    const drop = {};
+    for (let i = 0; i < chosen.length; i += 1) drop[chosen[i].id] = true;
+    const kept = [];
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (!drop[state.bodies[i].id]) kept.push(state.bodies[i]);
+    }
+    if (!kept.length) {
+      for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
+      state.bodies = [];
+      state.primitive = null;
+      state.topology = null;
+      state.topologySource = 'occt';
+      state.shapeGate = null;
+      state.hoverId = null;
+      state.selectedIds = [];
+      state.booleanOp = '';
+      state.demo = '';
+      state.sceneCleared = true;
+      state.lastError = '';
+      mountBodyMeshes();
+      syncFromKernel();
+      refreshAnchor();
+      applyLook();
+      finishDelete(opsApi.DELETE_DONE);
+      return true;
+    }
+    const combined = combineBodyMeshes(kept);
+    const flat = primApi.flattenMesh(combined);
+    const name = kept.length === 1 ? (kept[0].name || 'body') : 'bodies';
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, name)) {
+      state.lastError = 'FAIL: the scene mesh was rejected. The model was not changed.';
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (drop[state.bodies[i].id]) dropShape(state.bodies[i].shape);
+    }
+    state.bodies = kept;
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.sceneCleared = false;
+    state.lastError = '';
+    state.shapeGate = sceneGate();
+    state.topology = kept.length === 1 ? kept[0].topology : null;
+    state.topologySource = 'occt';
+    state.primitive = null;
+    if (kept.length === 1 && kept[0].params && (kept[0].kind === 'box' || kept[0].kind === 'cylinder' || kept[0].kind === 'disc')) {
+      state.primitive = { kind: kept[0].kind, params: kept[0].params };
+    }
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    finishDelete(opsApi.DELETE_DONE);
+    return true;
+  }
+
+  function selectedFaceOrdinals() {
+    const topo = state.topology;
+    const ordinals = [];
+    if (!topo || !topo.faces) return ordinals;
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      for (let f = 0; f < topo.faces.length; f += 1) {
+        const face = topo.faces[f];
+        if (face.id !== id) continue;
+        ordinals.push(face.occtIndex > 0 ? face.occtIndex - 1 : f);
+      }
+    }
+    return ordinals;
+  }
+
+  function deleteSelectedFaces() {
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (!body || !body.shape || !opsApi || typeof opsApi.defeatureFaceOrdinals !== 'function') {
+      state.lastError = opsApi && opsApi.DELETE_FACE_KEPT ? opsApi.DELETE_FACE_KEPT : 'Can\'t remove this face. The model was not changed.';
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    const ordinals = selectedFaceOrdinals();
+    if (!ordinals.length) {
+      state.lastError = opsApi.DELETE_FACE_KEPT;
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    let result = null;
+    try {
+      result = opsApi.defeatureFaceOrdinals(oc, body.shape, ordinals);
+    } catch (err) {
+      state.lastError = 'FAIL: delete threw ' + (err && err.message ? err.message : String(err)) + ' The model was not changed.';
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    if (!result || !result.ok || !result.shape) {
+      if (result && result.shape) dropShape(result.shape);
+      state.lastError = (result && result.error) || opsApi.DELETE_FACE_KEPT;
+      setHint(state.lastError);
+      toast(state.lastError);
+      return false;
+    }
+    return commitDeletedShape(body, result.shape, []);
+  }
+
+  function picksFromSelection() {
+    const topo = state.topology;
+    const picks = [];
+    if (!topo) return picks;
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      if (state.selection === 'vertex') {
+        const vertices = topo.vertices || [];
+        for (let k = 0; k < vertices.length; k += 1) {
+          if (vertices[k].id === id && vertices[k].p) picks.push({ kind: 'vertex', p: vertices[k].p.slice() });
+        }
+      } else {
+        const edges = topo.edges || [];
+        for (let k = 0; k < edges.length; k += 1) {
+          const edge = edges[k];
+          if (edge.id === id && edge.pts && edge.pts.length >= 2) {
+            picks.push({ kind: 'edge', a: edge.pts[0].slice(), b: edge.pts[edge.pts.length - 1].slice() });
+          }
+        }
+      }
+    }
+    return picks;
+  }
+
+  function deleteSelectedFeature() {
+    const alone = opsApi && opsApi.DELETE_EDGE_ALONE ? opsApi.DELETE_EDGE_ALONE : 'Can\'t delete this edge on its own.';
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    if (!body || !body.shape || !opsApi || typeof opsApi.deleteOwningFeature !== 'function') {
+      state.lastError = alone;
+      setHint(state.lastError);
+      return false;
+    }
+    const picks = picksFromSelection();
+    if (!picks.length) {
+      state.lastError = alone;
+      setHint(state.lastError);
+      return false;
+    }
+    const features = body.features || [];
+    let working = null;
+    let current = body.shape;
+    const dropped = [];
+    for (let i = 0; i < picks.length; i += 1) {
+      let result = null;
+      try {
+        result = opsApi.deleteOwningFeature(oc, current, features, picks[i]);
+      } catch (err) {
+        if (working && working !== body.shape) dropShape(working);
+        state.lastError = 'FAIL: delete threw ' + (err && err.message ? err.message : String(err)) + ' The model was not changed.';
+        setHint(state.lastError);
+        toast(state.lastError);
+        return false;
+      }
+      if (!result || !result.ok || !result.shape) {
+        if (result && result.shape) dropShape(result.shape);
+        if (result && result.error && result.error !== alone) {
+          if (working && working !== body.shape) dropShape(working);
+          state.lastError = result.error;
+          setHint(state.lastError);
+          toast(state.lastError);
+          return false;
+        }
+        continue;
+      }
+      if (working && working !== body.shape) dropShape(working);
+      working = result.shape;
+      current = working;
+      const indexes = result.featureIndexes || [];
+      for (let k = 0; k < indexes.length; k += 1) {
+        if (dropped.indexOf(indexes[k]) < 0) dropped.push(indexes[k]);
+      }
+    }
+    if (!working) {
+      state.lastError = alone;
+      setHint(state.lastError);
+      return false;
+    }
+    return commitDeletedShape(body, working, dropped);
+  }
+
+  function deleteSelection() {
+    if (!state.selectedIds.length) {
+      setHint('Select something to delete.');
+      return false;
+    }
+    if (!oc || !opsApi) {
+      setHint('OCCT is not loaded. The model was not changed.');
+      return false;
+    }
+    return runUndoable('Delete', function () {
+      if (state.selection === 'face') return deleteSelectedFaces();
+      if (state.selection === 'edge' || state.selection === 'vertex') return deleteSelectedFeature();
+      return deleteSelectedBodies();
+    });
+  }
+
+  function installProbeSolid(shape, kind) {
+    const view = primApi.inspectSolid(oc, shape);
+    const flat = primApi.flattenMesh(view.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, kind)) return null;
+    clearOwnedBodies();
+    state.bodySeq += 1;
+    const body = {
+      id: 'b' + state.bodySeq,
+      name: kind,
+      kind: kind,
+      params: null,
+      shape: shape,
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight,
+      features: []
+    };
+    state.bodies = [body];
+    state.primitive = null;
+    state.sceneCleared = false;
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    state.selection = 'item';
+    state.selectedIds = ['item'];
+    state.hoverId = null;
+    state.lastError = '';
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    applyLook();
+    return body;
+  }
+
+  window.__cadcamClearSelection = function () {
+    state.selectedIds = [];
+    state.hoverId = null;
+    applyLook();
+    return true;
+  };
+
+  window.__cadcamSelectItem = function () {
+    setSelectionMode('item');
+    return true;
+  };
+
+  window.__cadcamDeleteProbe = function () {
+    const report = { hole: null, boxFace: null, edge: null, fillet: null, error: '' };
+    function resetUndo() {
+      releaseCommands(commandStack.clear());
+    }
+    function volumeOf(shape) {
+      return opsApi.solidVolumeMm3(oc, shape);
+    }
+    try {
+      resetUndo();
+      const fixture = opsApi.buildHoleDeleteFixture(oc);
+      if (!fixture || !fixture.ok || !fixture.shape) {
+        report.hole = { ok: false, error: fixture && fixture.error ? fixture.error : 'fixture failed' };
+      } else {
+        const plain = fixture.plainVolumeMm3;
+        const holed = fixture.volumeMm3;
+        const body = installProbeSolid(fixture.shape, 'solid');
+        const wall = body && body.topology && body.topology.faces
+          ? body.topology.faces.filter(function (face) { return face.surface === 'GeomAbs_Cylinder'; })[0]
+          : null;
+        const beforeFaces = body && body.topology ? body.topology.faces.length : 0;
+        const depth = commandStack.depth();
+        if (wall) {
+          state.selection = 'face';
+          state.selectedIds = [wall.id];
+        }
+        const removed = wall ? deleteSelection() === true : false;
+        const healed = state.bodies[0];
+        const after = healed && healed.shape ? volumeOf(healed.shape) : NaN;
+        const valid = !!(healed && healed.gate && healed.gate.valid === true);
+        const afterFaces = healed && healed.topology ? healed.topology.faces.length : beforeFaces;
+        doUndo();
+        const restoredBody = state.bodies[0];
+        const restored = restoredBody && restoredBody.shape ? volumeOf(restoredBody.shape) : NaN;
+        report.hole = {
+          ok: removed && valid && Math.abs(after - plain) <= opsApi.DELETE_VOLUME_TOL_MM3,
+          delta: after - plain,
+          plain: plain,
+          after: after,
+          holed: holed,
+          valid: valid,
+          facesDropped: afterFaces < beforeFaces,
+          undoStep: commandStack.redoDepth() === 1 && commandStack.depth() === depth,
+          undoRestored: Math.abs(restored - holed) <= 1e-4,
+          error: ''
+        };
+      }
+
+      resetUndo();
+      const box = opsApi.makeBoxSolid(oc, 40, 20, 10, [0, 0, 0]);
+      const boxBefore = volumeOf(box);
+      const boxBody = installProbeSolid(box, 'box');
+      const plane = boxBody && boxBody.topology
+        ? boxBody.topology.faces.filter(function (face) { return face.surface === 'GeomAbs_Plane'; })[0]
+        : null;
+      const boxDepth = commandStack.depth();
+      if (plane) {
+        state.selection = 'face';
+        state.selectedIds = [plane.id];
+        deleteSelection();
+      }
+      const boxAfter = state.bodies[0] && state.bodies[0].shape ? volumeOf(state.bodies[0].shape) : NaN;
+      report.boxFace = {
+        unchanged: !!plane && state.bodies.length === 1 && Math.abs(boxAfter - boxBefore) <= 1e-6 && state.sceneCleared !== true,
+        undoSame: commandStack.depth() === boxDepth,
+        error: plane ? (state.lastError || '') : 'no plane face',
+        volume: boxAfter
+      };
+
+      const edge = state.topology && state.topology.edges ? state.topology.edges[0] : null;
+      const edgeDepth = commandStack.depth();
+      const edgeBefore = state.bodies[0] && state.bodies[0].shape ? volumeOf(state.bodies[0].shape) : NaN;
+      if (edge) {
+        if (state.bodies[0]) state.bodies[0].features = [];
+        state.selection = 'edge';
+        state.selectedIds = [edge.id];
+        deleteSelection();
+        const edgeAfter = state.bodies[0] && state.bodies[0].shape ? volumeOf(state.bodies[0].shape) : NaN;
+        report.edge = {
+          error: state.lastError || '',
+          unchanged: Math.abs(edgeAfter - edgeBefore) <= 1e-6 && commandStack.depth() === edgeDepth
+        };
+      } else {
+        report.edge = { error: 'no edge', unchanged: false };
+      }
+
+      resetUndo();
+      const stock = opsApi.makeBoxSolid(oc, 40, 20, 10, [0, 0, 0]);
+      const stockBody = installProbeSolid(stock, 'solid');
+      const stockEdge = stockBody && stockBody.topology && stockBody.topology.edges[0];
+      if (!stockEdge) {
+        report.fillet = { ok: false, error: 'no edge', valid: false, cylinderFaces: -1 };
+      } else {
+        state.edgeArm = 'fillet';
+        state.selection = 'edge';
+        state.selectedIds = [stockEdge.id];
+        const sizeInput = document.getElementById('edgeSize');
+        if (sizeInput) sizeInput.value = '2';
+        confirmPickedEdge();
+        const filleted = state.bodies[0];
+        const filletDepth = commandStack.depth();
+        let removed = false;
+        const edges = filleted && filleted.topology ? filleted.topology.edges : [];
+        for (let i = 0; i < edges.length; i += 1) {
+          state.selection = 'edge';
+          state.selectedIds = [edges[i].id];
+          if (deleteSelection() === true) {
+            removed = true;
+            break;
+          }
+        }
+        const healed = state.bodies[0];
+        const cylinders = healed && healed.topology
+          ? healed.topology.faces.filter(function (face) { return face.surface === 'GeomAbs_Cylinder'; }).length
+          : -1;
+        report.fillet = {
+          ok: removed && !!(healed && healed.gate && healed.gate.valid === true) && cylinders === 0 && !!(filleted && filleted.features && filleted.features.length),
+          valid: !!(healed && healed.gate && healed.gate.valid === true),
+          cylinderFaces: cylinders,
+          undoStep: commandStack.depth() === filletDepth + 1,
+          error: removed ? '' : (state.lastError || 'fillet delete failed'),
+          featureFaces: filleted && filleted.features ? filleted.features.length : 0
+        };
+      }
+    } catch (err) {
+      report.error = err && err.message ? err.message : String(err);
+    }
+    publishGateState();
+    return report;
+  };
 
   function translateBody(dx, dy, dz) {
     if (!dx && !dy && !dz) return false;
@@ -3977,6 +4484,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     }
     state.shapeGate = null;
     state.topologySource = 'mesh';
+    state.sceneCleared = false;
     syncFromKernel();
     refreshAnchor();
     applyLook();
@@ -4959,7 +5467,39 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
   }
 
+  function clearedReport() {
+    return {
+      watertightPass: false,
+      unitsPass: false,
+      exportUnit: 'millimeter',
+      blockReason: 'Nothing to export.',
+      volumeMm3: 0,
+      widthMm: 0,
+      depthMm: 0,
+      heightMm: 0,
+      displayUnit: state.unit === 'in' ? 'in' : 'mm',
+      watertightMessage: 'FAIL: mesh has no triangles.',
+      unitsMessage: ''
+    };
+  }
+
+  function showClearedScene() {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
+    mesh.geometry.dispose();
+    mesh.geometry = geo;
+    edges.geometry.dispose();
+    edges.geometry = new THREE.BufferGeometry();
+    state.meshCad = { vertices: [], triangles: [] };
+    state.occtReady = true;
+    state.occtGate = false;
+    state.occtMessage = 'Nothing to export.';
+    state.shapeGate = null;
+    state.topology = null;
+  }
+
   function applyReport(report) {
+    if (state.sceneCleared) report = clearedReport();
     state.watertight = !!report.watertightPass;
     state.unitsPass = !!report.unitsPass;
     state.exportAllowed = false;
@@ -5105,6 +5645,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       holeCount: state.holeLog.length,
       undoDepth: commandStack.depth(),
       redoDepth: commandStack.redoDepth(),
+      sceneCleared: state.sceneCleared === true,
+      deleteButton: (function () {
+        const btn = document.getElementById('deleteBtn');
+        if (!btn) return { hidden: true, w: 0, h: 0 };
+        const rect = btn.getBoundingClientRect();
+        return { hidden: btn.hidden === true, w: rect.width, h: rect.height };
+      })(),
       holeLog: state.holeLog.slice(),
       facePick: upwardFacePick(),
       holeDefaults: opsApi ? {
@@ -5164,6 +5711,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   }
 
   function syncFromKernel() {
+    if (state.sceneCleared) {
+      showClearedScene();
+      applyReport(clearedReport());
+      refreshUnits();
+      return;
+    }
     applyReport(Module.gate());
     replaceBody();
     refreshUnits();
@@ -5180,7 +5733,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
 
   function applyLook() {
     const mode = state.display;
-    const showBody = vis.body;
+    const showBody = vis.body && state.sceneCleared !== true;
     const multi = state.bodies.length > 1;
     mesh.visible = showBody && mode !== 'wire' && !multi;
     edges.visible = showBody && mode !== 'shaded' && !multi;
@@ -5241,9 +5794,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
       readout.textContent = names[state.display] || state.display;
     }
-    document.getElementById('hudName').textContent = state.node === 'body'
-      ? Module.fixtureName()
-      : (NODE_LABELS[state.node] || 'Body1');
+    document.getElementById('hudName').textContent = state.sceneCleared
+      ? 'Empty'
+      : (state.node === 'body' ? Module.fixtureName() : (NODE_LABELS[state.node] || 'Body1'));
     markPressed('[data-action="select"]', 'mode', state.selection);
     markPressed('[data-action="display"]', 'mode', state.display);
     markPressed('[data-action="units"]', 'unit', state.unit);
@@ -5551,6 +6104,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   }
 
   function exportFormat(fmt) {
+    if (state.sceneCleared) {
+      applyReport(clearedReport());
+      refreshUnits();
+      const why = exportBlockText();
+      toast(why);
+      setHint(why);
+      if (exportMenu) exportMenu.hidden = true;
+      return;
+    }
     const report = Module.gate();
     applyReport(report);
     refreshUnits();
@@ -5631,6 +6193,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
         message = 'Unknown fixture';
         setHint(message);
       } else {
+        state.sceneCleared = false;
         syncFromKernel();
         spherical.radius = fitDistance();
         updateCamera();
@@ -5830,6 +6393,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       }
     } else if (action === 'exportFmt') {
       exportFormat(btn.getAttribute('data-fmt') || 'STL');
+      return;
+    } else if (action === 'delete') {
+      deleteSelection();
       return;
     } else {
       if (btn.getAttribute('data-tool')) {
@@ -6466,6 +7032,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
       return;
     }
     if (typing) return;
+    if (ev.key === 'Delete' && window.matchMedia('(min-width: 821px)').matches) {
+      ev.preventDefault();
+      deleteSelection();
+      return;
+    }
     if (ev.altKey && TAB_KEYS[ev.key]) {
       setTab(TAB_KEYS[ev.key]);
       toast(TAB_LABELS[state.tab]);
@@ -6557,6 +7128,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   const params = new URLSearchParams(window.location.search);
   const wanted = params.get('fixture');
   if (wanted && Module.loadFixture(wanted)) {
+    state.sceneCleared = false;
     syncFromKernel();
     spherical.radius = fitDistance();
     updateCamera();
