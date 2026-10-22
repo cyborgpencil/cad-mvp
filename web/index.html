@@ -641,6 +641,59 @@
   }
   .dim-panel .axis-row { margin: 0 0 4px; }
   .dim-note { margin: 4px 0 0; }
+  .dim-toggle {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    border-radius: 8px;
+    text-align: left;
+    font-weight: 650;
+  }
+  .dim-toggle .chev {
+    width: 10px;
+    height: 10px;
+    margin-left: auto;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    flex: none;
+  }
+  .dim-panel.is-open .dim-toggle .chev { transform: rotate(-135deg); }
+  .dim-unit {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    color: var(--muted);
+  }
+  .gizmo-switch {
+    display: flex;
+    gap: 4px;
+    min-height: 44px;
+  }
+  .gizmo-switch button {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--tab-bg);
+    color: var(--ink);
+    font-weight: 650;
+    font-size: 12px;
+  }
+  .gizmo-switch button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
+  .dim-body { display: grid; gap: 4px; }
   .statusbar {
     min-height: var(--status-h);
     height: auto;
@@ -1088,6 +1141,49 @@
     .workspace { display: flex; flex-direction: column; }
     .toolbox, #viewport, .browser, .inspector { grid-column: auto; grid-row: auto; }
   }
+  @media (orientation: portrait) and (max-width: 820px) {
+    .topbar {
+      flex-wrap: wrap;
+      height: auto;
+      min-height: 48px;
+    }
+    .hint {
+      flex: 1 1 100%;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+    /* The scrolling strip runs past the screen. The Tools sheet has the same actions. */
+    .toolbox .tools:not(.export-tools) { display: none; }
+    .touch-toolbar { flex-wrap: wrap; }
+    .touch-tool { flex: 1 1 72px; }
+    .gizmo-switch { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+    .gizmo-switch button { flex: 1 1 72px; }
+    .dim-panel {
+      top: auto;
+      left: 8px;
+      right: 8px;
+      width: auto;
+      bottom: 128px;
+      max-height: none;
+      min-width: 0;
+      overflow-x: hidden;
+      z-index: 7;
+    }
+    .dim-row { min-width: 0; }
+    .dim-panel:not(.is-open) .dim-body { display: none; }
+    .dim-panel.is-open {
+      bottom: 8px;
+      max-height: 40%;
+    }
+    .vp-bar {
+      flex-wrap: wrap;
+      overflow-x: hidden;
+      overflow-y: hidden;
+    }
+    .vp-cluster { display: contents; }
+    .vc-home { z-index: 8; }
+  }
   @media (max-height: 520px) {
     .interim-banner { min-height: 28px; padding: 2px 8px; }
     .toolbox .export-tools.tools,
@@ -1317,9 +1413,9 @@
         <button type="button" class="tool-btn" data-tool="Knife" title="Knife"><svg class="ico"><use href="#i-knife"></use></svg><span>Knife</span></button>
       </div><div class="group-label">Modify</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Grab" title="Grab"><svg class="ico"><use href="#i-grab"></use></svg><span>Grab</span></button>
-        <button type="button" class="tool-btn" data-tool="Rotate" title="Rotate"><svg class="ico"><use href="#i-rotate"></use></svg><span>Rotate</span></button>
-        <button type="button" class="tool-btn" data-tool="Scale" title="Scale"><svg class="ico"><use href="#i-scale"></use></svg><span>Scale</span></button>
+        <button type="button" class="tool-btn" data-action="gizmoMode" data-mode="move" data-tool="Grab" title="Move"><svg class="ico"><use href="#i-grab"></use></svg><span>Move</span></button>
+        <button type="button" class="tool-btn" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate"><svg class="ico"><use href="#i-rotate"></use></svg><span>Rotate</span></button>
+        <button type="button" class="tool-btn" data-action="gizmoMode" data-mode="scale" data-tool="Scale" title="Scale"><svg class="ico"><use href="#i-scale"></use></svg><span>Scale</span></button>
       </div><div class="group-label">Transform</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn bool-op" id="boolUnion" data-action="boolean" data-op="union" data-tool="Union" title="Union. 1 with 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-union"></use></svg><span>Union</span></button>
@@ -1327,7 +1423,7 @@
         <button type="button" class="tool-btn bool-op" id="boolIntersect" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect. Shared volume of 1 and 2." disabled aria-disabled="true"><svg class="ico"><use href="#i-intersect"></use></svg><span>Intersect</span></button>
       </div><div class="group-label" id="boolOrder">1 = target, 2 = tool</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" id="snapBtn" data-action="snap" data-tool="Snapping" title="Snapping" aria-pressed="false"><svg class="ico"><use href="#i-snap"></use></svg><span>Snap</span></button>
+        <button type="button" class="tool-btn is-on" id="snapBtn" data-action="snap" data-tool="Snapping" title="Snapping 1 mm / 15 deg" aria-pressed="true"><svg class="ico"><use href="#i-snap"></use></svg><span>Snap</span></button>
       </div><div class="group-label">Snap</div></div>
     </div>
     <div class="tools panel" data-panel="repair" hidden>
@@ -1419,18 +1515,28 @@
         <button type="button" class="touch-tool" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
       </nav>
       <form id="dimPanel" class="dim-panel" hidden>
-        <div class="dim-head"><span id="primTitle">Primitive</span><span>mm</span></div>
-        <div class="dim-row"><span class="dim-label">Centre X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="-1" data-tool="Centre X minus" aria-label="Centre X minus 1 mm">−</button><input id="primCx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="1" data-tool="Centre X plus" aria-label="Centre X plus 1 mm">+</button></div>
-        <div class="dim-row"><span class="dim-label">Centre Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="-1" data-tool="Centre Y minus" aria-label="Centre Y minus 1 mm">−</button><input id="primCy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="1" data-tool="Centre Y plus" aria-label="Centre Y plus 1 mm">+</button></div>
-        <div class="dim-row"><span class="dim-label">Centre Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="-1" data-tool="Centre Z minus" aria-label="Centre Z minus 1 mm">−</button><input id="primCz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="1" data-tool="Centre Z plus" aria-label="Centre Z plus 1 mm">+</button></div>
+        <div class="dim-head">
+          <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
+          <span class="dim-unit">mm</span>
+        </div>
+        <nav id="gizmoSwitch" class="gizmo-switch" aria-label="Transform">
+          <button type="button" class="is-on" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move" aria-pressed="true">Move</button>
+          <button type="button" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate" aria-pressed="false">Rotate</button>
+          <button type="button" data-action="gizmoMode" data-mode="scale" data-tool="Scale" title="Scale" aria-pressed="false">Scale</button>
+          <button type="button" class="is-on" data-action="snap" id="snapTouch" data-tool="Snapping" title="Snap 1 mm and 15 deg" aria-pressed="true">Snap</button>
+        </nav>
+        <div id="dimBody" class="dim-body">
+        <div class="dim-row"><span class="dim-label">Centre X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="-1" data-unit="mm" data-tool="Centre X minus" aria-label="Centre X minus">−</button><input id="primCx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCx" data-delta="1" data-unit="mm" data-tool="Centre X plus" aria-label="Centre X plus">+</button></div>
+        <div class="dim-row"><span class="dim-label">Centre Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="-1" data-unit="mm" data-tool="Centre Y minus" aria-label="Centre Y minus">−</button><input id="primCy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCy" data-delta="1" data-unit="mm" data-tool="Centre Y plus" aria-label="Centre Y plus">+</button></div>
+        <div class="dim-row"><span class="dim-label">Centre Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="-1" data-unit="mm" data-tool="Centre Z minus" aria-label="Centre Z minus">−</button><input id="primCz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Centre Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="primCz" data-delta="1" data-unit="mm" data-tool="Centre Z plus" aria-label="Centre Z plus">+</button></div>
         <div id="primBox">
-          <div class="dim-row"><span class="dim-label">Size X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="-1" data-tool="Size X minus" aria-label="Box size X minus 1 mm">−</button><input id="boxSx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="1" data-tool="Size X plus" aria-label="Box size X plus 1 mm">+</button></div>
-          <div class="dim-row"><span class="dim-label">Size Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="-1" data-tool="Size Y minus" aria-label="Box size Y minus 1 mm">−</button><input id="boxSy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="1" data-tool="Size Y plus" aria-label="Box size Y plus 1 mm">+</button></div>
-          <div class="dim-row"><span class="dim-label">Size Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="-1" data-tool="Size Z minus" aria-label="Box size Z minus 1 mm">−</button><input id="boxSz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="1" data-tool="Size Z plus" aria-label="Box size Z plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size X</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="-1" data-unit="mm" data-tool="Size X minus" aria-label="Box size X minus">−</button><input id="boxSx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size X mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSx" data-delta="1" data-unit="mm" data-tool="Size X plus" aria-label="Box size X plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Y</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="-1" data-unit="mm" data-tool="Size Y minus" aria-label="Box size Y minus">−</button><input id="boxSy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Y mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSy" data-delta="1" data-unit="mm" data-tool="Size Y plus" aria-label="Box size Y plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Size Z</span><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="-1" data-unit="mm" data-tool="Size Z minus" aria-label="Box size Z minus">−</button><input id="boxSz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Box size Z mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="boxSz" data-delta="1" data-unit="mm" data-tool="Size Z plus" aria-label="Box size Z plus">+</button></div>
         </div>
         <div id="primCyl" hidden>
-          <div class="dim-row"><span class="dim-label">Radius</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="-1" data-tool="Radius minus" aria-label="Cylinder radius minus 1 mm">−</button><input id="cylR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder radius mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="1" data-tool="Radius plus" aria-label="Cylinder radius plus 1 mm">+</button></div>
-          <div class="dim-row"><span class="dim-label">Height</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="-1" data-tool="Height minus" aria-label="Cylinder height minus 1 mm">−</button><input id="cylH" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder height mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="1" data-tool="Height plus" aria-label="Cylinder height plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Radius</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="-1" data-unit="mm" data-tool="Radius minus" aria-label="Cylinder radius minus">−</button><input id="cylR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder radius mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylR" data-delta="1" data-unit="mm" data-tool="Radius plus" aria-label="Cylinder radius plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Height</span><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="-1" data-unit="mm" data-tool="Height minus" aria-label="Cylinder height minus">−</button><input id="cylH" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Cylinder height mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="cylH" data-delta="1" data-unit="mm" data-tool="Height plus" aria-label="Cylinder height plus">+</button></div>
           <div class="muted">Axis</div>
           <div class="axis-row" role="group" aria-label="Cylinder axis">
             <button type="button" data-action="cylAxis" data-axis="X" data-tool="Axis X">X</button>
@@ -1439,8 +1545,8 @@
           </div>
         </div>
         <div id="primDisc" hidden>
-          <div class="dim-row"><span class="dim-label">Diameter</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="-1" data-tool="Diameter minus" aria-label="Disc diameter minus 1 mm">−</button><input id="discD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="1" data-tool="Diameter plus" aria-label="Disc diameter plus 1 mm">+</button></div>
-          <div class="dim-row"><span class="dim-label">Thickness</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="-1" data-tool="Thickness minus" aria-label="Disc thickness minus 1 mm">−</button><input id="discT" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc thickness mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="1" data-tool="Thickness plus" aria-label="Disc thickness plus 1 mm">+</button></div>
+          <div class="dim-row"><span class="dim-label">Diameter</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="-1" data-unit="mm" data-tool="Diameter minus" aria-label="Disc diameter minus">−</button><input id="discD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc diameter mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discD" data-delta="1" data-unit="mm" data-tool="Diameter plus" aria-label="Disc diameter plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Thickness</span><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="-1" data-unit="mm" data-tool="Thickness minus" aria-label="Disc thickness minus">−</button><input id="discT" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Disc thickness mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="discT" data-delta="1" data-unit="mm" data-tool="Thickness plus" aria-label="Disc thickness plus">+</button></div>
           <div class="muted">Axis</div>
           <div class="axis-row" role="group" aria-label="Disc axis">
             <button type="button" data-action="cylAxis" data-axis="X" data-tool="Disc axis X">X</button>
@@ -1448,7 +1554,13 @@
             <button type="button" data-action="cylAxis" data-axis="Z" data-tool="Disc axis Z">Z</button>
           </div>
         </div>
-        <p class="fine dim-note">Millimetres. Box 20 mm, cylinder diameter 20 mm and height 20 mm, disc diameter 18 mm and thickness 4 mm. A rejected edit keeps the last solid.</p>
+        <div id="primRotate">
+          <div class="dim-row"><span class="dim-label">Rot X °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRx" data-delta="-15" data-unit="deg" data-tool="Rotate X minus" aria-label="Rotate X minus">−</button><input id="primRx" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate X degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRx" data-delta="15" data-unit="deg" data-tool="Rotate X plus" aria-label="Rotate X plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Rot Y °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="-15" data-unit="deg" data-tool="Rotate Y minus" aria-label="Rotate Y minus">−</button><input id="primRy" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Y degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRy" data-delta="15" data-unit="deg" data-tool="Rotate Y plus" aria-label="Rotate Y plus">+</button></div>
+          <div class="dim-row"><span class="dim-label">Rot Z °</span><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="-15" data-unit="deg" data-tool="Rotate Z minus" aria-label="Rotate Z minus">−</button><input id="primRz" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Rotate Z degrees"><button type="button" class="dim-step" data-action="dimStep" data-dim="primRz" data-delta="15" data-unit="deg" data-tool="Rotate Z plus" aria-label="Rotate Z plus">+</button></div>
+        </div>
+        <p class="fine dim-note">Millimetres and degrees. Snap 1 mm and 15 deg on by default. Steppers 1 mm or 15 deg; long press 400 ms for 0.1 mm or 1 deg. A rejected edit keeps the last solid.</p>
+        </div>
       </form>
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
@@ -1790,7 +1902,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     anchor: { x: 0, y: 0, z: 0 },
     boundsCad: { cx: 0, cy: 0, cz: 0 },
     writingFields: false,
-    snap: false,
+    snap: true,
+    gizmoMode: 'move',
+    dimSheetOpen: false,
+    dimStepFromPointer: false,
     section: false,
     measure: false,
     display: 'edges',
@@ -2024,6 +2139,36 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     return window.matchMedia('(max-width: 820px), (max-height: 520px)').matches;
   }
 
+  function isPortraitSheet() {
+    return window.matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
+  }
+
+  function tapSlopPx() {
+    return viewApi && viewApi.TAP_SLOP_PX ? viewApi.TAP_SLOP_PX : 8;
+  }
+
+  function gizmoZonePx() {
+    return viewApi && viewApi.GIZMO_TOUCH_ZONE_PX ? viewApi.GIZMO_TOUCH_ZONE_PX : 44;
+  }
+
+  function snapOn() {
+    return state.snap === true;
+  }
+
+  function snapMm(value) {
+    const step = viewApi && viewApi.SNAP_MM ? viewApi.SNAP_MM : 1;
+    return viewApi && viewApi.snapNumber ? viewApi.snapNumber(value, step, snapOn()) : value;
+  }
+
+  function snapDeg(value) {
+    const step = viewApi && viewApi.SNAP_DEG ? viewApi.SNAP_DEG : 15;
+    return viewApi && viewApi.snapNumber ? viewApi.snapNumber(value, step, snapOn()) : value;
+  }
+
+  function minSizeMm() {
+    return viewApi && viewApi.MIN_SIZE_MM ? viewApi.MIN_SIZE_MM : 0.1;
+  }
+
   function isTypingTarget(el) {
     if (!el) return false;
     const tag = el.tagName;
@@ -2094,6 +2239,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     return true;
   }
 
+  function primitiveEuler() {
+    const prim = state.primitive;
+    if (!prim || !prim.params) return { rx: 0, ry: 0, rz: 0 };
+    return {
+      rx: Number(prim.params.rx) || 0,
+      ry: Number(prim.params.ry) || 0,
+      rz: Number(prim.params.rz) || 0
+    };
+  }
+
+  function setGizmoMode(mode) {
+    const next = gizmo && gizmo.setMode ? gizmo.setMode(mode) : (mode === 'rotate' || mode === 'scale' ? mode : 'move');
+    state.gizmoMode = next;
+    if (next === 'rotate') state.activeTool = 'Rotate';
+    else if (next === 'scale') state.activeTool = 'Scale';
+    else state.activeTool = 'Grab';
+    markPressed('[data-action="gizmoMode"]', 'mode', next);
+    placeHandles();
+    publishGateState();
+  }
+
   function placeHandles() {
     viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, handles.position);
     if (gizmoDrag && gizmoDrag.cad) {
@@ -2101,9 +2267,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       handles.position.y += gizmoDrag.cad.z;
       handles.position.z += gizmoDrag.cad.y;
     }
+    const euler = primitiveEuler();
+    const extra = gizmoDrag && gizmoDrag.rot ? gizmoDrag.rot : { rx: 0, ry: 0, rz: 0 };
+    if (viewApi.cadEulerToThreeQuaternion) {
+      handles.quaternion.copy(viewApi.cadEulerToThreeQuaternion(
+        THREE,
+        euler.rx + extra.rx,
+        euler.ry + extra.ry,
+        euler.rz + extra.rz
+      ));
+    }
     const len = Math.max(fitRadius * 0.9, 8);
-    handles.scale.setScalar(len / 18);
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    handles.scale.setScalar((len / 18) * (coarse ? 1.35 : 1));
+    if (gizmo && gizmo.setMode) gizmo.setMode(state.gizmoMode || 'move');
     handles.visible = gizmoShouldShow();
+    handles.updateMatrixWorld(true);
   }
 
   function writePosFields() {
@@ -2228,8 +2407,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
         document.getElementById('cylH').value = String(prim.params.height);
         paintAxis(prim.params.axis);
       }
+      const rx = document.getElementById('primRx');
+      const ry = document.getElementById('primRy');
+      const rz = document.getElementById('primRz');
+      if (rx) rx.value = String(prim.params.rx || 0);
+      if (ry) ry.value = String(prim.params.ry || 0);
+      if (rz) rz.value = String(prim.params.rz || 0);
       state.writingFields = false;
     }
+    host.classList.toggle('is-open', !isPortraitSheet() || state.dimSheetOpen === true);
+    const toggle = document.getElementById('dimToggle');
+    if (toggle) toggle.setAttribute('aria-expanded', host.classList.contains('is-open') ? 'true' : 'false');
+    layoutDimSheet();
     publishGateState();
   }
 
@@ -2654,6 +2843,29 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       ]);
     }
     if (!shape) return null;
+    const rot = {
+      rxDeg: normalized.rx || 0,
+      ryDeg: normalized.ry || 0,
+      rzDeg: normalized.rz || 0,
+      origin: [normalized.cx, normalized.cy, normalized.cz]
+    };
+    if ((rot.rxDeg || rot.ryDeg || rot.rzDeg) && opsApi && typeof opsApi.transformShape === 'function') {
+      const rotated = opsApi.transformShape(oc, shape, rot);
+      if (!rotated.ok || !rotated.shape) {
+        dropShape(shape);
+        return {
+          failed: true,
+          view: {
+            gate: {
+              pass: false,
+              message: (rotated && rotated.error) || 'FAIL: rotation was rejected. The last good shape was kept.'
+            }
+          }
+        };
+      }
+      dropShape(shape);
+      shape = rotated.shape;
+    }
     let view = null;
     try {
       view = primApi.inspectSolid(oc, shape);
@@ -3146,10 +3358,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
 
   function pickHandle(clientX, clientY) {
     if (!handles.visible || !gizmo) return '';
+    const bounds = canvas.getBoundingClientRect();
+    const px = clientX - bounds.left;
+    const py = clientY - bounds.top;
+    if (viewApi.pickGizmoHandle) {
+      const hit = viewApi.pickGizmoHandle(
+        gizmo.pickables,
+        camera,
+        px,
+        py,
+        bounds.width,
+        bounds.height,
+        gizmoZonePx()
+      );
+      if (hit) return hit;
+    }
     pointerNdc(clientX, clientY);
     const hits = raycaster.intersectObjects(gizmo.pickables, false);
     if (!hits.length) return '';
-    return hits[0].object.userData.handle || '';
+    const obj = hits[0].object;
+    if (obj.parent && obj.parent.visible === false) return '';
+    return obj.userData.handle || '';
   }
 
   function screenOfCad(p) {
@@ -3243,18 +3472,59 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     }
   }
 
+  function worldAxisThree(handle) {
+    const dir = viewApi.axisVector(handle);
+    const v = new THREE.Vector3(dir ? dir[0] : 0, dir ? dir[1] : 1, dir ? dir[2] : 0);
+    v.applyQuaternion(handles.quaternion);
+    if (v.lengthSq() < 1e-10) v.set(0, 1, 0);
+    v.normalize();
+    return v;
+  }
+
+  function planarAngle(origin, axis, point) {
+    const v = point.clone().sub(origin);
+    v.addScaledVector(axis, -v.dot(axis));
+    if (v.lengthSq() < 1e-12) return 0;
+    const ref = Math.abs(axis.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const x = new THREE.Vector3().crossVectors(ref, axis);
+    if (x.lengthSq() < 1e-12) x.set(1, 0, 0);
+    x.normalize();
+    const y = new THREE.Vector3().crossVectors(axis, x).normalize();
+    return Math.atan2(v.dot(y), v.dot(x));
+  }
+
   function beginGizmoDrag(handle, clientX, clientY) {
     const origin = new THREE.Vector3();
     viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, origin);
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
-    const n = viewApi.dragPlaneNormal(handle, [camDir.x, camDir.y, camDir.z]);
+    const kind = viewApi.handleKind ? viewApi.handleKind(handle) : 'move';
+    let n;
+    if (kind === 'rotate') {
+      const axis = worldAxisThree(handle);
+      n = [axis.x, axis.y, axis.z];
+    } else {
+      n = viewApi.dragPlaneNormal(handle, [camDir.x, camDir.y, camDir.z]);
+    }
     const plane = new THREE.Plane();
     plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(n[0], n[1], n[2]), origin);
     pointerNdc(clientX, clientY);
     const hit = new THREE.Vector3();
     if (!raycaster.ray.intersectPlane(plane, hit)) return null;
-    return { handle: handle, plane: plane, startHit: hit, origin: origin, cad: { x: 0, y: 0, z: 0 } };
+    const axis = worldAxisThree(handle);
+    return {
+      handle: handle,
+      kind: kind,
+      plane: plane,
+      startHit: hit,
+      origin: origin,
+      axis: axis,
+      startAngle: planarAngle(origin, axis, hit),
+      startAlong: hit.clone().sub(origin).dot(axis),
+      cad: { x: 0, y: 0, z: 0 },
+      rot: { rx: 0, ry: 0, rz: 0 },
+      size: 0
+    };
   }
 
   function dragGizmo(clientX, clientY) {
@@ -3262,19 +3532,93 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     pointerNdc(clientX, clientY);
     const hit = new THREE.Vector3();
     if (!raycaster.ray.intersectPlane(gizmoDrag.plane, hit)) return;
-    const delta = hit.clone().sub(gizmoDrag.startHit);
-    const axis = viewApi.axisVector(gizmoDrag.handle);
-    if (axis) {
-      const ax = new THREE.Vector3(axis[0], axis[1], axis[2]);
-      delta.copy(ax.multiplyScalar(delta.dot(ax)));
+    if (gizmoDrag.kind === 'rotate') {
+      const now = planarAngle(gizmoDrag.origin, gizmoDrag.axis, hit);
+      let deg = (now - gizmoDrag.startAngle) * 180 / Math.PI;
+      deg = snapDeg(deg);
+      gizmoDrag.rot = { rx: 0, ry: 0, rz: 0 };
+      const axisName = viewApi.handleAxis ? viewApi.handleAxis(gizmoDrag.handle) : '';
+      if (axisName === 'x') gizmoDrag.rot.rx = deg;
+      else if (axisName === 'y') gizmoDrag.rot.ry = deg;
+      else gizmoDrag.rot.rz = deg;
+      gizmoDrag.cad = { x: 0, y: 0, z: 0 };
+      shiftPreview(null, gizmoDrag.rot, 0);
+    } else if (gizmoDrag.kind === 'scale') {
+      const along = hit.clone().sub(gizmoDrag.origin).dot(gizmoDrag.axis);
+      let delta = along - gizmoDrag.startAlong;
+      delta = snapMm(delta);
+      gizmoDrag.size = delta;
+      gizmoDrag.cad = { x: 0, y: 0, z: 0 };
+      shiftPreview(null, null, delta);
+    } else {
+      const delta = hit.clone().sub(gizmoDrag.startHit);
+      const axis = gizmoDrag.axis;
+      if (axis && (gizmoDrag.handle === 'x' || gizmoDrag.handle === 'y' || gizmoDrag.handle === 'z')) {
+        delta.copy(axis.clone().multiplyScalar(delta.dot(axis)));
+      }
+      let cad = viewApi.threeDeltaToCad(delta.x, delta.y, delta.z);
+      cad = { x: snapMm(cad.x), y: snapMm(cad.y), z: snapMm(cad.z) };
+      gizmoDrag.cad = cad;
+      shiftPreview(cad, null, 0);
     }
-    gizmoDrag.cad = viewApi.threeDeltaToCad(delta.x, delta.y, delta.z);
-    shiftPreview(gizmoDrag.cad);
     placeHandles();
     writePosFields();
   }
 
-  function shiftPreview(cad) {
+  function shiftPreview(cad, rot, sizeDelta) {
+    mesh.quaternion.identity();
+    mesh.scale.set(1, 1, 1);
+    mesh.position.set(0, 0, 0);
+    for (let i = 0; i < overlays.nodes.length; i += 1) {
+      overlays.nodes[i].position.set(0, 0, 0);
+      overlays.nodes[i].quaternion.identity();
+      overlays.nodes[i].scale.set(1, 1, 1);
+    }
+    const center = new THREE.Vector3();
+    viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, center);
+    if (rot && (rot.rx || rot.ry || rot.rz) && viewApi.cadEulerToThreeQuaternion) {
+      const q = viewApi.cadEulerToThreeQuaternion(THREE, rot.rx, rot.ry, rot.rz);
+      const rc = center.clone().applyQuaternion(q);
+      mesh.quaternion.copy(q);
+      mesh.position.copy(center).sub(rc);
+      for (let i = 0; i < overlays.nodes.length; i += 1) {
+        overlays.nodes[i].quaternion.copy(q);
+        overlays.nodes[i].position.copy(mesh.position);
+      }
+      return;
+    }
+    if (sizeDelta) {
+      const axis = gizmoDrag && gizmoDrag.axis ? gizmoDrag.axis : new THREE.Vector3(1, 0, 0);
+      const prim = state.primitive;
+      let base = 20;
+      const axisName = gizmoDrag && viewApi.handleAxis ? viewApi.handleAxis(gizmoDrag.handle) : 'x';
+      if (prim && prim.kind === 'box') {
+        base = axisName === 'y' ? prim.params.sy : axisName === 'z' ? prim.params.sz : prim.params.sx;
+      } else if (prim && prim.kind === 'cylinder') {
+        base = axisName === 'z' || (prim.params.axis === 'Z' && axisName === 'z')
+          ? prim.params.height
+          : prim.params.radius * 2;
+      } else if (prim && prim.kind === 'disc') {
+        base = axisName === 'z' ? prim.params.thickness : prim.params.diameter;
+      }
+      const next = Math.max(minSizeMm(), base + sizeDelta);
+      const factor = next / Math.max(base, minSizeMm());
+      mesh.scale.set(
+        axis.x ? factor : 1,
+        axis.y ? factor : 1,
+        axis.z ? factor : 1
+      );
+      mesh.position.set(
+        center.x - center.x * mesh.scale.x,
+        center.y - center.y * mesh.scale.y,
+        center.z - center.z * mesh.scale.z
+      );
+      for (let i = 0; i < overlays.nodes.length; i += 1) {
+        overlays.nodes[i].scale.copy(mesh.scale);
+        overlays.nodes[i].position.copy(mesh.position);
+      }
+      return;
+    }
     const x = cad ? cad.x : 0;
     const y = cad ? cad.z : 0;
     const z = cad ? cad.y : 0;
@@ -3282,12 +3626,60 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     for (let i = 0; i < overlays.nodes.length; i += 1) overlays.nodes[i].position.set(x, y, z);
   }
 
-  function commitGizmoDrag() {
-    const cad = gizmoDrag && gizmoDrag.cad ? gizmoDrag.cad : null;
+  function commitGizmoDrag(moved) {
+    const drag = gizmoDrag;
     gizmoDrag = null;
     shiftPreview(null);
-    if (!cad) return;
+    if (!drag || !moved) {
+      placeHandles();
+      return;
+    }
+    if (drag.kind === 'rotate') {
+      const prim = state.primitive;
+      if (!prim) {
+        setHint('Rotate needs a box, cylinder, or disc.');
+        return;
+      }
+      const next = Object.assign({}, prim.params);
+      next.rx = (Number(next.rx) || 0) + (drag.rot.rx || 0);
+      next.ry = (Number(next.ry) || 0) + (drag.rot.ry || 0);
+      next.rz = (Number(next.rz) || 0) + (drag.rot.rz || 0);
+      createPrimitive(prim.kind, next, null, true);
+      return;
+    }
+    if (drag.kind === 'scale') {
+      applySizeDelta(viewApi.handleAxis ? viewApi.handleAxis(drag.handle) : 'x', drag.size || 0);
+      return;
+    }
+    const cad = drag.cad;
+    if (!cad || (!cad.x && !cad.y && !cad.z)) return;
     translateBody(cad.x, cad.y, cad.z);
+  }
+
+  function applySizeDelta(axisName, delta) {
+    const prim = state.primitive;
+    if (!prim || !delta) {
+      if (!prim) setHint('Resize needs a box, cylinder, or disc.');
+      return;
+    }
+    const next = Object.assign({}, prim.params);
+    const floor = minSizeMm();
+    if (prim.kind === 'box') {
+      if (axisName === 'y') next.sy = Math.max(floor, next.sy + delta);
+      else if (axisName === 'z') next.sz = Math.max(floor, next.sz + delta);
+      else next.sx = Math.max(floor, next.sx + delta);
+    } else if (prim.kind === 'disc') {
+      if (axisName === (String(prim.params.axis || 'Z').toLowerCase())) {
+        next.thickness = Math.max(floor, next.thickness + delta);
+      } else {
+        next.diameter = Math.max(floor, next.diameter + delta);
+      }
+    } else {
+      const along = String(prim.params.axis || 'Z').toLowerCase();
+      if (axisName === along) next.height = Math.max(floor, next.height + delta);
+      else next.radius = Math.max(floor, next.radius + delta / 2);
+    }
+    createPrimitive(prim.kind, next, null, true);
   }
 
   function readField(id) {
@@ -3312,7 +3704,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const cy = readField('primCy');
     const cz = readField('primCz');
     if (cx == null || cy == null || cz == null) return;
+    const rx = readField('primRx');
+    const ry = readField('primRy');
+    const rz = readField('primRz');
     const next = Object.assign({}, state.primitive.params, { cx: cx, cy: cy, cz: cz });
+    if (rx != null) next.rx = rx;
+    if (ry != null) next.ry = ry;
+    if (rz != null) next.rz = rz;
     if (state.primitive.kind === 'box') {
       const sx = readField('boxSx');
       const sy = readField('boxSy');
@@ -3337,6 +3735,105 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     createPrimitive(state.primitive.kind, next, null, true);
   }
 
+  function applyDimStep(btn, fine) {
+    const dimId = btn.getAttribute('data-dim') || '';
+    const sign = Number(btn.getAttribute('data-delta')) < 0 ? -1 : 1;
+    const unit = btn.getAttribute('data-unit') === 'deg' ? 'deg' : 'mm';
+    const step = unit === 'deg'
+      ? (fine ? (viewApi && viewApi.STEPPER_FINE_DEG) || 1 : (viewApi && viewApi.STEPPER_DEG) || 15)
+      : (fine ? (viewApi && viewApi.STEPPER_FINE_MM) || 0.1 : (viewApi && viewApi.STEPPER_MM) || 1);
+    const field = document.getElementById(dimId);
+    const current = readField(dimId);
+    if (!field || current == null) return false;
+    field.value = String(Math.round((current + sign * step) * 1000) / 1000);
+    onPrimitiveCommit();
+    return true;
+  }
+
+  function layoutPortraitStack() {
+    const bar = viewport.querySelector('.vp-bar');
+    const toolbar = document.getElementById('touchToolbar');
+    const portrait = isPortraitSheet();
+    const gap = 8;
+    const barH = bar ? bar.offsetHeight : 56;
+    if (toolbar) toolbar.style.bottom = portrait ? (gap + barH + gap) + 'px' : '';
+    const toolbarH = toolbar ? toolbar.offsetHeight : 44;
+    return gap + barH + gap + toolbarH + gap;
+  }
+
+  function layoutDimSheet() {
+    const panel = document.getElementById('dimPanel');
+    const home = document.getElementById('vcHome');
+    const collapsedBottom = layoutPortraitStack();
+    if (!panel) return;
+    if (!isPortraitSheet() || panel.hidden) {
+      panel.style.maxHeight = '';
+      panel.style.bottom = '';
+      return;
+    }
+    const homeBox = home ? home.getBoundingClientRect() : null;
+    const vpBox = viewport.getBoundingClientRect();
+    const homeBottom = homeBox ? homeBox.bottom : vpBox.top + 52;
+    const gap = 8;
+    const maxTop = homeBottom + gap;
+    if (panel.classList.contains('is-open')) {
+      const maxH = Math.max(132, vpBox.bottom - gap - maxTop);
+      panel.style.maxHeight = Math.min(maxH, vpBox.height * 0.4) + 'px';
+      panel.style.bottom = gap + 'px';
+    } else {
+      panel.style.maxHeight = '';
+      panel.style.bottom = collapsedBottom + 'px';
+    }
+  }
+
+  function layoutRects() {
+    const panel = document.getElementById('dimPanel');
+    const home = document.getElementById('vcHome');
+    const vp = viewport.getBoundingClientRect();
+    function box(el) {
+      if (!el || el.hidden || el.closest('[hidden]')) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return null;
+      return { x: r.left, y: r.top, w: r.width, h: r.height, bottom: r.bottom, right: r.right };
+    }
+    const panelBox = box(panel);
+    const homeBox = box(home);
+    let overlap = false;
+    if (panelBox && homeBox) {
+      overlap = !(homeBox.right <= panelBox.x || homeBox.x >= panelBox.right
+        || homeBox.bottom <= panelBox.y || homeBox.y >= panelBox.bottom);
+    }
+    const panelTop = panelBox ? panelBox.y - vp.top : vp.height;
+    return {
+      portrait: isPortraitSheet(),
+      sheet: isPortraitSheet() && !!(panel && !panel.hidden),
+      sheetOpen: !!(panel && panel.classList.contains('is-open')),
+      homeOverlap: overlap,
+      viewClearPx: Math.max(0, panelTop),
+      home: homeBox,
+      panel: panelBox
+    };
+  }
+
+  function gizmoHandleState() {
+    if (!handles.visible || !gizmo || !viewApi.gizmoHandleZones) {
+      return { minPx: 0, count: 0 };
+    }
+    handles.updateMatrixWorld(true);
+    const bounds = canvas.getBoundingClientRect();
+    const measured = viewApi.gizmoHandleZones(
+      gizmo.pickables,
+      camera,
+      bounds.width,
+      bounds.height,
+      gizmoZonePx()
+    );
+    return {
+      minPx: measured.minPx || 0,
+      count: measured.zones ? measured.zones.length : 0
+    };
+  }
+
   function layoutChrome() {
     const narrow = isNarrow();
     const h = viewport.clientHeight || 0;
@@ -3354,6 +3851,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const home = document.getElementById('vcHome');
     home.style.top = margin + 'px';
     home.style.right = (margin + cubeCss + 8) + 'px';
+    layoutDimSheet();
   }
 
   function resize() {
@@ -3496,7 +3994,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     document.getElementById('inspFine').textContent = info.fine || (state.node === 'body' ? 'Triangle mesh from the wasm checks.' : 'TBD. This control does not edit the mesh.');
     const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool], .touch-tool[data-tool]');
     for (let i = 0; i < toolBtns.length; i++) {
-      if (toolBtns[i].id === 'snapBtn') continue;
+      if (toolBtns[i].id === 'snapBtn' || toolBtns[i].getAttribute('data-action') === 'snap') continue;
+      if (toolBtns[i].getAttribute('data-action') === 'gizmoMode') continue;
       toolBtns[i].classList.toggle('is-on', toolBtns[i].getAttribute('data-tool') === state.activeTool);
     }
   }
@@ -3609,6 +4108,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     mesh.geometry.dispose();
     mesh.geometry = geo;
     mesh.position.set(0, 0, 0);
+    mesh.quaternion.identity();
+    mesh.scale.set(1, 1, 1);
     edges.geometry.dispose();
     edges.geometry = new THREE.EdgesGeometry(geo);
     const cx = (minX + maxX) / 2;
@@ -3690,7 +4191,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       dimPanelOpen: (function () {
         const panel = document.getElementById('dimPanel');
         return !!(panel && panel.hidden !== true);
-      })()
+      })(),
+      gizmoMode: state.gizmoMode || 'move',
+      snap: state.snap === true,
+      dimSheetOpen: state.dimSheetOpen === true,
+      layout: layoutRects(),
+      gizmoHandles: gizmoHandleState()
     };
   }
 
@@ -3820,10 +4326,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     markPressed('[data-action="select"]', 'mode', state.selection);
     markPressed('[data-action="display"]', 'mode', state.display);
     markPressed('[data-action="units"]', 'unit', state.unit);
+    markPressed('[data-action="gizmoMode"]', 'mode', state.gizmoMode || 'move');
     const toggles = [
       ['[data-action="section"]', state.section],
       ['[data-action="measure"]', state.measure],
-      ['#snapBtn', state.snap],
+      ['[data-action="snap"]', state.snap],
       ['#isoBtn', state.isolated]
     ];
     for (let i = 0; i < toggles.length; i++) {
@@ -4117,15 +4624,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       confirmPickedEdge();
       return;
     } else if (action === 'dimStep') {
-      const dimId = btn.getAttribute('data-dim') || '';
-      const delta = Number(btn.getAttribute('data-delta'));
-      const field = document.getElementById(dimId);
-      const current = readField(dimId);
-      if (field && Number.isFinite(delta) && current != null) {
-        field.value = String(Math.round((current + delta) * 1000) / 1000);
-        onPrimitiveCommit();
+      if (state.dimStepFromPointer) {
+        state.dimStepFromPointer = false;
+        return;
       }
+      applyDimStep(btn, false);
       message = btn.getAttribute('data-tool') || 'Dimension';
+    } else if (action === 'gizmoMode') {
+      setGizmoMode(btn.getAttribute('data-mode') || 'move');
+      message = state.gizmoMode === 'rotate' ? 'Rotate' : state.gizmoMode === 'scale' ? 'Scale' : 'Move';
+      applyLook();
+    } else if (action === 'dimSheet') {
+      state.dimSheetOpen = !state.dimSheetOpen;
+      paintPrimFields();
+      message = state.dimSheetOpen ? 'Dimensions' : 'Hide dimensions';
     } else if (action === 'cylAxis') {
       const axis = btn.getAttribute('data-axis') || 'Z';
       if (state.primitive && (state.primitive.kind === 'cylinder' || state.primitive.kind === 'disc')) {
@@ -4427,7 +4939,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     const dy = ev.clientY - rec.y;
     rec.x = ev.clientX;
     rec.y = ev.clientY;
-    if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) > 7) gesture.moved = true;
+    if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) >= tapSlopPx()) gesture.moved = true;
     if (gesture.type === 'gizmo' && gesture.pid === ev.pointerId) {
       dragGizmo(ev.clientX, ev.clientY);
       return;
@@ -4484,7 +4996,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       return;
     }
     if (g && g.pid === ev.pointerId) {
-      if (g.type === 'gizmo') commitGizmoDrag();
+      if (g.type === 'gizmo') commitGizmoDrag(g.moved);
       else if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
       else if (g.type === 'orbit' && !g.moved && ev.button === 0) {
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
@@ -4563,7 +5075,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   for (let pi = 0; pi < positionIds.length; pi += 1) {
     document.getElementById(positionIds[pi]).addEventListener('change', onPositionCommit);
   }
-  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH', 'discD', 'discT'];
+  const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylR', 'cylH', 'discD', 'discT', 'primRx', 'primRy', 'primRz'];
   for (let pi = 0; pi < primIds.length; pi += 1) {
     document.getElementById(primIds[pi]).addEventListener('change', onPrimitiveCommit);
   }
@@ -4575,6 +5087,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       ev.preventDefault();
       ev.target.blur();
     });
+    let stepHold = null;
+    function clearStepHold() {
+      if (!stepHold) return;
+      if (stepHold.timer) window.clearTimeout(stepHold.timer);
+      if (stepHold.repeat) window.clearInterval(stepHold.repeat);
+      stepHold = null;
+    }
+    dimPanel.addEventListener('pointerdown', function (ev) {
+      const btn = ev.target.closest('[data-action="dimStep"]');
+      if (!btn) return;
+      clearStepHold();
+      const holdMs = (viewApi && viewApi.LONG_PRESS_MS) || 400;
+      stepHold = {
+        btn: btn,
+        timer: window.setTimeout(function () {
+          if (!stepHold || stepHold.btn !== btn) return;
+          state.dimStepFromPointer = true;
+          applyDimStep(btn, true);
+          stepHold.repeat = window.setInterval(function () {
+            state.dimStepFromPointer = true;
+            applyDimStep(btn, true);
+          }, 80);
+        }, holdMs)
+      };
+      try { btn.setPointerCapture(ev.pointerId); } catch (_err) { /* already captured */ }
+    });
+    dimPanel.addEventListener('pointerup', function (ev) {
+      const btn = ev.target.closest('[data-action="dimStep"]');
+      const held = stepHold;
+      const long = !!(held && held.repeat);
+      clearStepHold();
+      if (!btn || long) return;
+      state.dimStepFromPointer = true;
+      applyDimStep(btn, false);
+    });
+    dimPanel.addEventListener('pointercancel', function () { clearStepHold(); });
   }
 
   document.addEventListener('keydown', function (ev) {

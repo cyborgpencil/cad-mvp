@@ -15,4 +15,4 @@ BLINK_DEFAULTS moves to tests/fixtures/ as the acceptance geometry only. It stay
 
 Note (21:17): the BLINK_DEFAULTS move now happens in step 1. Here, just confirm it's still in tests/fixtures/ and that ?demo=blink is gone.
 
-Note (21:28): the Blink fixture should have 8 through-holes, 6 countersunk leg holes plus the disc's 2 M3 placeholders at 3.4 mm and +/-5 mm (unverified fit). The fixture is local-only (tests/fixtures/blink.* is gitignored, Chief's final ruling at 21:38). occt_gate skips it on a clean checkout and logs 'skipped, local fixture'. It's only published if Erik approves.
+Note (21:28): the Blink fixture should have 8 through-holes, 6 countersunk leg holes plus 2 disc screw holes (sizes in the local fixture notes). The fixture is local-only (tests/fixtures/blink.* is gitignored, Chief's final ruling at 21:38). occt_gate skips it on a clean checkout and logs 'skipped, local fixture'. It's only published if Erik approves.

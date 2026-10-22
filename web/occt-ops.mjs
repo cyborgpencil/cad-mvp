@@ -412,6 +412,89 @@ function releaseShape(shape) {
   try { shape.delete(); } catch (_err) { /* already released */ }
 }
 
+// CAD Euler XYZ: rotate about X, then Y, then Z, around origin, then translate.
+// Team choice, 2026-10-21. Angles are degrees in the UI and radians in OCCT.
+export const TRANSFORM_EULER = 'XYZ';
+
+export function transformShape(oc, shape, spec) {
+  const src = spec || {};
+  const dx = num(src.dx, 0);
+  const dy = num(src.dy, 0);
+  const dz = num(src.dz, 0);
+  const rxDeg = num(src.rxDeg, 0);
+  const ryDeg = num(src.ryDeg, 0);
+  const rzDeg = num(src.rzDeg, 0);
+  const origin = Array.isArray(src.origin) ? src.origin : [0, 0, 0];
+  if (!shape) {
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: transform needs a shape. The last good shape was kept.',
+      kept: true,
+    };
+  }
+  if (!dx && !dy && !dz && !rxDeg && !ryDeg && !rzDeg) {
+    return { ok: true, shape: null, skipped: true, error: '', kept: true };
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    const originPnt = track(trash, new oc.gp_Pnt(origin[0], origin[1], origin[2]));
+    const trsf = track(trash, new oc.gp_Trsf());
+    // Multiply in Z, Y, X so the composed matrix is Rz*Ry*Rx (X first).
+    const rotations = [
+      [[0, 0, 1], rzDeg],
+      [[0, 1, 0], ryDeg],
+      [[1, 0, 0], rxDeg],
+    ];
+    for (let i = 0; i < rotations.length; i += 1) {
+      const deg = rotations[i][1];
+      if (!deg) continue;
+      const dirv = rotations[i][0];
+      const dir = track(trash, new oc.gp_Dir(dirv[0], dirv[1], dirv[2]));
+      const ax = track(trash, new oc.gp_Ax1(originPnt, dir));
+      const part = track(trash, new oc.gp_Trsf());
+      part.SetRotation(ax, deg * Math.PI / 180);
+      trsf.Multiply(part);
+    }
+    if (dx || dy || dz) {
+      const vec = track(trash, new oc.gp_Vec(dx, dy, dz));
+      const move = track(trash, new oc.gp_Trsf());
+      move.SetTranslation(vec);
+      trsf.PreMultiply(move);
+    }
+    const xf = track(trash, new oc.BRepBuilderAPI_Transform(shape, trsf, true, false));
+    const taken = takeDoneShape(oc, xf, 'BRepBuilderAPI_Transform');
+    if (!taken.ok) {
+      taken.kept = true;
+      taken.error = taken.error || 'FAIL: transform IsDone is false; Shape() was not called.';
+      if (taken.error.indexOf('kept') < 0) taken.error += ' The last good shape was kept.';
+      return taken;
+    }
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok) {
+      copied.kept = true;
+      if (copied.error && copied.error.indexOf('kept') < 0) copied.error += ' The last good shape was kept.';
+      return copied;
+    }
+    owned = copied.shape;
+    return { ok: true, shape: owned, error: '', kept: false };
+  } catch (err) {
+    if (owned) {
+      try { owned.delete(); } catch (_drop) { /* already released */ }
+    }
+    return {
+      ok: false,
+      shape: null,
+      error: 'FAIL: BRepBuilderAPI_Transform threw ' + explain(oc, err) + ' The last good shape was kept.',
+      kept: true,
+    };
+  } finally {
+    dispose(trash);
+  }
+}
+
 export function makeBoxSolid(oc, dx, dy, dz, origin) {
   if (!(dx > 0) || !(dy > 0) || !(dz > 0)) return null;
   const trash = [];

@@ -5,6 +5,8 @@ Newest entries at the top.
 
 ## 2026-10-21
 
+- Portrait 390: the dimension mode row, primitive toolbar, mm/in toggle, and status line wrap inside the screen. The narrow tool strip's actions stay on the Tools sheet. Touch targets stay at least 44×44. No `src/` edits. No commit.
+- Mobile step 2 (transforms): touch Move/Rotate/Scale gizmo with 44 px handles and a 44 px mode switch, typed mm and degree fields, 1 mm / 15 deg snap on by default, steppers 1 mm or 15 deg (0.1 mm / 1 deg after a 400 ms long press). Portrait 390×844 uses a collapsed bottom dimension sheet that stays off the Home button. `transformShape` in `web/occt-ops.mjs` wraps `BRepBuilderAPI_Transform`. No `src/` edits. No commit.
 - Wired the approved mockup layout into `web/` as a single-threaded WASM page. The status bar and the one Export button call `evaluate_export_gate` (`src/export/gate.cpp`), which reads `check_watertight` and the millimeter `ExportUnitRecord` and reports the triple-sum volume. `src/solid`, `src/units`, and `src/model` are unchanged. CTest `gate` covers the block. Build steps are in `web/BUILD.md`. The `.wasm` is gitignored. No OCCT and no FixGaps in this slice.
 - Research Digest reworded `research/gui/README.md` (feasibility, scope conflict 6, next step 1) per Erik's rule: OCCT fillet/chamfer/cut/extrude would sit alongside the existing mesh code, not replace it; existing tests and values including O5b stay; post a reason in the room before changing existing code.
 - Research Digest filled four `mvp/gui-plan.md` TBDs with sourced proposals needing Erik's sign-off: sketch solver (PlaneGCS WASM), rendering stack (three.js + camera-controls + three-mesh-bvh), screenshot tool (Playwright), and inset feasibility (`BRepOffsetAPI_MakeOffset` + `BRepAlgoAPI_Splitter`). Pixel-diff tolerance and other TBDs unchanged.
@@ -171,13 +173,13 @@ Newest entries at the top.
 
 ## 2026-10-21 19:59 MT - Chief rulings folded into prompts/blink-holes-disc.md (#8 wood-screw leg holes, M3 disc only, two-body Booleans, UI fixes).
 
-## 2026-10-21 20:05 MT - prompts/blink-holes-disc.md now uses Research Digest's revised values: 4.5 mm holes with a 9.5 mm countersink, and an 18 mm disc in place of the 30 mm one.
+## 2026-10-21 20:05 MT - Blink layout values were logged here. They're now in the local fixture notes.
 
-## 2026-10-21 20:25 MT - The Chief confirmed the 4.5 mm hole, 9.5 mm countersink and 18 mm disc. The TBD in prompts/blink-holes-disc.md is replaced. Erik rule (8:24 PM): Z13 is the main machine and nobody uses Ally.
+## 2026-10-21 20:25 MT - Blink layout values were logged here. They're now in the local fixture notes.
 
 ## 2026-10-21 20:26 MT - Chief ruling: drop the vertical-leg holes the disc covers (probably all three); the horizontal leg keeps its three wood-screw holes. Added to prompts/blink-holes-disc.md. Erik clarified that only the NOC team uses Ally.
 
-## 2026-10-21 20:43 MT - Chief reversed the hole drop: 60 mm vertical leg, holes at 8/20/32 mm on both legs, 18 mm disc centred at 48 mm. Logged in web/PROGRESS.md and prompts/blink-holes-disc.md.
+## 2026-10-21 20:43 MT - Blink layout values were logged here. They're now in the local fixture notes.
 
 ## 2026-10-21 20:46 MT - Erik pivot: stop the baked-in Blink bracket. Erik will build it himself in the mobile app. The bracket stays a test case only, not a shipped demo. New priority: mobile tools (primitives with editable mm dimensions; move, rotate and resize; parameter edits; holes and countersinks; fillet and chamfer on picked edges; touch-friendly Booleans). Acceptance test: on a portrait phone, build an L-bracket with 3 countersunk holes per leg and an off-centre disc using only the UI. Gate and watertight checks apply. prompts/blink-holes-disc.md is superseded.
 
@@ -198,3 +200,13 @@ Newest entries at the top.
 ## 2026-10-21 21:38 MT - Final ruling: the Blink fixture stays local-only (skip if missing, gitignored), unless Erik approves publishing it. This replaces the 21:29 entry. Step 5 prompt updated.
 
 ## 2026-10-21 21:42 MT - The skip fix landed. occt_gate loads the Blink fixture with a guarded dynamic import, and tests/fixtures/blink.* is gitignored. CTest passes 7/7 both with and without the fixture. Step 1 is clear for commit and push.
+
+## 2026-10-21 21:55 MT - Scrub (Chief's go): the written Blink layout values in web/PROGRESS.md, prompts/blink-holes-disc.md, UPDATES.md and prompts/mobile-5 moved to the gitignored tests/fixtures/blink.notes.md. Older commits still contain them, and rewriting that history is Erik's call. Generic app defaults (hole tool, 18 mm disc primitive) are unchanged.
+
+## 2026-10-21 22:20 MT - Mobile step 2 PASS (Pilot, Grok session 01a161bc, 9:52-10:15 PM): CTest 7/7, deploy_smoke incl. 390x844 bottom sheet, WASM 11/11, all STLs watertight with mm header. Blink scrub held. Open: portrait horizontal overflow at 390 px (Snap, Disc, mm/in, status), touch tested by emulation only, Erik review of index.html, occt-ops.mjs, viewport-selection.mjs. Not committed.
+
+## 2026-10-21 22:33 MT - prompts/mobile-3-holes.md prepped for step 3 with step 2 carry-overs: reuse viewport-selection.mjs picking and transformShape snap, keep the portrait overflow checks, countersink as one Boolean cut, 3-hole portrait smoke test.
+
+## 2026-10-21 22:47 MT - Step 2 overflow fix PASS (Grok 01a161d7, 10:21-10:40 PM): portrait rows wrap, targets >= 44 px, overflow checks pass collapsed and expanded, CTest 7/7, WASM 11/11, STLs unchanged and watertight in mm. Erik to OK: tool strip hidden in portrait (actions via Tools). mobile-3 prompt: countersink default 82 deg (#8 flat head) with editable angle, cone formula per Research Digest.
+
+## 2026-10-21 22:49 MT - Chief accepted step 2. Hidden portrait tool strip recorded as a team choice in web/PROGRESS.md. mobile-3 prompt adds the closed-panel inert/hidden check.

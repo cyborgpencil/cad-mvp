@@ -27,6 +27,9 @@ export const PLACEHOLDER_BOX_MM = Object.freeze({
   sx: BOX_EDGE_MM,
   sy: BOX_EDGE_MM,
   sz: BOX_EDGE_MM,
+  rx: 0,
+  ry: 0,
+  rz: 0,
 });
 
 export const PLACEHOLDER_CYLINDER_MM = Object.freeze({
@@ -36,6 +39,9 @@ export const PLACEHOLDER_CYLINDER_MM = Object.freeze({
   radius: CYLINDER_DIAMETER_MM / 2,
   height: CYLINDER_HEIGHT_MM,
   axis: 'Z',
+  rx: 0,
+  ry: 0,
+  rz: 0,
 });
 
 export const PLACEHOLDER_DISC_MM = Object.freeze({
@@ -45,6 +51,9 @@ export const PLACEHOLDER_DISC_MM = Object.freeze({
   diameter: DISC_DIAMETER_MM,
   thickness: DISC_THICKNESS_MM,
   axis: 'Z',
+  rx: 0,
+  ry: 0,
+  rz: 0,
 });
 
 // Mesh defaults. Team proposal, sourced from the OCCT Mesh user guide
@@ -95,6 +104,9 @@ export function normalizeBox(params) {
     sx: num(src.sx, PLACEHOLDER_BOX_MM.sx),
     sy: num(src.sy, PLACEHOLDER_BOX_MM.sy),
     sz: num(src.sz, PLACEHOLDER_BOX_MM.sz),
+    rx: num(src.rx, PLACEHOLDER_BOX_MM.rx),
+    ry: num(src.ry, PLACEHOLDER_BOX_MM.ry),
+    rz: num(src.rz, PLACEHOLDER_BOX_MM.rz),
   };
 }
 
@@ -109,6 +121,9 @@ export function normalizeCylinder(params) {
     radius: num(src.radius, PLACEHOLDER_CYLINDER_MM.radius),
     height: num(src.height, PLACEHOLDER_CYLINDER_MM.height),
     axis: axis,
+    rx: num(src.rx, PLACEHOLDER_CYLINDER_MM.rx),
+    ry: num(src.ry, PLACEHOLDER_CYLINDER_MM.ry),
+    rz: num(src.rz, PLACEHOLDER_CYLINDER_MM.rz),
   };
 }
 
@@ -129,6 +144,9 @@ export function normalizeDisc(params) {
     diameter: diameter,
     thickness: thickness,
     axis: axis,
+    rx: num(src.rx, PLACEHOLDER_DISC_MM.rx),
+    ry: num(src.ry, PLACEHOLDER_DISC_MM.ry),
+    rz: num(src.rz, PLACEHOLDER_DISC_MM.rz),
   };
 }
 

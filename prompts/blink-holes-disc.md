@@ -1,4 +1,4 @@
-﻿# Prompt: Blink L-bracket screw holes, mount disc, and user-picked fillet/chamfer
+# Prompt: Blink L-bracket screw holes, mount disc, and user-picked fillet/chamfer
 
 Spec: mvp/projects/blink-l-bracket.md. Booleans rules: mvp/booleans.md. Values: web/PROGRESS.md decisions table.
 
@@ -24,27 +24,8 @@ Check IsDone() before Shape(). Run OCCT validity, watertight and mm checks. Reve
 ## Rules
 Don't commit. Flag any src/ change for Erik's review. Strict MVP scope. Print BLINK_DONE at the end.
 
-## Update 2026-10-21 19:58 MT - Chief rulings
-- Leg holes are clearance holes for #8 wood screws. Size: 4.5 mm clearance with a 9.5 mm 90 degree countersink (confirmed by the Chief at 20:25 MT, team choice, unverified fit; see the 20:05 section).
-- M3 holes are only for the disc screws.
-- The team picks the disc diameter, its position on one leg and its hole pattern, and each is labelled a team choice in web/PROGRESS.md. The four sizes only Erik can measure stay marked "unverified fit". Don't use the Outdoor 2K+ numbers.
-- Booleans stay two-body for the MVP.
-- Two UI fixes are part of this session: make the op buttons easier to see, and show the gizmo when a body is selected in Item mode.
-- Start only after CI is green on the Booleans push.
-
-## Update 2026-10-21 20:05 MT - Hole and disc values (team choices, all "unverified fit")
-- Leg holes for #8 wood screws: 4.5 mm through (the free fit per the UVA clearance chart), 90 degree countersink 9.5 mm across (Engineering ToolBox), on the leg centreline at 10, 20 and 30 mm from the corner. This replaces the earlier 8.5 mm countersink.
-- Disc: 18 mm across and 4 mm thick, fused flush on top of the vertical leg so it stays inside the 20 mm leg width. It sits between two leg holes; Pilot's clearance check sets the final offset. This replaces the earlier 30 mm disc, which would hang over the leg.
-- If the disc still covers a leg hole, drop that hole rather than move the disc, and log it (Chief ruling).
-- M3 disc screw holes only. The hole pattern is a team choice and stays marked "unverified fit".
-
-## Update 2026-10-21 20:26 MT - Chief ruling on hole drops (team choice)
-- Drop every vertical-leg hole the 18 mm disc covers, counting any countersink edge it overlaps. Research Digest's math shows that is probably all three holes, since the countersinks at 10 and 30 mm still overlap the disc by about 3.75 mm.
-- All three holes on the horizontal leg stay; that leg carries the wood screws.
-- Log which holes were dropped, then run the gate on the result.
-
-## Update 2026-10-21 20:43 MT - Supersedes the 20:26 hole-drop ruling
-Both legs keep 3 holes (Erik's spec). The vertical leg is 60 mm long. Holes sit at 8, 20 and 32 mm on both legs, and the 18 mm disc is centred at 48 mm. Pilot's clearance check and the gate must pass before anything is pushed. All values are team choices, unverified fit.
+## Updates 19:58-20:43 MT
+Moved to the local fixture notes (tests/fixtures/blink.notes.md).
 
 ## SUPERSEDED 2026-10-21 20:46 MT
 Erik stopped the baked-in Blink build. Keep the geometry as a test fixture only. See prompts/mobile-modeling-tools.md.

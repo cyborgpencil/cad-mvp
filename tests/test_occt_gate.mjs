@@ -45,7 +45,7 @@ if (existsSync(blinkPath)) {
   try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
 }
 const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
-const { threeDeltaToCad, GIZMO_AXIS_THREE } = await import(viewUrl);
+const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES } = await import(viewUrl);
 
 let failures = 0;
 
@@ -138,6 +138,12 @@ expect('three Y is cad Z', cad.x === 1 && cad.y === 3 && cad.z === 2);
 expect('gizmo X', GIZMO_AXIS_THREE.x[0] === 1 && GIZMO_AXIS_THREE.x[1] === 0 && GIZMO_AXIS_THREE.x[2] === 0);
 expect('gizmo Y', GIZMO_AXIS_THREE.y[0] === 0 && GIZMO_AXIS_THREE.y[1] === 0 && GIZMO_AXIS_THREE.y[2] === 1);
 expect('gizmo Z up', GIZMO_AXIS_THREE.z[0] === 0 && GIZMO_AXIS_THREE.z[1] === 1 && GIZMO_AXIS_THREE.z[2] === 0);
+expect('tap slop 8', TAP_SLOP_PX === 8 && isTapMove(5, 5, 8) === true && isTapMove(8, 0, 8) === false);
+expect('gizmo zone 44', GIZMO_TOUCH_ZONE_PX === 44);
+expect('snap 1mm 15deg', SNAP_MM === 1 && SNAP_DEG === 15 && snapNumber(5.4, 1, true) === 5 && snapNumber(22, 15, true) === 15);
+expect('steppers', STEPPER_MM === 1 && STEPPER_FINE_MM === 0.1 && STEPPER_DEG === 15 && STEPPER_FINE_DEG === 1 && LONG_PRESS_MS === 400);
+expect('gizmo modes', GIZMO_MODES.join(',') === 'move,rotate,scale' && handleKind('rx') === 'rotate' && handleKind('sx') === 'scale' && handleKind('x') === 'move');
+expect('transform euler XYZ', ops.TRANSFORM_EULER === 'XYZ');
 
 const fixture = JSON.parse(readFileSync(path.join(root, 'tests', 'fixtures', 'lbracket.json'), 'utf8'));
 const defaults = ops.lbracketSpec(null);
@@ -398,11 +404,63 @@ console.log('prim-box triangles', primBoxStl.triangles, 'bytes', primBoxStl.byte
 console.log('prim-cylinder triangles', primCylStl.triangles, 'bytes', primCylStl.bytes);
 console.log('prim-disc triangles', primDiscStl.triangles, 'bytes', primDiscStl.bytes);
 
+const boxSolid = ops.makeBoxSolid(oc, 20, 20, 20, [-10, -10, 0]);
+expect('transform source', !!boxSolid);
+const skipped = ops.transformShape(oc, boxSolid, { dx: 0, dy: 0, dz: 0, rxDeg: 0, ryDeg: 0, rzDeg: 0 });
+expect('identity transform skipped', skipped.ok === true && skipped.skipped === true && skipped.shape === null);
+const missing = ops.transformShape(oc, null, { dx: 5 });
+expect('null transform kept', missing.ok === false && missing.shape === null && missing.kept === true && missing.error.indexOf('kept') !== -1);
+const moved = ops.transformShape(oc, boxSolid, { dx: 5, dy: 0, dz: 0 });
+expect('move ok', moved.ok === true && !!moved.shape);
+const movedView = inspectSolid(oc, moved.shape);
+expect('move gate', movedView.gate.pass === true && movedView.watertight.pass === true && movedView.units === 'mm');
+const movedBounds = ops.solidBounds(oc, moved.shape);
+nearBounds('moved box', movedBounds, { xmin: -5, ymin: -10, zmin: 0, xmax: 15, ymax: 10, zmax: 20 }, 0.05);
+expect('move volume', Math.abs(ops.solidVolumeMm3(oc, moved.shape) - 8000) <= 1e-3);
+const movedStl = writeCheckedStl('prim-box-moved.stl', movedView.mesh, { xmin: -5, ymin: -10, zmin: 0, xmax: 15, ymax: 10, zmax: 20 }, 0.05);
+console.log('prim-box-moved triangles', movedStl.triangles, 'bytes', movedStl.bytes);
+const rotated = ops.transformShape(oc, boxSolid, { rzDeg: 15, origin: [0, 0, 10] });
+expect('rotate ok', rotated.ok === true && !!rotated.shape);
+const rotatedView = inspectSolid(oc, rotated.shape);
+expect('rotate gate', rotatedView.gate.pass === true && rotatedView.watertight.pass === true && rotatedView.units === 'mm');
+expect('rotate volume', Math.abs(ops.solidVolumeMm3(oc, rotated.shape) - 8000) <= 1e-3);
+const rotatedBounds = ops.solidBounds(oc, rotated.shape);
+const rotExtent = 10 * (Math.cos(15 * Math.PI / 180) + Math.sin(15 * Math.PI / 180));
+nearBounds('rotated box', rotatedBounds, {
+  xmin: -rotExtent,
+  ymin: -rotExtent,
+  zmin: 0,
+  xmax: rotExtent,
+  ymax: rotExtent,
+  zmax: 20,
+}, 0.2);
+const rotatedStl = writeCheckedStl('prim-box-rotated.stl', rotatedView.mesh, {
+  xmin: -rotExtent,
+  ymin: -rotExtent,
+  zmin: 0,
+  xmax: rotExtent,
+  ymax: rotExtent,
+  zmax: 20,
+}, 0.2);
+console.log('prim-box-rotated triangles', rotatedStl.triangles, 'bytes', rotatedStl.bytes);
+expect('input kept after transform', Math.abs(ops.solidVolumeMm3(oc, boxSolid) - 8000) <= 1e-3);
+if (moved.shape) moved.shape.delete();
+if (rotated.shape) rotated.shape.delete();
+if (boxSolid) boxSolid.delete();
+const resized = buildBox(oc, { sx: 24, sy: 20, sz: 20, cx: 0, cy: 0, cz: 10 });
+expect('resize gate', resized.gate.pass === true && resized.watertight.pass === true && resized.units === 'mm');
+expect('resize volume ' + (resized.params.sx * resized.params.sy * resized.params.sz), Math.abs((resized.params.sx * resized.params.sy * resized.params.sz) - 9600) < 1e-9);
+const resizedStl = writeCheckedStl('prim-box-resized.stl', resized.mesh, { xmin: -12, ymin: -10, zmin: 0, xmax: 12, ymax: 10, zmax: 20 }, 0.05);
+console.log('prim-box-resized triangles', resizedStl.triangles, 'bytes', resizedStl.bytes);
+
 const pageSrc = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
 expect('no bracket demo in the page', pageSrc.indexOf('demo=blink') === -1 && pageSrc.indexOf('buildBlink') === -1);
 expect('disc hook', pageSrc.indexOf("primKind === 'disc'") !== -1);
 expect('touch toolbar', pageSrc.indexOf('id="touchToolbar"') !== -1);
 expect('decimal keypad', pageSrc.indexOf('inputmode="decimal"') !== -1);
+expect('gizmo switch', pageSrc.indexOf('id="gizmoSwitch"') !== -1 && pageSrc.indexOf('data-mode="rotate"') !== -1 && pageSrc.indexOf('data-mode="scale"') !== -1);
+expect('portrait sheet', pageSrc.indexOf('id="dimToggle"') !== -1 && pageSrc.indexOf('id="dimBody"') !== -1 && pageSrc.indexOf('primRz') !== -1);
+expect('tap slop in page', pageSrc.indexOf('tapSlopPx()') !== -1);
 expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);
 
 if (blinkMod) {

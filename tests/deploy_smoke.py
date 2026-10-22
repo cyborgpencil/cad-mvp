@@ -18,7 +18,11 @@ Asserts window.__cadcamExportState.occtReady for:
   ?demo=booleans&op=    union, cut, and intersect each PASS
   ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
   /?fixture=closed_box  plain 4 key selects the whole body
-  portrait 390x844      touch-create box, cylinder, and disc, then edit one dimension
+  portrait 390x844      touch-create box, cylinder, and disc; bottom sheet does not cover Home;
+                        move, rotate, and resize a box with taps and typed values;
+                        no page-level horizontal scroll; visible buttons and the status
+                        line stay inside the width; the sheet and toolbar do not scroll
+                        sideways unless marked data-hscroll
   /tests/fixtures/lbracket.json, /fixtures/lbracket.json,
   /tests/fixtures/blink.json, and /fixtures/blink.json return 404
 
@@ -735,7 +739,13 @@ def eval_expr(cdp: Cdp, expression: str) -> tuple[Any, str]:
 def set_portrait(cdp: Cdp) -> None:
     cdp.call(
         "Emulation.setDeviceMetricsOverride",
-        {"width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True},
+        {
+            "width": 390,
+            "height": 844,
+            "deviceScaleFactor": 1,
+            "mobile": True,
+            "screenOrientation": {"type": "portraitPrimary", "angle": 0},
+        },
     )
     cdp.call("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 1})
 
@@ -772,7 +782,7 @@ TARGET_EXPR = (
     "var label=(el.id||el.getAttribute('aria-label')||el.textContent||'').replace(/\\s+/g,' ').trim();"
     "return {w:r.width,h:r.height,label:label};"
     "}"
-    "var nodes=document.querySelectorAll('#touchToolbar button, #dimPanel button, #dimPanel input');"
+    "var nodes=document.querySelectorAll('#touchToolbar button, #dimPanel button, #dimPanel input, #gizmoSwitch button');"
     "var bad=[];"
     "var n=0;"
     "for(var i=0;i<nodes.length;i++){"
@@ -784,6 +794,20 @@ TARGET_EXPR = (
     "return JSON.stringify({n:n,bad:bad});"
     "})()"
 )
+
+
+def point_expr(selector: str) -> str:
+    return (
+        "(function(){"
+        f"var b=document.querySelector('{selector}');"
+        "if(!b) return 'missing';"
+        "var st=getComputedStyle(b);"
+        "if(st.display==='none'||st.visibility==='hidden') return 'hidden';"
+        "var r=b.getBoundingClientRect();"
+        "if(r.width<1||r.height<1) return 'empty';"
+        "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height});"
+        "})()"
+    )
 
 
 def edit_expr(field: str, value: str) -> str:
@@ -813,12 +837,13 @@ def wait_portrait(
     cdp: Cdp,
     origin: str,
     kind: str,
-    key: str,
-    want: float,
+    params: dict[str, float],
     timeout: float,
+    extra: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     deadline = time.time() + timeout
     last: dict[str, Any] | None = None
+    extra = extra or {}
     while time.time() < deadline:
         cdp.drain(0.3)
         problems = site_problems(cdp.events, origin, cdp.urls)
@@ -838,16 +863,110 @@ def wait_portrait(
                 and state.get("unitsPass") is True
                 and not state.get("lastError")
                 and int(state.get("bodyCount") or 0) == 1
-                and param_is(state, key, want)
+                and all(param_is(state, key, want) for key, want in params.items())
             )
+            for key, want in extra.items():
+                if state.get(key) != want:
+                    ready = False
+                    break
             if ready:
                 return state, []
         time.sleep(0.15)
-    return last, [f"portrait {kind} timed out waiting for {key}={want}", json.dumps(last)]
+    return last, [f"portrait {kind} timed out waiting for {params} {extra}", json.dumps(last)]
+
+
+def tap_selector(cdp: Cdp, selector: str, label: str) -> list[str]:
+    raw, err = eval_expr(cdp, point_expr(selector))
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return [f"{label} {raw or err}"]
+    box = json.loads(raw)
+    if float(box["w"]) < 44 or float(box["h"]) < 44:
+        return [f"{label} {box['w']}x{box['h']}"]
+    touch_tap(cdp, float(box["x"]), float(box["y"]))
+    return []
+
+
+PORTRAIT_FIT_EXPR = r"""
+(function(){
+  var iw = window.innerWidth;
+  var ih = window.innerHeight;
+  var problems = [];
+  if (document.documentElement.scrollWidth > iw + 0.5) {
+    problems.push('page scrollWidth ' + document.documentElement.scrollWidth + ' > ' + iw);
+  }
+  function shown(el) {
+    if (!el || el.closest('[hidden]')) return null;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    if (r.bottom <= 0 || r.top >= ih || r.right <= 0 || r.left >= iw) return null;
+    return r;
+  }
+  var nodes = document.querySelectorAll('button, #statusHint, .statusbar');
+  for (var i = 0; i < nodes.length; i++) {
+    var el = nodes[i];
+    var r = shown(el);
+    if (!r) continue;
+    if (r.right > iw + 0.5) {
+      var label = (el.id || el.getAttribute('aria-label') || el.getAttribute('data-tool') || el.className || '')
+        .toString().replace(/\s+/g, ' ').trim().slice(0, 48);
+      problems.push(label + ' right ' + r.right.toFixed(1));
+    }
+  }
+  var hosts = document.querySelectorAll('#dimPanel, #touchToolbar');
+  for (var j = 0; j < hosts.length; j++) {
+    var host = hosts[j];
+    if (!shown(host)) continue;
+    if (host.hasAttribute('data-hscroll')) continue;
+    if (host.scrollWidth > host.clientWidth + 1) {
+      problems.push((host.id || 'host') + ' scrollWidth ' + host.scrollWidth + ' > ' + host.clientWidth);
+    }
+  }
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def portrait_fit_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, PORTRAIT_FIT_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"portrait fit {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"portrait fit {raw}"]
+    if not isinstance(found, list):
+        return [f"portrait fit {raw}"]
+    return [str(item) for item in found]
+
+
+def portrait_layout_ok(state: dict[str, Any], expanded: bool) -> list[str]:
+    layout = state.get("layout") or {}
+    problems: list[str] = []
+    if layout.get("portrait") is not True:
+        problems.append(f"portrait layout flag {layout.get('portrait')!r}")
+    if layout.get("sheet") is not True:
+        problems.append("portrait sheet missing")
+    if layout.get("homeOverlap") is True:
+        problems.append("Home overlaps the dimension sheet")
+    view_clear = float(layout.get("viewClearPx") or 0)
+    if view_clear < 80:
+        problems.append(f"view covered, clear {view_clear}px")
+    if expanded and layout.get("sheetOpen") is not True:
+        problems.append("sheet not expanded")
+    if not expanded and layout.get("sheetOpen") is True:
+        problems.append("sheet started expanded")
+    home = layout.get("home") or {}
+    panel = layout.get("panel") or {}
+    if home and panel and float(panel.get("y") or 0) < float(home.get("bottom") or 0) + 4:
+        if layout.get("homeOverlap") is True:
+            problems.append("sheet top meets Home")
+    return problems
 
 
 def run_portrait(cdp: Cdp, origin: str) -> list[str]:
-    """390x844 touch emulation. Tap each primitive, edit one dimension, gate PASS."""
+    """390x844 touch emulation. Tap primitives, bottom sheet, move/rotate/resize a box."""
     try:
         set_portrait(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
@@ -872,11 +991,47 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             return problems
         touch_tap(cdp, float(box["x"]), float(box["y"]))
         created, wait_problems = wait_portrait(
-            cdp, origin, kind, str(spec["key"]), float(spec["fresh"]), PAGE_TIMEOUT_S
+            cdp, origin, kind, {str(spec["key"]): float(spec["fresh"])}, PAGE_TIMEOUT_S
         )
         if wait_problems or not isinstance(created, dict):
             problems.append(f"portrait {kind} create")
             problems.extend(wait_problems[:20])
+            return problems
+        layout_problems = portrait_layout_ok(created, expanded=False)
+        if layout_problems:
+            problems.append(f"portrait {kind} layout")
+            problems.extend(layout_problems)
+            return problems
+        fit_problems = portrait_fit_problems(cdp)
+        if fit_problems:
+            problems.append(f"portrait {kind} overflow")
+            problems.extend(fit_problems)
+            return problems
+        expand_problems = tap_selector(cdp, "#dimToggle", f"portrait {kind} expand")
+        if expand_problems:
+            problems.extend(expand_problems)
+            return problems
+        opened, open_problems = wait_portrait(
+            cdp,
+            origin,
+            kind,
+            {str(spec["key"]): float(spec["fresh"])},
+            PAGE_TIMEOUT_S,
+            extra={"dimSheetOpen": True},
+        )
+        if open_problems or not isinstance(opened, dict):
+            problems.append(f"portrait {kind} expand wait")
+            problems.extend(open_problems[:20])
+            return problems
+        open_layout = portrait_layout_ok(opened, expanded=True)
+        if open_layout:
+            problems.append(f"portrait {kind} expanded layout")
+            problems.extend(open_layout)
+            return problems
+        open_fit = portrait_fit_problems(cdp)
+        if open_fit:
+            problems.append(f"portrait {kind} expanded overflow")
+            problems.extend(open_fit)
             return problems
         measured, measure_err = eval_expr(cdp, TARGET_EXPR)
         if measure_err or not isinstance(measured, str):
@@ -886,12 +1041,16 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if int(sizes.get("n") or 0) < 12 or sizes.get("bad"):
             problems.append(f"portrait {kind} targets {measured}")
             return problems
+        handles = opened.get("gizmoHandles") or {}
+        if float(handles.get("minPx") or 0) < 44:
+            problems.append(f"portrait {kind} gizmo handles {handles}")
+            return problems
         edited, edit_err = eval_expr(cdp, edit_expr(str(spec["field"]), str(spec["value"])))
         if edit_err or edited != "edited":
             problems.append(f"portrait {kind} edit {edited or edit_err}")
             return problems
         done, edit_problems = wait_portrait(
-            cdp, origin, kind, str(spec["key"]), float(spec["want"]), PAGE_TIMEOUT_S
+            cdp, origin, kind, {str(spec["key"]): float(spec["want"])}, PAGE_TIMEOUT_S
         )
         if edit_problems or not isinstance(done, dict):
             problems.append(f"portrait {kind} edited")
@@ -899,7 +1058,82 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             return problems
         print(
             f"portrait_{kind}: gate PASS, {spec['field']} {spec['fresh']} -> {spec['want']}, "
-            f"targets {sizes.get('n')}",
+            f"targets {sizes.get('n')}, handles {handles.get('minPx')}",
+            flush=True,
+        )
+        if kind != "box":
+            continue
+        typed, type_err = eval_expr(cdp, edit_expr("primCx", "5"))
+        if type_err or typed != "edited":
+            problems.append(f"portrait box move type {typed or type_err}")
+            return problems
+        moved, move_problems = wait_portrait(cdp, origin, "box", {"cx": 5.0, "sx": 30.0}, PAGE_TIMEOUT_S)
+        if move_problems or not isinstance(moved, dict):
+            problems.append("portrait box move")
+            problems.extend(move_problems[:20])
+            return problems
+        mode_problems = tap_selector(cdp, '#gizmoSwitch [data-mode="rotate"]', "portrait box rotate mode")
+        if mode_problems:
+            problems.extend(mode_problems)
+            return problems
+        rotated_mode, mode_wait = wait_portrait(
+            cdp, origin, "box", {"cx": 5.0}, PAGE_TIMEOUT_S, extra={"gizmoMode": "rotate"}
+        )
+        if mode_wait or not isinstance(rotated_mode, dict):
+            problems.append("portrait box rotate mode wait")
+            problems.extend(mode_wait[:20])
+            return problems
+        rot_typed, rot_err = eval_expr(cdp, edit_expr("primRz", "15"))
+        if rot_err or rot_typed != "edited":
+            problems.append(f"portrait box rotate type {rot_typed or rot_err}")
+            return problems
+        rotated, rot_problems = wait_portrait(
+            cdp, origin, "box", {"cx": 5.0, "rz": 15.0, "sx": 30.0}, PAGE_TIMEOUT_S
+        )
+        if rot_problems or not isinstance(rotated, dict):
+            problems.append("portrait box rotate")
+            problems.extend(rot_problems[:20])
+            return problems
+        scale_mode = tap_selector(cdp, '#gizmoSwitch [data-mode="scale"]', "portrait box scale mode")
+        if scale_mode:
+            problems.extend(scale_mode)
+            return problems
+        scaled_mode, scale_wait = wait_portrait(
+            cdp, origin, "box", {"rz": 15.0}, PAGE_TIMEOUT_S, extra={"gizmoMode": "scale"}
+        )
+        if scale_wait or not isinstance(scaled_mode, dict):
+            problems.append("portrait box scale mode wait")
+            problems.extend(scale_wait[:20])
+            return problems
+        size_typed, size_err = eval_expr(cdp, edit_expr("boxSy", "22"))
+        if size_err or size_typed != "edited":
+            problems.append(f"portrait box scale type {size_typed or size_err}")
+            return problems
+        scaled, scale_problems = wait_portrait(
+            cdp, origin, "box", {"cx": 5.0, "rz": 15.0, "sx": 30.0, "sy": 22.0}, PAGE_TIMEOUT_S
+        )
+        if scale_problems or not isinstance(scaled, dict):
+            problems.append("portrait box scale")
+            problems.extend(scale_problems[:20])
+            return problems
+        step_problems = tap_selector(
+            cdp, '#dimPanel button[data-dim="primCx"][data-delta="1"]', "portrait box stepper"
+        )
+        if step_problems:
+            problems.extend(step_problems)
+            return problems
+        stepped, step_wait = wait_portrait(
+            cdp, origin, "box", {"cx": 6.0, "rz": 15.0, "sy": 22.0, "sx": 30.0}, PAGE_TIMEOUT_S
+        )
+        if step_wait or not isinstance(stepped, dict):
+            problems.append("portrait box stepper")
+            problems.extend(step_wait[:20])
+            return problems
+        if stepped.get("snap") is not True:
+            problems.append(f"portrait box snap {stepped.get('snap')!r}")
+            return problems
+        print(
+            "portrait_box transforms: move cx 5 stepper 6, rotate z 15, resize sy 22, snap on, gate PASS",
             flush=True,
         )
     return problems
