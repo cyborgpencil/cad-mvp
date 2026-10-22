@@ -4387,7 +4387,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function snapToDirection(dir, label) {
     const unit = dir.clone().normalize();
     const focus = target.clone();
-    const radius = Math.max(16, camera.position.distanceTo(focus));
+    const radius = Math.max(1e-3, camera.position.distanceTo(focus));
     const end = focus.clone().addScaledVector(unit, radius);
     const dummy = new THREE.Object3D();
     dummy.position.copy(focus);

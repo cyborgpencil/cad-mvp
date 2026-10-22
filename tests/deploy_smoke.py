@@ -1369,7 +1369,7 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
         distance = float(nav.get("distance"))
     except (TypeError, ValueError):
         return [f"nav distance {nav.get('distance')!r}"]
-    if distance < 16:
+    if not math.isfinite(distance) or distance < 1e-3:
         return [f"nav distance {distance}"]
     for name, axis in FACE_AXES:
         time.sleep(0.4)
