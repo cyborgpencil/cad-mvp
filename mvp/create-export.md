@@ -2,7 +2,9 @@
 
 **Status**: Built
 **Date**: 2026-10-20
-**Scope**: Mesh creation, the Qt panels, manifold repair, and STL/3MF export. Does not change the watertight checker.
+**Scope**: Mesh creation, the Qt test-harness panels, manifold repair, and STL/3MF export, as built on 2026-10-20. Does not change the legacy mesh checker.
+
+> Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export. The PASS-sentence export condition below describes the 2026-10-20 build; it is no longer the rule.
 
 `mvp/common-tools.md` is not in this tree. This note follows [requirements.md](requirements.md).
 
@@ -16,7 +18,7 @@ OpenCASCADE is not installed. Solids are triangle meshes. Every stored coordinat
 - Cut. Two boxes use that cell difference. A box cutter strictly inside another closed mesh becomes an interior void shell.
 - Constant-radius fillet on the box edge that runs along X at minimum Y and maximum Z. The GUI uses the edge selected in the view.
 - `repair_manifold` welds identical vertices, drops degenerate triangles, and flips an inward shell, then calls `check_watertight` again. A mesh that is still open returns `cannot repair: ` plus the checker sentence. That path does not write files.
-- Export writes binary STL and 3MF only after the checker PASS sentence. STL coordinates are millimeters. The 3MF model `unit` is `millimeter`.
+- As built, export wrote binary STL and 3MF only after the checker PASS sentence (legacy; the current gate is the units check). STL coordinates are millimeters. The 3MF model `unit` is `millimeter`.
 - `solid_view` keeps Closed box, Open box, Flipped box, and 20 mm box. It adds Sketch, Solid, and Inspect, a left browser, a bottom timeline, and a right properties panel. The panel toggles millimeters and inches by 25.4 and does not scale stored vertices. The measure readout uses the current display unit. Left drag orbits, right drag pans, the wheel zooms, and a left click selects the nearest edge of the hit triangle. The window opens on the closed box and shows that fixture's checker sentence.
 
 ## Deferred

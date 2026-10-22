@@ -6,9 +6,9 @@
 
 `box_mm(width, depth, height)` builds a triangle mesh in millimeters from the origin. The twelve triangles use the same outward order as `closed_box()`. A non-positive size returns no triangles. No tessellator is used.
 
-`export_mesh_if_closed` runs `check_watertight`. It writes `box.stl` and `box.3mf` only when that check passes. A failure does not create the directory.
+As built (2026-10-20), `export_mesh_if_closed` runs `check_watertight` and writes `box.stl` and `box.3mf` only when it passes. Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export. A watertight pass is no longer required to export.
 
-Binary STL coordinates are millimeters. The 80-byte header says so and does not start with `solid`. Reading that STL keeps three vertices per triangle and does not weld them, so the index-based checker stays the pre-export gate.
+Binary STL coordinates are millimeters. The 80-byte header says so and does not start with `solid`. Reading that STL keeps three vertices per triangle and does not weld them, so the index-based checker was the pre-export gate in this build (legacy).
 
 3MF is a stored ZIP of `[Content_Types].xml`, `_rels/.rels`, and `3D/3dmodel.model`. The model `unit` is `millimeter` from `ExportUnitRecord`. lib3mf is not used.
 

@@ -2,7 +2,9 @@
 
 Single-threaded Emscripten build of the existing mesh checks, plus the libcascade 3.1.0 OCCT gate loaded as a second WASM. No `-pthread`, so the page is static files and needs no COOP/COEP headers (`research/occt-wasm/pages-hosting.md`).
 
-`src/solid/watertight.cpp`, `src/units/units.cpp`, and `src/model/repair.cpp` are not edited. The gate in `src/export/gate.cpp` calls `check_watertight` and `export_units`. Volume is the triple sum from `mvp/solid-check.md` divided by 6, computed here so the checker stays the PASS/FAIL source. That is a new readout, not a change to the checker rules.
+`src/solid/watertight.cpp`, `src/units/units.cpp`, and `src/model/repair.cpp` are not edited. The gate in `src/export/gate.cpp` calls `export_units` (units lock); its older `check_watertight` call is legacy and is no longer an Export requirement. Volume is the triple sum from `mvp/solid-check.md` divided by 6, shown as a readout only.
+
+Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export.
 
 ## Native tests
 
@@ -14,7 +16,7 @@ cmake --build builds\solid-check --target test_watertight test_units test_export
 ctest --test-dir builds\solid-check --output-on-failure
 ```
 
-`builds\` is gitignored. The `gate` test covers the watertight result, the millimeter lock, the volume, and the export block. After `python web\fetch-libcascade.py`, CTest also runs `occt_gate` (Node, libcascade `BRepCheck_Analyzer` + `ShapeAnalysis_FreeBounds` on `closed_box` / `open_box`).
+`builds\` is gitignored. The `gate` test covers the millimeter lock, the volume, and the export block. `test_watertight` is a legacy test and not a required check. After `python web\fetch-libcascade.py`, CTest also runs `occt_gate` (Node, libcascade `BRepCheck_Analyzer` shape-validity check).
 
 ## Emscripten (this machine)
 
@@ -46,7 +48,7 @@ Prebuilt taucad `libcascade` 3.1.0, single-threaded (`opencascade_single.wasm`, 
 python web\fetch-libcascade.py
 ```
 
-Source: `https://registry.npmjs.org/libcascade/-/libcascade-3.1.0.tgz` (OCCT V8_0_1, Emscripten 6.0.5). The OCCT check is `web/occt-gate.mjs`: sew the current mesh, then `BRepCheck_Analyzer.IsValid()` and `ShapeAnalysis_FreeBounds` with zero free edges.
+Source: `https://registry.npmjs.org/libcascade/-/libcascade-3.1.0.tgz` (OCCT V8_0_1, Emscripten 6.0.5). The OCCT check is `web/occt-gate.mjs`: `BRepCheck_Analyzer.IsValid()` after operations. A failed operation becomes a clean error and reverts; the check does not block Export. Free-edge (watertight) counting is no longer a requirement.
 
 ## Serve
 
@@ -58,7 +60,7 @@ python -m http.server 8765 --directory web
 
 Open `http://127.0.0.1:8765/`. Optional query, still behind the same gate: `?fixture=closed_box&tab=export` or `?fixture=open_box&tab=export`. Fixtures are `closed_box`, `open_box`, `box20`, and `flipped_box`.
 
-File → Load closed box / Load open box / Load 20 mm box switches the mesh. The status bar and the Export tab read `gate()` from the wasm module. Export stays disabled until watertight, the millimeter lock, and the OCCT gate all pass, and the button title is the block reason. STL and 3MF then download from the same writers as the native export. The interim banner hides only while the OCCT gate is green for the current shape.
+File → Load closed box / Load open box / Load 20 mm box switches the mesh. The status bar and the Export tab read `gate()` from the wasm module. Export is gated by the millimeter (units) lock, and the button title is the block reason. Watertight is not a gate, and the OCCT validity result goes to the log without blocking Export. STL and 3MF then download from the same writers as the native export.
 
 ## Pages
 

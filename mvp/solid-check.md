@@ -65,7 +65,7 @@ flipped_box: FAIL: edge (0,1) is wound the same way by two triangles.
 
 ## Assumptions
 
-- A watertight solid here is an edge-manifold triangle mesh with outward winding, as already required for meshes in `research/formats/validation.md`.
+- A closed solid here meant an edge-manifold triangle mesh with outward winding (the 2026-10-20 definition; no longer required).
 - The smallest index pair is the edge named when several edges fail the same rule.
 - Vertices that land on the same point under different indices are not welded.
 
