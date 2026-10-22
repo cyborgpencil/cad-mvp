@@ -3,6 +3,12 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-22
+
+- Merged main `fbd0947` into the nav-cube branch. The phone cube and the gizmo/undo stack both stay. The view-cube scissor uses `cubeRect` in CSS pixels, because `setViewport` and `setScissor` already multiply by the pixel ratio.
+- Nav-cube smoke double-tap is two pointer-ups 80 ms apart inside one page turn. A CDP round trip between taps was missing the 320 ms window and leaving the camera on the first face.
+- Phone nav cube on the existing `#viewCube`: 88 px, top-right, safe-area inset, 6 face and 8 corner taps at 44 px extending past the cube, edge taps desktop-only, double-tap home iso, ViewHelper-style orbit snap eased over 250 ms at the current orbit distance. The smoke check accepts a late headless frame. Checks live in `tests/deploy_smoke.py` and `tests/phone_smoke.py` (phone_smoke still exits 77 when Playwright is missing). Units stay mm. No `src/` or bindings edits. Recorded in `web/PROGRESS.md`.
+
 ## 2026-10-21
 
 - Portrait 390: the dimension mode row, primitive toolbar, mm/in toggle, and status line wrap inside the screen. The narrow tool strip's actions stay on the Tools sheet. Touch targets stay at least 44×44. No `src/` edits. No commit.

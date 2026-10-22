@@ -442,6 +442,14 @@
     z-index: 5;
     pointer-events: none;
   }
+  #safeProbe {
+    position: absolute;
+    width: 0;
+    height: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    visibility: hidden;
+    pointer-events: none;
+  }
   .hud {
     position: absolute;
     top: 12px;
@@ -1588,6 +1596,7 @@
     <main id="viewport">
       <canvas id="canvas"></canvas>
       <div id="viewCube" class="view-cube" aria-hidden="true"></div>
+      <div id="safeProbe" aria-hidden="true"></div>
       <svg class="measure-layer" id="measureSvg" hidden>
         <line id="mExt1" class="ext"></line>
         <line id="mExt2" class="ext"></line>
@@ -1899,7 +1908,38 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     iso: { theta: Math.PI / 4, phi: 0.96 },
     home: { theta: Math.PI / 4, phi: 0.96 }
   };
-  const FACE_NAMES = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+  const FACE_AXIS = [
+    { axis: 'x', sign: 1, name: 'right' },
+    { axis: 'x', sign: -1, name: 'left' },
+    { axis: 'y', sign: 1, name: 'top' },
+    { axis: 'y', sign: -1, name: 'bottom' },
+    { axis: 'z', sign: 1, name: 'front' },
+    { axis: 'z', sign: -1, name: 'back' }
+  ];
+  const CUBE_HALF = 0.575;
+  const CUBE_EDGE_BAND = 0.36;
+  const PHONE_CUBE_PX = 88;
+  const CUBE_HIT_PX = 44;
+  const CUBE_SNAP_MS = 250;
+  const CUBE_DOUBLE_MS = 320;
+  // Phone hit centers, in the 44 px pad left of and below the 88 px cube.
+  // Each center sits outside the visible cube so its 44 px rect extends past it.
+  const PHONE_ZONE_LAYOUT = [
+    { name: 'front', kind: 'face', cx: 18, cy: 16 },
+    { name: 'back', kind: 'face', cx: 18, cy: 38 },
+    { name: 'left', kind: 'face', cx: 18, cy: 60 },
+    { name: 'right', kind: 'face', cx: 18, cy: 82 },
+    { name: 'top', kind: 'face', cx: 18, cy: 104 },
+    { name: 'bottom', kind: 'face', cx: 18, cy: 126 },
+    { name: 'trf', kind: 'corner', cx: 38, cy: 16, x: 1, y: 1, z: 1 },
+    { name: 'tlf', kind: 'corner', cx: 38, cy: 40, x: -1, y: 1, z: 1 },
+    { name: 'trb', kind: 'corner', cx: 38, cy: 64, x: 1, y: 1, z: -1 },
+    { name: 'tlb', kind: 'corner', cx: 38, cy: 88, x: -1, y: 1, z: -1 },
+    { name: 'brf', kind: 'corner', cx: 38, cy: 112, x: 1, y: -1, z: 1 },
+    { name: 'blf', kind: 'corner', cx: 60, cy: 112, x: -1, y: -1, z: 1 },
+    { name: 'brb', kind: 'corner', cx: 84, cy: 112, x: 1, y: -1, z: -1 },
+    { name: 'blb', kind: 'corner', cx: 108, cy: 112, x: -1, y: -1, z: -1 }
+  ];
   const TAB_KEYS = { '1': 'sketch', '2': 'model', '3': 'repair', '4': 'export' };
   const TAB_LABELS = { sketch: 'Sketch', model: 'Model', repair: 'Repair', export: 'Export' };
   const NODE_LABELS = {
@@ -2244,9 +2284,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   vcScene.add(vcMesh);
 
   let cubeCss = 160;
-  let cubeMargin = 14;
+  let cubeTop = 14;
+  let cubeRight = 14;
   let fitRadius = 10;
   let tween = 0;
+  let cubeSnap = null;
+  let cubeTapMs = 0;
+  let lastSnapMs = 0;
+  let lastSnapBudget = 0;
   const ptrs = new Map();
   let gesture = null;
   let pinch = null;
@@ -2278,6 +2323,40 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
 
   function isPortraitSheet() {
     return window.matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
+  }
+
+  function isPhoneCube() {
+    return isNarrow();
+  }
+
+  function readCssPx(value) {
+    const n = parseFloat(value);
+    return n > 0 ? n : 0;
+  }
+
+  function screenSafeInsets() {
+    const probe = document.getElementById('safeProbe');
+    if (!probe) return { top: 0, right: 0, bottom: 0, left: 0 };
+    const st = getComputedStyle(probe);
+    return {
+      top: readCssPx(st.paddingTop),
+      right: readCssPx(st.paddingRight),
+      bottom: readCssPx(st.paddingBottom),
+      left: readCssPx(st.paddingLeft)
+    };
+  }
+
+  function viewportSafeInsets() {
+    const safe = screenSafeInsets();
+    const vp = viewport.getBoundingClientRect();
+    const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    return {
+      top: Math.max(0, safe.top - vp.top),
+      right: Math.max(0, safe.right - (vw - vp.right)),
+      bottom: Math.max(0, safe.bottom - (vh - vp.bottom)),
+      left: Math.max(0, safe.left - vp.left)
+    };
   }
 
   function tapSlopPx() {
@@ -4422,22 +4501,28 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   }
 
   function layoutChrome() {
+    const phone = isPhoneCube();
     const narrow = isNarrow();
+    const safe = viewportSafeInsets();
     const h = viewport.clientHeight || 0;
     const bar = viewport.querySelector('.vp-bar');
     const barH = bar ? bar.offsetHeight : 56;
     const barGap = narrow ? 8 : 10;
-    const margin = narrow ? 8 : 12;
-    let size = narrow ? 96 : 128;
-    if (h > 40) {
-      const room = h - barH - barGap - margin - 8;
+    const minMargin = phone ? 8 : (narrow ? 8 : 12);
+    const marginTop = Math.max(minMargin, safe.top);
+    const marginRight = Math.max(minMargin, safe.right);
+    let size = phone ? PHONE_CUBE_PX : (narrow ? 96 : 128);
+    if (!phone && h > 40) {
+      const room = h - barH - barGap - marginTop - 8;
       if (size > room) size = room;
     }
-    cubeCss = Math.round(Math.max(32, size));
-    cubeMargin = margin;
+    cubeCss = phone ? PHONE_CUBE_PX : Math.round(Math.max(32, size));
+    cubeTop = marginTop;
+    cubeRight = marginRight;
     const home = document.getElementById('vcHome');
-    home.style.top = margin + 'px';
-    home.style.right = (margin + cubeCss + 8) + 'px';
+    const pad = phone ? CUBE_HIT_PX : 0;
+    home.style.top = marginTop + 'px';
+    home.style.right = (marginRight + cubeCss + pad + 8) + 'px';
     placeViewCube();
     layoutDimSheet();
     placeCreateMenu();
@@ -4512,6 +4597,93 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   function cancelTween() {
     if (tween) cancelAnimationFrame(tween);
     tween = 0;
+    cubeSnap = null;
+  }
+
+  function writeSphericalFromCamera() {
+    const offset = new THREE.Vector3().subVectors(camera.position, target);
+    spherical.setFromVector3(offset);
+    if (!(spherical.radius > 16)) spherical.radius = Math.max(16, offset.length());
+  }
+
+  function faceDirection(name) {
+    if (name === 'right') return new THREE.Vector3(1, 0, 0);
+    if (name === 'left') return new THREE.Vector3(-1, 0, 0);
+    if (name === 'top') return new THREE.Vector3(0, 1, 0);
+    if (name === 'bottom') return new THREE.Vector3(0, -1, 0);
+    if (name === 'back') return new THREE.Vector3(0, 0, -1);
+    if (name === 'home') {
+      return new THREE.Vector3().setFromSphericalCoords(1, VIEWS.home.phi, VIEWS.home.theta).normalize();
+    }
+    return new THREE.Vector3(0, 0, 1);
+  }
+
+  function dirFromSigns(x, y, z) {
+    const v = new THREE.Vector3(x, y, z);
+    if (v.lengthSq() < 1e-8) return new THREE.Vector3(0, 0, 1);
+    return v.normalize();
+  }
+
+  function snapUp(dir) {
+    if (dir.y > 0.9) return new THREE.Vector3(0, 0, -1);
+    if (dir.y < -0.9) return new THREE.Vector3(0, 0, 1);
+    return new THREE.Vector3(0, 1, 0);
+  }
+
+  function snapToDirection(dir, label) {
+    const unit = dir.clone().normalize();
+    const focus = target.clone();
+    const radius = Math.max(1e-3, camera.position.distanceTo(focus));
+    const end = focus.clone().addScaledVector(unit, radius);
+    const dummy = new THREE.Object3D();
+    dummy.position.copy(focus);
+    dummy.up.set(0, 1, 0);
+    dummy.lookAt(camera.position);
+    const q1 = dummy.quaternion.clone();
+    dummy.lookAt(end);
+    const q2 = dummy.quaternion.clone();
+    const up = snapUp(unit);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    cancelTween();
+    cubeSnap = {
+      t0: performance.now(),
+      dur: reduce ? 1 : CUBE_SNAP_MS,
+      radius: radius,
+      focus: focus,
+      q1: q1,
+      q2: q2,
+      up: up,
+      end: end
+    };
+    tween = requestAnimationFrame(stepSnap);
+    toast('View: ' + label);
+    setHint(label === 'Home' ? 'Home view' : ('View: ' + label));
+  }
+
+  function stepSnap(now) {
+    const snap = cubeSnap;
+    if (!snap) return;
+    if (!snap.started) {
+      snap.started = true;
+      snap.t0 = now;
+    }
+    const u = Math.min(1, (now - snap.t0) / snap.dur);
+    const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const q = snap.q1.clone().slerp(snap.q2, e);
+    camera.position.set(0, 0, 1).applyQuaternion(q).multiplyScalar(snap.radius).add(snap.focus);
+    if (u >= 1) camera.position.copy(snap.end);
+    camera.up.copy(snap.up);
+    camera.lookAt(snap.focus);
+    camera.updateMatrixWorld(true);
+    writeSphericalFromCamera();
+    syncViewCube();
+    if (u < 1 && cubeSnap === snap) tween = requestAnimationFrame(stepSnap);
+    else if (cubeSnap === snap) {
+      lastSnapMs = performance.now() - snap.t0;
+      lastSnapBudget = snap.dur;
+      cubeSnap = null;
+      tween = 0;
+    }
   }
 
   function animateSpherical(theta, phi, radius, recenter) {
@@ -5674,33 +5846,174 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
 
   function cubeRect() {
     return {
-      x: viewport.clientWidth - cubeCss - cubeMargin,
-      y: cubeMargin,
+      x: viewport.clientWidth - cubeCss - cubeRight,
+      y: cubeTop,
       s: cubeCss
     };
   }
 
-  function inCube(lx, ly) {
+  function cubeHitRect() {
     const r = cubeRect();
-    return lx >= r.x && ly >= r.y && lx <= r.x + r.s && ly <= r.y + r.s;
+    if (!isPhoneCube()) return { x: r.x, y: r.y, w: r.s, h: r.s, pad: 0 };
+    return { x: r.x - CUBE_HIT_PX, y: r.y, w: r.s + CUBE_HIT_PX, h: r.s + CUBE_HIT_PX, pad: CUBE_HIT_PX };
+  }
+
+  function phoneZones() {
+    const hit = cubeHitRect();
+    const visible = cubeRect();
+    const zones = [];
+    for (let i = 0; i < PHONE_ZONE_LAYOUT.length; i += 1) {
+      const spec = PHONE_ZONE_LAYOUT[i];
+      const cx = hit.x + spec.cx;
+      const cy = hit.y + spec.cy;
+      const left = cx - CUBE_HIT_PX / 2;
+      const top = cy - CUBE_HIT_PX / 2;
+      const dir = spec.kind === 'corner'
+        ? dirFromSigns(spec.x, spec.y, spec.z)
+        : faceDirection(spec.name);
+      const past = left < visible.x - 0.5 || top < visible.y - 0.5
+        || left + CUBE_HIT_PX > visible.x + visible.s + 0.5
+        || top + CUBE_HIT_PX > visible.y + visible.s + 0.5;
+      zones.push({
+        name: spec.name,
+        kind: spec.kind,
+        cx: cx,
+        cy: cy,
+        left: left,
+        top: top,
+        w: CUBE_HIT_PX,
+        h: CUBE_HIT_PX,
+        dir: dir,
+        extendsPast: past
+      });
+    }
+    return zones;
+  }
+
+  function zoneAt(lx, ly, zones) {
+    let best = null;
+    let bestD = 1e9;
+    for (let i = 0; i < zones.length; i += 1) {
+      const z = zones[i];
+      if (lx < z.left || ly < z.top || lx > z.left + z.w || ly > z.top + z.h) continue;
+      const d = Math.hypot(lx - z.cx, ly - z.cy);
+      if (d < bestD) {
+        bestD = d;
+        best = z;
+      }
+    }
+    return best;
+  }
+
+  function inCube(lx, ly) {
+    const visible = cubeRect();
+    if (lx >= visible.x && ly >= visible.y && lx <= visible.x + visible.s && ly <= visible.y + visible.s) return true;
+    if (!isPhoneCube()) return false;
+    const zones = phoneZones();
+    for (let i = 0; i < zones.length; i += 1) {
+      const z = zones[i];
+      if (lx >= z.left && ly >= z.top && lx <= z.left + z.w && ly <= z.top + z.h) return true;
+    }
+    return false;
+  }
+
+  function cornerName(signs) {
+    return (signs.y > 0 ? 't' : 'b') + (signs.x > 0 ? 'r' : 'l') + (signs.z > 0 ? 'f' : 'b');
+  }
+
+  function classifyCubeHit(hit) {
+    const local = hit.point.clone();
+    vcMesh.worldToLocal(local);
+    const info = FACE_AXIS[hit.face.materialIndex] || FACE_AXIS[4];
+    const axes = ['x', 'y', 'z'].filter(function (axis) { return axis !== info.axis; });
+    const limit = CUBE_HALF * (1 - CUBE_EDGE_BAND);
+    const a0 = local[axes[0]];
+    const a1 = local[axes[1]];
+    const edge0 = Math.abs(a0) >= limit;
+    const edge1 = Math.abs(a1) >= limit;
+    const signs = { x: 0, y: 0, z: 0 };
+    signs[info.axis] = info.sign;
+    signs[axes[0]] = a0 >= 0 ? 1 : -1;
+    signs[axes[1]] = a1 >= 0 ? 1 : -1;
+    if (edge0 && edge1) {
+      return { kind: 'corner', name: cornerName(signs), dir: dirFromSigns(signs.x, signs.y, signs.z) };
+    }
+    if ((edge0 || edge1) && !isPhoneCube()) {
+      const edge = { x: 0, y: 0, z: 0 };
+      edge[info.axis] = info.sign;
+      if (edge0) edge[axes[0]] = signs[axes[0]];
+      if (edge1) edge[axes[1]] = signs[axes[1]];
+      return { kind: 'edge', name: 'edge', dir: dirFromSigns(edge.x, edge.y, edge.z) };
+    }
+    return { kind: 'face', name: info.name, dir: faceDirection(info.name) };
   }
 
   function pickViewCube(clientX, clientY) {
     const bounds = canvas.getBoundingClientRect();
     const lx = clientX - bounds.left;
     const ly = clientY - bounds.top;
-    const r = cubeRect();
-    syncViewCube();
-    raycaster.setFromCamera(new THREE.Vector2(
-      ((lx - r.x) / r.s) * 2 - 1,
-      -((ly - r.y) / r.s) * 2 + 1
-    ), vcCam);
-    const hits = raycaster.intersectObject(vcMesh, false);
-    if (!hits.length || !hits[0].face) return;
-    const view = FACE_NAMES[hits[0].face.materialIndex];
-    if (!view) return;
-    toast('View: ' + cap(view));
-    goView(view);
+    const visible = cubeRect();
+    const inside = lx >= visible.x && ly >= visible.y && lx <= visible.x + visible.s && ly <= visible.y + visible.s;
+    if (inside) {
+      syncViewCube();
+      raycaster.setFromCamera(new THREE.Vector2(
+        ((lx - visible.x) / visible.s) * 2 - 1,
+        -((ly - visible.y) / visible.s) * 2 + 1
+      ), vcCam);
+      const hits = raycaster.intersectObject(vcMesh, false);
+      if (hits.length && hits[0].face) return classifyCubeHit(hits[0]);
+    }
+    if (isPhoneCube()) return zoneAt(lx, ly, phoneZones());
+    return null;
+  }
+
+  function snapLabel(picked) {
+    if (!picked) return 'View';
+    if (picked.kind === 'corner') return 'Iso';
+    if (picked.kind === 'edge') return 'Edge';
+    if (picked.name === 'home') return 'Home';
+    return cap(picked.name);
+  }
+
+  function navCubeState() {
+    const offset = camera.position.clone().sub(target);
+    const dist = offset.length();
+    const dir = dist > 1e-8 ? offset.clone().multiplyScalar(1 / dist) : new THREE.Vector3(0, 0, 1);
+    const el = document.getElementById('viewCube');
+    const box = el.getBoundingClientRect();
+    const bounds = canvas.getBoundingClientRect();
+    const home = faceDirection('home');
+    const zones = isPhoneCube() ? phoneZones() : [];
+    const listed = [];
+    for (let i = 0; i < zones.length; i += 1) {
+      const z = zones[i];
+      listed.push({
+        name: z.name,
+        kind: z.kind,
+        x: bounds.left + z.cx,
+        y: bounds.top + z.cy,
+        w: z.w,
+        h: z.h,
+        left: bounds.left + z.left,
+        top: bounds.top + z.top,
+        dir: [z.dir.x, z.dir.y, z.dir.z],
+        extendsPast: z.extendsPast === true
+      });
+    }
+    return {
+      phone: isPhoneCube(),
+      animating: !!cubeSnap,
+      snapMs: CUBE_SNAP_MS,
+      lastSnapMs: lastSnapMs,
+      lastSnapBudget: lastSnapBudget,
+      size: cubeCss,
+      distance: dist,
+      direction: [dir.x, dir.y, dir.z],
+      target: [target.x, target.y, target.z],
+      home: [home.x, home.y, home.z],
+      visible: { x: box.left, y: box.top, w: box.width, h: box.height },
+      zones: listed
+    };
   }
 
   function panPixels(dx, dy) {
@@ -5786,10 +6099,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     renderer.setViewport(0, 0, cssW, cssH);
     renderer.clear(true, true, true);
     renderer.render(scene, camera);
-    const cube = Math.max(2, cubeCss);
-    const margin = cubeMargin;
-    renderer.setViewport(cssW - cube - margin, cssH - cube - margin, cube, cube);
-    renderer.setScissor(cssW - cube - margin, cssH - cube - margin, cube, cube);
+    // cubeRect is CSS pixels. setViewport and setScissor multiply by the pixel ratio.
+    const cube = cubeRect();
+    const s = Math.max(2, cube.s);
+    const vx = cube.x;
+    const vy = cssH - cube.y - cube.s;
+    renderer.setViewport(vx, vy, s, s);
+    renderer.setScissor(vx, vy, s, s);
     renderer.setScissorTest(true);
     renderer.clearDepth();
     syncViewCube();
@@ -5966,7 +6282,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
     }
     if (g && g.pid === ev.pointerId) {
       if (g.type === 'gizmo') commitGizmoDrag(g.moved);
-      else if (g.type === 'cube' && !g.moved) pickViewCube(ev.clientX, ev.clientY);
+      else if (g.type === 'cube' && !g.moved) {
+        const now = performance.now();
+        const doubleTap = cubeTapMs > 0 && (now - cubeTapMs) <= CUBE_DOUBLE_MS;
+        if (doubleTap) {
+          cubeTapMs = 0;
+          snapToDirection(faceDirection('home'), 'Home');
+        } else if (cubeSnap) {
+          /* A tap during the snap is ignored unless it is the double-tap home. */
+        } else {
+          cubeTapMs = now;
+          const picked = pickViewCube(ev.clientX, ev.clientY);
+          if (picked && picked.dir) snapToDirection(picked.dir, snapLabel(picked));
+        }
+      }
       else if (g.type === 'orbit' && !g.moved && g.button === 0 && (ev.button === 0 || ev.pointerType === 'touch')) {
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
         const next = selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
@@ -6259,6 +6588,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, undoApi) {
   if (startTab === 'sketch' || startTab === 'model' || startTab === 'repair' || startTab === 'export') setTab(startTab);
   else setTab('model');
   publishGateState();
+  window.__cadcamNavCube = navCubeState;
   renderFrame();
 
   function frame() {
