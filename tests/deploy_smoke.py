@@ -733,11 +733,11 @@ PORTRAIT = (
 )
 
 
-def eval_expr(cdp: Cdp, expression: str) -> tuple[Any, str]:
+def eval_expr(cdp: Cdp, expression: str, timeout: float = 30) -> tuple[Any, str]:
     result = cdp.call(
         "Runtime.evaluate",
         {"expression": expression, "returnByValue": True},
-        timeout=30,
+        timeout=timeout,
     )
     if result.get("exceptionDetails"):
         detail = result.get("exceptionDetails") or {}
@@ -1141,7 +1141,7 @@ STAMP_EXPR = r"""
       problems.push('script url');
     }
   }
-  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'selection.mjs', 'viewport-selection.mjs'];
+  var names = ['init.single.js', 'occt-gate.mjs', 'occt-primitives.mjs', 'occt-ops.mjs', 'project-file.mjs', 'selection.mjs', 'viewport-selection.mjs'];
   var found = {};
   var entries = performance.getEntriesByType('resource');
   for (var e = 0; e < entries.length; e++) {
@@ -2355,6 +2355,199 @@ def assert_fixture_urls_404(origin: str) -> list[str]:
     return problems
 
 
+SAVELOAD_BUTTONS_EXPR = r"""
+(function () {
+  var problems = [];
+  function closeMenu() {
+    var menu = document.getElementById('fileMenu');
+    var btn = document.getElementById('fileBtn');
+    if (menu && !menu.hidden && btn) btn.click();
+  }
+  try {
+    var menu = document.getElementById('fileMenu');
+    var fileBtn = document.getElementById('fileBtn');
+    if (!menu || !fileBtn) problems.push('file menu missing');
+    else {
+      fileBtn.click();
+      if (menu.hidden) problems.push('file menu stayed closed');
+      ['saveProjectBtn', 'loadProjectBtn'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) { problems.push('missing ' + id); return; }
+        var r = el.getBoundingClientRect();
+        if (r.width < 44 || r.height < 44) problems.push(id + ' size ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+        if (r.left < -0.5 || r.top < -0.5 || r.right > window.innerWidth + 0.5 || r.bottom > window.innerHeight + 0.5) {
+          problems.push(id + ' offscreen ' + r.left.toFixed(1) + ',' + r.top.toFixed(1) + ' ' + r.right.toFixed(1) + ',' + r.bottom.toFixed(1) + ' view ' + window.innerWidth + 'x' + window.innerHeight);
+        }
+      });
+      var input = document.getElementById('projectFile');
+      if (!input || input.type !== 'file') problems.push('file input missing');
+      else if (getComputedStyle(input).display === 'none') problems.push('file input display none');
+      closeMenu();
+      if (!menu.hidden) problems.push('file menu stayed open');
+    }
+  } catch (err) {
+    problems.push('buttons ' + (err && err.message ? err.message : String(err)));
+    closeMenu();
+  }
+  return JSON.stringify({ problems: problems });
+})()
+"""
+
+
+SAVELOAD_EXPR = r"""
+(function () {
+  var problems = [];
+  var clears = 0;
+  function near(a, b) {
+    return typeof a === 'number' && typeof b === 'number' && isFinite(a) && isFinite(b) && Math.abs(a - b) <= 0.01;
+  }
+  var hook = window.__cadcamProject;
+  if (!hook || typeof hook.preparePair !== 'function') {
+    problems.push('missing project hook');
+    return JSON.stringify({ problems: problems, clears: clears });
+  }
+  try {
+    var pair = hook.preparePair();
+    if (!pair || pair.ok !== true) {
+      problems.push('pair ' + (pair && pair.error ? pair.error : 'failed'));
+      return JSON.stringify({ problems: problems, clears: clears });
+    }
+    var before = hook.measures();
+    if (!before || before.length !== pair.count) problems.push('measure count ' + (before && before.length));
+    var box = null;
+    for (var i = 0; i < before.length; i += 1) {
+      if (before[i].name.indexOf('Box') === 0) box = before[i];
+    }
+    if (!box || !near(box.volumeMm3, 8000)) problems.push('box volume ' + (box && box.volumeMm3));
+    var saved = hook.saveText();
+    if (!saved || saved.ok !== true) {
+      problems.push('save ' + (saved && saved.error ? saved.error : 'failed'));
+      return JSON.stringify({ problems: problems, clears: clears });
+    }
+    var doc = JSON.parse(saved.text);
+    if (doc.units !== 'mm') problems.push('file units ' + doc.units);
+    if (doc.version !== 1) problems.push('file version ' + doc.version);
+    if (!doc.parts || doc.parts.length !== before.length) problems.push('file parts');
+    var prevClear = window.__cadcamClearUndo;
+    window.__cadcamClearUndo = function () {
+      clears += 1;
+      if (typeof prevClear === 'function') prevClear();
+    };
+    var loaded = hook.loadText(saved.text, true);
+    if (!loaded || loaded.ok !== true) problems.push('load ' + (loaded && loaded.error ? loaded.error : 'failed'));
+    if (clears !== 1) problems.push('clearUndo after load ' + clears);
+    var after = hook.measures();
+    if (!after || after.length !== before.length) problems.push('reload count');
+    else {
+      for (var n = 0; n < before.length; n += 1) {
+        if (after[n].name !== before[n].name) problems.push('name ' + before[n].name + ' vs ' + after[n].name);
+        if (after[n].source !== 'parameters') problems.push('source ' + after[n].name + ' ' + after[n].source);
+        if (!near(after[n].volumeMm3, before[n].volumeMm3)) problems.push('volume ' + after[n].name + ' ' + after[n].volumeMm3);
+        var keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
+        for (var k = 0; k < keys.length; k += 1) {
+          var key = keys[k];
+          if (!after[n].bounds || !near(after[n].bounds[key], before[n].bounds[key])) {
+            problems.push('bound ' + after[n].name + ' ' + key);
+          }
+        }
+      }
+    }
+    var inchBtn = document.querySelector('[data-action="units"][data-unit="in"]');
+    if (!inchBtn) problems.push('inch button missing');
+    else inchBtn.click();
+    if (hook.unit() !== 'in') problems.push('display unit ' + hook.unit());
+    var inchSaved = hook.saveText();
+    if (!inchSaved || inchSaved.ok !== true) problems.push('inch save');
+    else {
+      var inchDoc = JSON.parse(inchSaved.text);
+      if (inchDoc.units !== 'mm') problems.push('inch file units ' + inchDoc.units);
+      var inchLoaded = hook.loadText(inchSaved.text, true);
+      if (!inchLoaded || inchLoaded.ok !== true) problems.push('inch load');
+      if (hook.unit() !== 'in') problems.push('unit changed on load ' + hook.unit());
+      var inchAfter = hook.measures();
+      if (!inchAfter || inchAfter.length !== before.length) problems.push('inch count');
+      else {
+        for (var m = 0; m < before.length; m += 1) {
+          if (!near(inchAfter[m].volumeMm3, before[m].volumeMm3)) problems.push('inch drift ' + inchAfter[m].name + ' ' + inchAfter[m].volumeMm3);
+        }
+      }
+    }
+    if (clears !== 2) problems.push('clearUndo after inch load ' + clears);
+    var names = hook.measures().map(function (row) { return row.name; });
+    var volumes = hook.measures().map(function (row) { return row.volumeMm3; });
+    hook.setDirty(true);
+    function unchanged(label, result) {
+      if (!result || result.unchanged !== true || result.ok !== false) problems.push(label + ' result');
+      var now = hook.measures();
+      if (now.length !== names.length) problems.push(label + ' count');
+      for (var u = 0; u < names.length; u += 1) {
+        if (!now[u] || now[u].name !== names[u] || !near(now[u].volumeMm3, volumes[u])) problems.push(label + ' model');
+      }
+      if (hook.dirty() !== true) problems.push(label + ' dirty');
+    }
+    unchanged('corrupt', hook.loadText('{not json', true));
+    unchanged('empty', hook.loadText('', true));
+    unchanged('blank', hook.loadText('   ', true));
+    var badUnits = JSON.parse(saved.text);
+    badUnits.units = 'in';
+    unchanged('units', hook.loadText(JSON.stringify(badUnits), true));
+    var missingUnits = JSON.parse(saved.text);
+    delete missingUnits.units;
+    unchanged('missing units', hook.loadText(JSON.stringify(missingUnits), true));
+    var beforeCancel = clears;
+    unchanged('cancel', hook.loadText(saved.text, false));
+    if (clears !== beforeCancel) problems.push('cancel cleared undo');
+    if (clears !== 2) problems.push('clearUndo final ' + clears);
+  } catch (err2) {
+    problems.push(err2 && err2.message ? err2.message : String(err2));
+  }
+  return JSON.stringify({ problems: problems, clears: clears });
+})()
+"""
+
+
+def run_saveload(cdp: Cdp, origin: str) -> list[str]:
+    """Round-trip a box and a cylinder through the project-file hook."""
+    url = origin + "/?primitive=box"
+    _state, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["saveload load", *load_problems[:20]]
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"saveload portrait {exc}"]
+    time.sleep(0.3)
+    button_raw, button_err = eval_expr(cdp, SAVELOAD_BUTTONS_EXPR)
+    if button_err or not isinstance(button_raw, str):
+        return [f"saveload buttons {button_raw or button_err}"]
+    try:
+        button_found = json.loads(button_raw)
+    except json.JSONDecodeError:
+        return [f"saveload buttons {button_raw[:500]}"]
+    button_problems = button_found.get("problems") if isinstance(button_found, dict) else [str(button_raw)]
+    if not isinstance(button_problems, list):
+        return [f"saveload buttons {button_raw[:500]}"]
+    if button_problems:
+        return [f"saveload {item}" for item in button_problems]
+    cover = coverage_problems(cdp, False)
+    if cover:
+        return [f"saveload {item}" for item in cover]
+    raw, err = eval_expr(cdp, SAVELOAD_EXPR, timeout=180)
+    if err or not isinstance(raw, str):
+        return [f"saveload eval {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"saveload json {raw[:500]}"]
+    problems = found.get("problems") if isinstance(found, dict) else [str(raw)]
+    if not isinstance(problems, list):
+        return [f"saveload {raw[:500]}"]
+    if problems:
+        return [f"saveload {item}" for item in problems]
+    print("saveload pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -2602,6 +2795,11 @@ def run(omit: list[str]) -> int:
             if hole_problems:
                 failures.append("portrait_holes")
                 failures.extend(hole_problems[:40])
+        if not failures:
+            saveload_problems = run_saveload(cdp, origin)
+            if saveload_problems:
+                failures.append("saveload")
+                failures.extend(saveload_problems[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:

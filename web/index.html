@@ -202,17 +202,31 @@
     z-index: 30;
   }
   .menu.right { left: auto; right: 0; }
-  .menu button {
+  .menu button, .menu .menu-file {
     display: flex;
     align-items: center;
     gap: 8px;
     width: 100%;
     min-height: 44px;
+    min-width: 44px;
     padding: 0 10px;
     border-radius: 8px;
     text-align: left;
+    position: relative;
   }
-  .menu button:hover { background: rgba(255, 255, 255, 0.06); }
+  .menu button:hover, .menu .menu-file:hover { background: rgba(255, 255, 255, 0.06); }
+  .menu-file { cursor: pointer; }
+  .menu-file input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 16px;
+  }
   .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; align-items: stretch; }
   .ribbon > .tools { flex: 1; min-width: 0; }
   .tools-menu-btn { align-self: center; margin: 4px 4px 4px 8px; }
@@ -1424,7 +1438,11 @@
       <div class="menu" id="fileMenu" hidden>
         <button type="button" data-tool="New">New</button>
         <button type="button" data-tool="Open">Open</button>
-        <button type="button" data-tool="Save">Save</button>
+        <button type="button" id="saveProjectBtn" data-action="saveProject" data-tool="Save">Save</button>
+        <label id="loadProjectBtn" class="menu-file" data-action="loadProject" data-tool="Load" title="Load a .cadmvp project" aria-label="Load">
+          Load
+          <input id="projectFile" type="file" accept=".cadmvp,application/json,text/plain" tabindex="-1" aria-label="Choose a .cadmvp project">
+        </label>
         <button type="button" data-tool="Import STL">Import STL</button>
         <button type="button" data-action="loadFixture" data-fixture="closed_box" data-tool="Load closed box">Load closed box</button>
         <button type="button" data-action="loadFixture" data-fixture="open_box" data-tool="Load open box">Load open box</button>
@@ -1873,9 +1891,13 @@ async function boot() {
       console.error('occt-ops failed', err);
       return null;
     });
+    const projectPromise = import('./project-file.mjs').catch(function (err) {
+      console.error('project-file failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -1883,7 +1905,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -2025,6 +2047,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     holeDepthMode: 'through',
     holeCountersink: true,
     holeLog: [],
+    projectDirty: false,
+    projectError: '',
+    projectApplying: false,
+    projectBlank: false,
     dimStepFromPointer: false,
     section: false,
     measure: false,
@@ -2931,7 +2957,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     refreshAnchor();
     paintPrimFields();
     applyLook();
+    state.projectBlank = false;
+    if (!state.projectApplying) state.projectDirty = true;
     setHint(built.gate.pass ? (built.watertight.pass ? built.gate.message : built.watertight.message) : built.gate.message);
+    publishProjectHook();
     return built.gate.pass === true && built.watertight.pass === true;
     } catch (err) {
       window.__cadcamBootNote = err && err.message ? err.message : String(err);
@@ -3308,10 +3337,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
       setHint(state.lastError);
       return false;
     }
+    if (state.bodies.length) state.projectBlank = false;
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
     applyLook();
+    if (!state.projectApplying) state.projectDirty = true;
+    publishProjectHook();
     return !!(state.shapeGate && state.shapeGate.pass === true);
   }
 
@@ -4562,6 +4594,284 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     banner.hidden = state.occtGate === true;
   }
 
+
+  function ensureClearUndo() {
+    if (typeof window.__cadcamClearUndo !== 'function') {
+      window.__cadcamClearUndo = function () {};
+    }
+  }
+
+  function clearProjectUndo() {
+    ensureClearUndo();
+    try { window.__cadcamClearUndo(); } catch (_err) { /* the undo batch owns this */ }
+  }
+
+  function projectFileName() {
+    const raw = (document.getElementById('docName') || {}).value || 'part';
+    const name = String(raw).replace(/[^\w.-]+/g, '_') || 'part';
+    const ext = projectApi && projectApi.PROJECT_EXTENSION ? projectApi.PROJECT_EXTENSION : '.cadmvp';
+    return name + ext;
+  }
+
+  function downloadText(text, filename) {
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function saveProject(download) {
+    const fail = projectApi && projectApi.ERR_SAVE ? projectApi.ERR_SAVE : 'The project could not be saved.';
+    if (!projectApi || !oc || typeof projectApi.documentFromBodies !== 'function') {
+      state.projectError = fail;
+      toast(fail);
+      setHint(fail);
+      publishGateState();
+      publishProjectHook();
+      return { ok: false, text: '', error: fail };
+    }
+    const written = projectApi.documentFromBodies(oc, state.bodies);
+    if (!written.ok || typeof written.text !== 'string') {
+      state.projectError = written.error || fail;
+      toast(state.projectError);
+      setHint(state.projectError);
+      publishGateState();
+      publishProjectHook();
+      return { ok: false, text: '', error: state.projectError };
+    }
+    state.projectError = '';
+    state.projectDirty = false;
+    if (download) downloadText(written.text, projectFileName());
+    const note = download ? ('Saved ' + projectFileName()) : 'Project ready';
+    toast(note);
+    setHint(note);
+    publishGateState();
+    publishProjectHook();
+    return { ok: true, text: written.text, error: '' };
+  }
+
+  function askReplace() {
+    const dirty = state.projectDirty === true;
+    if (typeof window.__cadcamProjectConfirm === 'function') {
+      return window.__cadcamProjectConfirm(dirty) === true;
+    }
+    const message = dirty
+      ? 'Replace the current model? Unsaved changes will be lost.'
+      : 'Replace the current model with this file?';
+    return window.confirm(message) === true;
+  }
+
+  function projectSnap() {
+    return {
+      bodies: state.bodies.slice(),
+      primitive: state.primitive,
+      shapeGate: state.shapeGate,
+      topology: state.topology,
+      topologySource: state.topologySource,
+      selectedIds: state.selectedIds.slice(),
+      dirty: state.projectDirty === true,
+      lastError: state.lastError || '',
+      demo: state.demo || '',
+      booleanOp: state.booleanOp || '',
+      booleanMessage: state.booleanMessage || '',
+      projectBlank: state.projectBlank === true,
+      selection: state.selection
+    };
+  }
+
+  function restoreProjectSnap(snap) {
+    state.bodies = snap.bodies;
+    state.primitive = snap.primitive;
+    state.shapeGate = snap.shapeGate;
+    state.topology = snap.topology;
+    state.topologySource = snap.topologySource;
+    state.selectedIds = snap.selectedIds;
+    state.demo = snap.demo;
+    state.booleanOp = snap.booleanOp;
+    state.booleanMessage = snap.booleanMessage;
+    state.projectBlank = snap.projectBlank;
+    state.selection = snap.selection;
+    state.projectApplying = true;
+    try {
+      if (snap.bodies.length) installBodiesAndSync('project');
+      else {
+        mountBodyMeshes();
+        applyLook();
+      }
+    } finally {
+      state.projectApplying = false;
+      state.projectDirty = snap.dirty;
+      state.lastError = snap.lastError;
+    }
+  }
+
+  function failProject(error) {
+    state.projectError = error;
+    toast(error);
+    setHint(error);
+    publishGateState();
+    publishProjectHook();
+    return { ok: false, unchanged: true, error: error };
+  }
+
+  function applyLoadedProject(text, opts) {
+    const options = opts || {};
+    const readError = projectApi && projectApi.ERR_READ ? projectApi.ERR_READ : 'This file could not be read. The model was not changed.';
+    if (!projectApi || !oc || !primApi || typeof projectApi.parseProject !== 'function') {
+      return failProject(readError);
+    }
+    const parsed = projectApi.parseProject(text);
+    if (!parsed.ok || !parsed.doc) return failProject(parsed.error || readError);
+    let accept = true;
+    if (options.confirm === false) accept = false;
+    else if (options.confirm === true) accept = true;
+    else accept = askReplace();
+    if (!accept) {
+      return failProject('Load cancelled. The model was not changed.');
+    }
+    const loaded = projectApi.loadShapes(oc, parsed.doc, primApi, opsApi);
+    if (!loaded.ok) return failProject(loaded.error || (projectApi.ERR_SHAPE || readError));
+    const inspected = [];
+    for (let i = 0; i < loaded.parts.length; i += 1) {
+      const part = loaded.parts[i];
+      let view = null;
+      try { view = primApi.inspectSolid(oc, part.shape); } catch (_err) { view = null; }
+      const tris = view && view.mesh && view.mesh.triangles ? view.mesh.triangles : [];
+      if (!view || !tris.length) {
+        for (let j = 0; j < loaded.parts.length; j += 1) dropShape(loaded.parts[j].shape);
+        return failProject(projectApi.ERR_SHAPE);
+      }
+      inspected.push({ part: part, view: view });
+    }
+    const snap = projectSnap();
+    const next = [];
+    for (let i = 0; i < inspected.length; i += 1) {
+      const part = inspected[i].part;
+      const view = inspected[i].view;
+      state.bodySeq += 1;
+      let params = null;
+      if (part.params) {
+        try { params = JSON.parse(JSON.stringify(part.params)); } catch (_err) { params = null; }
+      }
+      next.push({
+        id: 'b' + state.bodySeq,
+        name: part.name,
+        kind: part.kind || 'brep',
+        params: params,
+        material: part.material,
+        features: part.features || [],
+        source: part.source || '',
+        shape: part.shape,
+        mesh: view.mesh,
+        topology: view.topology,
+        gate: view.gate,
+        watertight: view.watertight
+      });
+    }
+    state.projectApplying = true;
+    state.bodies = next;
+    state.primitive = null;
+    state.selection = 'item';
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.booleanOp = '';
+    state.booleanMessage = '';
+    state.demo = '';
+    state.projectBlank = next.length === 0;
+    state.lastError = '';
+    let meshRejected = false;
+    try {
+      if (next.length) {
+        installBodiesAndSync('project');
+        meshRejected = state.lastError === 'FAIL: the scene mesh was rejected.';
+      } else {
+        state.topology = null;
+        state.topologySource = 'mesh';
+        state.shapeGate = null;
+        mountBodyMeshes();
+        applyLook();
+      }
+    } catch (_err) {
+      meshRejected = true;
+      state.lastError = 'FAIL: the scene mesh was rejected.';
+    } finally {
+      state.projectApplying = false;
+    }
+    if (meshRejected) {
+      for (let i = 0; i < next.length; i += 1) dropShape(next[i].shape);
+      restoreProjectSnap(snap);
+      return failProject(projectApi.ERR_SHAPE);
+    }
+    for (let i = 0; i < snap.bodies.length; i += 1) dropShape(snap.bodies[i].shape);
+    clearProjectUndo();
+    state.projectDirty = false;
+    state.projectError = '';
+    publishGateState();
+    publishProjectHook();
+    const note = 'Loaded ' + String(next.length) + (next.length === 1 ? ' part' : ' parts');
+    toast(note);
+    setHint(note);
+    return { ok: true, unchanged: false, error: '', count: next.length };
+  }
+
+  function measureProject() {
+    const rows = [];
+    if (!projectApi || !oc || typeof projectApi.measureShape !== 'function') return rows;
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      if (!body || !body.shape) continue;
+      const measured = projectApi.measureShape(oc, body.shape);
+      rows.push({
+        name: body.name,
+        volumeMm3: measured.volumeMm3,
+        bounds: measured.bounds,
+        source: body.source || ''
+      });
+    }
+    return rows;
+  }
+
+  function prepareProjectPair() {
+    const first = createPrimitive('box', null, 'item', false);
+    if (!first) return { ok: false, error: 'box failed', names: [], count: state.bodies.length };
+    const second = addAnotherBody('cylinder');
+    if (!second) return { ok: false, error: 'cylinder failed', names: state.bodies.map(function (body) { return body.name; }), count: state.bodies.length };
+    return {
+      ok: true,
+      error: '',
+      names: state.bodies.map(function (body) { return body.name; }),
+      count: state.bodies.length
+    };
+  }
+
+  function publishProjectHook() {
+    ensureClearUndo();
+    window.__cadcamProject = {
+      version: projectApi ? projectApi.PROJECT_VERSION : 0,
+      extension: projectApi ? projectApi.PROJECT_EXTENSION : '.cadmvp',
+      units: projectApi ? projectApi.PROJECT_UNITS : 'mm',
+      dirty: function () { return state.projectDirty === true; },
+      unit: function () { return state.unit; },
+      saveText: function () { return saveProject(false); },
+      download: function () { return saveProject(true); },
+      loadText: function (text, confirm) { return applyLoadedProject(text, { confirm: confirm }); },
+      measures: function () { return measureProject(); },
+      preparePair: function () { return prepareProjectPair(); },
+      setDirty: function (value) {
+        state.projectDirty = value === true;
+        publishGateState();
+        return state.projectDirty === true;
+      },
+      makeDisc: function () { return createPrimitive('disc', null, 'item', false) === true; }
+    };
+    publishGateState();
+  }
+
   function publishGateState() {
     const banner = document.getElementById('occtBanner');
     const btn = document.getElementById('exportBtn');
@@ -4622,7 +4932,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
         plateSz: opsApi.PLATE_SZ_MM,
         positions: opsApi.PLATE_HOLE_UV_MM,
         fit: opsApi.HOLE_FIT
-      } : null
+      } : null,
+      projectDirty: state.projectDirty === true,
+      projectError: state.projectError || '',
+      projectPartCount: state.bodies.length,
+      projectNames: state.bodies.map(function (body) { return body.name; }),
+      projectBlank: state.projectBlank === true
     };
   }
 
@@ -4690,6 +5005,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     mesh.visible = showBody && mode !== 'wire' && !multi;
     edges.visible = showBody && mode !== 'shaded' && !multi;
     bodyRoot.visible = showBody && multi;
+    if (state.projectBlank && !state.bodies.length) {
+      mesh.visible = false;
+      edges.visible = false;
+      bodyRoot.visible = false;
+    }
     if (multi) {
       const picked = {};
       const selectedNow = orderedBodies();
@@ -5084,7 +5404,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu' && action !== 'loadProject') {
       closePopups();
     }
     if (action === 'tab') {
@@ -5138,9 +5458,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
         syncFromKernel();
         spherical.radius = fitDistance();
         updateCamera();
+        state.projectBlank = false;
+        if (!state.projectApplying) state.projectDirty = true;
+        publishProjectHook();
         message = 'Loaded ' + Module.fixtureName();
         setHint(state.occtGate ? (state.exportAllowed ? state.watertightMessage : state.failReason) : exportBlockText());
       }
+    } else if (action === 'saveProject') {
+      saveProject(true);
+      return;
+    } else if (action === 'loadProject') {
+      message = 'Load';
     } else if (action === 'undo') setHint('Undo');
     else if (action === 'redo') setHint('Redo');
     else if (action === 'snap') {
@@ -5874,6 +6202,31 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi) {
     screen.orientation.addEventListener('change', onViewportChange);
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(viewport);
+
+  const projectInput = document.getElementById('projectFile');
+  if (projectInput) {
+    projectInput.addEventListener('change', function () {
+      const file = projectInput.files && projectInput.files[0];
+      projectInput.value = '';
+      closePopups();
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const text = typeof reader.result === 'string' ? reader.result : '';
+        applyLoadedProject(text);
+      };
+      reader.onerror = function () {
+        const error = projectApi && projectApi.ERR_READ ? projectApi.ERR_READ : 'This file could not be read. The model was not changed.';
+        state.projectError = error;
+        toast(error);
+        setHint(error);
+        publishGateState();
+        publishProjectHook();
+      };
+      reader.readAsText(file);
+    });
+  }
+  publishProjectHook();
 
   onViewportChange();
   syncFromKernel();

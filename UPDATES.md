@@ -3,6 +3,10 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-22
+
+- Project save/load. `.cadmvp` is plain JSON (`units` `"mm"`, `version` 1, parts with placement, material, primitive parameters, features, and OCCT BREP text). Save downloads the file. Load uses a file input inside a 44 px label so iPhone Safari can open it, asks before replacing the model, checks every part with the OCCT shape-validity gate, and leaves the current model in place on a bad file. libcascade 3.1.0 exports file-path `BRepTools::Write` / `Read`; the stream overloads are not linked, and `cadcam.wasm` does not link OCCT, so the binding is `web/project-file.mjs` (copy the text out, delete the temp file). Flagged for Erik review. `window.__cadcamClearUndo` is only a hook. Team choices are in `web/PROGRESS.md`. The physical iPhone file picker was not exercised.
+
 ## 2026-10-21
 
 - Portrait 390: the dimension mode row, primitive toolbar, mm/in toggle, and status line wrap inside the screen. The narrow tool strip's actions stay on the Tools sheet. Touch targets stay at least 44×44. No `src/` edits. No commit.
