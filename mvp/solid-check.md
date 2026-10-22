@@ -1,4 +1,6 @@
-# In-memory watertight check
+# In-memory mesh check (legacy)
+
+> Current rule (Erik, 2026-10-22 02:17 MT): watertight checks and tests are dropped. The units (mm) check stays and gates Export. The OCCT shape-validity check after operations stays, but it does not block Export. This file records the 2026-10-20 mesh checker as built; it is no longer a required check or an Export gate.
 
 **Status**: Built and tested with MSVC 19.51 on 2026-10-20
 **Date**: 2026-10-20
