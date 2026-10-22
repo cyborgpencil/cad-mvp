@@ -7,7 +7,7 @@ Preconditions: main has gizmo/undo (fbd0947), PR #1 nav cube, PR #2 save/load, a
 Steps and checks:
 1. A1 build: using only the live app UI (phone portrait 390x844 and desktop), build the bracket from blink.notes.md: L-bracket with 4 mm thickness, 3 countersunk holes per leg, and an off-centre disc. No baked-in layout or script shortcut. Screenshot the result.
 2. A2 validity and units: the OCCT validity check passes after each operation, and the units read mm throughout.
-3. A3 measure: the bounding box and exact-shape volume (BRepGProp) match blink.notes.md within 0.01 mm and 0.01 mm3. The pass/fail values are recorded locally only.
+3. A3 measure: the exported bracket's bounding box is within 0.1 mm of the mm sizes typed into the UI, and its trimesh volume is within 1% of the app's own exact-shape volume (BRepGProp). Targets are the typed values, not blink.notes.md (3T ruling, 2026-10-22). The pass/fail values are recorded locally only.
 4. A4 save/load: save as .cadmvp, reload, and the A3 values still match.
 5. A5 export: export STL and 3MF. The 3MF says unit="millimeter".
 6. A6 Orca: open both files in OrcaSlicer on Z13. `--info` and the size readout match A3 within 0.05 mm on every axis (Chief 07:06), with no scale prompt and no errors.
