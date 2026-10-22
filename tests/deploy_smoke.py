@@ -11,7 +11,7 @@ a JavaScript exception, an unhandled rejection, or a console error.
 
 Asserts window.__cadcamExportState.occtReady for:
   ?fixture=closed_box   OCCT gate PASS, Export enabled
-  ?fixture=open_box     OCCT gate FAIL, Export locked
+  ?fixture=open_box     OCCT gate FAIL, units pass, Export enabled
   ?primitive=box&select=face   OCCT ready, one face selected
   ?demo=lbracket        final L-bracket OCCT gate PASS (app defaults)
   ?demo=booleans        box minus cylinder, OCCT gate PASS
@@ -473,7 +473,7 @@ CASES = (
     {
         "name": "open_box",
         "query": "/?fixture=open_box&tab=export",
-        "expect": "occtReady and gate FAIL, Export locked",
+        "expect": "occtReady and gate FAIL, units pass, Export enabled",
     },
     {
         "name": "box_face",
@@ -530,8 +530,10 @@ def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[
             problems.append(f"{name}: fixture {state.get('fixture')!r}")
         if state.get("occtGate") is not False or state.get("gateOcct") != "FAIL":
             problems.append(f"{name}: gate is not FAIL ({state.get('gateOcct')!r})")
-        if state.get("exportAllowed") is not False or state.get("exportDisabled") is not True:
-            problems.append(f"{name}: Export is not locked")
+        if state.get("unitsPass") is not True:
+            problems.append(f"{name}: units are not locked")
+        if state.get("exportAllowed") is not True or state.get("exportDisabled") is not False:
+            problems.append(f"{name}: Export is not enabled")
     elif name == "box_face":
         if state.get("occtReady") is not True:
             problems.append(f"{name}: occtReady is not true")
@@ -547,8 +549,6 @@ def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[
             problems.append(f"{name}: demo {state.get('demo')!r}")
         if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
             problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
-        if state.get("watertight") is not True:
-            problems.append(f"{name}: watertight is not true")
         if state.get("unitsPass") is not True:
             problems.append(f"{name}: units are not locked")
         if state.get("lastError"):
@@ -561,8 +561,6 @@ def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[
             problems.append(f"{name}: demo {state.get('demo')!r}")
         if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
             problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
-        if state.get("watertight") is not True:
-            problems.append(f"{name}: watertight is not true")
         if state.get("unitsPass") is not True:
             problems.append(f"{name}: units are not locked")
         if state.get("exportAllowed") is not True:
@@ -927,7 +925,6 @@ def wait_portrait(
                 and state.get("occtGate") is True
                 and state.get("gateOcct") == "PASS"
                 and state.get("dimPanelOpen") is True
-                and state.get("watertight") is True
                 and state.get("unitsPass") is True
                 and not state.get("lastError")
                 and int(state.get("bodyCount") or 0) == 1
@@ -2183,6 +2180,375 @@ def portrait_layout_ok(state: dict[str, Any], expanded: bool) -> list[str]:
     return problems
 
 
+def _is_default_box(state: dict[str, Any] | None) -> bool:
+    """True when the page already holds the Create > Box 20 mm solid."""
+    if not isinstance(state, dict):
+        return False
+    params = state.get("primitiveParams") or {}
+    if not isinstance(params, dict):
+        return False
+    try:
+        sx = float(params.get("sx"))
+        sy = float(params.get("sy"))
+        sz = float(params.get("sz"))
+    except (TypeError, ValueError):
+        return False
+    return (
+        state.get("primitiveKind") == "box"
+        and abs(sx - 20.0) < 1e-6
+        and abs(sy - 20.0) < 1e-6
+        and abs(sz - 20.0) < 1e-6
+        and int(state.get("bodyCount") or 0) == 1
+    )
+
+
+def _wait_body_count(cdp: Cdp, origin: str, count: int, timeout: float = 30) -> list[str]:
+    deadline = time.time() + timeout
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.2)
+        problems = site_problems(cdp.events, origin, cdp.urls)
+        if problems:
+            return problems[:12]
+        payload = eval_state(cdp)
+        state = (payload or {}).get("state") if payload else None
+        if isinstance(state, dict):
+            last = state
+            if int(state.get("bodyCount") or 0) == count:
+                return []
+        time.sleep(0.1)
+    return [f"bodyCount did not become {count}", json.dumps(last)]
+
+
+def _delete_default_body(cdp: Cdp, origin: str) -> list[str]:
+    tapped = tap_selector(cdp, "#deleteBtn", "clear default box")
+    if tapped:
+        return tapped
+    return _wait_body_count(cdp, origin, 0)
+
+
+WRAPUP_PHONE_EXPR = r"""
+(function(){
+  var problems = [];
+  function shown(el) {
+    if (!el) return null;
+    var st = getComputedStyle(el);
+    var r = el.getBoundingClientRect();
+    if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) return null;
+    return r;
+  }
+  if (document.getElementById('occtBanner')) problems.push('occtBanner present');
+  if (document.getElementById('statusTight')) problems.push('statusTight present');
+  if (document.getElementById('gateTight')) problems.push('gateTight present');
+  if (document.querySelectorAll('#fileMenu [data-action="loadFixture"]').length) problems.push('fixture loaders remain');
+  if (!document.querySelector('#fileMenu [data-action="downloadLog"]')) problems.push('missing download log');
+  var units = document.getElementById('statusUnits');
+  if (!units || !/mm/i.test(units.textContent || '')) problems.push('units readout ' + (units ? units.textContent : 'missing'));
+  var hits = [];
+  function walk(node) {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      if (/watertight/i.test(node.nodeValue || '')) hits.push(String(node.nodeValue).trim().slice(0, 40));
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName;
+    if (tag === 'SCRIPT' || tag === 'STYLE') return;
+    ['title', 'aria-label', 'data-tool', 'placeholder'].forEach(function (name) {
+      var value = node.getAttribute(name);
+      if (value && /watertight/i.test(value)) hits.push(name + ':' + value.slice(0, 40));
+    });
+    for (var child = node.firstChild; child; child = child.nextSibling) walk(child);
+  }
+  walk(document.body);
+  if (hits.length) problems.push('watertight text ' + hits.slice(0, 4).join(' | '));
+  var st = window.__cadcamExportState || {};
+  var params = st.primitiveParams || {};
+  if (st.primitiveKind !== 'box' || st.bodyCount !== 1) problems.push('model ' + st.primitiveKind + ' bodies ' + st.bodyCount);
+  if (st.undoDepth !== 0) problems.push('undo ' + st.undoDepth);
+  if (st.projectDirty === true) problems.push('dirty');
+  if (st.exactVolume !== true) problems.push('exactVolume ' + st.exactVolume);
+  if (!(Math.abs(Number(st.volumeMm3) - 8000) < 0.01)) problems.push('volume ' + st.volumeMm3);
+  var bb = st.bboxMm || {};
+  ['dx', 'dy', 'dz'].forEach(function (key) {
+    if (!(Math.abs(Number(bb[key]) - 20) < 0.01)) problems.push('bbox ' + key + ' ' + bb[key]);
+  });
+  [['cx', 0], ['cy', 0], ['cz', 10], ['sx', 20], ['sy', 20], ['sz', 20]].forEach(function (pair) {
+    if (!(Math.abs(Number(params[pair[0]]) - pair[1]) < 0.01)) problems.push(pair[0] + ' ' + params[pair[0]]);
+  });
+  if (st.unitsPass !== true) problems.push('unitsPass');
+  if (st.occtGate !== true || st.gateOcct !== 'PASS') problems.push('gate ' + st.gateOcct);
+  if (st.exportAllowed !== true || st.exportDisabled !== false) problems.push('export');
+  if (st.bannerHidden !== true) problems.push('bannerHidden');
+  var lines = String(st.logText || '').split('\n').filter(Boolean);
+  var iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z \[cadmvp\] /;
+  if (!lines.length) problems.push('empty log');
+  lines.forEach(function (line) {
+    if (!iso.test(line)) problems.push('log line ' + line.slice(0, 80));
+  });
+  function lastMsg(prefix) {
+    var found = '';
+    lines.forEach(function (line) {
+      var at = line.indexOf('[cadmvp] ');
+      if (at < 0) return;
+      var msg = line.slice(at + 9);
+      if (msg.indexOf(prefix) === 0) found = msg;
+    });
+    return found;
+  }
+  var vol = parseFloat(lastMsg('volume ').replace('volume ', ''));
+  if (!(Math.abs(vol - 8000) < 0.01)) problems.push('log volume ' + lastMsg('volume '));
+  var boxParts = lastMsg('bbox ').replace('bbox ', '').split(' x ').map(parseFloat);
+  if (boxParts.length !== 3 || boxParts.some(function (n) { return !(Math.abs(n - 20) < 0.01); })) {
+    problems.push('log bbox ' + lastMsg('bbox '));
+  }
+  var bar = document.querySelector('.phone-tabbar');
+  if (!shown(bar)) problems.push('phone bar hidden');
+  function tab(action) {
+    var nodes = document.querySelectorAll('.phone-tabbar [data-action="' + action + '"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var rect = shown(nodes[i]);
+      if (rect) return {el: nodes[i], r: rect};
+    }
+    return null;
+  }
+  var undo = tab('undo');
+  var redo = tab('redo');
+  var create = tab('createMenu');
+  var modify = tab('modifyShelf');
+  [['undo', undo], ['redo', redo], ['create', create], ['modify', modify]].forEach(function (pair) {
+    if (!pair[1]) problems.push(pair[0] + ' missing');
+    else if (pair[1].r.width + 0.5 < 44 || pair[1].r.height + 0.5 < 44) {
+      problems.push(pair[0] + ' ' + pair[1].r.width.toFixed(1) + 'x' + pair[1].r.height.toFixed(1));
+    } else if (pair[1].r.left < -0.5 || pair[1].r.right > window.innerWidth + 0.5) {
+      problems.push(pair[0] + ' outside ' + window.innerWidth);
+    }
+  });
+  if (bar && create && modify) {
+    var buttons = bar.querySelectorAll('button');
+    var ci = -1;
+    var mi = -1;
+    for (var n = 0; n < buttons.length; n++) {
+      if (buttons[n] === create.el) ci = n;
+      if (buttons[n] === modify.el) mi = n;
+    }
+    if (mi !== ci + 1) problems.push('modify index ' + mi + ' create ' + ci);
+  }
+  var shelf = document.getElementById('modifyShelf');
+  if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
+  if (modify && modify.el.getAttribute('aria-expanded') !== 'false') {
+    problems.push('phone aria ' + (modify ? modify.el.getAttribute('aria-expanded') : ''));
+  }
+  if (st.modifyOpen === true) problems.push('modifyOpen on phone');
+  return JSON.stringify(problems);
+})()
+"""
+
+
+WRAPUP_DESK_EXPR = r"""
+(function(){
+  var problems = [];
+  var shelf = document.getElementById('modifyShelf');
+  if (!shelf || shelf.hidden) problems.push('shelf hidden on desktop');
+  var btn = document.getElementById('modifyDesktop');
+  if (!btn) problems.push('missing modifyDesktop');
+  else {
+    var st = getComputedStyle(btn);
+    var rect = btn.getBoundingClientRect();
+    if (st.display === 'none' || rect.width < 1) problems.push('modifyDesktop hidden');
+    if (btn.getAttribute('aria-expanded') !== 'true') problems.push('desktop aria ' + btn.getAttribute('aria-expanded'));
+    if (btn.getAttribute('aria-controls') !== 'modifyShelf') problems.push('aria-controls ' + btn.getAttribute('aria-controls'));
+  }
+  if (shelf) {
+    var cs = getComputedStyle(shelf);
+    if (cs.flexWrap !== 'nowrap') problems.push('wrap ' + cs.flexWrap);
+    var top = null;
+    var buttons = shelf.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      var br = buttons[i].getBoundingClientRect();
+      if (br.width < 1) continue;
+      if (top === null) top = br.top;
+      else if (Math.abs(br.top - top) > 0.5) problems.push('shelf top ' + br.top.toFixed(1) + ' vs ' + top.toFixed(1));
+    }
+    var sr = shelf.getBoundingClientRect();
+    if (sr.height < 44 || sr.height > 64) problems.push('shelf height ' + sr.height.toFixed(1));
+  }
+  var desk = document.querySelector('.desk-bottom');
+  var kids = desk ? desk.querySelectorAll('button') : [];
+  if (kids.length < 2) problems.push('desk buttons ' + kids.length);
+  else {
+    if (kids[0].getAttribute('data-action') !== 'createMenu') problems.push('desk first ' + kids[0].getAttribute('data-action'));
+    if (kids[1].id !== 'modifyDesktop') problems.push('desk second ' + kids[1].id);
+  }
+  var phone = document.querySelector('.phone-tabbar');
+  if (phone && getComputedStyle(phone).display !== 'none') problems.push('phone bar shown on desktop');
+  var menu = document.getElementById('createMenu');
+  if (menu && menu.hidden !== true) problems.push('create menu open at start');
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def _json_problems(raw: Any, err: str, label: str) -> list[str]:
+    if err or not isinstance(raw, str):
+        return [f"{label} {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"{label} {raw[:500]}"]
+    if not isinstance(found, list):
+        return [f"{label} {raw[:500]}"]
+    return [str(item) for item in found]
+
+
+def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
+    """Default 20 mm box, [cadmvp] log, phone Undo/Redo/Modify, desktop shelf."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"wrapup portrait {exc}"]
+    url = origin + "/"
+    print(f"load wrapup phone {url}", flush=True)
+    state, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["wrapup phone load", *load_problems[:20]]
+    if not isinstance(state, dict):
+        return ["wrapup phone returned no state"]
+    raw, err = eval_expr(cdp, WRAPUP_PHONE_EXPR)
+    problems = _json_problems(raw, err, "wrapup phone")
+    if problems:
+        return problems
+    clicked, click_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('.phone-tabbar [data-action=\"undo\"]');"
+        "if(!b)return 'missing';b.click();"
+        "var r=document.querySelector('.phone-tabbar [data-action=\"redo\"]');"
+        "if(!r)return 'missing redo';r.click();return 'clicked';})()",
+    )
+    if click_err or clicked != "clicked":
+        return [f"wrapup undo click {clicked or click_err}"]
+    time.sleep(0.2)
+    cdp.drain(0.3)
+    quiet = site_problems(cdp.events, origin, cdp.urls)
+    if quiet:
+        return ["wrapup undo click", *quiet[:12]]
+    after = eval_state(cdp)
+    after_state = (after or {}).get("state") if after else None
+    if not isinstance(after_state, dict) or int(after_state.get("undoDepth") or 0) != 0:
+        return [f"wrapup undo depth {after_state!r}"[:400]]
+    if int(after_state.get("bodyCount") or 0) != 1:
+        return [f"wrapup undo changed the model {after_state.get('bodyCount')!r}"]
+    covered = coverage_problems(cdp, False)
+    if covered:
+        return ["wrapup phone coverage", *covered[:20]]
+    fit = portrait_fit_problems(cdp)
+    if fit:
+        return ["wrapup phone fit", *fit[:20]]
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"wrapup desktop {exc}"]
+    print(f"load wrapup desktop {url}", flush=True)
+    state, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["wrapup desktop load", *load_problems[:20]]
+    raw, err = eval_expr(cdp, WRAPUP_DESK_EXPR)
+    problems = _json_problems(raw, err, "wrapup desktop")
+    if problems:
+        return problems
+    escaped, esc_err = eval_expr(
+        cdp,
+        "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));"
+        "var shelf=document.getElementById('modifyShelf');"
+        "var btn=document.getElementById('modifyDesktop');"
+        "return JSON.stringify({hidden:!!(shelf&&shelf.hidden),aria:btn?btn.getAttribute('aria-expanded'):''});})()",
+    )
+    if esc_err or not isinstance(escaped, str):
+        return [f"wrapup esc {escaped or esc_err}"]
+    try:
+        esc_state = json.loads(escaped)
+    except json.JSONDecodeError:
+        return [f"wrapup esc {escaped}"]
+    if esc_state.get("hidden") is not True or esc_state.get("aria") != "false":
+        return [f"wrapup esc left the shelf open {esc_state}"]
+    toggled, toggle_err = eval_expr(
+        cdp,
+        "(function(){var b=document.getElementById('modifyDesktop');if(!b)return 'missing';b.click();"
+        "var shelf=document.getElementById('modifyShelf');"
+        "var menu=document.getElementById('createMenu');"
+        "return JSON.stringify({open:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true),"
+        "aria:b.getAttribute('aria-expanded')});})()",
+    )
+    if toggle_err or not isinstance(toggled, str):
+        return [f"wrapup modify {toggled or toggle_err}"]
+    try:
+        opened = json.loads(toggled)
+    except json.JSONDecodeError:
+        return [f"wrapup modify {toggled}"]
+    if opened.get("open") is not True or opened.get("aria") != "true" or opened.get("menu") is True:
+        return [f"wrapup modify did not open {opened}"]
+    created, create_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('.desk-bottom [data-action=\"createMenu\"]');"
+        "if(!b)return 'missing';b.click();"
+        "var shelf=document.getElementById('modifyShelf');"
+        "var menu=document.getElementById('createMenu');"
+        "return JSON.stringify({shelf:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true)});})()",
+    )
+    if create_err or not isinstance(created, str):
+        return [f"wrapup create {created or create_err}"]
+    try:
+        created_state = json.loads(created)
+    except json.JSONDecodeError:
+        return [f"wrapup create {created}"]
+    if created_state.get("shelf") is not False or created_state.get("menu") is not True:
+        return [f"wrapup create did not close the shelf {created_state}"]
+    again, again_err = eval_expr(
+        cdp,
+        "(function(){var b=document.getElementById('modifyDesktop');if(!b)return 'missing';b.click();"
+        "var shelf=document.getElementById('modifyShelf');"
+        "var menu=document.getElementById('createMenu');"
+        "return JSON.stringify({open:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true)});})()",
+    )
+    if again_err or not isinstance(again, str):
+        return [f"wrapup modify again {again or again_err}"]
+    try:
+        again_state = json.loads(again)
+    except json.JSONDecodeError:
+        return [f"wrapup modify again {again}"]
+    if again_state.get("open") is not True or again_state.get("menu") is not False:
+        return [f"wrapup modify did not close create {again_state}"]
+    downloaded, down_err = eval_expr(
+        cdp,
+        "(function(){var file=document.getElementById('fileBtn');if(!file)return 'missing file';file.click();"
+        "var log=document.querySelector('#fileMenu [data-action=\"downloadLog\"]');"
+        "if(!log)return 'missing log';log.click();"
+        "var last=window.__cadcamLastDownload||{};"
+        "return JSON.stringify({name:last.name||'',text:last.text||''});})()",
+    )
+    if down_err or not isinstance(downloaded, str) or not downloaded.startswith("{"):
+        return [f"wrapup download {downloaded or down_err}"]
+    try:
+        saved = json.loads(downloaded)
+    except json.JSONDecodeError:
+        return [f"wrapup download {downloaded[:300]}"]
+    if saved.get("name") != "cadmvp-log.txt":
+        return [f"wrapup download name {saved.get('name')!r}"]
+    text = str(saved.get("text") or "")
+    lines = [line for line in text.splitlines() if line]
+    if not lines:
+        return ["wrapup download empty"]
+    import re
+    stamp = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z \[cadmvp\] ")
+    bad = [line for line in lines if not stamp.match(line)]
+    if bad:
+        return [f"wrapup download line {bad[0][:120]}"]
+    if not any("volume " in line and "8000" in line for line in lines):
+        return ["wrapup download missing volume 8000"]
+    print("wrapup pass", flush=True)
+    return []
+
+
 def run_portrait(cdp: Cdp, origin: str) -> list[str]:
     """390x844 touch emulation. Tap primitives, bottom sheet, move/rotate/resize a box."""
     try:
@@ -2231,15 +2597,23 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
                 problems.append(f"portrait {kind} create menu")
                 problems.extend(menu_found)
                 return problems
-        raw, err = eval_expr(cdp, toolbar_point_expr(kind))
-        if err or not isinstance(raw, str) or not raw.startswith("{"):
-            problems.append(f"portrait {kind} toolbar {raw or err}")
-            return problems
-        box = json.loads(raw)
-        if float(box["w"]) < 44 or float(box["h"]) < 44:
-            problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
-            return problems
-        touch_tap(cdp, float(box["x"]), float(box["y"]))
+        # The default page is already the 20 mm box. Another Box tap adds a body.
+        if not (kind == "box" and _is_default_box(_state)):
+            if kind in ("cylinder", "disc"):
+                cleared = _delete_default_body(cdp, origin)
+                if cleared:
+                    problems.append(f"portrait {kind} clear")
+                    problems.extend(cleared[:12])
+                    return problems
+            raw, err = eval_expr(cdp, toolbar_point_expr(kind))
+            if err or not isinstance(raw, str) or not raw.startswith("{"):
+                problems.append(f"portrait {kind} toolbar {raw or err}")
+                return problems
+            box = json.loads(raw)
+            if float(box["w"]) < 44 or float(box["h"]) < 44:
+                problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
+                return problems
+            touch_tap(cdp, float(box["x"]), float(box["y"]))
         created, wait_problems = wait_portrait(
             cdp, origin, kind, {str(spec["key"]): float(spec["fresh"])}, PAGE_TIMEOUT_S
         )
@@ -2425,11 +2799,12 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     _loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
     if load_problems:
         return ["portrait holes load", *load_problems[:20]]
-    raw, err = eval_expr(cdp, toolbar_point_expr("box"))
-    if err or not isinstance(raw, str) or not raw.startswith("{"):
-        return [f"portrait holes toolbar {raw or err}"]
-    box = json.loads(raw)
-    touch_tap(cdp, float(box["x"]), float(box["y"]))
+    if not _is_default_box(_loaded):
+        raw, err = eval_expr(cdp, toolbar_point_expr("box"))
+        if err or not isinstance(raw, str) or not raw.startswith("{"):
+            return [f"portrait holes toolbar {raw or err}"]
+        box = json.loads(raw)
+        touch_tap(cdp, float(box["x"]), float(box["y"]))
     created, wait_problems = wait_portrait(cdp, origin, "box", {"sx": 20.0}, PAGE_TIMEOUT_S)
     if wait_problems or not isinstance(created, dict):
         return ["portrait holes create", *wait_problems[:20]]
@@ -2615,7 +2990,6 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
                 int(state.get("holeCount") or 0) == count
                 and state.get("occtGate") is True
                 and state.get("gateOcct") == "PASS"
-                and state.get("watertight") is True
                 and state.get("unitsPass") is True
                 and int(state.get("bodyCount") or 0) == 1
             ),
@@ -3384,8 +3758,14 @@ def run(omit: list[str]) -> int:
         print(f"serving {origin} cacheDisabled=true", flush=True)
 
         failures: list[str] = []
+        wrap = run_wrapup(cdp, origin)
+        if wrap:
+            failures.append("wrapup")
+            failures.extend(wrap[:60])
         stamped = False
         for case in CASES:
+            if failures:
+                break
             url = origin + case["query"]
             print(f"load {case['name']} {url}", flush=True)
             started = time.time()
@@ -3478,8 +3858,8 @@ def run(omit: list[str]) -> int:
                     print(f"boolean_{op}={json.dumps(done, separators=(',', ':'))}", flush=True)
                     if done.get("occtGate") is not True or done.get("gateOcct") != "PASS":
                         problems.append(f"boolean_{op}: gate {done.get('gateOcct')!r}")
-                    if done.get("watertight") is not True or done.get("unitsPass") is not True:
-                        problems.append(f"boolean_{op}: watertight or units failed")
+                    if done.get("unitsPass") is not True:
+                        problems.append(f"boolean_{op}: units failed")
                     if done.get("exportAllowed") is not True:
                         problems.append(f"boolean_{op}: Export is not enabled")
                     if int(done.get("bodyCount") or 0) != 1:
