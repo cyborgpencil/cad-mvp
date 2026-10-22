@@ -45,7 +45,7 @@ if (existsSync(blinkPath)) {
   try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
 }
 const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
-const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles } = await import(viewUrl);
+const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles, viewerBuffersFromCad, viewerVertexNormals } = await import(viewUrl);
 const blinkJsonPath = path.join(root, 'tests', 'fixtures', 'blink.json');
 let blinkFile = null;
 if (existsSync(blinkJsonPath)) {
@@ -60,6 +60,154 @@ function expect(name, ok) {
   }
   console.error(name + ' failed');
   failures += 1;
+}
+
+// Viewer mesh of a countersunk hole. Normals must point out of the material
+// (toward the hole axis) and agree with the triangle winding.
+function viewerCutNormalReport(mesh, holePoints, plateSz, csRadius) {
+  const built = viewerBuffersFromCad(mesh.vertices, mesh.triangles);
+  const normals = viewerVertexNormals(built.positions, built.indices);
+  const positions = built.positions;
+  const indices = built.indices;
+  let walls = 0;
+  let into = 0;
+  let disagree = 0;
+  let topUp = 0;
+  let topDown = 0;
+  function xyz(i) {
+    return [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+  }
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    const ia = indices[t];
+    const ib = indices[t + 1];
+    const ic = indices[t + 2];
+    const a = xyz(ia);
+    const b = xyz(ib);
+    const c = xyz(ic);
+    const cx = (a[0] + b[0] + c[0]) / 3;
+    const cy = (a[1] + b[1] + c[1]) / 3;
+    const cz = (a[2] + b[2] + c[2]) / 3;
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    let fnx = uy * vz - uz * vy;
+    let fny = uz * vx - ux * vz;
+    let fnz = ux * vy - uy * vx;
+    const fl = Math.hypot(fnx, fny, fnz) || 1;
+    fnx /= fl;
+    fny /= fl;
+    fnz /= fl;
+    let nearest = 1e9;
+    let radial = [0, 0];
+    for (let h = 0; h < holePoints.length; h += 1) {
+      const hole = holePoints[h];
+      const dx = cx - hole[0];
+      const dz = cz - hole[1];
+      const dist = Math.hypot(dx, dz);
+      if (dist < nearest) {
+        nearest = dist;
+        radial = [dx, dz];
+      }
+    }
+    const rl = Math.hypot(radial[0], radial[1]) || 1;
+    const faceRadial = (fnx * radial[0] + fnz * radial[1]) / rl;
+    if (cy > plateSz - 0.3 && nearest > csRadius + 1 && fny > 0.9) topUp += 1;
+    if (cy > plateSz - 0.3 && nearest > csRadius + 1 && fny < -0.9) topDown += 1;
+    if (!(nearest < csRadius + 0.35) || !(nearest > 0.4)) continue;
+    if (!(cy > 0.25) || !(cy < plateSz - 0.15)) continue;
+    if (Math.abs(faceRadial) < 0.2) continue;
+    walls += 1;
+    const ids = [ia, ib, ic];
+    for (let k = 0; k < 3; k += 1) {
+      const p = xyz(ids[k]);
+      const nx = normals[ids[k] * 3];
+      const ny = normals[ids[k] * 3 + 1];
+      const nz = normals[ids[k] * 3 + 2];
+      let best = 1e9;
+      let rv = [0, 0];
+      for (let h = 0; h < holePoints.length; h += 1) {
+        const hole = holePoints[h];
+        const dx = p[0] - hole[0];
+        const dz = p[2] - hole[1];
+        const dist = Math.hypot(dx, dz);
+        if (dist < best) {
+          best = dist;
+          rv = [dx, dz];
+        }
+      }
+      const rlen = Math.hypot(rv[0], rv[1]);
+      if (rlen < 0.2) continue;
+      if ((nx * rv[0] + nz * rv[1]) / rlen > 1e-3) into += 1;
+      if (nx * fnx + ny * fny + nz * fnz <= 0) disagree += 1;
+    }
+  }
+  if (!walls) return 'no cut-face triangles';
+  if (!topUp || topDown) return 'top face normal up ' + topUp + ' down ' + topDown;
+  if (into) return into + ' vertex normals point into the solid';
+  if (disagree) return disagree + ' vertex normals disagree with winding';
+  return '';
+}
+
+// Countersink mouths on the plate top. A seam may split one circle into two arcs.
+function topCountersinkCircles(oc, shape, zTop, diameterMm) {
+  const trash = [];
+  function track(obj) {
+    if (obj) trash.push(obj);
+    return obj;
+  }
+  const groups = new Map();
+  const seen = new Set();
+  let ok = true;
+  try {
+    const explorer = track(new oc.TopExp_Explorer(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE));
+    while (explorer.More()) {
+      const edge = track(oc.TopoDS.Edge(explorer.Current()));
+      const adaptor = track(new oc.BRepAdaptor_Curve(edge));
+      if (adaptor.GetType() === oc.GeomAbs_CurveType.GeomAbs_Circle) {
+        const circ = track(adaptor.Circle());
+        const radius = circ.Radius();
+        const loc = track(circ.Location());
+        const axis = track(circ.Axis());
+        const dir = track(axis.Direction());
+        const atTop = Math.abs(loc.Z() - zTop) <= 1e-6 && Math.abs(Math.abs(dir.Z()) - 1) <= 1e-6;
+        if (atTop) {
+          const diaOk = Math.abs(2 * radius - diameterMm) <= 1e-6;
+          if (!diaOk) ok = false;
+          const u0 = adaptor.FirstParameter();
+          const u1 = adaptor.LastParameter();
+          const mid = track(adaptor.Value((u0 + u1) * 0.5));
+          const edgeKey = [mid.X(), mid.Y(), mid.Z(), u0, u1].map(function (n) { return Math.round(n * 1e6); }).join(',');
+          if (!seen.has(edgeKey)) {
+            seen.add(edgeKey);
+            const ckey = [loc.X(), loc.Y(), loc.Z()].map(function (n) { return Math.round(n * 1e6); }).join(',');
+            const group = groups.get(ckey) || { arcs: 0, diaOk: true };
+            group.arcs += 1;
+            group.diaOk = group.diaOk && diaOk;
+            groups.set(ckey, group);
+          }
+        }
+      }
+      explorer.Next();
+    }
+  } catch (err) {
+    console.error('top countersink circles ' + (err && err.message ? err.message : String(err)));
+    ok = false;
+  } finally {
+    for (let i = trash.length - 1; i >= 0; i -= 1) {
+      try {
+        if (trash[i] && typeof trash[i].delete === 'function') trash[i].delete();
+      } catch (_err) {
+        // Already released.
+      }
+    }
+  }
+  groups.forEach(function (group) {
+    if (group.arcs < 1 || group.arcs > 2 || !group.diaOk) ok = false;
+  });
+  return { ok: ok, circles: groups.size };
 }
 
 const oc = await createInstance();
@@ -468,6 +616,7 @@ expect('plate gate', !!plateView && plateView.gate.pass === true && plateView.wa
 let plateFace = null;
 let plateFaceZ = -Infinity;
 const plateFaces = plateView && plateView.topology ? plateView.topology.faces : [];
+expect('plate faces ' + plateFaces.length, plateFaces.length === 6);
 for (let fi = 0; fi < plateFaces.length; fi += 1) {
   const centroid = plateFaces[fi].centroid;
   if (centroid && centroid[2] > plateFaceZ) {
@@ -523,6 +672,12 @@ if (plateFrame && plateShape) {
     expect('plate hole ' + (hi + 1) + ' ' + (cut.error || ''), cut.ok === true && !!cut.shape && cut.units === 'mm');
     expect('plate hole ' + (hi + 1) + ' gate', cut.ok === true && cut.gate && cut.gate.pass === true && cut.watertight && cut.watertight.pass === true);
     expect('plate hole ' + (hi + 1) + ' depth', cut.ok === true && Math.abs(cut.depthMm - plateSz) <= 0.05);
+    const faceCount = cut.topology && cut.topology.faces ? cut.topology.faces.length : 0;
+    expect('plate hole ' + (hi + 1) + ' faces ' + faceCount, cut.ok === true && faceCount === 6 + (hi + 1) * 2);
+    const tops = cut.ok && cut.shape
+      ? topCountersinkCircles(oc, cut.shape, plateSz, ops.HOLE_COUNTERSINK_DIAMETER_MM)
+      : { ok: false, circles: 0 };
+    expect('plate hole ' + (hi + 1) + ' countersink tops ' + tops.circles, tops.ok === true && tops.circles === hi + 1);
     if (!cut.ok || !cut.shape) break;
     if (hi === 0) plateBefore = cut.volumeBefore;
     plateAfter = cut.volumeAfter;
@@ -553,6 +708,20 @@ if (holedShape && holedShape !== plateShape) {
   const holedView = inspectSolid(oc, holedShape);
   const plateStl = writeCheckedStl('prim-plate-holes.stl', holedView.mesh, plateBounds, 0.2);
   console.log('prim-plate-holes triangles', plateStl.triangles, 'bytes', plateStl.bytes);
+  if (plateFrame) {
+    const holePoints = [];
+    for (let hi = 0; hi < ops.PLATE_HOLE_UV_MM.length; hi += 1) {
+      const uv = ops.PLATE_HOLE_UV_MM[hi];
+      holePoints.push(plateFrame.point(uv[0], uv[1]));
+    }
+    const normalReport = viewerCutNormalReport(
+      holedView.mesh,
+      holePoints,
+      plateSz,
+      ops.HOLE_COUNTERSINK_DIAMETER_MM / 2
+    );
+    expect('viewer cut normals ' + normalReport, normalReport === '');
+  }
 }
 console.log(
   'plate holes diameter', ops.HOLE_DIAMETER_MM,

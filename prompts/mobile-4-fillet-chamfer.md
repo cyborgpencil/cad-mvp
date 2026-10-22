@@ -16,3 +16,15 @@ Tap edges to pick them (a touch pick radius of about 20 px, with the picks highl
 - Portrait: keep deploy_smoke's horizontal-overflow checks and the closed-panel inert/zero-size check passing; wrap rows, never shrink targets below 44 px.
 - Tests: no Blink layout numbers in tracked files; use the local fixture or generic shapes. Smoke test fillets the inner edge and chamfers the outer edges of a generic L shape at 390x844.
 - From step 3 gaps: tracked tests must assert face count and key edge dimensions; the portrait screenshot must show the feature part, not the default box.
+
+## Acceptance numbers (Research Digest, 2026-10-22)
+One straight edge of length L on a box:
+- Fillet r (BRepFilletAPI_MakeFillet, Add(r, edge), Build): removes r^2*(1-pi/4)*L; new face is GeomAbs_Cylinder of radius r.
+- Equal-distance chamfer d (BRepFilletAPI_MakeChamfer, Add(d, edge)): removes d^2/2*L; new face is a 45 deg plane.
+- Topology for both: faces 6->7, edges 12->15, vertices 8->10 (V-E+F=2).
+- Generic test case: 20 mm cube, r=d=2 mm -> fillet 8000 to 7982.832 mm3 (-17.168), chamfer 8000 to 7960.000 mm3 (-40.000).
+- Checks: IsDone true, analyzer valid, zero free bounds; BRep volume within 0.1%, STL within 0.5% (team-chosen tolerances); STL watertight with mm header.
+- UI rejects r or d >= the shortest adjacent face width (single edge; the half-width limit applies only when two parallel edges of one face are both treated). Do not assume where IsDone turns false: the test treats IsDone false or an invalid analyzer result as a clean error (revert, message), never a crash.
+- These asserts go in tracked tests/test_occt_gate.mjs, not only a side script.
+Sources: OCCT modeling algos guide (fillets/chamfers), MakeFillet and MakeChamfer class references.
+- Viewer normals (Chief, 2026-10-22): smoke test fails if any vertex normal on a fillet/chamfer face points into the solid (TopAbs_REVERSED faces need flipped winding in the viewer mesh). Screenshot from above and at an angle.

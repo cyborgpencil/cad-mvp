@@ -910,13 +910,14 @@ PORTRAIT_FIT_EXPR = r"""
     var el = nodes[i];
     var r = shown(el);
     if (!r) continue;
+    if (el.closest && el.closest('[data-hscroll]')) continue;
     if (r.right > iw + 0.5) {
       var label = (el.id || el.getAttribute('aria-label') || el.getAttribute('data-tool') || el.className || '')
         .toString().replace(/\s+/g, ' ').trim().slice(0, 48);
       problems.push(label + ' right ' + r.right.toFixed(1));
     }
   }
-  var hosts = document.querySelectorAll('#dimPanel, #touchToolbar');
+  var hosts = document.querySelectorAll('#dimPanel, #touchToolbar, .vp-bar');
   for (var j = 0; j < hosts.length; j++) {
     var host = hosts[j];
     if (!shown(host)) continue;
@@ -940,7 +941,309 @@ def portrait_fit_problems(cdp: Cdp) -> list[str]:
         return [f"portrait fit {raw}"]
     if not isinstance(found, list):
         return [f"portrait fit {raw}"]
+    found_text = [str(item) for item in found]
+    found_text.extend(toolbar_row_problems(cdp))
+    found_text.extend(chrome_row_problems(cdp))
+    return found_text
+
+
+TOOLBAR_ROW_EXPR = r"""
+(function(){
+  var problems = [];
+  var iw = window.innerWidth;
+  if (document.documentElement.scrollWidth > iw + 0.5) {
+    problems.push('page scrollWidth ' + document.documentElement.scrollWidth + ' > ' + iw);
+  }
+  var bar = document.querySelector('.vp-bar');
+  if (!bar) return JSON.stringify(['missing toolbar']);
+  if (!bar.hasAttribute('data-hscroll')) problems.push('toolbar missing data-hscroll');
+  var st = getComputedStyle(bar);
+  if (st.flexWrap !== 'nowrap') problems.push('toolbar wrap ' + st.flexWrap);
+  if (st.overflowX !== 'auto' && st.overflowX !== 'scroll') problems.push('toolbar overflow-x ' + st.overflowX);
+  if (st.scrollSnapType.indexOf('x') < 0 || st.scrollSnapType.indexOf('mandatory') < 0) {
+    problems.push('toolbar snap ' + st.scrollSnapType);
+  }
+  var buttons = bar.querySelectorAll('button');
+  if (!buttons.length) problems.push('toolbar has no buttons');
+  var top = null;
+  var btnH = 0;
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    var r = b.getBoundingClientRect();
+    var bst = getComputedStyle(b);
+    if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+      problems.push('toolbar button ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+    }
+    if (bst.flexGrow !== '0' || bst.flexShrink !== '0') {
+      problems.push('toolbar button flex ' + bst.flexGrow + ' ' + bst.flexShrink);
+    }
+    if (top === null) {
+      top = r.top;
+      btnH = r.height;
+    } else if (Math.abs(r.top - top) > 0.5) {
+      problems.push('toolbar button top ' + r.top.toFixed(1) + ' vs ' + top.toFixed(1));
+    }
+  }
+  var br = bar.getBoundingClientRect();
+  var pad = parseFloat(st.paddingTop) + parseFloat(st.paddingBottom);
+  var border = parseFloat(st.borderTopWidth) + parseFloat(st.borderBottomWidth);
+  var limit = btnH + pad + border + 0.5;
+  if (br.height > limit) problems.push('toolbar height ' + br.height.toFixed(1) + ' > ' + limit.toFixed(1));
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def toolbar_row_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, TOOLBAR_ROW_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"toolbar row {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"toolbar row {raw}"]
+    if not isinstance(found, list):
+        return [f"toolbar row {raw}"]
     return [str(item) for item in found]
+
+
+CHROME_ROW_EXPR = r"""
+(function(){
+  var problems = [];
+  var tree = document.querySelector('[data-drawer="browser"]');
+  var info = document.querySelector('[data-drawer="inspector"]');
+  var name = document.getElementById('docName');
+  if (!tree || !info || !name) return JSON.stringify(['missing tree, info, or part name']);
+  function box(el) { return el.getBoundingClientRect(); }
+  var tr = box(tree);
+  var ir = box(info);
+  var nr = box(name);
+  if (tr.width + 0.5 < 44 || tr.height + 0.5 < 44) problems.push('Tree ' + tr.width.toFixed(1) + 'x' + tr.height.toFixed(1));
+  if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
+  if (Math.abs(tr.top - ir.top) > 0.5) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  if (ir.right > nr.left + 0.5) problems.push('Info is not left of the part name');
+  var buttons = document.querySelectorAll('.topbar button');
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    if (b.closest('[hidden]')) continue;
+    var st = getComputedStyle(b);
+    if (st.display === 'none' || st.visibility === 'hidden') continue;
+    var r = b.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+      var label = b.getAttribute('aria-label') || b.getAttribute('data-tool') || b.textContent || '';
+      problems.push(String(label).trim().slice(0, 24) + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+    }
+  }
+  var nrBox = box(name);
+  if (!(nrBox.width > 0) || !(nrBox.height > 0)) {
+    problems.push('part name box ' + nrBox.width.toFixed(1) + 'x' + nrBox.height.toFixed(1));
+  }
+  if (nrBox.right <= 0 || nrBox.left >= window.innerWidth || nrBox.bottom <= 0 || nrBox.top >= window.innerHeight) {
+    problems.push('part name offscreen ' + nrBox.left.toFixed(1) + ',' + nrBox.top.toFixed(1));
+  }
+  var ns = getComputedStyle(name);
+  var nameMin = parseFloat(ns.minWidth);
+  if (!(nameMin >= 64) || !(nameMin <= 96)) problems.push('part name min-width ' + ns.minWidth);
+  if (ns.overflowX !== 'hidden' && ns.overflowX !== 'clip' && ns.overflow !== 'hidden' && ns.overflow !== 'clip') {
+    problems.push('part name overflow ' + ns.overflowX);
+  }
+  if (ns.textOverflow !== 'ellipsis') problems.push('part name text-overflow ' + ns.textOverflow);
+  var savedName = name.value;
+  name.value = 'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM';
+  if (name.scrollWidth <= name.clientWidth + 1) problems.push('part name did not truncate');
+  name.value = savedName;
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def chrome_row_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, CHROME_ROW_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"chrome row {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"chrome row {raw}"]
+    if not isinstance(found, list):
+        return [f"chrome row {raw}"]
+    return [str(item) for item in found]
+
+
+SEARCH_DISCLOSURE_EXPR = r"""
+(function(){
+  var problems = [];
+  function box(el) { return el.getBoundingClientRect(); }
+  var btn = document.getElementById('searchBtn');
+  var dlg = document.getElementById('searchDlg');
+  var input = document.getElementById('searchInput');
+  var bar = document.querySelector('.vp-bar');
+  if (!btn || !dlg || !input || !bar) return JSON.stringify(['missing search chrome']);
+  var searchButtons = [];
+  var allBtns = document.querySelectorAll('button');
+  for (var s = 0; s < allBtns.length; s++) {
+    var candidate = allBtns[s];
+    var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.getAttribute('title') || '') + ' ' + (candidate.getAttribute('data-tool') || '')).toLowerCase();
+    var icon = candidate.querySelector('use');
+    var href = icon ? (icon.getAttribute('href') || '') : '';
+    if (label.indexOf('search') !== -1 || href === '#i-search') searchButtons.push(candidate);
+  }
+  if (searchButtons.length !== 1) problems.push('search buttons ' + searchButtons.length);
+  else if (searchButtons[0] !== btn) problems.push('search button is not the disclosure');
+  var searchBox = box(btn);
+  var searchStyle = getComputedStyle(btn);
+  if (searchStyle.display === 'none' || searchStyle.visibility === 'hidden' || !(searchBox.width > 0) || !(searchBox.height > 0)) {
+    problems.push('search button hidden');
+  }
+  if (searchBox.right <= 0 || searchBox.left >= window.innerWidth || searchBox.bottom <= 0 || searchBox.top >= window.innerHeight) {
+    problems.push('search button offscreen');
+  }
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
+    problems.push('missing interactive-widget');
+  }
+  if (btn.getAttribute('aria-controls') !== 'searchDlg') problems.push('aria-controls');
+  if (btn.getAttribute('aria-expanded') !== 'false') problems.push('aria-expanded start ' + btn.getAttribute('aria-expanded'));
+  var br = box(btn);
+  if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
+    problems.push('search button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
+  }
+  if (!dlg.hidden) problems.push('dialog not hidden');
+  var dr = box(dlg);
+  if (dr.width > 0.5 || dr.height > 0.5) problems.push('collapsed size ' + dr.width.toFixed(1) + 'x' + dr.height.toFixed(1));
+  try { input.focus(); } catch (err) {}
+  if (document.activeElement === input) problems.push('collapsed input took focus');
+  var barTop = box(bar).top;
+  btn.click();
+  if (dlg.hidden) problems.push('dialog stayed hidden');
+  if (btn.getAttribute('aria-expanded') !== 'true') problems.push('aria-expanded open ' + btn.getAttribute('aria-expanded'));
+  if (document.activeElement !== input) problems.push('open focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  var list = document.getElementById('searchList');
+  var results = list ? list.querySelectorAll('button') : [];
+  if (!results.length) problems.push('no search results');
+  var st = getComputedStyle(dlg);
+  if (st.position !== 'fixed' && st.position !== 'absolute') problems.push('dialog position ' + st.position);
+  var vv = window.visualViewport;
+  var viewTop = vv ? vv.offsetTop : 0;
+  var viewBottom = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
+  var openBox = box(dlg);
+  if (openBox.bottom > viewBottom + 1 || openBox.top < viewTop - 1) problems.push('dialog outside visual viewport');
+  var visible = 0;
+  for (var i = 0; i < results.length; i++) {
+    var rr = box(results[i]);
+    if (rr.height > 1 && rr.top >= viewTop - 1 && rr.bottom <= viewBottom + 1) visible++;
+  }
+  if (!visible) problems.push('no result inside visual viewport');
+  if (Math.abs(box(bar).top - barTop) > 0.5) problems.push('tool row moved ' + box(bar).top.toFixed(1) + ' vs ' + barTop.toFixed(1));
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
+  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('esc did not collapse');
+  if (document.activeElement !== btn) problems.push('esc focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  btn.click();
+  var canvas = document.getElementById('canvas');
+  if (canvas) canvas.click();
+  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('outside did not collapse');
+  if (document.activeElement !== btn) problems.push('outside focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  btn.click();
+  btn.click();
+  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('icon did not collapse');
+  if (document.activeElement !== btn) problems.push('icon focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  var end = box(dlg);
+  if (end.width > 0.5 || end.height > 0.5) problems.push('recollapsed size ' + end.width.toFixed(1) + 'x' + end.height.toFixed(1));
+  try { input.focus(); } catch (err2) {}
+  if (document.activeElement === input) problems.push('recollapsed input took focus');
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def search_disclosure_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, SEARCH_DISCLOSURE_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"search {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"search {raw}"]
+    if not isinstance(found, list):
+        return [f"search {raw}"]
+    return [str(item) for item in found]
+
+
+def read_home_aim(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
+    raw, err = eval_expr(
+        cdp,
+        "(function(){var a=window.__cadcamHomeAim&&window.__cadcamHomeAim();return a?JSON.stringify(a):'';})()",
+    )
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return None, str(raw or err or "no home aim")
+    try:
+        aim = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, raw
+    if not isinstance(aim, dict):
+        return None, raw
+    return aim, ""
+
+
+def home_target_ready(aim: dict[str, Any], selected: bool) -> bool:
+    target = aim.get("target")
+    if not isinstance(target, list) or len(target) != 3:
+        return False
+    if any(abs(float(v)) > 1e-6 for v in target):
+        return False
+    count = int(aim.get("selectionCount") or 0)
+    sel_ok = count > 0 if selected else count == 0
+    return aim.get("allInside") is True and int(aim.get("corners") or 0) == 8 and sel_ok
+
+
+def wait_home_aim(cdp: Cdp, label: str, selected: bool) -> list[str]:
+    clicked, err = eval_expr(
+        cdp,
+        "(function(){var b=document.getElementById('vcHome');if(!b)return 'missing';b.click();return 'ok';})()",
+    )
+    if clicked != "ok":
+        return [f"{label} home click {clicked or err}"]
+    last: dict[str, Any] | None = None
+    deadline = time.time() + 2.5
+    while time.time() < deadline:
+        aim, _why = read_home_aim(cdp)
+        if aim is None:
+            time.sleep(0.1)
+            continue
+        last = aim
+        if home_target_ready(aim, selected):
+            return []
+        time.sleep(0.1)
+    return [f"{label} home {json.dumps(last)}"]
+
+
+def home_aim_round(cdp: Cdp, label: str) -> list[str]:
+    problems = wait_home_aim(cdp, label + " selected", True)
+    if problems:
+        return problems
+    raw, err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"select\"][data-mode=\"vertex\"]');"
+        "if(!b)return 'missing';b.click();var a=window.__cadcamHomeAim?window.__cadcamHomeAim():{};"
+        "return String(a.selectionCount);})()",
+    )
+    if str(raw) != "0":
+        return [f"{label} vertex selection {raw or err}"]
+    return wait_home_aim(cdp, label + " clear", False)
+
+
+def set_desktop(cdp: Cdp) -> None:
+    cdp.call(
+        "Emulation.setDeviceMetricsOverride",
+        {
+            "width": 1280,
+            "height": 800,
+            "deviceScaleFactor": 1,
+            "mobile": False,
+        },
+    )
 
 
 SHEET_HIT_EXPR = r"""
@@ -1148,6 +1451,7 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         return [f"portrait emulation failed: {exc}"]
     problems: list[str] = []
     inspector_checked = False
+    search_checked = False
     for spec in PORTRAIT:
         kind = str(spec["kind"])
         url = origin + "/"
@@ -1163,6 +1467,13 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             if closed:
                 problems.append(f"portrait {kind} closed inspector")
                 problems.extend(closed)
+                return problems
+        if not search_checked:
+            search_checked = True
+            search_found = search_disclosure_problems(cdp)
+            if search_found:
+                problems.append(f"portrait {kind} search")
+                problems.extend(search_found)
                 return problems
         raw, err = eval_expr(cdp, toolbar_point_expr(kind))
         if err or not isinstance(raw, str) or not raw.startswith("{"):
@@ -1190,6 +1501,17 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             problems.append(f"portrait {kind} overflow")
             problems.extend(fit_problems)
             return problems
+        if kind == "box":
+            home_found = home_aim_round(cdp, "portrait")
+            if home_found:
+                problems.append("portrait home")
+                problems.extend(home_found)
+                return problems
+            eval_expr(
+                cdp,
+                "(function(){var b=document.querySelector('[data-action=\"select\"][data-mode=\"item\"]');"
+                "if(b)b.click();return 'ok';})()",
+            )
         expand_problems = tap_selector(cdp, "#dimToggle", f"portrait {kind} expand")
         if expand_problems:
             problems.extend(expand_problems)
@@ -1872,6 +2194,37 @@ def run(omit: list[str]) -> int:
                     failures.extend(problems[:40])
                     break
                 print(f"boolean_{op}: gate PASS, {elapsed:.1f}s", flush=True)
+        if not failures:
+            try:
+                set_desktop(cdp)
+            except (RuntimeError, TimeoutError, OSError) as exc:
+                failures.append(f"desktop toolbar metrics {exc}")
+            else:
+                time.sleep(0.3)
+                desktop_bar = toolbar_row_problems(cdp)
+                desktop_bar.extend(chrome_row_problems(cdp))
+                desktop_bar.extend(search_disclosure_problems(cdp))
+                if desktop_bar:
+                    failures.append("desktop toolbar")
+                    failures.extend(desktop_bar[:40])
+        if not failures:
+            home_url = origin + "/?primitive=box"
+            print(f"load home {home_url}", flush=True)
+            _home_state, home_load = wait_for_case(cdp, origin, home_url, PAGE_TIMEOUT_S)
+            if home_load:
+                failures.append("home load")
+                failures.extend(home_load[:40])
+            else:
+                try:
+                    set_desktop(cdp)
+                except (RuntimeError, TimeoutError, OSError) as exc:
+                    failures.append(f"home desktop metrics {exc}")
+                else:
+                    time.sleep(0.3)
+                    home_found = home_aim_round(cdp, "desktop")
+                    if home_found:
+                        failures.append("desktop home")
+                        failures.extend(home_found[:40])
         if not failures:
             portrait_problems = run_portrait(cdp, origin)
             if portrait_problems:

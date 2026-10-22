@@ -81,6 +81,97 @@ export function threeDeltaToCad(dx, dy, dz) {
   return { x: dx, y: dz, z: dy };
 }
 
+// CAD (x, y, z) is drawn as (x, z, y). That swap is a reflection, so the
+// triangle order is swapped as well. STL keeps CAD order. Without the swap,
+// vertex normals on a cut face point into the solid and a countersink shades
+// as a bump.
+export function viewerBuffersFromCad(vertices, triangles) {
+  const verts = vertices || [];
+  const tris = triangles || [];
+  const positions = new Float32Array(verts.length * 3);
+  for (let i = 0; i < verts.length; i += 1) {
+    const p = verts[i];
+    positions[i * 3] = p[0];
+    positions[i * 3 + 1] = p[2];
+    positions[i * 3 + 2] = p[1];
+  }
+  const indices = new Uint32Array(tris.length * 3);
+  for (let i = 0; i < tris.length; i += 1) {
+    const tri = tris[i];
+    indices[i * 3] = tri[0];
+    indices[i * 3 + 1] = tri[2];
+    indices[i * 3 + 2] = tri[1];
+  }
+  return { positions: positions, indices: indices };
+}
+
+export function viewerBuffersFromFlat(positions, indices) {
+  const src = positions || [];
+  const idx = indices || [];
+  const count = Math.floor(src.length / 3);
+  const xyz = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    xyz[i * 3] = src[i * 3];
+    xyz[i * 3 + 1] = src[i * 3 + 2];
+    xyz[i * 3 + 2] = src[i * 3 + 1];
+  }
+  const out = new Uint32Array(Math.floor(idx.length / 3) * 3);
+  for (let i = 0; i + 2 < idx.length; i += 3) {
+    out[i] = idx[i];
+    out[i + 1] = idx[i + 2];
+    out[i + 2] = idx[i + 1];
+  }
+  return { positions: xyz, indices: out };
+}
+
+// Same accumulation as three.js computeVertexNormals: area-weighted face
+// normals, then normalized per vertex.
+export function viewerVertexNormals(positions, indices) {
+  const count = Math.floor(positions.length / 3);
+  const normals = new Float32Array(count * 3);
+  for (let i = 0; i + 2 < indices.length; i += 3) {
+    const ia = indices[i] * 3;
+    const ib = indices[i + 1] * 3;
+    const ic = indices[i + 2] * 3;
+    const ax = positions[ia];
+    const ay = positions[ia + 1];
+    const az = positions[ia + 2];
+    const bx = positions[ib];
+    const by = positions[ib + 1];
+    const bz = positions[ib + 2];
+    const cx = positions[ic];
+    const cy = positions[ic + 1];
+    const cz = positions[ic + 2];
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    normals[ia] += nx;
+    normals[ia + 1] += ny;
+    normals[ia + 2] += nz;
+    normals[ib] += nx;
+    normals[ib + 1] += ny;
+    normals[ib + 2] += nz;
+    normals[ic] += nx;
+    normals[ic + 1] += ny;
+    normals[ic + 2] += nz;
+  }
+  for (let i = 0; i < count; i += 1) {
+    const len = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+    if (len > 0) {
+      normals[i * 3] /= len;
+      normals[i * 3 + 1] /= len;
+      normals[i * 3 + 2] /= len;
+    }
+  }
+  return normals;
+}
+
 export function readCssColor(name) {
   if (typeof document === 'undefined') return '';
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
