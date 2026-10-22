@@ -382,8 +382,244 @@ def canvas_pixel_problems(page: Any, engine: str) -> list[str]:
     return []
 
 
+def _toast_text(page: Any) -> list[str]:
+    value = page.evaluate(
+        "() => Array.from(document.querySelectorAll('#toasts .toast')).map(function (node) {"
+        "return node.textContent || '';"
+        "})"
+    )
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _wait_toasts(page: Any, timeout: float = 4.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _toast_text(page):
+            return True
+        page.wait_for_timeout(100)
+    return False
+
+
+def _is_plate_blue(r: int, g: int, b: int) -> bool:
+    return b > 110 and g > 80 and b > r + 25 and r < 170
+
+
+def _is_label_light(r: int, g: int, b: int) -> bool:
+    return r > 170 and g > 180 and b > 180
+
+
+def _near(r: int, g: int, b: int, rr: int, gg: int, bb: int, tol: int) -> bool:
+    return abs(r - rr) <= tol and abs(g - gg) <= tol and abs(b - bb) <= tol
+
+
+def _frame_pixels(png: bytes, aim: dict[str, Any], cube: dict[str, Any]) -> list[str]:
+    """The presented canvas, not the CSS projection, has to hold the plate."""
+    width, height, rgb = decode_png_rgb(png)
+    plate = aim.get("plate")
+    if not isinstance(plate, dict):
+        return ["webkit screenshot: no plate bounds"]
+    try:
+        css_w = float(plate["canvasW"])
+        css_h = float(plate["canvasH"])
+        min_x = float(plate["minX"])
+        min_y = float(plate["minY"])
+        max_x = float(plate["maxX"])
+        max_y = float(plate["maxY"])
+        cube_x = float(cube["x"])
+        cube_y = float(cube["y"])
+        cube_w = float(cube["w"])
+        cube_h = float(cube["h"])
+    except (KeyError, TypeError, ValueError):
+        return [f"webkit screenshot: plate bounds {plate!r} cube {cube!r}"]
+    if css_w < 2 or css_h < 2 or width < 2 or height < 2:
+        return [f"webkit screenshot: canvas {css_w}x{css_h} png {width}x{height}"]
+    margin = 12.0
+    if min_x < margin or min_y < margin or max_x > css_w - margin or max_y > css_h - margin:
+        return [
+            "webkit screenshot: plate touches the canvas edge "
+            f"{min_x:.1f},{min_y:.1f} {max_x:.1f},{max_y:.1f} on {css_w:.0f}x{css_h:.0f}"
+        ]
+    sx = width / css_w
+    sy = height / css_h
+
+    def colors(x0: float, y0: float, x1: float, y1: float) -> list[tuple[int, int, int]]:
+        left = max(0, min(width - 1, int(x0 * sx)))
+        right = max(left + 1, min(width, int(x1 * sx)))
+        top = max(0, min(height - 1, int(y0 * sy)))
+        bottom = max(top + 1, min(height, int(y1 * sy)))
+        found: list[tuple[int, int, int]] = []
+        for y in range(top, bottom):
+            row = y * width
+            for x in range(left, right):
+                i = (row + x) * 3
+                found.append((rgb[i], rgb[i + 1], rgb[i + 2]))
+        return found
+
+    cx = (min_x + max_x) * 0.5
+    cy = (min_y + max_y) * 0.5
+    center = colors(cx - 8, cy - 8, cx + 8, cy + 8)
+    plate_hits = sum(1 for r, g, b in center if _is_plate_blue(r, g, b))
+    if not center or plate_hits * 2 < len(center):
+        mid = center[len(center) // 2] if center else None
+        return [
+            "webkit screenshot: plate centre is not the body "
+            f"{plate_hits}/{len(center)} {mid}"
+        ]
+    corner = colors(4, css_h - 18, 18, css_h - 4)
+    if any(_is_plate_blue(r, g, b) for r, g, b in corner):
+        return ["webkit screenshot: plate still fills a canvas corner"]
+    inset = 0.18
+    cube_colors = colors(
+        cube_x + cube_w * inset,
+        cube_y + cube_h * inset,
+        cube_x + cube_w * (1 - inset),
+        cube_y + cube_h * (1 - inset),
+    )
+    lights = sum(1 for r, g, b in cube_colors if _is_label_light(r, g, b))
+    blues = sum(1 for r, g, b in cube_colors if _is_plate_blue(r, g, b))
+    if lights < 8 or (cube_colors and blues * 2 > len(cube_colors)):
+        return [
+            "webkit screenshot: view cube not drawn "
+            f"lights={lights} blues={blues}/{len(cube_colors)}"
+        ]
+    grid = 0
+    step = 3
+    for y in range(0, height, step):
+        css_y = y / sy
+        if cube_y - 2 <= css_y <= cube_y + cube_h + 2:
+            continue
+        if min_y - 4 <= css_y <= max_y + 4:
+            continue
+        row = y * width
+        for x in range(0, width, step):
+            css_x = x / sx
+            if cube_x - 2 <= css_x <= cube_x + cube_w + 2:
+                continue
+            if min_x - 4 <= css_x <= max_x + 4:
+                continue
+            i = (row + x) * 3
+            r, g, b = rgb[i], rgb[i + 1], rgb[i + 2]
+            if _is_plate_blue(r, g, b):
+                continue
+            if _near(r, g, b, 110, 143, 150, 36) or _near(r, g, b, 30, 74, 82, 16):
+                grid += 1
+    if grid < 8:
+        return [f"webkit screenshot: grid not in frame ({grid} px)"]
+    return []
+
+
+def _frame_plate(page: Any, cdp: PwCdp) -> list[str]:
+    """Home, then an empty tap so the plate, grid, and view cube are unobstructed."""
+    home = deploy_smoke.tap_selector(cdp, "#vcHome", "webkit home")
+    if home:
+        return home
+    deadline = time.time() + 4
+    aim: Any = None
+    while time.time() < deadline:
+        cdp.drain(0.15)
+        aim = page.evaluate("() => window.__cadcamHomeAim ? window.__cadcamHomeAim() : null")
+        if isinstance(aim, dict):
+            target = aim.get("target") or [9, 9, 9]
+            try:
+                settled = (
+                    abs(float(target[0])) < 0.05
+                    and abs(float(target[1])) < 0.05
+                    and abs(float(target[2])) < 0.05
+                    and aim.get("allInside") is True
+                    and int(aim.get("corners") or 0) == 8
+                )
+            except (TypeError, ValueError, IndexError):
+                settled = False
+            if settled:
+                break
+    else:
+        return [f"webkit screenshot: home aim {aim!r}"]
+    points = page.evaluate(
+        """() => {
+          const canvas = document.getElementById('canvas').getBoundingClientRect();
+          const panel = document.getElementById('dimPanel');
+          const pr = panel ? panel.getBoundingClientRect() : null;
+          const pts = [];
+          for (let i = 0; i < 8; i += 1) {
+            const x = canvas.left + 18 + (i % 2) * 22;
+            const y = canvas.top + canvas.height * (0.58 + i * 0.04);
+            const onPanel = pr && x >= pr.left && x <= pr.right && y >= pr.top && y <= pr.bottom;
+            if (!onPanel && y > canvas.top + 8 && y < canvas.bottom - 8) pts.push({x: x, y: y});
+          }
+          return pts;
+        }"""
+    )
+    if not isinstance(points, list) or not points:
+        return ["webkit screenshot: no empty-canvas point"]
+    cleared = False
+    last: Any = None
+    for point in points:
+        if not isinstance(point, dict):
+            continue
+        page.touchscreen.tap(float(point["x"]), float(point["y"]))
+        cdp.drain(0.25)
+        payload = deploy_smoke.eval_state(cdp)
+        state = (payload or {}).get("state") if isinstance(payload, dict) else None
+        last = state
+        if (
+            isinstance(state, dict)
+            and int(state.get("selectionCount") or 0) == 0
+            and int(state.get("holeCount") or 0) == 3
+            and state.get("gateOcct") == "PASS"
+        ):
+            cleared = True
+            break
+    if not cleared:
+        count = last.get("selectionCount") if isinstance(last, dict) else None
+        return [f"webkit screenshot: selection stayed {count!r}"]
+    aim = page.evaluate("() => window.__cadcamHomeAim ? window.__cadcamHomeAim() : null")
+    if not isinstance(aim, dict) or aim.get("allInside") is not True:
+        return [f"webkit screenshot: plate left the frame {aim!r}"]
+    plate = aim.get("plate") if isinstance(aim.get("plate"), dict) else {}
+    print(
+        "webkit home "
+        f"target={aim.get('target')} "
+        f"plate=({plate.get('minX')},{plate.get('minY')})-({plate.get('maxX')},{plate.get('maxY')}) "
+        f"css={plate.get('canvasW')}x{plate.get('canvasH')} "
+        f"buf={plate.get('buffer')} dpr-cam={plate.get('cam')}",
+        flush=True,
+    )
+    cube = page.evaluate(
+        """() => {
+          const el = document.getElementById('viewCube');
+          const canvas = document.getElementById('canvas');
+          const r = el.getBoundingClientRect();
+          const c = canvas.getBoundingClientRect();
+          return {x: r.x - c.x, y: r.y - c.y, w: r.width, h: r.height,
+            pageX: r.x, pageY: r.y,
+            vw: window.innerWidth, vh: window.innerHeight};
+        }"""
+    )
+    if not isinstance(cube, dict):
+        return ["webkit screenshot: view cube missing"]
+    try:
+        inside = (
+            float(cube["w"]) >= 32
+            and float(cube["h"]) >= 32
+            and float(cube["pageX"]) >= -1
+            and float(cube["pageY"]) >= -1
+            and float(cube["pageX"]) + float(cube["w"]) <= float(cube["vw"]) + 1
+            and float(cube["pageY"]) + float(cube["h"]) <= float(cube["vh"]) + 1
+        )
+    except (KeyError, TypeError, ValueError):
+        inside = False
+    if not inside:
+        return [f"webkit screenshot: view cube {cube!r}"]
+    if not _wait_toasts(page):
+        return [f"webkit screenshot: toast still up {_toast_text(page)!r}"]
+    png = page.locator("#canvas").screenshot(animations="disabled")
+    return _frame_pixels(png, aim, cube)
+
+
 def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
-    """Save the WebKit plate collapsed, then with the dimension panel open."""
+    """Home and clear the selection, then save the plate collapsed and open."""
     shots = Path.home() / "Pictures" / "cadmvp-shots"
     shots.mkdir(parents=True, exist_ok=True)
     payload = deploy_smoke.eval_state(cdp)
@@ -395,6 +631,9 @@ def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
             "webkit screenshot: plate gate "
             f"{state.get('gateOcct')!r} holes {state.get('holeCount')!r}"
         ]
+    framed = _frame_plate(page, cdp)
+    if framed:
+        return framed
     collapsed = shots / "wasm-webkit-portrait.png"
     page.screenshot(path=str(collapsed))
     print(f"screenshot {collapsed}", flush=True)
@@ -407,6 +646,8 @@ def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
         payload = deploy_smoke.eval_state(cdp)
         state = (payload or {}).get("state") if isinstance(payload, dict) else None
         if isinstance(state, dict) and state.get("dimSheetOpen") is True:
+            if not _wait_toasts(page):
+                return [f"webkit screenshot: open toast {_toast_text(page)!r}"]
             open_path = shots / "wasm-webkit-portrait-open.png"
             page.screenshot(path=str(open_path))
             print(f"screenshot {open_path}", flush=True)

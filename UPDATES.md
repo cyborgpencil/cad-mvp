@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-22
 
+- Merged main `fbd0947` into the nav-cube branch. The phone cube and the gizmo/undo stack both stay. The view-cube scissor uses `cubeRect` in CSS pixels, because `setViewport` and `setScissor` already multiply by the pixel ratio.
 - Nav-cube smoke double-tap is two pointer-ups 80 ms apart inside one page turn. A CDP round trip between taps was missing the 320 ms window and leaving the camera on the first face.
 - Phone nav cube on the existing `#viewCube`: 88 px, top-right, safe-area inset, 6 face and 8 corner taps at 44 px extending past the cube, edge taps desktop-only, double-tap home iso, ViewHelper-style orbit snap eased over 250 ms at the current orbit distance. The smoke check accepts a late headless frame. Checks live in `tests/deploy_smoke.py` and `tests/phone_smoke.py` (phone_smoke still exits 77 when Playwright is missing). Units stay mm. No `src/` or bindings edits. Recorded in `web/PROGRESS.md`.
 
@@ -257,3 +258,9 @@ Newest entries at the top.
 - Cost: fix session unknown (watchdog stop 03:29). Running total $5.48 + 2 unknown.
 - 03:39 MT: Unknown-cost session times (Pilot): 01a1629d 01:55-02:43 MT, done marker 02:33 (~38 min working); WebKit-blank fix ~02:55-03:29 MT (watchdog stop). Cost estimate TBD until a per-minute rate or Grok session-file cost is available. Push approved (Chief + 3T); next batch order: gizmo bug, then screenshot Home/no-selection fix + Dimensions box check, then undo/redo.
 - 03:40 MT: Grok post-DONE hang explained (Pilot): background tasks it started kept triggering new turns; out.json written only on exit; watchdog killed too early. Provisional costs via grok usage (assumes 1e10 ticks per dollar, unit unconfirmed): 01a1629d ~$3.15 (2188 s), 01a162cd ~$3.06 (2271 s). Confirmed total stays $5.48; provisional $11.69 once Pilot confirms the unit. Launcher changes from gizmo batch: streaming-json output, stdin closed + -s session id, watchdog waits DONE + last turn_completed + 120 s idle then taskkill /T, prompt kills its background tasks before DONE.
+- 04:33 MT: nav-cube and save-load prompts cleaned to match Pilot's overrides (edge taps desktop-only, commit on PR branch, checks in phone_smoke.py with exit-77 skip). Nav cube Cursor agent launched by 3T (bc-c6892f6a).
+- 04:35 MT: project-save-load.md finalized and posted for launch (intro points to Chief format, round trip without Boolean at 0.01 tolerance, clearUndo hook since undo doesn't exist yet). Open for Chief (Research Digest): where undo/redo gets built, unlocked resize of non-primitives, phone trash icon placement, face-removal fixture.
+- 04:36 MT: Chief rulings from 04:33 logged in DECISIONS and added to type-in-resize.md and selection-and-delete.md. The save-load undo line now points to the gizmo batch's stack. All of this is uncommitted, for Repo Keeper.
+- 04:49 MT: Nav cube agent opened PR #1 (cursor/nav-cube-mobile-0865, +717/-32, 5 files, no C++). Merge waits on the build check. Doc review of save-load, type-in-resize and selection-and-delete is done.
+- 05:25 MT: PR #2 save/load is green (temp-file BRep, b2f43b1 for Erik). The gizmo root cause is found and the fix is in progress. Docs commit 63938fb is local only.
+- 06:05 MT: The gizmo batch finished on Z13 with all checks green, uncommitted. Cost unit confirmed at 1e10 ticks per dollar: 01a1629d is $3.149, 01a162cd is $3.058 and 417dfb52 is $6.61, all confirmed. The running Grok cost total is about $18.30 ($5.48 + $3.149 + $3.058 + $6.61), with nothing provisional left.
