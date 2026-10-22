@@ -2,8 +2,10 @@ name: CI (build and test, no deploy)
 
 on:
   pull_request:
+    paths-ignore: ['**/*.md', 'research/**', 'prompts/**']
   push:
-    branches-ignore: [main]
+    branches: [main]
+    paths-ignore: ['**/*.md', 'research/**', 'prompts/**']
   workflow_dispatch:
 
 permissions:

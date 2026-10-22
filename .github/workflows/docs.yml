@@ -1,0 +1,24 @@
+# Docs-only changes skip the native C++ build. ci.yml lists **/*.md,
+# research/**, and prompts/** in paths-ignore, so that workflow does not
+# run when a pull request or a push to main touches only those paths.
+# Branch protection on main requires the status check named "build"
+# (ci.yml job id `build`, with no job name). This workflow uses the same
+# job id and reports that check as a pass for docs-only changes.
+
+name: Docs (skip native build)
+
+on:
+  pull_request:
+    paths: ['**/*.md', 'research/**', 'prompts/**']
+  push:
+    branches: [main]
+    paths: ['**/*.md', 'research/**', 'prompts/**']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "docs-only changes skip the native build"
