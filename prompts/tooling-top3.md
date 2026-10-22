@@ -14,7 +14,7 @@ Goal: let agents drive the browser app for acceptance tests A and B and capture 
 Scope: add a project MCP config for Playwright MCP (Apache-2.0, `npx @playwright/mcp@latest`). Per the digest, Grok Build reads `.cursor/mcp.json` and `.mcp.json`, so one config can serve Grok Build and Cursor. Out of scope: capturing the OrcaSlicer desktop window (no sourced MCP tool; TBD).
 Steps:
 1. Research first: re-read the digest links (github.com/microsoft/playwright-mcp, playwright.dev/mcp/tools/screenshots) and post a short plan.
-2. Add the project MCP config (file location: `.mcp.json` vs `.cursor/mcp.json` = TBD, pick one and say why).
+2. Add the project MCP config (file location: `.cursor/mcp.json`, Cursor's documented project file, which Grok Build also reads; source: research/cursor-and-tooling.md).
 3. Use `browser_take_screenshot` on the Pages build at desktop and 390x844 portrait; save PNGs to `builds\screenshots\<ID>-<step>.png`.
 4. Drive one acceptance flow end to end and record the steps.
 Checks: units readout shows mm; exported file passes the units check; screenshots saved; deploy_smoke still passes.
@@ -25,9 +25,9 @@ Goal: a test-side export check on every PR (MIT, `pip install` in CI).
 Scope: a Python check run by CI on exported STL/3MF: bounds and volume for size, plus an explicit `unit="millimeter"` assertion on 3MF. Do not use `is_watertight` as a gate (watertight dropped). Repair helpers: out of scope.
 Steps:
 1. Research first: trimesh docs (trimesh.org/trimesh.html) and the existing ci.yml; post a plan.
-2. Add the script under `tools/` (name TBD) and a step in the existing CI workflow (job placement TBD, Repo Keeper to confirm).
+2. Add the script as `tools/check_export.py` (units, bounds, volume and empty-mesh checks; watertight is not a gate) and a step after Native CTest in the existing `build` job (approved).
 3. Run it against current export fixtures (default 20 mm cube; others TBD).
-4. trimesh version pin: TBD.
+4. trimesh version pin: `trimesh==5.1.1`.
 Checks: units assertion present and failing on a non-mm file; bounds within the matrix tolerance; CI green; no printer send.
 Report back: script path, CI run link, fixtures checked with bounds/volume values, trimesh version, PR link.
 
