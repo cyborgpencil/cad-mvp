@@ -34,7 +34,7 @@ The prebuilt single-threaded module exports file-path `BRepTools.Write` and `BRe
 ## Next steps (Grok Build first)
 1. Native: add `vcpkg.json` with `opencascade` 8.0.1; CMake `find_package(OpenCASCADE)`; spike = box -> BRepCheck -> BRepMesh -> STL, ctest passes on Z13.
 2. WASM: install emsdk (user-level, no removals), build OCCT 8.0.1 static with only ModelingData/ModelingAlgorithms/Mesh modules, link the same core, record wasm size raw + brotli.
-3. Load on iPhone Safari + Windows browser; record load time and memory. Watertight + units (mm) checks required on every exported file.
+3. Load on iPhone Safari + Windows browser; record load time and memory. Units (mm) check required on every exported file (watertight dropped, 02:17 rule).
 
 ## Sources
 1. https://github.com/Open-Cascade-SAS/OCCT/releases

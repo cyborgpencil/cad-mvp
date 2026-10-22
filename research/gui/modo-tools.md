@@ -33,7 +33,7 @@ Sources are Foundry Modo docs (learn.foundry.com) unless noted. Hex colors: none
 3. Inactive tabs light gray, background tabs darker gray (Modo convention [4]). Exact values TBD.
 4. Tabs switch only on click. Don't auto-switch panels when the selection changes. [4]
 5. Show on-canvas tool handles (axis-colored per Modo's handle scheme [5]) with a live Preview toggle in tool Properties, the way Work Plane works. [7]
-6. Keep the 44 px touch targets and the Export gate (watertight + units) unchanged.
+6. Keep the 44 px touch targets and the Export gate (units only, 02:17 rule) unchanged.
 
 ## Sources
 1. https://learn.foundry.com/modo/current/content/help/pages/modo_interface/exploring_layout.html

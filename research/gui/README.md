@@ -1,6 +1,6 @@
 ﻿# GUI research note: Fusion-style layout, Blender-style ops, browser target
 
-Research Digest, 2026-10-21. Plan input only, no code. Feeds `mvp/gui-plan.md` (owned by Doc Steward). The GUI target is the **browser app only** (C++ + OpenCASCADE 8.0.1 -> Emscripten WASM, single-threaded, WebGL2; Chrome on Windows, Android, iPhone, where iPhone Chrome uses WebKit). The Qt `solid_view` is a native test harness only. Watertight + `unit="millimeter"` checks stay as an export gate. License and activity data checked 2026-10-21 via the GitHub API.
+Research Digest, 2026-10-21. Plan input only, no code. Feeds `mvp/gui-plan.md` (owned by Doc Steward). The GUI target is the **browser app only** (C++ + OpenCASCADE 8.0.1 -> Emscripten WASM, single-threaded, WebGL2; Chrome on Windows, Android, iPhone, where iPhone Chrome uses WebKit). The Qt `solid_view` is a native test harness only. The `unit="millimeter"` check is the export gate; watertight was dropped by the 02:17 rule (2026-10-22). License and activity data checked 2026-10-21 via the GitHub API.
 
 ## 1. Fusion layout reference [A1-A5]
 
@@ -67,7 +67,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 
 ## 6. Feasibility on OpenCASCADE (WASM)
 
-- Every row in section 2's B-rep column is a documented OCCT algorithm [C2][C3]. These are B-rep ops, so the watertight gate runs on the tessellated result.
+- Every row in section 2's B-rep column is a documented OCCT algorithm [C2][C3]. These are B-rep ops, so the OCCT validity check runs on the B-rep result.
 - **Add OCCT B-rep alongside existing code**: today's Qt fillet (`fillet_box_edge`) and cut are the team's own mesh code, and per Erik's rule they stay as-is (no rewrites or deletions). Proposal: add OCCT versions next to them (fillet/chamfer -> `BRepFilletAPI_*`, cut/union -> `BRepAlgoAPI_*`, extrude -> `BRepPrimAPI_MakePrism`, tessellated for display and STL/3MF). Current tests and expected values, including O5b, stay unchanged. Any change to existing code needs a reason posted in the room first.
 - **History**: OCCT has OCAF; `TNaming_NamedShape` stores old/new shape pairs (shape evolution) and supports topological naming, plus transaction undo/redo [C1]. This is the building block for a timeline but is not a ready Fusion-style timeline.
 - WASM: single-threaded build means long fillets/booleans block the UI unless run in a Worker (Worker use is TBD; not measured).
@@ -87,7 +87,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 - Playwright `expect(page).toHaveScreenshot()` makes baselines on first run, compares later; rendering varies by OS/GPU/headless, so generate baselines in the same environment [T1].
 - Device emulation: `devices['Desktop Chrome']`, `devices['iPhone 13']` (WebKit), and Pixel devices for Android-sized Chromium [T2].
 - Layout: baselines in `tests/gui/baselines/` (git-tracked), new captures in `builds/screenshots/`. Use fixed viewport, deterministic camera, disabled animations.
-- UX flows to script: sketch rectangle -> extrude -> fillet edge -> section -> measure -> toggle inch -> export, asserting the watertight gate line passes.
+- UX flows to script: sketch rectangle -> extrude -> fillet edge -> section -> measure -> toggle inch -> export, asserting the units gate line passes.
 
 ## Sources (fetched 2026-10-21)
 
@@ -127,7 +127,7 @@ Existing Qt sketch tools: line, rectangle, circle, distance, radius, horizontal,
 
 ## Next steps for Grok Build
 
-1. Plan-mode spike: add `BRepFilletAPI_MakeFillet` + `BRepAlgoAPI_Cut` paths in the WASM core alongside (not replacing) the mesh fillet/cut; keep existing tests and values, including O5b; run the watertight/units gate on the new path. Post a reason in the room before touching existing code.
+1. Plan-mode spike: add `BRepFilletAPI_MakeFillet` + `BRepAlgoAPI_Cut` paths in the WASM core alongside (not replacing) the mesh fillet/cut; keep existing tests and values, including O5b; run the units gate and OCCT validity check on the new path. Post a reason in the room before touching existing code.
 2. Prototype a three.js viewer shell (OrbitControls or camera-controls, ViewHelper, TransformControls, three-mesh-bvh face/edge picking) that maps picks to B-rep face/edge IDs.
 3. Build a PlaneGCS (`@salusoft89/planegcs`) sketch spike reproducing the current 8 sketch tools/constraints.
 4. Add a Playwright harness with Desktop Chrome, Pixel, and iPhone 13 projects; baselines to `tests/gui/baselines/`, captures to `builds/screenshots/`.

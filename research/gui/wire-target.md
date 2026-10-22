@@ -14,7 +14,7 @@ Updated 2026-10-21 (MT). Research Digest. Informs Erik's choice; does not decide
 | OCCT 8.0.1 build | Native MSVC via vcpkg `opencascade` port [4]; OCCT ships Qt Widgets samples historically [5] | Emscripten is an official OCCT target; `adm/scripts/wasm_build.bat` [3]; WebGL sample exists [5] |
 | Mockup reuse | Must be rebuilt in Qt Widgets/QML; the HTML is reference only | HTML/CSS mockup used directly; C++ core exposed via embind |
 | Phone reach (44 px, 390 px) | Desktop only as built. Phone needs Qt for WASM or Android build (proposal, unscoped) | Same page on desktop Chrome, Android, iPhone WebKit [ref occt-wasm] |
-| Watertight + units gate on Export | C++ call before `QFileDialog` save; gate lives in C++ | Same C++ gate called through embind; JS enables Export button only on pass |
+| Units gate on Export (watertight dropped, 02:17 rule) | C++ call before `QFileDialog` save; gate lives in C++ | Same C++ gate called through embind; JS enables Export button only on pass |
 | Export path | Normal file save to disk | Blob download, `showSaveFilePicker`, or Web Share (iPhone) [ref occt-wasm 19-21] |
 | Fit with Erik's prompt | Conflicts: Qt GUI listed out of scope | Matches `prompts/wasm-occt-core.md` |
 

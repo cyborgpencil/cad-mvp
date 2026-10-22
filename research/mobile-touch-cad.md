@@ -30,4 +30,4 @@ Scope: WASM + OpenCASCADE app, Three.js-style viewport, portrait phone. Every fi
 4. Use one-axis-at-a-time handles plus a Move / Rotate / Scale segmented control (44 px buttons).
 5. Add a numeric panel (`inputmode=decimal`, mm suffix) that stays in sync with the gizmo and writes back to the parametric feature.
 6. Snaps: translation in mm, rotation in degrees. Values TBD; ask Erik.
-7. After every transform commit: OCCT rebuild, watertight + mm gate, then a CTest and a portrait-viewport smoke tap test.
+7. After every transform commit: OCCT rebuild, OCCT validity check + mm gate (no watertight check, 02:17 rule), then a CTest and a portrait-viewport smoke tap test.
