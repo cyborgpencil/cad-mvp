@@ -2257,6 +2257,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     snap: true,
     lockProportions: true,
     lastResize: null,
+    lastMove: null,
     bboxMm: null,
     gizmoMode: 'move',
     dimSheetOpen: false,
@@ -2704,7 +2705,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function gizmoShouldShow() {
     if (state.holeTool) return false;
-    if (state.bodies.length > 1) return false;
+    if (state.bodies.length > 1) {
+      if ((state.gizmoMode || 'move') !== 'move') return false;
+      return !!activeEditBody();
+    }
     if (state.preview) return true;
     if (state.selection === 'item' && state.selectedIds.length > 0) return true;
     if (state.bodies.length === 1 && !state.primitive) return false;
@@ -2712,8 +2716,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return true;
   }
 
+  function positionEditable() {
+    if (state.holeTool) return false;
+    if (state.bodies.length > 1) return !!activeEditBody();
+    return gizmoShouldShow();
+  }
+
+  function anchorOf(body) {
+    const params = body && body.params;
+    const cx = params ? Number(params.cx) : NaN;
+    const cy = params ? Number(params.cy) : NaN;
+    const cz = params ? Number(params.cz) : NaN;
+    if (Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(cz)) {
+      return { x: cx, y: cy, z: cz };
+    }
+    const c = bodyCentroid(body);
+    return { x: c[0], y: c[1], z: c[2] };
+  }
+
   function primitiveEuler() {
-    const prim = state.primitive;
+    const prim = state.bodies.length > 1 ? sheetPrimitive() : state.primitive;
     if (!prim || !prim.params) return { rx: 0, ry: 0, rz: 0 };
     return {
       rx: Number(prim.params.rx) || 0,
@@ -2774,14 +2796,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     writeLength('posX', show.x);
     writeLength('posY', show.y);
     writeLength('posZ', show.z);
-    const on = gizmoShouldShow();
+    const on = positionEditable();
     x.disabled = !on;
     y.disabled = !on;
     z.disabled = !on;
+    const title = !on && state.bodies.length > 1 ? 'Select one part to move it.' : '';
+    x.title = title;
+    y.title = title;
+    z.title = title;
     state.writingFields = false;
   }
 
   function refreshAnchor() {
+    if (state.bodies.length > 1) {
+      const body = activeEditBody();
+      if (body) state.anchor = anchorOf(body);
+      writePosFields();
+      placeHandles();
+      return;
+    }
     const ids = state.selectedIds;
     const topo = state.topology;
     const itemish = ids.length === 0 || (ids.length === 1 && ids[0] === 'item');
@@ -4439,8 +4472,40 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return view;
   }
 
-  function moveOwnedShape(dx, dy, dz) {
-    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+  function flatForBody(body, viewMesh) {
+    let sceneMesh = viewMesh;
+    if (state.bodies.length > 1 && body) {
+      const savedMesh = body.mesh;
+      body.mesh = viewMesh;
+      sceneMesh = combineBodyMeshes(state.bodies);
+      body.mesh = savedMesh;
+    }
+    return primApi.flattenMesh(sceneMesh);
+  }
+
+  function finishMove(body, baked, shapeSame) {
+    if (state.bodies.length > 1) {
+      state.topology = null;
+      state.primitive = null;
+      state.shapeGate = sceneGate();
+    }
+    const place = body && body.shapeLocal === true && body.placement
+      ? {
+        x: Number(body.placement.x) || 0,
+        y: Number(body.placement.y) || 0,
+        z: Number(body.placement.z) || 0
+      }
+      : anchorOf(body);
+    state.lastMove = {
+      baked: baked === true,
+      shapeSame: shapeSame === true,
+      placement: place,
+      id: body ? body.id : ''
+    };
+  }
+
+  function moveOwnedShape(dx, dy, dz, explicit) {
+    const body = explicit || (state.bodies.length === 1 ? state.bodies[0] : null);
     if (body && body.shapeLocal === true && body.placement && assemblyApi && typeof assemblyApi.moveLocalPart === 'function' && primApi) {
       const step = assemblyApi.moveLocalPart(body, dx, dy, dz);
       if (!step.ok || step.shape !== body.shape) {
@@ -4457,7 +4522,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         try { view = primApi.inspectSolid(oc, placed.shape); } catch (_err) { view = null; }
         dropShape(placed.shape);
       }
-      const flat = view && view.mesh ? primApi.flattenMesh(view.mesh) : { indices: [] };
+      const flat = view && view.mesh ? flatForBody(body, view.mesh) : { indices: [] };
       if (!view || !view.gate || view.gate.valid !== true || !flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'move')) {
         body.placement = previous;
         shiftParams(body.params, -dx, -dy, -dz);
@@ -4480,6 +4545,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       mountBodyMeshes();
       refreshAnchor();
       applyLook();
+      finishMove(body, false, true);
       publishGateState();
       return true;
     }
@@ -4506,7 +4572,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       writePosFields();
       return false;
     }
-    const flat = primApi.flattenMesh(view.mesh);
+    const flat = flatForBody(body, view.mesh);
+    const shapeSame = moved.shape === body.shape;
     if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'move')) {
       dropShape(moved.shape);
       setHint('FAIL: moved mesh was rejected. The solid was kept.');
@@ -4532,6 +4599,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     mountBodyMeshes();
     refreshAnchor();
     applyLook();
+    finishMove(body, true, shapeSame);
     publishGateState();
     return true;
   }
@@ -5011,6 +5079,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function translateBody(dx, dy, dz) {
     if (!dx && !dy && !dz) return false;
+    if (state.bodies.length > 1) {
+      const body = activeEditBody();
+      if (!body || !body.shape) {
+        setHint('Select one part to move it.');
+        writePosFields();
+        return false;
+      }
+      return moveOwnedShape(dx, dy, dz, body);
+    }
     if (state.bodies.length === 1 && state.bodies[0].shape) {
       return moveOwnedShape(dx, dy, dz);
     }
@@ -5298,6 +5375,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         overlays.nodes[i].quaternion.copy(q);
         overlays.nodes[i].position.copy(mesh.position);
       }
+      previewOwnedShift(null);
       return;
     }
     if (sizeDelta) {
@@ -5330,6 +5408,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         overlays.nodes[i].scale.copy(mesh.scale);
         overlays.nodes[i].position.copy(mesh.position);
       }
+      previewOwnedShift(null);
       return;
     }
     const x = cad ? cad.x : 0;
@@ -5337,6 +5416,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const z = cad ? cad.y : 0;
     mesh.position.set(x, y, z);
     for (let i = 0; i < overlays.nodes.length; i += 1) overlays.nodes[i].position.set(x, y, z);
+    previewOwnedShift(cad);
+  }
+
+  function previewOwnedShift(cad) {
+    if (state.bodies.length < 2) return;
+    const body = activeEditBody();
+    const id = body ? body.id : '';
+    const x = cad ? cad.x : 0;
+    const y = cad ? cad.z : 0;
+    const z = cad ? cad.y : 0;
+    for (let i = 0; i < bodyRoot.children.length; i += 1) {
+      const child = bodyRoot.children[i];
+      if (id && child.userData.bodyId === id) child.position.set(x, y, z);
+      else child.position.set(0, 0, 0);
+    }
   }
 
   function commitGizmoDrag(moved) {
@@ -6405,6 +6499,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return { axis: name, mm: step, handle: handle, down: down, up: pageOf(shifted) };
   };
 
+  window.__cadcamShapeMark = function (id, mark) {
+    const body = findBody(id);
+    if (!body || !body.shape) return { ok: false, mark: '' };
+    if (arguments.length > 1) body.shape.__cadMoveMark = mark;
+    return { ok: true, mark: body.shape.__cadMoveMark == null ? '' : String(body.shape.__cadMoveMark) };
+  };
+
   function resizeStatus() {
     const multi = state.bodies.length > 1;
     const body = multi ? activeEditBody() : singleBody();
@@ -7226,6 +7327,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       selectionOrder: orderedBodies().map(function (body) { return body.id; }),
       droppedHoles: state.droppedHoles || [],
       gizmoVisible: !!(handles && handles.visible),
+      lastMove: state.lastMove || null,
+      posDisabled: (function () {
+        const pos = document.getElementById('posX');
+        return !!(pos && pos.disabled);
+      })(),
       edgePickPoint: currentEdgePickPoint(),
       edgeOpLog: state.edgeOpLog || [],
       edgeArm: state.edgeArm || '',

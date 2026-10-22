@@ -3974,6 +3974,323 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+MOVE_POS_EXPR = (
+    "(function(){"
+    "var x=document.getElementById('posX');"
+    "var s=window.__cadcamExportState||{};"
+    "return JSON.stringify({"
+    "disabled:!!(x&&x.disabled),"
+    "title:x?x.title:'',"
+    "mm:x&&x.getAttribute('data-mm')!=null?Number(x.getAttribute('data-mm')):null,"
+    "gizmo:s.gizmoVisible===true,"
+    "undo:s.undoDepth||0,"
+    "redo:s.redoDepth||0,"
+    "lastMove:s.lastMove||null,"
+    "error:s.lastError||''"
+    "});})()"
+)
+
+MOVE_DRAG_EXPR = (
+    "(function(){"
+    "if(typeof window.__cadcamGizmoDrag!=='function') return 'missing-drag';"
+    "var plan=window.__cadcamGizmoDrag('x',10);"
+    "if(!plan||!plan.down||!plan.up) return JSON.stringify({error:'no-plan',handle:plan&&plan.handle});"
+    "if(plan.handle!=='x') return JSON.stringify({error:'handle',handle:plan.handle});"
+    "var el=document.getElementById('viewport');"
+    "function fire(type,x,y){"
+    "var ending=type==='pointerup'||type==='pointercancel';"
+    "el.dispatchEvent(new PointerEvent(type,{"
+    "bubbles:true,cancelable:true,pointerId:7,pointerType:'mouse',isPrimary:true,"
+    "button:0,buttons:ending?0:1,clientX:x,clientY:y}));}"
+    "fire('pointerdown',plan.down.x,plan.down.y);"
+    "fire('pointermove',(plan.down.x+plan.up.x)/2,(plan.down.y+plan.up.y)/2);"
+    "fire('pointermove',plan.up.x,plan.up.y);"
+    "fire('pointerup',plan.up.x,plan.up.y);"
+    "var s=window.__cadcamExportState||{};"
+    "var hint=document.getElementById('statusHint');"
+    "return JSON.stringify({handle:plan.handle,"
+    "span:Math.hypot(plan.up.x-plan.down.x,plan.up.y-plan.down.y),"
+    "lastMove:s.lastMove||null,gizmo:s.gizmoVisible===true,"
+    "undo:s.undoDepth||0,redo:s.redoDepth||0,"
+    "hint:hint?hint.textContent:'',error:s.lastError||''});"
+    "})()"
+)
+
+MOVE_FIELD_EXPR = (
+    "(function(){"
+    "var el=document.getElementById('posX');"
+    "if(!el) return JSON.stringify({error:'missing'});"
+    "if(el.disabled) return JSON.stringify({error:'disabled',title:el.title||''});"
+    "var before=Number(el.getAttribute('data-mm'));"
+    "el.value=String(before+10);"
+    "el.dispatchEvent(new Event('change',{bubbles:true}));"
+    "var s=window.__cadcamExportState||{};"
+    "var hint=document.getElementById('statusHint');"
+    "return JSON.stringify({before:before,after:Number(el.getAttribute('data-mm')),"
+    "lastMove:s.lastMove||null,undo:s.undoDepth||0,redo:s.redoDepth||0,"
+    "disabled:!!el.disabled,title:el.title||'',"
+    "hint:hint?hint.textContent:'',error:s.lastError||''});"
+    "})()"
+)
+
+
+def _assembly_doc(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
+    return _json_eval(
+        cdp,
+        "(function(){var a=window.__cadcamAssembly?window.__cadcamAssembly():null;"
+        "return a?JSON.stringify(a):'';})()",
+        timeout=60,
+    )
+
+
+def _asm_part(doc: dict[str, Any] | None, name: str) -> dict[str, Any]:
+    if not doc:
+        return {}
+    return _named_part(doc, name) or {}
+
+
+def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Several bodies: the selected part shows the move gizmo and editable X/Y/Z.
+
+    Repro before the fix: with more than one body, the gizmo stayed hidden and
+    the position fields were disabled, with no message. A plain primitive must
+    update its placement. A Boolean result may bake the translation.
+    """
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"multi move desktop {exc}"]
+    url = origin + "/?demo=assembly"
+    print(f"load multi_body_move {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["multi move load", *load_problems[:20]]
+    if loaded.get("demo") != "assembly" or int(loaded.get("bodyCount") or 0) != 2:
+        return [f"multi move scene {loaded.get('demo')!r} bodies {loaded.get('bodyCount')!r}"]
+    if loaded.get("gizmoVisible") is not False or loaded.get("posDisabled") is not True:
+        return [f"multi move both selected gizmo {loaded.get('gizmoVisible')!r} disabled {loaded.get('posDisabled')!r}"]
+    both, both_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if both_err or not both:
+        return [f"multi move both fields {both_err}"]
+    if both.get("disabled") is not True or "Select one part" not in str(both.get("title") or ""):
+        return [f"multi move both title {both}"]
+
+    cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
+    if cyl_err or not cyl_id:
+        return [f"multi move cylinder id {cyl_err or cyl_id!r}"]
+    picked, pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"if(typeof window.__cadcamPickPart!=='function') return 'missing';"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(cyl_id)}));"
+        "})()",
+    )
+    if pick_err or not picked or picked.get("kind") != "cylinder":
+        return [f"multi move pick {pick_err or picked}"]
+    shown, shown_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if shown_err or not shown:
+        return [f"multi move shown {shown_err}"]
+    if shown.get("gizmo") is not True or shown.get("disabled") is not False or shown.get("title"):
+        return [f"multi move cylinder fields {shown}"]
+    if not _near(shown.get("mm"), 10.0, 0.05):
+        return [f"multi move cylinder x {shown.get('mm')!r}"]
+
+    marked, mark_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(cyl_id)},'keep'):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if mark_err or not marked or marked.get("mark") != "keep":
+        return [f"multi move mark {mark_err or marked}"]
+    dragged, drag_err = _json_eval(cdp, MOVE_DRAG_EXPR, timeout=120)
+    if drag_err or not dragged:
+        return [f"multi move drag {drag_err}"]
+    if dragged.get("error") or dragged.get("handle") != "x":
+        return [f"multi move drag plan {dragged}"]
+    try:
+        span = float(dragged.get("span"))
+    except (TypeError, ValueError):
+        span = 0.0
+    if span < 8:
+        return [f"multi move drag span {dragged.get('span')!r}"]
+    move = dragged.get("lastMove") if isinstance(dragged.get("lastMove"), dict) else {}
+    if move.get("baked") is not False or move.get("shapeSame") is not True:
+        return [f"multi move primitive bake {dragged}"]
+    if int(dragged.get("undo") or 0) != 1:
+        return [f"multi move drag depth {dragged}"]
+    if not _near((move.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move placement {move}"]
+    kept, kept_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(cyl_id)}):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if kept_err or not kept or kept.get("mark") != "keep":
+        return [f"multi move mark lost {kept_err or kept}"]
+    doc, doc_err = _assembly_doc(cdp)
+    if doc_err or not doc:
+        return [f"multi move assembly {doc_err}"]
+    cyl = _asm_part(doc, "Cylinder")
+    box = _asm_part(doc, "Box")
+    if cyl.get("shapeLocal") is not True or not _near((cyl.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move cylinder placed {cyl}"]
+    box_place = box.get("placement") or {}
+    if not _near(box_place.get("x"), 0.0, 0.05) or not _near(box_place.get("z"), 10.0, 0.05):
+        return [f"multi move box moved {box}"]
+
+    undone, undo_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if undo_err or not undone or int(undone.get("undoDepth") or 0) != 0 or int(undone.get("redoDepth") or 0) != 1:
+        return [f"multi move undo {undo_err or undone}"]
+    doc, doc_err = _assembly_doc(cdp)
+    cyl = _asm_part(doc, "Cylinder")
+    if doc_err or not _near((cyl.get("placement") or {}).get("x"), 10.0, 0.05):
+        return [f"multi move undo placement {doc_err or cyl}"]
+    redone, redo_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if redo_err or not redone or int(redone.get("undoDepth") or 0) != 1 or int(redone.get("redoDepth") or 0) != 0:
+        return [f"multi move redo {redo_err or redone}"]
+    doc, doc_err = _assembly_doc(cdp)
+    cyl = _asm_part(doc, "Cylinder")
+    if doc_err or not _near((cyl.get("placement") or {}).get("x"), 20.0, 0.05):
+        return [f"multi move redo placement {doc_err or cyl}"]
+    cleared, clear_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if clear_err or not cleared or int(cleared.get("undoDepth") or 0) != 0:
+        return [f"multi move clear {clear_err or cleared}"]
+
+    added, add_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"primitive\"][data-kind=\"cylinder\"]');"
+        "if(!b) return 'missing'; b.click(); return 'added';})()",
+        timeout=120,
+    )
+    if add_err or added != "added":
+        return [f"multi move add {added or add_err}"]
+    for name in ("Box", "Cylinder"):
+        _clicked, click_err = _click_part(cdp, name)
+        if click_err:
+            return [f"multi move union select {name} {click_err}"]
+    union, union_err = eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector('[data-action=\"boolean\"][data-op=\"union\"]');"
+        "if(!b) return 'missing'; if(b.disabled) return 'disabled'; b.click();"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({bodies:s.bodyCount,gizmo:s.gizmoVisible===true,"
+        "disabled:s.posDisabled===true,error:s.lastError||s.booleanMessage||''});})()",
+        timeout=120,
+    )
+    if union_err or not isinstance(union, str) or not union.startswith("{"):
+        return [f"multi move union {union or union_err}"]
+    try:
+        union_state = json.loads(union)
+    except json.JSONDecodeError:
+        return [f"multi move union {union}"]
+    if int(union_state.get("bodies") or 0) != 2 or union_state.get("error"):
+        return [f"multi move union result {union_state}"]
+    if union_state.get("gizmo") is not True or union_state.get("disabled") is not False:
+        return [f"multi move union gizmo {union_state}"]
+    union_id, union_id_err = _part_row_id(cdp, "Union")
+    if union_id_err or not union_id:
+        return [f"multi move union id {union_id_err or union_id!r}"]
+    planned, plan_err = _json_eval(
+        cdp,
+        "(function(){var p=window.__cadcamGizmoDrag?window.__cadcamGizmoDrag('x',10):null;"
+        "return p?JSON.stringify({handle:p.handle}):'missing';})()",
+    )
+    if plan_err or not planned or planned.get("handle") != "x":
+        return [f"multi move union handle {plan_err or planned}"]
+    stamped, stamp_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(union_id)},'bake'):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if stamp_err or not stamped or stamped.get("mark") != "bake":
+        return [f"multi move union mark {stamp_err or stamped}"]
+    before_doc, before_err = _assembly_doc(cdp)
+    extra_before = _asm_part(before_doc, "Cylinder 3")
+    if before_err or extra_before.get("shapeLocal") is not True:
+        return [f"multi move extra before {before_err or extra_before}"]
+    baked, bake_err = _json_eval(cdp, MOVE_FIELD_EXPR, timeout=120)
+    if bake_err or not baked:
+        return [f"multi move union field {bake_err}"]
+    if baked.get("error") and baked.get("error") != "disabled":
+        return [f"multi move union field error {baked}"]
+    baked_move = baked.get("lastMove") if isinstance(baked.get("lastMove"), dict) else {}
+    if baked_move.get("baked") is not True or baked_move.get("shapeSame") is not False:
+        return [f"multi move union baked {baked}"]
+    if not _near(baked.get("after"), float(baked.get("before") or 0) + 10.0, 0.05):
+        return [f"multi move union x {baked.get('before')!r} -> {baked.get('after')!r}"]
+    gone, gone_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"var m=window.__cadcamShapeMark?window.__cadcamShapeMark({json.dumps(union_id)}):null;"
+        "return m?JSON.stringify(m):'missing';})()",
+    )
+    if gone_err or not gone or gone.get("mark"):
+        return [f"multi move union mark kept {gone_err or gone}"]
+    after_doc, after_err = _assembly_doc(cdp)
+    extra_after = _asm_part(after_doc, "Cylinder 3")
+    if after_err or not _near((extra_after.get("placement") or {}).get("x"), (extra_before.get("placement") or {}).get("x"), 0.05):
+        return [f"multi move extra shifted {after_err or extra_after}"]
+    union_depth = int(baked.get("undo") or 0)
+
+    extra_id, extra_id_err = _part_row_id(cdp, "Cylinder 3")
+    if extra_id_err or not extra_id:
+        return [f"multi move extra id {extra_id_err or extra_id!r}"]
+    picked_extra, extra_pick_err = _json_eval(
+        cdp,
+        "(function(){"
+        f"return JSON.stringify(window.__cadcamPickPart({json.dumps(extra_id)}));"
+        "})()",
+    )
+    if extra_pick_err or not picked_extra or picked_extra.get("kind") != "cylinder":
+        return [f"multi move pick extra {extra_pick_err or picked_extra}"]
+    slid, slide_err = _json_eval(cdp, MOVE_FIELD_EXPR, timeout=120)
+    if slide_err or not slid:
+        return [f"multi move extra field {slide_err}"]
+    slid_move = slid.get("lastMove") if isinstance(slid.get("lastMove"), dict) else {}
+    if slid_move.get("baked") is not False or slid_move.get("shapeSame") is not True:
+        return [f"multi move extra bake {slid}"]
+    if not _near((slid_move.get("placement") or {}).get("x"), float((extra_before.get("placement") or {}).get("x") or 0) + 10.0, 0.05):
+        return [f"multi move extra placement {slid_move}"]
+    extra_depth = int(slid.get("undo") or 0)
+    if extra_depth != union_depth + 1:
+        return [f"multi move extra depth {extra_depth} after {union_depth}"]
+
+    back, back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if back_err or not back or int(back.get("undoDepth") or 0) != union_depth:
+        return [f"multi move extra undo {back_err or back}"]
+    doc, doc_err = _assembly_doc(cdp)
+    extra = _asm_part(doc, "Cylinder 3")
+    if doc_err or not _near((extra.get("placement") or {}).get("x"), (extra_before.get("placement") or {}).get("x"), 0.05):
+        return [f"multi move extra undo placement {doc_err or extra}"]
+    again, again_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if again_err or not again or int(again.get("undoDepth") or 0) != extra_depth:
+        return [f"multi move extra redo {again_err or again}"]
+    doc, doc_err = _assembly_doc(cdp)
+    extra = _asm_part(doc, "Cylinder 3")
+    if doc_err or not _near((extra.get("placement") or {}).get("x"), float((extra_before.get("placement") or {}).get("x") or 0) + 10.0, 0.05):
+        return [f"multi move extra redo placement {doc_err or extra}"]
+    back, back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if back_err or not back or int(back.get("undoDepth") or 0) != union_depth:
+        return [f"multi move extra undo again {back_err or back}"]
+    union_back, union_back_err = resize_call(cdp, {"undo": True}, timeout=120)
+    if union_back_err or not union_back or int(union_back.get("undoDepth") or 0) != union_depth - 1:
+        return [f"multi move union undo {union_back_err or union_back}"]
+    restored, restored_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if restored_err or not restored or not _near(restored.get("mm"), baked.get("before"), 0.05):
+        return [f"multi move union undo x {restored_err or restored}"]
+    union_fwd, union_fwd_err = resize_call(cdp, {"redo": True}, timeout=120)
+    if union_fwd_err or not union_fwd or int(union_fwd.get("undoDepth") or 0) != union_depth:
+        return [f"multi move union redo {union_fwd_err or union_fwd}"]
+    forwarded, forwarded_err = _json_eval(cdp, MOVE_POS_EXPR)
+    if forwarded_err or not forwarded or not _near(forwarded.get("mm"), float(baked.get("before") or 0) + 10.0, 0.05):
+        return [f"multi move union redo x {forwarded_err or forwarded}"]
+    print("multi body move pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -4259,6 +4576,11 @@ def run(omit: list[str]) -> int:
             if size_found:
                 failures.append("multi_body_size")
                 failures.extend(size_found[:40])
+        if not failures:
+            move_found = multi_body_move_problems(cdp, origin)
+            if move_found:
+                failures.append("multi_body_move")
+                failures.extend(move_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:
