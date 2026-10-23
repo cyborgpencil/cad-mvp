@@ -1,5 +1,8 @@
 // View-cube swipe: adjacent face and tap-vs-swipe threshold.
-// Team choice (3T, 2026-10-23): 24 CSS px within 400 ms, dominant axis.
+// Team choice (3T, 2026-10-23): 24 CSS px, dominant axis. SWIPE_MS (400) is
+// the old flick window. Travel that has already reached SWIPE_PX is still a
+// swipe when the finger is slower than that, so a slow drag is not handed
+// back to the face picker. The pixel threshold stays separate from tap slop.
 // Horizontal swipes walk Front > Right > Back > Left. Vertical swipes go
 // Top / Bottom. From Top / Bottom, up/down go Back/Front (Top) or Front/Back
 // (Bottom); left/right go Left/Right.
@@ -16,7 +19,8 @@ export function swipeDirection(dx, dy, dt) {
   const y = Number(dy);
   const t = Number(dt);
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(t)) return null;
-  if (t < 0 || t > SWIPE_MS) return null;
+  if (t < 0) return null;
+  // A qualified travel is a swipe even when it takes longer than SWIPE_MS.
   if (Math.hypot(x, y) < SWIPE_PX) return null;
   if (Math.abs(x) >= Math.abs(y)) return x < 0 ? 'left' : 'right';
   return y < 0 ? 'up' : 'down';
