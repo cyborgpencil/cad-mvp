@@ -118,6 +118,44 @@ MeshSolid l_prism() {
     return mesh;
 }
 
+// 12-sided disc on the outer face (x = 0). Radius 4 mm hangs past the 6 mm
+// thickness, so the lowest vertex is the disc, not the leg face.
+MeshSolid l_with_boss() {
+    MeshSolid mesh = l_prism();
+    constexpr int n = 12;
+    constexpr double radius = 4.0;
+    constexpr double cy = 3.0;
+    constexpr double cz = 18.0;
+    constexpr double pi = 3.14159265358979323846;
+    const std::uint32_t ring = static_cast<std::uint32_t>(mesh.vertices.size());
+    for (int side = 0; side < 2; ++side) {
+        const double x = side == 0 ? -3.0 : 0.0;
+        for (int i = 0; i < n; ++i) {
+            const double angle = (2.0 * pi * i) / n;
+            mesh.vertices.push_back({
+                x,
+                cy + radius * std::cos(angle),
+                cz + radius * std::sin(angle),
+            });
+        }
+    }
+    const std::uint32_t cap0 = static_cast<std::uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back({-3.0, cy, cz});
+    const std::uint32_t cap1 = cap0 + 1;
+    mesh.vertices.push_back({0.0, cy, cz});
+    for (int i = 0; i < n; ++i) {
+        const auto i0 = ring + static_cast<std::uint32_t>(i);
+        const auto j0 = ring + static_cast<std::uint32_t>((i + 1) % n);
+        const auto i1 = i0 + static_cast<std::uint32_t>(n);
+        const auto j1 = j0 + static_cast<std::uint32_t>(n);
+        mesh.triangles.push_back({i0, j0, j1});
+        mesh.triangles.push_back({i0, j1, i1});
+        mesh.triangles.push_back({cap0, j0, i0});
+        mesh.triangles.push_back({cap1, i1, j1});
+    }
+    return mesh;
+}
+
 struct FaceArea {
     double nx = 0;
     double ny = 0;
@@ -431,6 +469,28 @@ int main() {
     expect_z_span(l_3mf, &l_zmin, &l_zmax);
     expect("L 3mf zmin", near_mm(l_zmin, 0.0, 1e-4));
     expect("L 3mf height", near_mm(l_zmax - l_zmin, 6.0, 1e-3));
+
+    const std::filesystem::path boss_dir = fresh_dir("l-boss");
+    std::filesystem::create_directories(boss_dir);
+    const MeshSolid boss = l_with_boss();
+    const std::filesystem::path boss_stl = boss_dir / "boss.stl";
+    const std::filesystem::path boss_3mf = boss_dir / "boss.3mf";
+    expect("boss stl writes", write_binary_stl(boss_stl, boss));
+    expect("boss 3mf writes", write_3mf(boss_3mf, boss));
+    MeshSolid boss_loaded;
+    expect("boss stl reads", read_binary_stl(boss_stl, boss_loaded));
+    if (!boss_loaded.vertices.empty()) {
+        const Extents boss_box = extents_of(boss_loaded);
+        expect("boss stl min z", near_mm(boss_box.zmin, 0.0, 0.01));
+        expect("boss stl height", near_mm(boss_box.zmax - boss_box.zmin, 8.0, 0.01));
+    } else {
+        expect("boss stl has vertices", false);
+    }
+    double boss_zmin = 1.0;
+    double boss_zmax = 0.0;
+    expect_z_span(boss_3mf, &boss_zmin, &boss_zmax);
+    expect("boss 3mf min z", near_mm(boss_zmin, 0.0, 0.01));
+    expect("boss 3mf height", near_mm(boss_zmax - boss_zmin, 8.0, 0.01));
 
     const std::filesystem::path l_raw = l_dir / "raw.stl";
     expect("L raw stl writes", write_binary_stl(l_raw, prism, false));
