@@ -215,6 +215,11 @@
     position: relative;
   }
   .menu button:hover, .menu .menu-file:hover { background: rgba(255, 255, 255, 0.06); }
+  #fileMenu { min-width: 240px; }
+  #threeFingerUndo { justify-content: space-between; }
+  #threeFingerUndo[aria-pressed="true"]::after { content: "On"; margin-left: 12px; }
+  #threeFingerUndo[aria-pressed="false"] { color: var(--muted); }
+  #threeFingerUndo[aria-pressed="false"]::after { content: "Off"; margin-left: 12px; }
   .menu-file { cursor: pointer; }
   .menu-file input {
     position: absolute;
@@ -1604,6 +1609,7 @@
         </label>
         <button type="button" data-tool="Import STL">Import STL</button>
         <button type="button" data-action="downloadLog" data-tool="Download log">Download log</button>
+        <button type="button" id="threeFingerUndo" data-action="threeFingerUndo" data-tool="Three-finger undo/redo" aria-pressed="true">Three-finger undo/redo</button>
       </div>
     </div>
     <button type="button" class="icon-btn hide-tight" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
@@ -2105,9 +2111,13 @@ async function boot() {
       console.error('view-cube failed', err);
       return null;
     });
+    const fingerPromise = import('./three-finger.mjs').catch(function (err) {
+      console.error('three-finger failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -2115,7 +2125,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -2530,6 +2540,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const ptrs = new Map();
   let gesture = null;
   let pinch = null;
+  const fingerSession = fingerApi && typeof fingerApi.createThreeFingerSession === 'function'
+    ? fingerApi.createThreeFingerSession()
+    : null;
+  let releasingCapture = false;
   const panX = new THREE.Vector3();
   const panY = new THREE.Vector3();
   const proj = new THREE.Vector3();
@@ -8574,6 +8588,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'redo') {
       doRedo();
       message = 'Redo';
+    } else if (action === 'threeFingerUndo') {
+      const next = !threeFingerOn();
+      if (fingerApi && typeof fingerApi.writeEnabled === 'function') {
+        fingerApi.writeEnabled(window.localStorage, next);
+      }
+      paintThreeFinger();
+      message = next ? 'Three-finger undo/redo on' : 'Three-finger undo/redo off';
+      setHint(message);
     }
     else if (action === 'snap') {
       state.snap = !state.snap;
@@ -9151,6 +9173,45 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }, { passive: false });
   }
 
+  function threeFingerOn() {
+    if (!fingerApi || typeof fingerApi.readEnabled !== 'function') return false;
+    try {
+      return fingerApi.readEnabled(window.localStorage) === true;
+    } catch (err) {
+      return true;
+    }
+  }
+
+  function paintThreeFinger() {
+    const on = threeFingerOn();
+    const btn = document.getElementById('threeFingerUndo');
+    if (!btn) return on;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.classList.toggle('is-on', on);
+    return on;
+  }
+
+  function takeThreeFinger(ev) {
+    if (!fingerSession) return null;
+    if (ev.type === 'pointercancel') {
+      fingerSession.cancel(ev.pointerId);
+      return null;
+    }
+    return fingerSession.up(ev.pointerId, ev.clientX, ev.clientY, performance.now(), threeFingerOn());
+  }
+
+  function onLostThreeFinger(ev) {
+    if (releasingCapture || !fingerSession) return;
+    if (!gesture || gesture.type !== 'three') return;
+    fingerSession.lostCapture(ev.pointerId);
+    ptrs.delete(ev.pointerId);
+    pinch = null;
+    gesture = null;
+    viewport.classList.remove('is-drag');
+  }
+
+  // Three-finger undo/redo (web/three-finger.mjs). One finger still orbits.
+  // Two fingers still pinch. A third finger cancels that pinch without a camera step.
   viewport.addEventListener('pointerdown', function (ev) {
     if (ev.target.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar')) return;
     if (typeof viewport.focus === 'function') {
@@ -9163,12 +9224,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       try { viewport.setPointerCapture(ev.pointerId); } catch (err) { /* already captured */ }
     }
     ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, button: ev.button });
+    if (fingerSession) fingerSession.down(ev.pointerId, ev.clientX, ev.clientY, performance.now());
     if (ptrs.size >= 2) {
       if (gizmoDrag) {
         gizmoDrag = null;
         shiftPreview(null);
         placeHandles();
         writePosFields();
+      }
+      if (threeFingerOn() && ptrs.size >= 3) {
+        pinch = null;
+        gesture = {
+          type: 'three',
+          moved: true,
+          sx: ev.clientX,
+          sy: ev.clientY,
+          button: 0,
+          pid: ev.pointerId,
+          t0: performance.now()
+        };
+        return;
       }
       gesture = { type: 'pinch', moved: false, sx: ev.clientX, sy: ev.clientY, button: 0, pid: ev.pointerId };
       pinch = currentPinch();
@@ -9210,6 +9285,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const dy = ev.clientY - rec.y;
     rec.x = ev.clientX;
     rec.y = ev.clientY;
+    if (fingerSession) fingerSession.move(ev.pointerId, ev.clientX, ev.clientY);
+    if (gesture.type === 'three' || (threeFingerOn() && ptrs.size >= 3)) return;
     if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) >= tapSlopPx()) gesture.moved = true;
     if (gesture.type === 'gizmo' && gesture.pid === ev.pointerId) {
       dragGizmo(ev.clientX, ev.clientY);
@@ -9246,13 +9323,58 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   viewport.addEventListener('pointerup', onPointerDone);
   viewport.addEventListener('pointercancel', onPointerDone);
+  viewport.addEventListener('lostpointercapture', onLostThreeFinger);
+  if (viewCubeEl) viewCubeEl.addEventListener('lostpointercapture', onLostThreeFinger);
 
   function onPointerDone(ev) {
     const g = gesture;
+    const threeAction = takeThreeFinger(ev);
     ptrs.delete(ev.pointerId);
-    try { viewport.releasePointerCapture(ev.pointerId); } catch (err) { /* not captured */ }
-    try { if (viewCubeEl) viewCubeEl.releasePointerCapture(ev.pointerId); } catch (err) { /* not captured */ }
+    releasingCapture = true;
+    try {
+      try { viewport.releasePointerCapture(ev.pointerId); } catch (err) { /* not captured */ }
+      try { if (viewCubeEl) viewCubeEl.releasePointerCapture(ev.pointerId); } catch (err) { /* not captured */ }
+    } finally {
+      releasingCapture = false;
+    }
     viewport.classList.remove('is-drag');
+    if (g && g.type === 'three') {
+      if (ev.type !== 'pointercancel') {
+        if (threeAction === 'undo') doUndo();
+        else if (threeAction === 'redo') doRedo();
+      }
+      if (ptrs.size >= 2) {
+        pinch = null;
+        const id = Array.from(ptrs.keys())[0];
+        const rest = ptrs.get(id);
+        gesture = {
+          type: 'pinch',
+          moved: true,
+          sx: rest.x,
+          sy: rest.y,
+          button: rest.button,
+          pid: id
+        };
+        return;
+      }
+      if (ptrs.size === 1) {
+        const id = Array.from(ptrs.keys())[0];
+        const rest = ptrs.get(id);
+        gesture = {
+          type: rest.button === 1 || rest.button === 2 ? 'pan' : 'orbit',
+          moved: true,
+          sx: rest.x,
+          sy: rest.y,
+          button: rest.button,
+          pid: id
+        };
+        pinch = null;
+        return;
+      }
+      gesture = null;
+      pinch = null;
+      return;
+    }
     if (ptrs.size >= 2) return;
     if (ptrs.size === 1) {
       const id = Array.from(ptrs.keys())[0];
@@ -9665,6 +9787,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   if (startTab === 'sketch' || startTab === 'model' || startTab === 'repair' || startTab === 'export') setTab(startTab);
   else setTab('model');
   publishGateState();
+  paintThreeFinger();
+  if (fingerApi) {
+    window.__cadcamThreeFinger = {
+      px: fingerApi.SWIPE_PX,
+      ms: fingerApi.SWIPE_MS,
+      key: fingerApi.STORAGE_KEY,
+      enabled: function () { return threeFingerOn(); }
+    };
+  }
   window.__cadcamNavCube = navCubeState;
   renderFrame();
 
