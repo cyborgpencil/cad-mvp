@@ -198,6 +198,47 @@ if (liftedMeshes[0] && liftedMeshes[0].vertices.length) {
   );
 }
 
+// Round boss on the outer face of the upright (x = 0). Radius 4 mm on the
+// 6 mm thickness, so the disc hangs past both sides. A shift that used only
+// the leg face would leave those vertices below z = 0. Made-up sizes.
+const bossBase = ops.makeBoxSolid(oc, 30, 6, 10, [0, 0, 0]);
+const bossUpright = ops.makeBoxSolid(oc, 10, 6, 24, [0, 0, 0]);
+const bossFused = ops.fuseShapes(oc, bossBase, bossUpright);
+release(bossBase);
+release(bossUpright);
+expect('boss L fuse ' + (bossFused.error || ''), bossFused.ok === true && !!bossFused.shape);
+const bossDisc = bossFused.ok ? ops.makeCylinderSolid(oc, 4, 3, [-3, 3, 18], [1, 0, 0]) : null;
+const bossGlued = bossFused.ok && bossDisc
+  ? ops.fuseFlushShapes(oc, bossFused.shape, bossDisc)
+  : { ok: false, shape: null, error: 'disc was not built' };
+release(bossDisc);
+if (bossFused.shape) release(bossFused.shape);
+expect('boss flush ' + (bossGlued.error || ''), bossGlued.ok === true && !!bossGlued.shape);
+const bossLaid = bossGlued.ok ? exportOne({
+  name: 'BossBracket',
+  material: 'PLA',
+  shape: bossGlued.shape,
+  placement: { x: 0, y: 0, z: 0 },
+  shapeLocal: true,
+}, { units: 'mm' }) : { ok: false, bytes: null };
+expect('boss 3mf written', bossLaid.ok === true);
+const bossMeshes = parseObjectMeshes(bossLaid.ok ? asm.modelXmlFrom3mf(bossLaid.bytes) : '');
+expect('boss 3mf one object', bossMeshes.length === 1);
+if (bossMeshes[0] && bossMeshes[0].vertices.length) {
+  const bounds = asm.meshBounds(bossMeshes[0].vertices);
+  let minZ = Infinity;
+  const verts = bossMeshes[0].vertices;
+  for (let i = 0; i < verts.length; i += 1) {
+    if (verts[i][2] < minZ) minZ = verts[i][2];
+  }
+  expect(
+    'boss 3mf min z ' + minZ,
+    Math.abs(minZ) <= 0.01 && Math.abs(bounds.zmin) <= 0.01
+  );
+  expect('boss laid on the thin axis', near(bounds.zmax - bounds.zmin, 8, 0.05));
+}
+release(bossGlued.shape);
+
 const page = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
 expect('single-body STL lays on the bed', page.indexOf('Module.exportStl()') >= 0);
 expect('multi-body STL stays raw', page.indexOf('Module.exportStlRaw') >= 0);
