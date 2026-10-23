@@ -3,12 +3,15 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-23
+- 2026-10-23 PR #23 (merged at cb6a942): research/touch-gestures.md, a sourced digest of touch swipe gestures in Onshape, Shapr3D and Nomad (plus MDN pointer and touch-action notes), with its INDEX line. A follow-up PR fixes its dates and describes main as it is.
+
 ## 2026-10-22
 
 - trimesh export check (PR #18, merged at 3649de9): new `tools/check_export.py` with `trimesh==5.1.1` pinned in `tools/requirements.txt`, run as a step in the CI `build` job only when code changed. CI checks the default 20 mm cube (20 mm on each axis, 8000 mm3) within 0.1 mm and 1%; the check against typed sizes stays a manual A3 step on Z13.
 - Acceptance A3 and CI wording (PR #17, merged at 7675b7c): A3 passes when the exported bounding box is within 0.1 mm of the typed sizes and the trimesh volume is within 1% of the app's volume. `AGENTS.md` line 48 now describes the single `build` job with its docs-only skip.
 - Multi-body UI fixes (PR #16, merged at 4117e42): one selected part shows and resizes only its own sizes; one selected part gets the move gizmo and X/Y/Z fields (a plain primitive updates its placement, a Boolean result bakes the move, undo and redo cover both); PETG is `#B9D6F2` and TPU is `#E7C36A`, matching the 3MF colours. No `src/` change.
-- Docs wave 3: acceptance B3 reads within 1% (relative), the Orca CLI workarounds are noted in the acceptance doc, and the local `PROGRESS.md` is gitignored.
+- Docs wave 3 (PR #19, merged at 8f6703b): acceptance B3 reads within 1% (relative), the Orca CLI workarounds are noted in the acceptance doc, and the local `PROGRESS.md` is gitignored.
 - CI (PR #15): one `build` job in `ci.yml`; pushes run on main only, PRs always run. A `git diff` step skips the native build when only `*.md`, `research/` or `prompts/` changed; manual runs and first commits always build. Any future trimesh step needs the same code-changed condition.
 - Process speed-ups (PR #14, merged at 2493612): `AGENTS.md` gains a "Process speed-ups" section; `mvp/tooling-priority.md` routes all C++ through Grok Build or Cursor until Erik rules on small direct edits. Repo Keeper alone writes UPDATES.md, one line per PR at merge.
 - Export gate: a mesh with no triangles, or a signed volume at or below 1e-9 mm3, is refused. The sentence is `FAIL: mesh has no triangles.` or `FAIL: mesh has zero volume.` Units still win when they fail. Watertight stays informational. An inside-out shell has negative volume and is blocked with `FAIL: mesh is inside-out (negative volume).` (PR #11, merged at eeccb77). `flipped_box()` reverses one face and still exports. `cadcam.wasm` does not link OCCT.
