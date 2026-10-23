@@ -1,12 +1,15 @@
-# Touch swipe gestures (2026-10-22)
+# Touch swipe gestures (2026-10-23)
 
-Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-22: the view-cube swipe first, then the three-finger undo/redo swipe, then the value-field nudge. Tool-shelf edge swipe is out, and orbit/pan stay as they are.
+Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-23: the view-cube swipe first, then the three-finger undo/redo swipe, then the value-field nudge. Tool-shelf edge swipe is out, and orbit/pan stay as they are.
 
-## Repo today (`fix/3mf-and-ui`, `web/index.html`)
-- One pointer-event state machine on the viewport (about lines 9112-9262), with gesture types orbit, pan, gizmo, pinch and cube. One finger orbits; two fingers pinch-zoom and pan together.
+## Repo today (main)
+- One pointer-event state machine on the viewport, with gesture types orbit, pan, gizmo, pinch and cube. One finger orbits; two fingers pinch-zoom and pan together.
 - `#canvas` has `touch-action: none`; the view cube is tap-only (`pickViewCube`).
-- The view-cube swipe is in PR #21 (`web/view-cube.mjs`): 24 px within 400 ms, separate from `tapSlopPx()`; `pointercancel` ends it; a second finger hands off to pinch/pan (team-chosen values, Erik may change them after phone tests).
 
+## Planned (open PRs, not on main)
+- PR #21: view-cube swipe to the next face, 24 px within 400 ms, separate from `tapSlopPx()`, `pointercancel` ends it (team-chosen values; Erik may change them after phone tests).
+- PR #22: three-finger swipe left undoes, right redoes, with an off switch.
+- PR #24: swipe a focused value field to nudge it 1 mm (1 deg on rotation) per step, one undo step each.
 ## Other apps (sourced)
 | App | Orbit / pan / zoom | Undo / redo | View cube on touch |
 |---|---|---|---|
@@ -25,7 +28,7 @@ Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-
 - Edge swipe for the shelf: no source found, and it competes with iOS and Safari edge gestures. Dropped.
 
 ## Next steps
-- Pilot / Grok Build: finish PR #21, then the three-finger undo/redo swipe with an off switch, then the nudge.
+- Pilot / Grok Build: PRs #21, #22 and #24 cover the three items; #21 must pass the Front-left-to-Right check before merge.
 - Tests: smoke-test each swipe in a 390x844 frame and on a real phone; units still read mm after each.
 
 ## Sources
