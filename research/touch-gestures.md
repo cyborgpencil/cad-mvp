@@ -7,7 +7,7 @@ Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-
 - `#canvas` has `touch-action: none`; the view cube is tap-only (`pickViewCube`).
 
 ## Planned (open PRs, not on main)
-- PR #21: view-cube swipe to the next face, 24 px within 400 ms, separate from `tapSlopPx()`, `pointercancel` ends it (team-chosen values; Erik may change them after phone tests).
+- PR #21: view-cube swipe to the next face, 24 px at any speed, starting on the cube, separate from `tapSlopPx()`, `pointercancel` ends it (team-chosen values; Erik may change them after phone tests).
 - PR #22: three-finger swipe left undoes, right redoes, with an off switch.
 - PR #24: swipe a focused value field to nudge it 1 mm (1 deg on rotation) per step, one undo step each.
 ## Other apps (sourced)
@@ -28,7 +28,7 @@ Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-
 - Edge swipe for the shelf: no source found, and it competes with iOS and Safari edge gestures. Dropped.
 
 ## Next steps
-- Pilot / Grok Build: PRs #21, #22 and #24 cover the three items; #21 must pass the Front-left-to-Right check before merge.
+- Pilot / Grok Build: PRs #21, #22 and #24 cover the three items; #21 passed the Front-left-to-Right rerun (8 of 8, all four directions, fast and slow).
 - Tests: smoke-test each swipe in a 390x844 frame and on a real phone; units still read mm after each.
 
 ## Sources
