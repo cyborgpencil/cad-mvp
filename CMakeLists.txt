@@ -127,6 +127,20 @@ else()
     message(STATUS "view_cube skipped locally: Node was not found.")
 endif()
 
+# Three-finger undo/redo classifier. Pure JS, no libcascade.
+if(CADCAM_NODE)
+    add_test(NAME three_finger COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_three_finger.mjs")
+    set_tests_properties(three_finger PROPERTIES
+        TIMEOUT 30
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "three_finger requires Node. CI must not skip this test when Node is missing.")
+else()
+    message(STATUS "three_finger skipped locally: Node was not found.")
+endif()
+
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
 # gizmo_drag_smoke exits 77 when Playwright cannot be imported. Prefer the
