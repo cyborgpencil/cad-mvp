@@ -2,10 +2,10 @@ name: Deploy web app to GitHub Pages
 
 # main builds to the site root, exactly as before. Each PR listed in
 # .github/preview-prs.txt builds from its own head (own wasm) into prN/.
-# A push to a listed PR's branch redeploys so its preview stays current.
+# Previews refresh on main pushes, the daily run, or a manual run.
 on:
   push:
-    branches: [main, "feat/**", "fix/**"]
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "17 9 * * *"
