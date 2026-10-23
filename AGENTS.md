@@ -55,3 +55,5 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 - When Z13 is down, docs edits go to a Cursor cloud agent that 3T launches. No new GitHub access.
 - Erik's C++ review commits stay separate.
 - Small direct C++ edits that skip Grok Build: waiting on Erik's answer. Until then, all C++ goes through Grok Build or Cursor.
+## Mobile test links (Erik's rule, 2026-10-23)
+Links for phone testing come only from https://cyborgpencil.github.io/cad-mvp/: main at the root, and open PR builds under `/cad-mvp/prN/` (index at `/cad-mvp/previews/`). Never post LAN or localhost links. Previews deploy as a GitHub Actions Pages artifact (no `gh-pages` branch, no committed `.wasm`), and a guard step blocks fixtures, `builds/`, Blink files and secrets. A preview containing C++ that Erik hasn't reviewed is labelled as needing his review.
