@@ -106,9 +106,11 @@ All web-only, in the pointer handler in `web/index.html`; no C++. Sources: [Onsh
 4. **Dropped: edge swipe for the tool shelf.** Clashes with iOS/Safari edge gestures, no source found; the Modify shelf toggle covers it.
 5. **No change: two-finger orbit/pan lock.** Current one-finger orbit and two-finger pinch/pan match Onshape and Shapr3D; revisit only if Erik's phone testing finds a problem.
 
-## Phone selection (team-chosen by the Chief 2026-10-23; Erik reviews afterward)
-Needed for Erik's phone acceptance test (picked edges for fillet and chamfer, and Booleans). JS only, on `feat/phone-selection`.
-- Tapping a body selects it; tapping empty space clears the selection.
-- Edge pick mode: tap an edge to pick it for fillet or chamfer, with a larger touch tolerance. The tolerance value is recorded in `PROGRESS.md` (TBD until set).
-- A Multi toggle adds or removes items from the selection, for Booleans.
-- The selection has a clear highlight, and the panel shows the selected count.
+## Phone selection (team-chosen by 3T and the Chief 2026-10-23; Erik reviews afterward)
+Needed for Erik's phone acceptance test (picked edges for fillet and chamfer, Booleans, and deleting solids and sub-elements). JS only, on `feat/phone-selection`.
+- Tap to select: tapping a body selects it; tapping empty space clears the selection. A drag never selects.
+- Pick modes: a bottom-bar chip switches between Body, Face, Edge and Vertex. No long press, to avoid iOS clashes. Edge mode uses a larger touch tolerance, recorded in `PROGRESS.md` (TBD until set).
+- Multi toggle: adds or removes items from the selection, for Booleans.
+- Delete: removes whatever is selected; undo and redo cover it.
+- Feedback: the selection has a clear highlight, and the panel shows the selected count.
+- Tests: a phone-frame Playwright run for each pick mode and a delete-plus-undo case, with screenshots.
