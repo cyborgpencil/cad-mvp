@@ -4420,7 +4420,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   // Save/load (PR #2) calls this on file load: commandStack.clear() from web/undo.mjs, snapshots freed.
-  window.__cadcamClearUndo = function () { releaseCommands(commandStack.clear()); return true; };
+  window.__cadcamClearUndo = function () {
+    releaseCommands(commandStack.clear());
+    publishGateState();
+    return true;
+  };
 
   function installSnapshot(snap) {
     for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
