@@ -449,7 +449,9 @@
     -webkit-touch-callout: none;
     cursor: grab;
     overflow: hidden;
+    outline: none;
   }
+  #viewport:focus, #viewport:focus-visible { outline: none; }
   #viewport.is-drag { cursor: grabbing; }
   #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   .view-cube {
@@ -1751,7 +1753,7 @@
       </div>
     </aside>
 
-    <main id="viewport">
+    <main id="viewport" tabindex="-1">
       <canvas id="canvas"></canvas>
       <div id="viewCube" class="view-cube" aria-hidden="true"></div>
       <div id="safeProbe" aria-hidden="true"></div>
@@ -2610,6 +2612,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function isTypingTarget(el) {
+    if (selApi && typeof selApi.isTypingTarget === 'function') return selApi.isTypingTarget(el);
     if (!el) return false;
     const tag = el.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
@@ -8582,8 +8585,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'primitive') {
       const rawKind = btn.getAttribute('data-kind');
       const kind = rawKind === 'cylinder' || rawKind === 'disc' ? rawKind : 'box';
-      if (state.bodies.length >= 1) addAnotherBody(kind);
-      else createPrimitive(kind, null, state.selection === 'item' ? 'item' : state.selection, false);
+      const label = 'Create ' + primitiveLabel(kind);
+      const selectMode = state.selection === 'item' ? 'item' : state.selection;
+      runUndoable(label, function () {
+        if (state.bodies.length >= 1) return addAnotherBody(kind) === true;
+        return createPrimitive(kind, null, selectMode, false) === true;
+      });
       message = primitiveLabel(kind);
     } else if (action === 'boolean') {
       applySceneBoolean(btn.getAttribute('data-op') || '');
@@ -9099,7 +9106,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   viewport.addEventListener('pointerdown', function (ev) {
-    if (ev.target.closest('button, a, input, textarea, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar')) return;
+    if (ev.target.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar')) return;
+    if (typeof viewport.focus === 'function') {
+      try { viewport.focus({ preventScroll: true }); } catch (_err) { viewport.focus(); }
+    }
     closePopups();
     ev.preventDefault();
     try { viewport.setPointerCapture(ev.pointerId); } catch (err) { /* already captured */ }
@@ -9409,8 +9419,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     }
     if (ev.altKey) return;
-    const selectionMode = selApi.modeFromHotkey(ev.key);
+    const selectionMode = selApi && typeof selApi.modeFromHotkey === 'function'
+      ? selApi.modeFromHotkey(ev.key)
+      : '';
     if (selectionMode) {
+      const allowed = selApi && typeof selApi.selectionHotkeyAllowed === 'function'
+        ? selApi.selectionHotkeyAllowed(ev.key, document.activeElement, ev.target)
+        : !typing;
+      if (!allowed) return;
       setSelectionMode(selectionMode);
       toast('Selection: ' + cap(state.selection));
       setHint('Selection: ' + cap(state.selection));

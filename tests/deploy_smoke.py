@@ -17,7 +17,9 @@ Asserts window.__cadcamExportState.occtReady for:
   ?demo=booleans        box minus cylinder, OCCT gate PASS
   ?demo=booleans&op=    union, cut, and intersect each PASS
   ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
-  /?fixture=closed_box  plain 4 key selects the whole body
+  /?fixture=closed_box  plain 4 key selects the whole body when the viewport is focused
+  Create Box/Cylinder/Disc is one undo/redo step; digits do not change selection
+                        unless the viewport is focused, and inputs ignore hotkeys
   portrait 390x844      Create menu (Box, Cylinder, Disc, Hole, Sketch; no primitive
                         buttons left outside it), then box, cylinder, and disc;
                         uncovered viewport >= 70% with the dimension panel collapsed
@@ -4650,6 +4652,269 @@ def boolean_unique_names_problems(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+CREATE_STACK_JS = """
+  var s=window.__cadcamExportState||{};
+  var hint=document.getElementById('statusHint');
+  var names=[];
+  document.querySelectorAll('#partList .part-name').forEach(function(el){
+    names.push((el.textContent||'').trim());
+  });
+  return JSON.stringify({
+    body:s.bodyCount,
+    undo:s.undoDepth,
+    redo:s.redoDepth,
+    kind:s.primitiveKind||'',
+    hint:hint?hint.textContent:'',
+    names:names,
+    cleared:!!s.sceneCleared
+  });
+"""
+CREATE_STACK_EXPR = "(function(){" + CREATE_STACK_JS + "})()"
+REDO_KEY_EXPR = (
+    "(function(){"
+    "var el=document.activeElement;"
+    "if(el&&el.blur) el.blur();"
+    "document.dispatchEvent(new KeyboardEvent('keydown',{key:'y',ctrlKey:true,bubbles:true,cancelable:true}));"
+    + CREATE_STACK_JS
+    + "})()"
+)
+CREATE_EXTRA_UNDO_EXPR = (
+    "(function(){"
+    "var el=document.activeElement;if(el&&el.blur)el.blur();"
+    "document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true,cancelable:true}));"
+    + CREATE_STACK_JS
+    + "})()"
+)
+
+
+def _create_stack(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
+    return _json_eval(cdp, CREATE_STACK_EXPR)
+
+
+def _click_create_kind(cdp: Cdp, kind: str) -> tuple[dict[str, Any] | None, str]:
+    return _json_eval(
+        cdp,
+        "(function(){"
+        "var menu=document.getElementById('createMenu');"
+        "if(!menu) return JSON.stringify({error:'missing menu'});"
+        "if(menu.hidden){"
+        "var openers=document.querySelectorAll('[data-action=\"createMenu\"]');"
+        "var opener=null;"
+        "for(var i=0;i<openers.length;i++){"
+        "var st=getComputedStyle(openers[i]);"
+        "var r=openers[i].getBoundingClientRect();"
+        "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
+        "opener=openers[i];break;"
+        "}"
+        "if(!opener) return JSON.stringify({error:'missing create'});"
+        "opener.click();"
+        "}"
+        f"var b=menu.querySelector('[data-kind={json.dumps(kind)}]');"
+        "if(!b) return JSON.stringify({error:'missing kind'});"
+        "b.click();"
+        + CREATE_STACK_JS
+        + "})()",
+    )
+
+
+def create_undo_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Create Box/Cylinder/Disc each push one undo step, and redo restores them."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"create undo desktop {exc}"]
+    url = origin + "/?primitive=box"
+    print(f"load create_undo {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["create undo load", *load_problems[:20]]
+    start, start_err = _create_stack(cdp)
+    if start_err or not start or int(start.get("body") or 0) != 1 or int(start.get("undo") or 0) != 0:
+        return [f"create undo start {start_err or start}"]
+    added, add_err = _click_create_kind(cdp, "cylinder")
+    if add_err or not added or added.get("error"):
+        return [f"create cylinder click {add_err or added}"]
+    names = [str(n) for n in (added.get("names") or [])]
+    if int(added.get("body") or 0) != 2 or int(added.get("undo") or 0) != 1 or int(added.get("redo") or 0) != 0:
+        return [f"create cylinder stack {added}"]
+    if not any("Cylinder" in n for n in names):
+        return [f"create cylinder names {names}"]
+    raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+    undone, undo_err = _key_state(raw, err)
+    if undo_err or not undone or int(undone.get("body") or 0) != 1 or int(undone.get("undo") or 0) != 0:
+        return [f"create cylinder undo {undo_err or undone}"]
+    stack, stack_err = _create_stack(cdp)
+    if stack_err or not stack or int(stack.get("redo") or 0) != 1:
+        return [f"create cylinder redo depth {stack_err or stack}"]
+    if "Nothing to undo" in str(stack.get("hint") or ""):
+        return [f"create cylinder hint {stack.get('hint')!r}"]
+    if not str(stack.get("hint") or "").startswith("Undo Create"):
+        return [f"create cylinder undo hint {stack.get('hint')!r}"]
+    redone, redo_err = _json_eval(cdp, REDO_KEY_EXPR)
+    if redo_err or not redone or int(redone.get("body") or 0) != 2 or int(redone.get("undo") or 0) != 1:
+        return [f"create cylinder redo {redo_err or redone}"]
+    raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+    back, back_err = _key_state(raw, err)
+    if back_err or not back or int(back.get("body") or 0) != 1:
+        return [f"create cylinder undo again {back_err or back}"]
+    cleared = _delete_default_body(cdp, origin)
+    if cleared:
+        return ["create undo clear", *cleared[:12]]
+    reset, reset_err = eval_expr(cdp, "window.__cadcamClearUndo()")
+    if reset_err or reset is not True:
+        return [f"create undo reset {reset or reset_err}"]
+    empty, empty_err = _create_stack(cdp)
+    if empty_err or not empty or int(empty.get("body") or 0) != 0 or int(empty.get("undo") or 0) != 0:
+        return [f"create undo empty {empty_err or empty}"]
+    for kind, label in (("disc", "Disc"), ("box", "Box"), ("cylinder", "Cylinder")):
+        made, made_err = _click_create_kind(cdp, kind)
+        if made_err or not made or made.get("error"):
+            return [f"create {kind} empty click {made_err or made}"]
+        names = [str(n) for n in (made.get("names") or [])]
+        if int(made.get("body") or 0) != 1 or int(made.get("undo") or 0) != 1 or int(made.get("redo") or 0) != 0:
+            return [f"create {kind} empty stack {made}"]
+        if not any(label in n for n in names):
+            return [f"create {kind} empty names {names}"]
+        raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+        gone, gone_err = _key_state(raw, err)
+        if gone_err or not gone or int(gone.get("body") or 0) != 0 or int(gone.get("undo") or 0) != 0:
+            return [f"create {kind} empty undo {gone_err or gone}"]
+        stack, stack_err = _create_stack(cdp)
+        if stack_err or not stack or int(stack.get("redo") or 0) != 1:
+            return [f"create {kind} empty redo depth {stack_err or stack}"]
+        if "Nothing to undo" in str(stack.get("hint") or ""):
+            return [f"create {kind} empty hint {stack.get('hint')!r}"]
+        redone, redo_err = _json_eval(cdp, REDO_KEY_EXPR)
+        if redo_err or not redone or int(redone.get("body") or 0) != 1 or int(redone.get("undo") or 0) != 1:
+            return [f"create {kind} empty redo {redo_err or redone}"]
+        raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+        gone, gone_err = _key_state(raw, err)
+        if gone_err or not gone or int(gone.get("body") or 0) != 0:
+            return [f"create {kind} empty undo 2 {gone_err or gone}"]
+    extra, extra_err = _json_eval(cdp, CREATE_EXTRA_UNDO_EXPR)
+    if extra_err or not extra or "Nothing to undo" not in str(extra.get("hint") or ""):
+        return [f"create extra undo {extra_err or extra}"]
+    print("create undo pass", flush=True)
+    return []
+
+
+def digit_hotkey_guard_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Desktop digits ignore selection hotkeys unless the viewport is focused."""
+    try:
+        set_desktop(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"digit hotkey desktop {exc}"]
+    url = origin + "/?primitive=box"
+    print(f"load digit_hotkeys {url}", flush=True)
+    loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(loaded, dict):
+        return ["digit hotkey load", *load_problems[:20]]
+    if loaded.get("selectionMode") != "item" or int(loaded.get("selectionCount") or 0) < 1:
+        return [f"digit hotkey start {loaded.get('selectionMode')!r} {loaded.get('selectionCount')!r}"]
+
+    def keyed(expr: str) -> tuple[dict[str, Any] | None, str]:
+        return _json_eval(cdp, expr)
+
+    unfocused, un_err = keyed(
+        "(function(){"
+        "var el=document.activeElement;if(el&&el.blur)el.blur();"
+        "var before=window.__cadcamExportState||{};"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'1',code:'Digit1',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "before:before.selectionMode,active:document.activeElement?(document.activeElement.id||document.activeElement.tagName):''});"
+        "})()"
+    )
+    if un_err or not unfocused:
+        return [f"digit unfocused {un_err or unfocused}"]
+    if unfocused.get("mode") != "item" or int(unfocused.get("count") or 0) < 1:
+        return [f"digit unfocused changed selection {unfocused}"]
+    typed, typed_err = keyed(
+        "(function(){"
+        "var el=document.getElementById('docName');"
+        "if(!el) return JSON.stringify({error:'missing docName'});"
+        "el.focus();"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'4',code:'Digit4',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,active:document.activeElement?document.activeElement.id:''});"
+        "})()"
+    )
+    if typed_err or not typed or typed.get("error"):
+        return [f"digit input {typed_err or typed}"]
+    if typed.get("mode") != "item" or typed.get("active") != "docName" or int(typed.get("count") or 0) < 1:
+        return [f"digit input changed selection {typed}"]
+    select_hit, select_err = keyed(
+        "(function(){"
+        "var el=document.getElementById('partMaterial');"
+        "if(!el){el=document.createElement('select');el.id='hotkeyProbeSelect';document.body.appendChild(el);}"
+        "el.focus();"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'2',code:'Digit2',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "tag:document.activeElement?document.activeElement.tagName:''});"
+        "})()"
+    )
+    if select_err or not select_hit:
+        return [f"digit select {select_err or select_hit}"]
+    if select_hit.get("mode") != "item" or select_hit.get("tag") != "SELECT":
+        return [f"digit select changed selection {select_hit}"]
+    area_hit, area_err = keyed(
+        "(function(){"
+        "var el=document.getElementById('hotkeyProbeArea');"
+        "if(!el){el=document.createElement('textarea');el.id='hotkeyProbeArea';document.body.appendChild(el);}"
+        "el.focus();"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'3',code:'Digit3',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "tag:document.activeElement?document.activeElement.tagName:''});"
+        "})()"
+    )
+    if area_err or not area_hit:
+        return [f"digit textarea {area_err or area_hit}"]
+    if area_hit.get("mode") != "item" or area_hit.get("tag") != "TEXTAREA":
+        return [f"digit textarea changed selection {area_hit}"]
+    edit_hit, edit_err = keyed(
+        "(function(){"
+        "var el=document.getElementById('hotkeyProbeEdit');"
+        "if(!el){el=document.createElement('div');el.id='hotkeyProbeEdit';el.contentEditable='true';document.body.appendChild(el);}"
+        "el.focus();"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'1',code:'Digit1',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "edit:!!(document.activeElement&&document.activeElement.isContentEditable)});"
+        "})()"
+    )
+    if edit_err or not edit_hit:
+        return [f"digit contenteditable {edit_err or edit_hit}"]
+    if edit_hit.get("mode") != "item" or edit_hit.get("edit") is not True:
+        return [f"digit contenteditable changed selection {edit_hit}"]
+    intended, intended_err = keyed(
+        "(function(){"
+        "var vp=document.getElementById('viewport');"
+        "if(!vp) return JSON.stringify({error:'missing viewport'});"
+        "if(vp.focus) vp.focus();"
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:'1',code:'Digit1',bubbles:true,cancelable:true}));"
+        "var s=window.__cadcamExportState||{};"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "active:document.activeElement?document.activeElement.id:''});"
+        "})()"
+    )
+    if intended_err or not intended or intended.get("error"):
+        return [f"digit viewport {intended_err or intended}"]
+    if intended.get("mode") != "vertex" or intended.get("active") != "viewport":
+        return [f"digit viewport intended {intended}"]
+    press_plain_4(cdp)
+    cdp.drain(0.3)
+    restored = _export_state(cdp)
+    if restored.get("selectionMode") != "item" or int(restored.get("selectionCount") or 0) < 1:
+        return [
+            "digit viewport 4 "
+            f"{restored.get('selectionMode')!r} {restored.get('selectionCount')!r}"
+        ]
+    print("digit hotkey guard pass", flush=True)
+    return []
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -4965,6 +5230,16 @@ def run(omit: list[str]) -> int:
             if names_found:
                 failures.append("boolean_names")
                 failures.extend(names_found[:40])
+        if not failures:
+            create_undo_found = create_undo_problems(cdp, origin)
+            if create_undo_found:
+                failures.append("create_undo")
+                failures.extend(create_undo_found[:40])
+        if not failures:
+            hotkey_found = digit_hotkey_guard_problems(cdp, origin)
+            if hotkey_found:
+                failures.append("digit_hotkeys")
+                failures.extend(hotkey_found[:40])
         if failures:
             print("FAIL deploy_smoke", flush=True)
             for line in failures:
