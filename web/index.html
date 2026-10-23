@@ -710,6 +710,15 @@
     border-radius: 8px;
     padding: 0 8px;
   }
+  /* Field nudge only. pan-y keeps vertical panel scroll native. */
+  #primCentres input,
+  #primBox input,
+  #primCyl input,
+  #primDisc input,
+  #primRotate input,
+  #primBbox input {
+    touch-action: pan-y;
+  }
   .dim-panel .axis-row { margin: 0 0 4px; }
   .dim-note { margin: 4px 0 0; }
   .lock-btn {
@@ -2115,9 +2124,13 @@ async function boot() {
       console.error('three-finger failed', err);
       return null;
     });
+    const nudgePromise = import('./field-nudge.mjs').catch(function (err) {
+      console.error('field-nudge failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise, nudgePromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10], occtLoaded[11]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -2125,7 +2138,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi, nudgeApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -6168,6 +6181,39 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return true;
   }
 
+  // One call per crossed step. Each successful commit is one undo step.
+  function applyFieldNudge(field, steps) {
+    if (!field || !nudgeApi || !steps || field.disabled) return 0;
+    if (typeof nudgeApi.fieldSpec !== 'function' || typeof nudgeApi.clampValue !== 'function') return 0;
+    const spec = nudgeApi.fieldSpec(field.id);
+    if (!spec || !(spec.step > 0)) return 0;
+    const sign = steps < 0 ? -1 : 1;
+    const count = Math.abs(steps);
+    let applied = 0;
+    for (let i = 0; i < count; i += 1) {
+      if (document.activeElement !== field) break;
+      const delta = sign * spec.step;
+      const depth = commandStack.depth();
+      if (spec.unit === 'deg') {
+        const current = readField(field.id);
+        if (current == null) break;
+        const next = Math.round(nudgeApi.clampValue(current, delta, spec) * 1000) / 1000;
+        if (Math.abs(next - current) <= 1e-9) break;
+        field.value = String(next);
+      } else {
+        const current = fieldMm(field.id);
+        if (current == null) break;
+        const next = Math.round(nudgeApi.clampValue(current, delta, spec) * 1000) / 1000;
+        if (Math.abs(next - current) <= 1e-9) break;
+        stageExactMm(field.id, next);
+      }
+      onPrimitiveCommit();
+      if (commandStack.depth() !== depth + 1) break;
+      applied += 1;
+    }
+    return applied;
+  }
+
   function layoutPortraitStack() {
     const bar = viewport.querySelector('.vp-bar');
     const gap = 8;
@@ -9560,7 +9606,62 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.dimStepFromPointer = true;
       applyDimStep(btn, false);
     });
-    dimPanel.addEventListener('pointercancel', function () { clearStepHold(); });
+    dimPanel.addEventListener('pointercancel', function (ev) {
+      clearStepHold();
+      endFieldNudge(ev, 'cancel');
+    });
+    // Horizontal swipe on a focused size, centre, or rotation field.
+    // Right increases, left decreases, 24 px per step (web/field-nudge.mjs).
+    // Vertical travel locks to scroll and is not captured.
+    let nudgeLive = null;
+    let nudgeCapture = false;
+    function nudgeInput(target) {
+      if (!nudgeApi || !target || !target.closest) return null;
+      const field = target.closest('input');
+      if (!field || !field.closest('.dim-row')) return null;
+      if (typeof nudgeApi.fieldSpec !== 'function' || !nudgeApi.fieldSpec(field.id)) return null;
+      return field;
+    }
+    function endFieldNudge(ev, how) {
+      if (!nudgeLive || !ev) return;
+      const session = nudgeLive.session;
+      if (session.pointerId() !== ev.pointerId) return;
+      const field = nudgeLive.field;
+      const id = ev.pointerId;
+      if (how === 'cancel') session.cancel(id);
+      else if (how === 'lost') session.lostCapture(id);
+      else session.up(id);
+      nudgeLive = null;
+      nudgeCapture = false;
+      try { field.releasePointerCapture(id); } catch (_err) { /* not captured */ }
+    }
+    dimPanel.addEventListener('pointerdown', function (ev) {
+      const field = nudgeInput(ev.target);
+      if (!field) return;
+      if (ev.button !== 0 && ev.pointerType !== 'touch' && ev.pointerType !== 'pen') return;
+      if (nudgeLive && !nudgeLive.session.ended() && nudgeLive.session.pointerId() !== ev.pointerId) return;
+      const session = nudgeApi.createFieldNudgeSession();
+      const focused = document.activeElement === field && field.disabled !== true;
+      session.down(ev.pointerId, ev.clientX, ev.clientY, focused);
+      nudgeLive = { field: field, session: session };
+      nudgeCapture = false;
+    });
+    dimPanel.addEventListener('pointermove', function (ev) {
+      if (!nudgeLive || nudgeLive.session.ended()) return;
+      const steps = nudgeLive.session.move(ev.pointerId, ev.clientX, ev.clientY);
+      if (nudgeLive.session.lockedAxis() === 'x') {
+        if (ev.cancelable) ev.preventDefault();
+        if (!nudgeCapture) {
+          try {
+            nudgeLive.field.setPointerCapture(ev.pointerId);
+            nudgeCapture = true;
+          } catch (_err) { /* untrusted or already captured */ }
+        }
+      }
+      if (steps) applyFieldNudge(nudgeLive.field, steps);
+    }, { passive: false });
+    dimPanel.addEventListener('pointerup', function (ev) { endFieldNudge(ev, 'up'); });
+    dimPanel.addEventListener('lostpointercapture', function (ev) { endFieldNudge(ev, 'lost'); });
   }
 
   document.addEventListener('keydown', function (ev) {
@@ -9794,6 +9895,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       ms: fingerApi.SWIPE_MS,
       key: fingerApi.STORAGE_KEY,
       enabled: function () { return threeFingerOn(); }
+    };
+  }
+  if (nudgeApi) {
+    window.__cadcamFieldNudge = {
+      px: nudgeApi.STEP_PX,
+      axis: nudgeApi.AXIS,
+      mm: nudgeApi.MM_STEP,
+      deg: nudgeApi.DEG_STEP,
+      min: nudgeApi.MIN_SIZE_MM
     };
   }
   window.__cadcamNavCube = navCubeState;
