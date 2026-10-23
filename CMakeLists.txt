@@ -141,6 +141,20 @@ else()
     message(STATUS "three_finger skipped locally: Node was not found.")
 endif()
 
+# Focused-field nudge. Pure JS, no libcascade.
+if(CADCAM_NODE)
+    add_test(NAME field_nudge COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_field_nudge.mjs")
+    set_tests_properties(field_nudge PROPERTIES
+        TIMEOUT 30
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "field_nudge requires Node. CI must not skip this test when Node is missing.")
+else()
+    message(STATUS "field_nudge skipped locally: Node was not found.")
+endif()
+
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
 # gizmo_drag_smoke exits 77 when Playwright cannot be imported. Prefer the
