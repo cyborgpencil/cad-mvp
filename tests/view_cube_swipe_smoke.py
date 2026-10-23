@@ -103,36 +103,6 @@ CUBE_SWIPE = """({down, up, phase}) => {
   return 'up';
 }"""
 
-ZONE_SWIPE = """({down, up, phase}) => {
-  const start = document.elementFromPoint(down.x, down.y);
-  const el = start || document.getElementById('viewCube');
-  function fire(type, x, y) {
-    const ending = type === 'pointerup' || type === 'pointercancel';
-    el.dispatchEvent(new PointerEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      pointerId: 13,
-      pointerType: 'touch',
-      isPrimary: true,
-      button: 0,
-      buttons: ending ? 0 : 1,
-      clientX: x,
-      clientY: y,
-      width: 24,
-      height: 24
-    }));
-  }
-  if (phase === 'down') {
-    fire('pointerdown', down.x, down.y);
-    fire('pointermove', (down.x + up.x) / 2, (down.y + up.y) / 2);
-    const blocked = !!(start && start.closest && start.closest('button, a, input, textarea, select'));
-    return blocked ? 'button' : (start && (start.id || start.tagName)) || 'missing';
-  }
-  fire('pointermove', up.x, up.y);
-  fire('pointerup', up.x, up.y);
-  return 'up';
-}"""
-
 TAP_AT = """({x, y}) => {
   const el = document.elementFromPoint(x, y) || document.getElementById('viewCube');
   function fire(type) {
@@ -347,23 +317,6 @@ def run_phone_swipes(page: Any, kind: str) -> list[str]:
             hit = page.evaluate(TAP_AT, {"x": float(zone["x"]), "y": float(zone["y"])})
             print(f"{kind} tap zone right on {hit}", flush=True)
             problems.extend(face_problems(page, RIGHT, "right", "Right", f"{kind} tap right"))
-    if cube:
-        go_front(page)
-        zfront = wait_face(page, FRONT, f"{kind} zone swipe front")
-        problems.extend(zfront)
-        start_zone = outside_face_zone(page, cube, "front")
-        if not start_zone:
-            problems.append(f"{kind} phone front zone missing")
-        elif not zfront:
-            start = {"x": float(start_zone["x"]), "y": float(start_zone["y"])}
-            up = {"x": start["x"] - SWIPE_PX, "y": start["y"]}
-            began = page.evaluate(ZONE_SWIPE, {"down": start, "up": up, "phase": "down"})
-            page.evaluate(ZONE_SWIPE, {"down": start, "up": up, "phase": "up"})
-            print(f"{kind} zone swipe began {began}", flush=True)
-            if began == "button":
-                problems.append(f"{kind} zone swipe hit a button")
-            else:
-                problems.extend(face_problems(page, RIGHT, "right", "Right", f"{kind} zone swipe left"))
     after = read_nav(page)
     if after.get("selectionCount") != select_n:
         problems.append(

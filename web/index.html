@@ -9276,7 +9276,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const travel = Math.hypot(ev.clientX - g.sx, ev.clientY - g.sy);
         const pastSlop = g.moved || travel >= tapSlopPx();
         let didSwipe = false;
-        if (ev.type !== 'pointercancel' && cubeApi && typeof cubeApi.swipeDirection === 'function') {
+        if (ev.type !== 'pointercancel' && g.fromCubeEl && cubeApi && typeof cubeApi.swipeDirection === 'function') {
           const swipeDir = cubeApi.swipeDirection(
             ev.clientX - g.sx,
             ev.clientY - g.sy,
