@@ -2141,7 +2141,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const CUBE_HIT_PX = 44;
   const CUBE_SNAP_MS = 250;
   const CUBE_DOUBLE_MS = 320;
-  // Swipe on #viewCube: 24 CSS px within 400 ms, dominant axis (web/view-cube.mjs).
+  // Swipe on the view cube: 24 CSS px, dominant axis (web/view-cube.mjs).
+  // A drag that already passed that distance still counts when it is slower
+  // than 400 ms. Travel past the tap slop is never a face pick.
   // Phone hit centers, in the 44 px pad left of and below the 88 px cube.
   // Each center sits outside the visible cube so its 44 px rect extends past it.
   const PHONE_ZONE_LAYOUT = [
@@ -9271,8 +9273,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (g && g.pid === ev.pointerId) {
       if (g.type === 'gizmo') commitGizmoDrag(g.moved);
       else if (g.type === 'cube') {
+        const travel = Math.hypot(ev.clientX - g.sx, ev.clientY - g.sy);
+        const pastSlop = g.moved || travel >= tapSlopPx();
         let didSwipe = false;
-        if (ev.type !== 'pointercancel' && g.fromCubeEl && cubeApi && typeof cubeApi.swipeDirection === 'function') {
+        if (ev.type !== 'pointercancel' && cubeApi && typeof cubeApi.swipeDirection === 'function') {
           const swipeDir = cubeApi.swipeDirection(
             ev.clientX - g.sx,
             ev.clientY - g.sy,
@@ -9287,7 +9291,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             }
           }
         }
-        if (!didSwipe && ev.type !== 'pointercancel' && (g.fromCubeEl || !g.moved)) {
+        // A drag past the tap slop must not pick at the release point.
+        // On the phone cube that point sits on a side zone.
+        if (!didSwipe && ev.type !== 'pointercancel' && !pastSlop) {
           const now = performance.now();
           const doubleTap = cubeTapMs > 0 && (now - cubeTapMs) <= CUBE_DOUBLE_MS;
           if (doubleTap) {
