@@ -1,0 +1,7 @@
+# PR previews published under /cad-mvp/prN/ by .github/workflows/pages.yml.
+# One PR number per line. Add "review" after the number when the PR has
+# C++ that Erik has not reviewed yet; its preview gets a visible banner.
+21
+22
+24
+26 review

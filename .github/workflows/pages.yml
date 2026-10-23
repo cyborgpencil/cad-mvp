@@ -1,9 +1,14 @@
 name: Deploy web app to GitHub Pages
 
+# main builds to the site root, exactly as before. Each PR listed in
+# .github/preview-prs.txt builds from its own head (own wasm) into prN/.
+# A push to a listed PR's branch redeploys so its preview stays current.
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/**", "fix/**"]
   workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
 
 permissions:
   contents: read
@@ -15,10 +20,106 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  previews:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      run: ${{ steps.list.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          items="[]"
+          heads=""
+          while read -r num flag; do
+            case "$num" in ""|\#*) continue ;; esac
+            pr=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${num}")
+            if [ "$(jq -r .state <<<"$pr")" != "open" ]; then echo "skip #$num (not open)"; continue; fi
+            head=$(jq -r .head.ref <<<"$pr")
+            heads="$heads $head"
+            review=false; [ "${flag:-}" = "review" ] && review=true
+            items=$(jq -c --arg n "$num" --arg h "$head" --argjson r "$review" '. + [{pr:$n, ref:$h, review:$r}]' <<<"$items")
+          done < .github/preview-prs.txt
+          run=true
+          if [ "$EVENT" = "push" ] && [ "$REF" != "main" ]; then
+            run=false
+            for h in $heads; do [ "$h" = "$REF" ] && run=true; done
+          fi
+          echo "matrix={\"include\":$items}" >> "$GITHUB_OUTPUT"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "previews: $items run=$run"
+
+  preview:
+    needs: previews
+    if: needs.previews.outputs.run == 'true' && needs.previews.outputs.matrix != '{"include":[]}'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.previews.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake
+      - name: Build this PR's own cadcam.js and cadcam.wasm
+        run: |
+          emcmake cmake -S web -B builds/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build builds/wasm
+          test -f web/cadcam.js && test -f web/cadcam.wasm
+      - name: Fetch libcascade
+        run: python3 web/fetch-libcascade.py
+      - name: Assemble preview (the PR's own site list)
+        env:
+          PR: ${{ matrix.pr }}
+          REVIEW: ${{ matrix.review }}
+        run: |
+          set -euo pipefail
+          python3 web/assemble_site.py _site
+          sha=$(git rev-parse --short HEAD)
+          if [ "$REVIEW" = "true" ]; then
+            label="PR #${PR} preview (${sha}) - NEEDS ERIK'S REVIEW: contains unreviewed C++"
+            color="#b00020"
+          else
+            label="PR #${PR} preview (${sha})"
+            color="#5a3d00"
+          fi
+          banner="<div id=\"prPreviewBanner\" style=\"position:fixed;left:0;right:0;bottom:0;z-index:99999;background:${color};color:#fff;font:600 12px system-ui;padding:3px 8px;text-align:center;pointer-events:none\">${label}</div>"
+          python3 - "$banner" <<'PY'
+          import sys, pathlib
+          p = pathlib.Path("_site/index.html")
+          s = p.read_text(encoding="utf-8")
+          i = s.lower().rfind("</body>")
+          assert i > 0, "no </body>"
+          p.write_text(s[:i] + sys.argv[1] + s[i:], encoding="utf-8")
+          PY
+          mkdir -p out && mv _site "out/pr${PR}"
+          printf '%s %s %s %s\n' "$PR" "$sha" "$REVIEW" "$(git log -1 --format=%s | tr -d '<>&')" > "out/pr${PR}.meta"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-pr${{ matrix.pr }}
+          path: out
+          retention-days: 3
+
   build:
+    needs: [previews, preview]
+    if: ${{ !cancelled() && needs.previews.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -55,6 +156,40 @@ jobs:
           cmake -S . -B builds/native -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build builds/native
           ctest --test-dir builds/native --output-on-failure
+      - name: Add PR previews and the previews index
+        if: needs.preview.result != 'skipped'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: preview-pr*
+          path: previews-in
+          merge-multiple: true
+      - name: Place previews
+        run: |
+          set -euo pipefail
+          mkdir -p _site/previews
+          {
+            echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>cad-mvp PR previews</title>'
+            echo '<h1>PR previews</h1><p>Main is at <a href="../">the site root</a>.</p><ul>'
+            for m in previews-in/pr*.meta; do
+              [ -f "$m" ] || continue
+              read -r pr sha review subject < "$m"
+              [ -d "previews-in/pr${pr}" ] || continue
+              rm -rf "_site/pr${pr}" && cp -r "previews-in/pr${pr}" "_site/pr${pr}"
+              note=""; [ "$review" = "true" ] && note=' <strong style="color:#b00020">NEEDS ERIK&#39;S REVIEW (unreviewed C++)</strong>'
+              echo "<li><a href=\"../pr${pr}/\">PR #${pr}</a> at ${sha}: ${subject}${note}</li>"
+            done
+            echo '</ul>'
+          } > _site/previews/index.html
+          ls _site
+      - name: Artifact guard (no fixtures, builds/, or secrets)
+        run: |
+          set -euo pipefail
+          bad=$(find _site \( -ipath '*fixtures*' -o -ipath '*/builds/*' -o -iname 'blink*' -o -iname 'lbracket*' -o -iname '*.json' \) -print)
+          if [ -n "$bad" ]; then echo "refuse to publish: $bad"; exit 1; fi
+          if grep -rIlE 'gh[p]_[A-Za-z0-9]{20,}|github_pat_|-----BEGIN [A-Z ]*PRIVATE KEY' _site; then
+            echo "refuse to publish: secret found"; exit 1
+          fi
+          echo "artifact guard passed"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -62,6 +197,7 @@ jobs:
 
   deploy:
     needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
