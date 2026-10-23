@@ -1,5 +1,7 @@
 #include "stl.hpp"
 
+#include "bed_orient.hpp"
+
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -80,10 +82,12 @@ bool index_ok(const MeshSolid& mesh, std::uint32_t index) {
 
 }  // namespace
 
-bool write_binary_stl(const std::filesystem::path& path, const MeshSolid& mesh) {
-    for (const auto& triangle : mesh.triangles) {
-        if (!index_ok(mesh, triangle[0]) || !index_ok(mesh, triangle[1]) ||
-            !index_ok(mesh, triangle[2])) {
+bool write_binary_stl(const std::filesystem::path& path, const MeshSolid& mesh, bool lay_on_bed) {
+    const MeshSolid laid = lay_on_bed ? lay_single_body_on_bed(mesh) : mesh;
+    const MeshSolid& body = laid;
+    for (const auto& triangle : body.triangles) {
+        if (!index_ok(body, triangle[0]) || !index_ok(body, triangle[1]) ||
+            !index_ok(body, triangle[2])) {
             return false;
         }
     }
@@ -97,12 +101,12 @@ bool write_binary_stl(const std::filesystem::path& path, const MeshSolid& mesh) 
     const char text[] = "cadcam-mvp binary stl, coordinates in millimeters";
     std::memcpy(header.data(), text, sizeof(text) - 1);
     out.write(header.data(), static_cast<std::streamsize>(header.size()));
-    write_u32(out, static_cast<std::uint32_t>(mesh.triangles.size()));
+    write_u32(out, static_cast<std::uint32_t>(body.triangles.size()));
 
-    for (const auto& triangle : mesh.triangles) {
-        const Vec3& a = mesh.vertices[triangle[0]];
-        const Vec3& b = mesh.vertices[triangle[1]];
-        const Vec3& c = mesh.vertices[triangle[2]];
+    for (const auto& triangle : body.triangles) {
+        const Vec3& a = body.vertices[triangle[0]];
+        const Vec3& b = body.vertices[triangle[1]];
+        const Vec3& c = body.vertices[triangle[2]];
         float normal[3];
         face_normal(a, b, c, normal);
         write_f32(out, normal[0]);

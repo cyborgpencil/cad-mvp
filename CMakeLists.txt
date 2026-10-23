@@ -33,6 +33,7 @@ add_library(export_mesh
     src/export/box.cpp
     src/export/stl.cpp
     src/export/threemf.cpp
+    src/export/bed_orient.cpp
     src/export/export_files.cpp
     src/export/gate.cpp
 )

@@ -19,6 +19,7 @@ add_executable(cadcam
     ../src/export/box.cpp
     ../src/export/stl.cpp
     ../src/export/threemf.cpp
+    ../src/export/bed_orient.cpp
     ../src/export/gate.cpp
     ../src/model/shapes.cpp
     ../src/model/repair.cpp
