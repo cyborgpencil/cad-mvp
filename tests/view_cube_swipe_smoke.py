@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Swipe #viewCube left from Front and land on Right.
+"""Swipe #viewCube from Front onto the neighbouring face.
 
-Desktop Chromium uses a mouse drag on the cube overlay. WebKit uses
-Playwright's iPhone 13 profile and PointerEvents dispatched on #viewCube.
-A 10 px nudge stays a tap, so the camera stays on Front.
+Desktop Chromium uses a mouse drag on the cube overlay. WebKit and a
+390x844 Chromium context dispatch PointerEvents on #viewCube. Each of
+left, right, up, and down is reset through the Front button, then swiped
+40 px, including a slow drag longer than 400 ms. The camera direction and
+cubeFaceName must match the next face. A 10 px nudge stays on Front.
 
 Wired into CTest next to gizmo_drag_smoke. Playwright lives in the pwvenv.
 Exit 77 when it cannot be imported.
@@ -22,8 +24,19 @@ WORK = ROOT / "builds" / "view-cube-smoke"
 SKIP = 77
 SWIPE_PX = 40
 NUDGE_PX = 10
+SLOW_S = 0.5
 FRONT = (0.0, 0.0, 1.0)
 RIGHT = (1.0, 0.0, 0.0)
+LEFT = (-1.0, 0.0, 0.0)
+TOP = (0.0, 1.0, 0.0)
+BOTTOM = (0.0, -1.0, 0.0)
+# Screen up is negative clientY. Left from Front lands on Right.
+PHONE_SWIPES = (
+    ("left", -SWIPE_PX, 0.0, RIGHT, "right", "Right"),
+    ("right", SWIPE_PX, 0.0, LEFT, "left", "Left"),
+    ("up", 0.0, -SWIPE_PX, TOP, "top", "Top"),
+    ("down", 0.0, SWIPE_PX, BOTTOM, "bottom", "Bottom"),
+)
 
 
 def skip_missing_playwright() -> int:
@@ -82,8 +95,65 @@ CUBE_SWIPE = """({down, up, phase}) => {
     return 'down';
   }
   fire('pointermove', up.x, up.y);
+  if (phase === 'cancel') {
+    fire('pointercancel', up.x, up.y);
+    return 'cancel';
+  }
   fire('pointerup', up.x, up.y);
   return 'up';
+}"""
+
+ZONE_SWIPE = """({down, up, phase}) => {
+  const start = document.elementFromPoint(down.x, down.y);
+  const el = start || document.getElementById('viewCube');
+  function fire(type, x, y) {
+    const ending = type === 'pointerup' || type === 'pointercancel';
+    el.dispatchEvent(new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 13,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      buttons: ending ? 0 : 1,
+      clientX: x,
+      clientY: y,
+      width: 24,
+      height: 24
+    }));
+  }
+  if (phase === 'down') {
+    fire('pointerdown', down.x, down.y);
+    fire('pointermove', (down.x + up.x) / 2, (down.y + up.y) / 2);
+    const blocked = !!(start && start.closest && start.closest('button, a, input, textarea, select'));
+    return blocked ? 'button' : (start && (start.id || start.tagName)) || 'missing';
+  }
+  fire('pointermove', up.x, up.y);
+  fire('pointerup', up.x, up.y);
+  return 'up';
+}"""
+
+TAP_AT = """({x, y}) => {
+  const el = document.elementFromPoint(x, y) || document.getElementById('viewCube');
+  function fire(type) {
+    el.dispatchEvent(new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 14,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      buttons: type === 'pointerup' ? 0 : 1,
+      clientX: x,
+      clientY: y,
+      width: 24,
+      height: 24
+    }));
+  }
+  fire('pointerdown');
+  fire('pointerup');
+  if (el.closest && el.closest('button, a, input, textarea, select')) return 'button';
+  return el.id || el.tagName;
 }"""
 
 
@@ -165,6 +235,143 @@ def touch_drag(page: Any, down: dict[str, float], up: dict[str, float]) -> None:
     page.evaluate(CUBE_SWIPE, {"down": down, "up": up, "phase": "up"})
 
 
+def pointer_drag(
+    page: Any,
+    down: dict[str, float],
+    up: dict[str, float],
+    slow: bool = False,
+    cancel: bool = False,
+) -> None:
+    page.evaluate(CUBE_SWIPE, {"down": down, "up": up, "phase": "down"})
+    if slow:
+        time.sleep(SLOW_S)
+    phase = "cancel" if cancel else "up"
+    page.evaluate(CUBE_SWIPE, {"down": down, "up": up, "phase": phase})
+
+
+def face_problems(page: Any, axis: tuple[float, float, float], face: str, label: str, tag: str) -> list[str]:
+    problems = wait_face(page, axis, tag)
+    after = read_nav(page)
+    nav = after.get("nav") if isinstance(after.get("nav"), dict) else {}
+    direction = direction_of(after)
+    if nav.get("snapFace") != face:
+        problems.append(
+            f"{tag} cubeFaceName {nav.get('snapFace')!r} want {face!r} dir {direction!r}"
+        )
+    if str(after.get("viewLabel") or "") != label:
+        problems.append(f"{tag} viewLabel {after.get('viewLabel')!r}")
+    hint = str(after.get("hint") or "")
+    if "Orbit" in hint:
+        problems.append(f"{tag} hint {hint!r}")
+    return problems
+
+
+def outside_face_zone(page: Any, cube: dict[str, float], name: str | None = None) -> dict[str, Any] | None:
+    state = read_nav(page)
+    nav = state.get("nav") if isinstance(state.get("nav"), dict) else {}
+    zones = nav.get("zones") if isinstance(nav.get("zones"), list) else []
+    left = cube["x"] - cube["w"] / 2
+    top = cube["y"] - cube["h"] / 2
+    for zone in zones:
+        if not isinstance(zone, dict) or zone.get("kind") != "face":
+            continue
+        if name and zone.get("name") != name:
+            continue
+        x = float(zone["x"])
+        y = float(zone["y"])
+        if left <= x <= left + cube["w"] and top <= y <= top + cube["h"]:
+            continue
+        hit = page.evaluate(
+            """({x, y}) => {
+              const el = document.elementFromPoint(x, y);
+              if (!el) return '';
+              if (el.closest && el.closest('button, a, input, textarea, select')) return 'button';
+              return el.id || el.tagName;
+            }""",
+            {"x": x, "y": y},
+        )
+        if hit in {"", "button"}:
+            continue
+        return zone
+    return None
+
+
+def run_phone_swipes(page: Any, kind: str) -> list[str]:
+    """Four directions, fast and slow, through pointer events on #viewCube."""
+    problems: list[str] = []
+    select_n = read_nav(page).get("selectionCount")
+    for name, dx, dy, axis, face, label in PHONE_SWIPES:
+        for slow in (False, True):
+            pace = "slow" if slow else "fast"
+            tag = f"{kind} {pace} {name}"
+            go_front(page)
+            reset = wait_face(page, FRONT, f"{tag} front")
+            if reset:
+                problems.extend(reset)
+                continue
+            cube = cube_center(page)
+            if not cube:
+                problems.append(f"{tag} view cube missing")
+                continue
+            up = {"x": cube["x"] + dx, "y": cube["y"] + dy}
+            pointer_drag(page, cube, up, slow=slow)
+            problems.extend(face_problems(page, axis, face, label, tag))
+    go_front(page)
+    cancel_reset = wait_face(page, FRONT, f"{kind} cancel front")
+    problems.extend(cancel_reset)
+    cube = cube_center(page)
+    if cube and not cancel_reset:
+        pointer_drag(
+            page,
+            cube,
+            {"x": cube["x"] - SWIPE_PX, "y": cube["y"]},
+            slow=True,
+            cancel=True,
+        )
+        time.sleep(0.35)
+        cancelled = read_nav(page)
+        direction = direction_of(cancelled)
+        nav = cancelled.get("nav") if isinstance(cancelled.get("nav"), dict) else {}
+        if direction is None or angle_deg(direction, FRONT) > 1.0 or nav.get("animating") is True:
+            problems.append(f"{kind} pointercancel moved {direction!r} face {nav.get('face')!r}")
+        else:
+            print(f"{kind} pointercancel stayed Front", flush=True)
+    zone = outside_face_zone(page, cube, "right") if cube else None
+    if not zone:
+        problems.append(f"{kind} phone right zone missing")
+    else:
+        go_front(page)
+        zreset = wait_face(page, FRONT, f"{kind} zone tap front")
+        problems.extend(zreset)
+        if not zreset:
+            hit = page.evaluate(TAP_AT, {"x": float(zone["x"]), "y": float(zone["y"])})
+            print(f"{kind} tap zone right on {hit}", flush=True)
+            problems.extend(face_problems(page, RIGHT, "right", "Right", f"{kind} tap right"))
+    if cube:
+        go_front(page)
+        zfront = wait_face(page, FRONT, f"{kind} zone swipe front")
+        problems.extend(zfront)
+        start_zone = outside_face_zone(page, cube, "front")
+        if not start_zone:
+            problems.append(f"{kind} phone front zone missing")
+        elif not zfront:
+            start = {"x": float(start_zone["x"]), "y": float(start_zone["y"])}
+            up = {"x": start["x"] - SWIPE_PX, "y": start["y"]}
+            began = page.evaluate(ZONE_SWIPE, {"down": start, "up": up, "phase": "down"})
+            page.evaluate(ZONE_SWIPE, {"down": start, "up": up, "phase": "up"})
+            print(f"{kind} zone swipe began {began}", flush=True)
+            if began == "button":
+                problems.append(f"{kind} zone swipe hit a button")
+            else:
+                problems.extend(face_problems(page, RIGHT, "right", "Right", f"{kind} zone swipe left"))
+    after = read_nav(page)
+    if after.get("selectionCount") != select_n:
+        problems.append(
+            f"{kind} phone selection {after.get('selectionCount')!r} was {select_n!r}"
+        )
+    return problems
+
+
 def go_front(page: Any) -> None:
     page.evaluate(
         """() => {
@@ -235,13 +442,23 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} snap frame {elapsed:.0f} ms")
     if str(after.get("viewLabel") or "") != "Right":
         problems.append(f"{kind} viewLabel {after.get('viewLabel')!r}")
+    if kind == "touch":
+        problems.extend(run_phone_swipes(page, kind))
     return problems
 
 
-def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
+def run_engine(playwright: Any, engine: str, origin: str, phone: bool = False) -> list[str]:
     browser = getattr(playwright, engine).launch(headless=True)
     try:
-        if engine == "webkit":
+        if phone:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                device_scale_factor=1,
+                is_mobile=True,
+                has_touch=True,
+            )
+            kind = "touch"
+        elif engine == "webkit":
             device = dict(playwright.devices["iPhone 13"])
             device.pop("default_browser_type", None)
             device["screen"] = {"width": 390, "height": 844}
@@ -277,11 +494,12 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
         print(f"load {kind} {url}", flush=True)
         page.goto(url, wait_until="domcontentloaded", timeout=deploy_smoke.PAGE_TIMEOUT_S * 1000)
         problems = run_case(page, kind)
+        label = "chromium-390" if phone else engine
         if errors:
             problems = [f"{kind} js: {item}" for item in errors[:8]] + problems
         if problems:
-            return [f"{engine} {kind}", *problems]
-        print(f"PASS view_cube_swipe_smoke {engine}", flush=True)
+            return [f"{label} {kind}", *problems]
+        print(f"PASS view_cube_swipe_smoke {label}", flush=True)
         return []
     finally:
         browser.close()
@@ -308,8 +526,8 @@ def run() -> int:
     thread.start()
     try:
         with sync_playwright() as playwright:
-            for engine in ("chromium", "webkit"):
-                problems = run_engine(playwright, engine, origin)
+            for engine, phone in (("chromium", False), ("webkit", False), ("chromium", True)):
+                problems = run_engine(playwright, engine, origin, phone)
                 if problems:
                     print("FAIL view_cube_swipe_smoke", flush=True)
                     for line in problems:
