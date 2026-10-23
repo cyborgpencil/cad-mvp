@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 # Site root. `*.mjs` is every module the page loads, including
-# occt-gate.mjs, occt-primitives.mjs, occt-ops.mjs, project-file.mjs, selection.mjs, viewport-selection.mjs, and assemblies.mjs.
+# occt-gate.mjs, occt-primitives.mjs, occt-ops.mjs, project-file.mjs, selection.mjs, viewport-selection.mjs, assemblies.mjs, and view-cube.mjs.
 ROOT_GLOBS = ("index.html", "cadcam.js", "cadcam.wasm", "*.mjs")
 
 # Staged by web/fetch-libcascade.py. The page imports these paths.
@@ -39,6 +39,7 @@ REQUIRED = (
     "viewport-selection.mjs",
     "undo.mjs",
     "assemblies.mjs",
+    "view-cube.mjs",
     "dist/init.single.js",
     "dist/opencascade_single.js",
     "dist/opencascade_single.wasm",
