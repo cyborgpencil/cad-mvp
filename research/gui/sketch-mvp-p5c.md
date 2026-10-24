@@ -41,20 +41,20 @@ Aligned with the 3T lock in P2 [12]. Prefer OSS / OCCT paths already used in-rep
 1. **Enter Sketch** from Create → Sketch (shell already exists); **tap a planar face sets the sketch plane** (exclusive with V/E/F highlight; phone ≥44 px) — locked 3T 2026-10-24.
 2. **Tools only:** rectangle (corner or 2-point) + center circle. Typed L×W / Ø in **mm** (`inputmode=decimal`, mm suffix) [14]. No arcs, splines, fillets-in-sketch, or constraint icons.
 3. **Finish Sketch** returns to Model with a closed profile retained (implementation owned by Grok Build / Cursor).
-4. **Extrude:** Blind / Distance only; **default depth 5 mm** (typed override in mm); result = new body (Join/Cut later if cheap). Kernel: closed face/wire → `BRepPrimAPI_MakePrism` [13]. After commit: **OCCT validity + units (mm) gate** — same standing rule as primitives [15][14]; no watertight re-check (02:17).
+4. **Extrude:** Blind / Distance only; **default depth 10 mm** (typed override in mm); result = new body (Join/Cut later if cheap). Kernel: closed face/wire → `BRepPrimAPI_MakePrism` [13]. After commit: **OCCT validity + units (mm) gate** — same standing rule as primitives [15][14]; no watertight re-check (02:17).
 5. **Phone:** all new Sketch / Extrude controls ≥ **44 CSS px**; do not cover the bottom bar [12][14].
 6. **Out of scope this slice:** constraint solver, dimensions-as-constraints, construction geometry, multi-profile boolean in sketch, revolve/sweep/loft, imprint / disable-imprint (Onshape-only detail [2]).
 
 ## Next steps (Grok Build / Cursor)
 
 1. Doc Steward: PROGRESS lock row for P5c + prompt once P5a/P5b Measure+callouts land (P2 order) [12].
-2. Pilot / Cursor: tap-face → sketch plane; rect + circle tools; Finish Sketch; Extrude Blind default **5 mm** → `MakePrism`; unit tests on a 20 mm cube face (rect 10×10 mm × depth 5 mm; circle Ø10 mm).
+2. Pilot / Cursor: tap-face → sketch plane; rect + circle tools; Finish Sketch; Extrude Blind default **10 mm** → `MakePrism`; unit tests on a 20 mm cube face (rect 10×10 mm × depth 10 mm; circle Ø10 mm).
 3. Phone smoke: Sketch tools + Extrude Confirm ≥44 px; portrait 390×844.
 4. Regression: existing Create→Sketch shell still toggles Model ↔ Sketch; primitives path unchanged.
 
-## Team decisions (3T Chief, 2026-10-24 America/Denver)
+## Team decisions (3T final, 2026-10-24 America/Denver)
 
-1. **Default Blind extrude depth:** **5 mm** (typed override still allowed).
+1. **Default Blind extrude depth:** **10 mm** (3T final; overrides interim 5 mm). Typed override still allowed.
 2. **Face-pick:** tap face sets the sketch plane (exclusive with V/E/F highlight); phone targets ≥44 px.
 
 Measure + live callouts (P5a/P5b) still ship before sketch code.
@@ -81,4 +81,4 @@ Measure + live callouts (P5a/P5b) still ship before sketch code.
 14. Repo: `research/mobile-touch-cad.md` (WCAG/HIG 44 px; mm `inputmode=decimal`)  
 15. Repo: `research/gui/modo-selection-primitives.md` (mm primitives; OCCT validity after commit)  
 16. Repo: `research/gui/ui-layout-review.md` (Sketch as contextual mode)  
-17. Team lock (3T / CAD CAM MVP room, 2026-10-24 America/Denver): after Measure+live callouts, minimal sketch = rect/circle-on-face → extrude; no full constraint solver; Blind default 5 mm; tap face = sketch plane exclusive with V/E/F (≥44 px). Recorded in [12] + Chief 2026-10-24.
+17. Team lock (3T / CAD CAM MVP room, 2026-10-24 America/Denver): after Measure+live callouts, minimal sketch = rect/circle-on-face → extrude; no full constraint solver; Blind default 10 mm; tap face = sketch plane exclusive with V/E/F (≥44 px). Recorded in [12] + Chief 2026-10-24.
