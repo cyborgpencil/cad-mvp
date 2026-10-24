@@ -1267,8 +1267,10 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (!tools || tools.hidden) problems.push('tools sheet hidden');
   var rectBtn = sheetBtn('Rectangle');
   var circBtn = sheetBtn('Circle');
+  var lineBtn = sheetBtn('Line');
   need(rectBtn, 'Rectangle');
   need(circBtn, 'Circle');
+  need(lineBtn, 'Line');
   var face = hook.topFace();
   if (!face) problems.push('no top face');
   var tapped = face ? hook.tapFace(face) : false;
@@ -2042,13 +2044,92 @@ ORIGIN_PLANE_EXPR = r"""
       }
     }
   }
+  if (!ensureEmpty('line clear')) return JSON.stringify(problems);
+  if (!startSketch()) return JSON.stringify(problems);
+  pickPlane('xy', 'Line top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+  var lineSheet = document.getElementById('sketchSheet');
+  if (!lineSheet || lineSheet.hidden !== true) problems.push('line start sheet open');
+  var arcRibbon = document.querySelector('.tool-btn[data-tool="Arc"]');
+  if (!arcRibbon) problems.push('Arc button missing');
+  else if (arcRibbon.getAttribute('data-action')) problems.push('Arc data-action ' + arcRibbon.getAttribute('data-action'));
+  if (openTools()) {
+    var arcBtn = sheetBtn('Arc');
+    if (!arcBtn) problems.push('Arc sheet missing');
+    else {
+      if (arcBtn.getAttribute('data-action')) problems.push('Arc sheet action ' + arcBtn.getAttribute('data-action'));
+      arcBtn.click();
+    }
+    var arcSheet = document.getElementById('sketchSheet');
+    var arcSt = hook.state();
+    if (!arcSheet || arcSheet.hidden !== true) problems.push('Arc opened sheet');
+    if (!arcSt || arcSt.profile) problems.push('Arc profile ' + (arcSt && arcSt.profile));
+    if (!openTools()) problems.push('line tools hidden');
+    var lineTool = sheetBtn('Line');
+    need(lineTool, 'Line');
+    if (!lineTool) problems.push('Line missing');
+    else lineTool.click();
+    var lineNote = document.getElementById('sketchNote');
+    if (!lineNote || lineNote.textContent !== 'Line') problems.push('line note ' + (lineNote && lineNote.textContent));
+    var lineRect = document.getElementById('sketchRectRow');
+    var lineCirc = document.getElementById('sketchCircRow');
+    var lineDepth = document.getElementById('sketchDepthRow');
+    if (!lineRect || lineRect.hidden !== true) problems.push('line shows length');
+    if (!lineCirc || lineCirc.hidden !== true) problems.push('line shows diameter');
+    if (!lineDepth || lineDepth.hidden !== true) problems.push('line shows depth');
+    if (boxOf(document.getElementById('sketchL'))) problems.push('line shows sketchL');
+    if (boxOf(document.getElementById('sketchW'))) problems.push('line shows sketchW');
+    if (boxOf(document.getElementById('sketchD'))) problems.push('line shows sketchD');
+    var lineSheetBox = boxOf(document.getElementById('sketchSheet'));
+    if (!lineSheetBox) problems.push('line sheet hidden');
+    var lineKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
+    for (var lk = 0; lk < lineKeep.length; lk++) {
+      var keepEl = document.querySelector(lineKeep[lk]);
+      var keepBox = boxOf(keepEl);
+      if (keepBox && overlaps(lineSheetBox, keepBox)) problems.push('line covers ' + lineKeep[lk]);
+    }
+    var beforeLine = hook.state();
+    var beforeBodies = beforeLine ? beforeLine.bodies : -1;
+    if (typeof hook.placeLineVertex !== 'function') problems.push('placeLineVertex missing');
+    else {
+      if (hook.placeLineVertex(0, 0) !== true) problems.push('line vertex 1');
+      if (hook.placeLineVertex(10, 0) !== true) problems.push('line vertex 2');
+    }
+    var two = hook.state();
+    if (!two || two.lineVertices !== 2) problems.push('lineVertices 2 ' + (two && two.lineVertices));
+    if (!two || two.closed !== false) problems.push('line closed at 2');
+    if (!two || two.bodies !== beforeBodies) problems.push('line bodies ' + (two && two.bodies));
+    var twoBtn = document.getElementById('sketchConfirm');
+    need(twoBtn, 'Line confirm');
+    if (!twoBtn || twoBtn.disabled !== true || twoBtn.getAttribute('aria-disabled') !== 'true') {
+      problems.push('line confirm enabled at 2');
+    }
+    if (typeof hook.placeLineVertex === 'function' && hook.placeLineVertex(0, 10) !== true) problems.push('line vertex 3');
+    var three = hook.state();
+    if (!three || three.lineVertices !== 3 || three.closed !== false) {
+      problems.push('line before confirm n ' + (three && three.lineVertices) + ' closed ' + (three && three.closed));
+    }
+    confirmSketch('line');
+    var drawnLine = hook.state();
+    if (!drawnLine || drawnLine.profile !== 'line' || drawnLine.closed !== true || drawnLine.lineVertices !== 3) {
+      problems.push('line profile ' + (drawnLine && drawnLine.profile) + ' closed ' + (drawnLine && drawnLine.closed) + ' n ' + (drawnLine && drawnLine.lineVertices));
+    }
+    extrude('line');
+    assertSolid('line', 500, function (bounds) {
+      var min = bounds.min;
+      var max = bounds.max;
+      for (var axis = 0; axis < 3; axis++) {
+        if (Math.abs(min[axis]) > 0.05) problems.push('line min ' + axis + ' ' + min[axis]);
+        if (Math.abs(max[axis] - 10) > 0.05) problems.push('line max ' + axis + ' ' + max[axis]);
+      }
+    });
+  }
   return JSON.stringify(problems);
 })()
 """
 
 
 def portrait_origin_plane_problems(cdp: Cdp) -> list[str]:
-    """390x844 empty doc: Top/Front/Right, then rect and circle Blind 10 mm."""
+    """390x844 empty doc: Top/Front/Right, rect and circle Blind 10 mm, then a line triangle."""
     raw, err = eval_expr(cdp, ORIGIN_PLANE_EXPR, timeout=300)
     if err or not isinstance(raw, str):
         return [f"origin plane {raw or err}"]
