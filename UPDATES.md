@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #54 (merged at 1578ad0): P4 tool-shelf show/hide - shelves collapsed at load; Tools-sheet toggles; #hudSize only while editing box/cyl/disc.
+- 2026-10-24 PR #56 (merged at 672cb10): prompts/p5-measure-callouts.md + PROGRESS P5 link (measure/callouts impl prep after research #52).
 - 2026-10-24 PR #52 (merged at 4cdf7c0): research/gui/measure-callouts-p5.md + INDEX - P5a/P5b measure and callouts impl prep (research only).
 - 2026-10-24 PR #51 (merged at 9106b7f): web/PROGRESS.md scrub - P1/#47 on main at cc769e1 (not draft); P4 = Pilot building.
 - 2026-10-24 PR #47 (merged at cc769e1): clearer V/E/F selection overlays (18/14 px points, 6/4 px edge ribbons) in web/viewport-selection.mjs with phone-select and occt_gate tests.
