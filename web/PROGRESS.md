@@ -362,3 +362,14 @@ Error strings: empty file "This file is empty. The model was not changed."; unre
 - Phone selection: EDGE_TOUCH_TOLERANCE_PX is 32 (larger than the 20 px touch pick). Team-locked (3T, 2026-10-23).
 - Phone fillet and chamfer on picked edges. Team-chosen (3T, 2026-10-23): (a) chamfer default 0.5 mm, fillet 2 mm, and each tool sets its own default when it is picked; (b) an OCCT failure is the size limit, the old shape stays, and the page shows a short "try a smaller size" message; (c) Multi stays within one body, and Confirm is disabled with "pick edges on one body" when the picks span more bodies; (d) re-fillet is allowed, and a re-fillet OCCT rejects uses the same handling as (b). The units check stays. The OCCT validity check after the op is error handling and does not block Export. No watertight gate was added.
 - 2026-10-23 20:05 MT (3T/Erik phone; Doc Steward): PR preview banner moves to the top (safe-area), dismissible, never covers the phone bottom bar. Copy is "needs team review" (Erik no longer reviews). JS-only previews (#31, #34) drop the review flag in preview-prs.txt.
+
+## Parked queue (Erik 2026-10-23 ~9:17 PM MT)
+Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37 etc.). Picked up only when that stack has bandwidth; team decides approach. UPDATES.md logged only on pickup.
+
+| # | Item | Status | Source | Date |
+|---|---|---|---|---|
+| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Parked / not started | Erik | 2026-10-23 |
+| P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Parked / not started | Erik | 2026-10-23 |
+| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Parked / not started | Erik | 2026-10-23 |
+| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Parked / not started | Erik | 2026-10-23 |
+| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Parked / not started | Erik | 2026-10-23 |

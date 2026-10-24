@@ -7,7 +7,7 @@ Sourced notes for the swipe shortlist. 3T signed off the build order on 2026-10-
 - `#canvas` has `touch-action: none`; the view cube is tap-only (`pickViewCube`).
 
 ## Planned (open PRs, not on main)
-- PR #21: view-cube swipe to the next face, 24 px at any speed, starting on the cube, separate from `tapSlopPx()`, `pointercancel` ends it (team-chosen values; Erik may change them after phone tests).
+- PR #21: view-cube swipe to the next face, 24 px at any speed, starting on the cube, separate from `tapSlopPx()`, `pointercancel` ends it (team-chosen values; Erik may change them after phone tests). A successful swipe clears the 320 ms double-tap, so a tap then a swipe cannot send the next tap to Home.
 - PR #22: three-finger swipe left undoes, right redoes, with an off switch.
 - PR #24: swipe a focused value field to nudge it 1 mm (1 deg on rotation) per step, one undo step each.
 
