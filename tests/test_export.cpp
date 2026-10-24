@@ -1,3 +1,4 @@
+#include "bed_orient.hpp"
 #include "box.hpp"
 #include "export_files.hpp"
 #include "fixtures.hpp"
@@ -41,6 +42,233 @@ bool contains_unit(const std::filesystem::path& path) {
     std::ostringstream buffer;
     buffer << in.rdbuf();
     return buffer.str().find("unit=\"millimeter\"") != std::string::npos;
+}
+
+bool near_mm(double a, double b, double tol) {
+    return std::isfinite(a) && std::isfinite(b) && std::abs(a - b) <= tol;
+}
+
+struct Extents {
+    double xmin = 0;
+    double ymin = 0;
+    double zmin = 0;
+    double xmax = 0;
+    double ymax = 0;
+    double zmax = 0;
+};
+
+Extents extents_of(const MeshSolid& mesh) {
+    Extents box;
+    box.xmin = mesh.vertices[0].x;
+    box.ymin = mesh.vertices[0].y;
+    box.zmin = mesh.vertices[0].z;
+    box.xmax = box.xmin;
+    box.ymax = box.ymin;
+    box.zmax = box.zmin;
+    for (const Vec3& vertex : mesh.vertices) {
+        box.xmin = std::min(box.xmin, vertex.x);
+        box.ymin = std::min(box.ymin, vertex.y);
+        box.zmin = std::min(box.zmin, vertex.z);
+        box.xmax = std::max(box.xmax, vertex.x);
+        box.ymax = std::max(box.ymax, vertex.y);
+        box.zmax = std::max(box.zmax, vertex.z);
+    }
+    return box;
+}
+
+double signed_volume(const MeshSolid& mesh) {
+    double sum = 0.0;
+    for (const auto& triangle : mesh.triangles) {
+        const Vec3& a = mesh.vertices[triangle[0]];
+        const Vec3& b = mesh.vertices[triangle[1]];
+        const Vec3& c = mesh.vertices[triangle[2]];
+        const double cx = b.y * c.z - b.z * c.y;
+        const double cy = b.z * c.x - b.x * c.z;
+        const double cz = b.x * c.y - b.y * c.x;
+        sum += a.x * cx + a.y * cy + a.z * cz;
+    }
+    return sum / 6.0;
+}
+
+// Profile in XZ, 6 mm thick in Y. The profile is the unique largest face.
+MeshSolid l_prism() {
+    const double profile[6][2] = {
+        {0, 0}, {30, 0}, {30, 10}, {10, 10}, {10, 24}, {0, 24},
+    };
+    MeshSolid mesh;
+    mesh.vertices.reserve(12);
+    for (const auto& point : profile) {
+        mesh.vertices.push_back({point[0], 0.0, point[1]});
+    }
+    for (const auto& point : profile) {
+        mesh.vertices.push_back({point[0], 6.0, point[1]});
+    }
+    mesh.triangles = {
+        {0, 1, 2}, {0, 2, 3}, {0, 3, 4}, {0, 4, 5},
+        {6, 8, 7}, {6, 9, 8}, {6, 10, 9}, {6, 11, 10},
+    };
+    for (int i = 0; i < 6; ++i) {
+        const std::uint32_t i0 = static_cast<std::uint32_t>(i);
+        const std::uint32_t j0 = static_cast<std::uint32_t>((i + 1) % 6);
+        const std::uint32_t i1 = i0 + 6;
+        const std::uint32_t j1 = j0 + 6;
+        mesh.triangles.push_back({i0, j1, j0});
+        mesh.triangles.push_back({i0, i1, j1});
+    }
+    return mesh;
+}
+
+// 12-sided disc on the outer face (x = 0). Radius 4 mm hangs past the 6 mm
+// thickness, so the lowest vertex is the disc, not the leg face.
+MeshSolid l_with_boss() {
+    MeshSolid mesh = l_prism();
+    constexpr int n = 12;
+    constexpr double radius = 4.0;
+    constexpr double cy = 3.0;
+    constexpr double cz = 18.0;
+    constexpr double pi = 3.14159265358979323846;
+    const std::uint32_t ring = static_cast<std::uint32_t>(mesh.vertices.size());
+    for (int side = 0; side < 2; ++side) {
+        const double x = side == 0 ? -3.0 : 0.0;
+        for (int i = 0; i < n; ++i) {
+            const double angle = (2.0 * pi * i) / n;
+            mesh.vertices.push_back({
+                x,
+                cy + radius * std::cos(angle),
+                cz + radius * std::sin(angle),
+            });
+        }
+    }
+    const std::uint32_t cap0 = static_cast<std::uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back({-3.0, cy, cz});
+    const std::uint32_t cap1 = cap0 + 1;
+    mesh.vertices.push_back({0.0, cy, cz});
+    for (int i = 0; i < n; ++i) {
+        const auto i0 = ring + static_cast<std::uint32_t>(i);
+        const auto j0 = ring + static_cast<std::uint32_t>((i + 1) % n);
+        const auto i1 = i0 + static_cast<std::uint32_t>(n);
+        const auto j1 = j0 + static_cast<std::uint32_t>(n);
+        mesh.triangles.push_back({i0, j0, j1});
+        mesh.triangles.push_back({i0, j1, i1});
+        mesh.triangles.push_back({cap0, j0, i0});
+        mesh.triangles.push_back({cap1, i1, j1});
+    }
+    return mesh;
+}
+
+struct FaceArea {
+    double nx = 0;
+    double ny = 0;
+    double nz = 0;
+    double offset = 0;
+    double area = 0;
+    double zmin = 0;
+    double zmax = 0;
+};
+
+bool flat_on_bed(const MeshSolid& mesh, const char* label) {
+    if (mesh.vertices.empty()) {
+        expect(label, false);
+        return false;
+    }
+    const Extents box = extents_of(mesh);
+    expect(label, near_mm(box.zmin, 0.0, 1e-4));
+    expect(label, near_mm(box.zmax - box.zmin, 6.0, 1e-3));
+    expect(label, near_mm(box.xmax - box.xmin, 30.0, 1e-3));
+    expect(label, near_mm(box.ymax - box.ymin, 24.0, 1e-3));
+
+    std::vector<FaceArea> faces;
+    double down_on_bed = 0.0;
+    bool supported = true;
+    for (const auto& triangle : mesh.triangles) {
+        const Vec3& a = mesh.vertices[triangle[0]];
+        const Vec3& b = mesh.vertices[triangle[1]];
+        const Vec3& c = mesh.vertices[triangle[2]];
+        const double ux = b.x - a.x;
+        const double uy = b.y - a.y;
+        const double uz = b.z - a.z;
+        const double vx = c.x - a.x;
+        const double vy = c.y - a.y;
+        const double vz = c.z - a.z;
+        const double cx = uy * vz - uz * vy;
+        const double cy = uz * vx - ux * vz;
+        const double cz = ux * vy - uy * vx;
+        const double len = std::sqrt(cx * cx + cy * cy + cz * cz);
+        if (!(len > 1e-12)) {
+            continue;
+        }
+        const double nz = cz / len;
+        const double zmin = std::min(a.z, std::min(b.z, c.z));
+        const double zmax = std::max(a.z, std::max(b.z, c.z));
+        if (nz <= -0.999 && zmin > 0.05) {
+            supported = false;
+        }
+        FaceArea* found = nullptr;
+        const double nx = cx / len;
+        const double ny = cy / len;
+        const double offset = nx * a.x + ny * a.y + nz * a.z;
+        for (FaceArea& face : faces) {
+            const double dot = face.nx * nx + face.ny * ny + face.nz * nz;
+            if (dot >= 0.999 && std::abs(face.offset - offset) <= 0.05) {
+                found = &face;
+                break;
+            }
+        }
+        if (found == nullptr) {
+            FaceArea face;
+            face.nx = nx;
+            face.ny = ny;
+            face.nz = nz;
+            face.offset = offset;
+            face.area = len * 0.5;
+            face.zmin = zmin;
+            face.zmax = zmax;
+            faces.push_back(face);
+        } else {
+            found->area += len * 0.5;
+            found->zmin = std::min(found->zmin, zmin);
+            found->zmax = std::max(found->zmax, zmax);
+        }
+    }
+    double largest = 0.0;
+    for (const FaceArea& face : faces) {
+        largest = std::max(largest, face.area);
+        if (face.nz <= -0.999 && face.zmax <= 0.05 && face.zmin <= 1e-4) {
+            down_on_bed = std::max(down_on_bed, face.area);
+        }
+    }
+    expect(label, supported);
+    expect(label, largest > 400.0 && down_on_bed + 1e-3 >= largest);
+    return true;
+}
+
+void expect_z_span(const std::filesystem::path& path, double* zmin, double* zmax) {
+    std::ifstream in(path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    const std::string text = buffer.str();
+    double lo = 0.0;
+    double hi = 0.0;
+    bool any = false;
+    const std::string key = "z=\"";
+    for (std::size_t pos = text.find(key); pos != std::string::npos; pos = text.find(key, pos + key.size())) {
+        const double z = std::strtod(text.c_str() + pos + key.size(), nullptr);
+        if (!any) {
+            lo = z;
+            hi = z;
+            any = true;
+        } else {
+            lo = std::min(lo, z);
+            hi = std::max(hi, z);
+        }
+    }
+    expect("3mf has vertex z", any);
+    if (zmin != nullptr) {
+        *zmin = lo;
+    }
+    if (zmax != nullptr) {
+        *zmax = hi;
+    }
 }
 
 void expect_extent(const MeshSolid& mesh) {
@@ -188,6 +416,92 @@ int main() {
     expect("inside-out does not write", !inward.wrote);
     expect("inside-out stl absent", !std::filesystem::is_regular_file(inward.stl_path));
     expect("inside-out 3mf absent", !std::filesystem::is_regular_file(inward.threemf_path));
+
+    // A cube already seated on z = 0 stays put, including its XY shift.
+    MeshSolid seated = box_mm(20.0, 20.0, 20.0);
+    for (Vec3& vertex : seated.vertices) {
+        vertex.x -= 10.0;
+        vertex.y -= 10.0;
+    }
+    const MeshSolid seated_laid = lay_single_body_on_bed(seated);
+    bool seated_same = seated_laid.vertices.size() == seated.vertices.size() &&
+                       seated_laid.triangles.size() == seated.triangles.size();
+    for (std::size_t i = 0; seated_same && i < seated.vertices.size(); ++i) {
+        seated_same = seated_laid.vertices[i].x == seated.vertices[i].x &&
+                      seated_laid.vertices[i].y == seated.vertices[i].y &&
+                      seated_laid.vertices[i].z == seated.vertices[i].z;
+    }
+    expect("on-bed cube is unchanged", seated_same);
+
+    // 3 x 5 x 7. The short axis is X. The largest face is 5 x 7.
+    const MeshSolid brick = lay_single_body_on_bed(box_mm(3.0, 5.0, 7.0));
+    if (!brick.vertices.empty()) {
+        const Extents brick_box = extents_of(brick);
+        expect("brick zmin", near_mm(brick_box.zmin, 0.0, 1e-6));
+        expect("brick height", near_mm(brick_box.zmax - brick_box.zmin, 3.0, 1e-6));
+        expect("brick dx", near_mm(brick_box.xmax - brick_box.xmin, 7.0, 1e-6));
+        expect("brick dy", near_mm(brick_box.ymax - brick_box.ymin, 5.0, 1e-6));
+    } else {
+        expect("brick has vertices", false);
+    }
+
+    // Synthetic L from a 30 x 24 profile, 6 mm thick. Not a fixture part.
+    const MeshSolid prism = l_prism();
+    expect("L prism volume", near_mm(signed_volume(prism), 2640.0, 1e-4));
+    const MeshSolid prism_laid = lay_single_body_on_bed(prism);
+    flat_on_bed(prism_laid, "L prism on bed");
+
+    const std::filesystem::path l_dir = fresh_dir("l-prism");
+    std::filesystem::create_directories(l_dir);
+    const std::filesystem::path l_stl = l_dir / "l.stl";
+    const std::filesystem::path l_3mf = l_dir / "l.3mf";
+    expect("L stl writes", write_binary_stl(l_stl, prism));
+    expect("L 3mf writes", write_3mf(l_3mf, prism));
+    MeshSolid l_loaded;
+    expect("L stl reads", read_binary_stl(l_stl, l_loaded));
+    if (!l_loaded.vertices.empty()) {
+        flat_on_bed(l_loaded, "L stl on bed");
+    } else {
+        expect("L stl has vertices", false);
+    }
+    double l_zmin = 1.0;
+    double l_zmax = 0.0;
+    expect_z_span(l_3mf, &l_zmin, &l_zmax);
+    expect("L 3mf zmin", near_mm(l_zmin, 0.0, 1e-4));
+    expect("L 3mf height", near_mm(l_zmax - l_zmin, 6.0, 1e-3));
+
+    const std::filesystem::path boss_dir = fresh_dir("l-boss");
+    std::filesystem::create_directories(boss_dir);
+    const MeshSolid boss = l_with_boss();
+    const std::filesystem::path boss_stl = boss_dir / "boss.stl";
+    const std::filesystem::path boss_3mf = boss_dir / "boss.3mf";
+    expect("boss stl writes", write_binary_stl(boss_stl, boss));
+    expect("boss 3mf writes", write_3mf(boss_3mf, boss));
+    MeshSolid boss_loaded;
+    expect("boss stl reads", read_binary_stl(boss_stl, boss_loaded));
+    if (!boss_loaded.vertices.empty()) {
+        const Extents boss_box = extents_of(boss_loaded);
+        expect("boss stl min z", near_mm(boss_box.zmin, 0.0, 0.01));
+        expect("boss stl height", near_mm(boss_box.zmax - boss_box.zmin, 8.0, 0.01));
+    } else {
+        expect("boss stl has vertices", false);
+    }
+    double boss_zmin = 1.0;
+    double boss_zmax = 0.0;
+    expect_z_span(boss_3mf, &boss_zmin, &boss_zmax);
+    expect("boss 3mf min z", near_mm(boss_zmin, 0.0, 0.01));
+    expect("boss 3mf height", near_mm(boss_zmax - boss_zmin, 8.0, 0.01));
+
+    const std::filesystem::path l_raw = l_dir / "raw.stl";
+    expect("L raw stl writes", write_binary_stl(l_raw, prism, false));
+    MeshSolid l_upright;
+    expect("L raw stl reads", read_binary_stl(l_raw, l_upright));
+    if (!l_upright.vertices.empty()) {
+        const Extents upright = extents_of(l_upright);
+        expect("lay off keeps the arm", near_mm(upright.zmax - upright.zmin, 24.0, 1e-3));
+    } else {
+        expect("L raw stl has vertices", false);
+    }
 
     MeshSolid bad_index = box_mm(20.0, 20.0, 20.0);
     bad_index.triangles.push_back(

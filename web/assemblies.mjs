@@ -326,11 +326,177 @@ export function meshHasConsistentWinding(vertices, triangles) {
   return meshSignedVolumeMm3(vertices, triangles) > 0;
 }
 
-// Single-body export: if the solid is more than twice as tall as its thinner
-// horizontal AABB, rotate +90 deg about Y so a tall wall (L-bracket upright)
-// lies on the bed. Truck parts do not match. Spec: test-only heuristic, no
-// per-fixture millimetres.
-export const PRINT_BED_TALL_RATIO = 2;
+// Single-body print pose. Same rule as src/export/bed_orient.cpp:
+// 24 proper axis-aligned rotations, zmin at 0, lowest part, then the larger
+// planar face on the bed, then the longer X extent. Identity stays when it
+// already wins. Multi-body exports do not call this.
+const BED_NORMAL_DOT = 0.999;
+const BED_PLANE_MM = 0.05;
+
+export function axisAlignedRotations() {
+  const perms = [
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ];
+  const signOrder = [1, -1];
+  const out = [];
+  for (let sa = 0; sa < 2; sa += 1) {
+    for (let sb = 0; sb < 2; sb += 1) {
+      for (let sc = 0; sc < 2; sc += 1) {
+        const s = [signOrder[sa], signOrder[sb], signOrder[sc]];
+        for (let p = 0; p < perms.length; p += 1) {
+          const perm = perms[p];
+          const m = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+          for (let row = 0; row < 3; row += 1) m[row * 3 + perm[row]] = s[row];
+          const det = m[0] * (m[4] * m[8] - m[5] * m[7])
+            - m[1] * (m[3] * m[8] - m[5] * m[6])
+            + m[2] * (m[3] * m[7] - m[4] * m[6]);
+          if (det === 1) out.push(m);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function triGeom(a, b, c) {
+  const ux = b[0] - a[0];
+  const uy = b[1] - a[1];
+  const uz = b[2] - a[2];
+  const vx = c[0] - a[0];
+  const vy = c[1] - a[1];
+  const vz = c[2] - a[2];
+  const cx = uy * vz - uz * vy;
+  const cy = uz * vx - ux * vz;
+  const cz = ux * vy - uy * vx;
+  const len = Math.hypot(cx, cy, cz);
+  if (!(len > 1e-12)) return null;
+  return {
+    n: [cx / len, cy / len, cz / len],
+    area: len * 0.5,
+    offset: (cx * a[0] + cy * a[1] + cz * a[2]) / len,
+    zmin: Math.min(a[2], b[2], c[2]),
+    zmax: Math.max(a[2], b[2], c[2]),
+  };
+}
+
+export function meshPlanarFaces(vertices, triangles) {
+  const faces = [];
+  const verts = vertices || [];
+  const tris = triangles || [];
+  for (let t = 0; t < tris.length; t += 1) {
+    const tri = tris[t];
+    const a = verts[tri[0]];
+    const b = verts[tri[1]];
+    const c = verts[tri[2]];
+    if (!a || !b || !c) continue;
+    const geom = triGeom(a, b, c);
+    if (!geom) continue;
+    let found = null;
+    for (let i = 0; i < faces.length; i += 1) {
+      const face = faces[i];
+      const dot = face.normal[0] * geom.n[0] + face.normal[1] * geom.n[1] + face.normal[2] * geom.n[2];
+      if (dot >= BED_NORMAL_DOT && Math.abs(face.offset - geom.offset) <= BED_PLANE_MM) {
+        found = face;
+        break;
+      }
+    }
+    if (!found) {
+      found = {
+        normal: geom.n,
+        offset: geom.offset,
+        area: geom.area,
+        zMin: geom.zmin,
+        zMax: geom.zmax,
+      };
+      faces.push(found);
+    } else {
+      found.area += geom.area;
+      if (geom.zmin < found.zMin) found.zMin = geom.zmin;
+      if (geom.zmax > found.zMax) found.zMax = geom.zmax;
+    }
+  }
+  return faces;
+}
+
+function poseScore(vertices, triangles, index, zShift) {
+  const bounds = meshBounds(vertices);
+  const faces = meshPlanarFaces(vertices, triangles);
+  let bed = 0;
+  let floating = 0;
+  for (let i = 0; i < faces.length; i += 1) {
+    const face = faces[i];
+    const down = face.normal[2] <= -BED_NORMAL_DOT;
+    const onBed = face.zMax <= BED_PLANE_MM && face.zMin <= 1e-4;
+    if (down && onBed && face.area > bed) bed = face.area;
+    if (down && face.zMin > BED_PLANE_MM) floating += face.area;
+  }
+  return {
+    height: bounds ? bounds.zmax - bounds.zmin : 0,
+    bed: bed,
+    floating: floating,
+    dx: bounds ? bounds.xmax - bounds.xmin : 0,
+    index: index,
+    zShift: zShift,
+  };
+}
+
+function poseBetter(candidate, current) {
+  if (Math.abs(candidate.height - current.height) > BED_PLANE_MM) return candidate.height < current.height;
+  if (Math.abs(candidate.bed - current.bed) > 1e-3) return candidate.bed > current.bed;
+  if (Math.abs(candidate.floating - current.floating) > 1e-3) return candidate.floating < current.floating;
+  if (Math.abs(candidate.dx - current.dx) > BED_PLANE_MM) return candidate.dx > current.dx;
+  return candidate.index < current.index;
+}
+
+function applyRotation(vertices, m) {
+  const posed = [];
+  let zmin = Infinity;
+  for (let i = 0; i < vertices.length; i += 1) {
+    const p = vertices[i];
+    const next = [
+      m[0] * p[0] + m[1] * p[1] + m[2] * p[2],
+      m[3] * p[0] + m[4] * p[1] + m[5] * p[2],
+      m[6] * p[0] + m[7] * p[1] + m[8] * p[2],
+    ];
+    if (next[2] < zmin) zmin = next[2];
+    posed.push(next);
+  }
+  const shift = Number.isFinite(zmin) ? zmin : 0;
+  if (Math.abs(shift) > 1e-12) {
+    for (let i = 0; i < posed.length; i += 1) posed[i][2] -= shift;
+  }
+  return { vertices: posed, zShift: shift };
+}
+
+export function orientMeshFlatOnBed(vertices, triangles) {
+  const list = vertices || [];
+  const tris = triangles || [];
+  if (!list.length || !tris.length) {
+    return { vertices: list, triangles: tris, turned: false };
+  }
+  const rotations = axisAlignedRotations();
+  let best = null;
+  for (let i = 0; i < rotations.length; i += 1) {
+    const posed = applyRotation(list, rotations[i]);
+    const score = poseScore(posed.vertices, tris, i, posed.zShift);
+    if (!best || poseBetter(score, best.score)) {
+      best = { score: score, vertices: posed.vertices };
+    }
+  }
+  if (!best || (best.score.index === 0 && Math.abs(best.score.zShift) <= 1e-12)) {
+    return { vertices: list, triangles: tris, turned: false };
+  }
+  return {
+    vertices: best.vertices,
+    triangles: tris,
+    turned: best.score.index !== 0,
+  };
+}
 
 export function meshBounds(vertices) {
   const list = vertices || [];
@@ -351,31 +517,6 @@ export function meshBounds(vertices) {
     if (p[2] > zmax) zmax = p[2];
   }
   return { xmin: xmin, ymin: ymin, zmin: zmin, xmax: xmax, ymax: ymax, zmax: zmax };
-}
-
-export function shouldLayTallPartOnBed(bounds) {
-  if (!bounds) return false;
-  const dx = bounds.xmax - bounds.xmin;
-  const dy = bounds.ymax - bounds.ymin;
-  const dz = bounds.zmax - bounds.zmin;
-  const thin = Math.min(dx, dy);
-  return thin > 0 && dz > PRINT_BED_TALL_RATIO * thin && dy <= dx + 1e-9;
-}
-
-// (x, y, z) -> (z, y, -x), then shift so zmin is 0.
-export function rotateMeshPlusY90OntoBed(vertices) {
-  const list = vertices || [];
-  const rotated = [];
-  let zmin = Infinity;
-  for (let i = 0; i < list.length; i += 1) {
-    const p = list[i];
-    const next = [p[2], p[1], -p[0]];
-    if (next[2] < zmin) zmin = next[2];
-    rotated.push(next);
-  }
-  if (!Number.isFinite(zmin) || zmin === 0) return rotated;
-  for (let i = 0; i < rotated.length; i += 1) rotated[i][2] -= zmin;
-  return rotated;
 }
 
 function faceIsReversed(oc, face) {
@@ -630,11 +771,10 @@ export function exportAssembly3mf(oc, parts, options) {
       let placement = placementFor(part);
       const autoBed = !(options && options.autoBed === false);
       if (autoBed && list.length === 1) {
-        const localBounds = meshBounds(vertices);
-        if (shouldLayTallPartOnBed(localBounds)) {
-          vertices = rotateMeshPlusY90OntoBed(vertices);
-          placement = { x: 0, y: 0, z: 0 };
-        }
+        const laid = orientMeshFlatOnBed(vertices, mesh.triangles);
+        vertices = laid.vertices;
+        if (laid.turned) placement = { x: 0, y: 0, z: 0 };
+        else placement = { x: placement.x, y: placement.y, z: 0 };
       }
       objects.push({
         name: part.name ? String(part.name) : 'Part',
