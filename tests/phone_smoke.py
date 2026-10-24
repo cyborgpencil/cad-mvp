@@ -3,8 +3,9 @@
 
 Uses Playwright's iPhone 13 device (390x844) and the portrait checks in
 deploy_smoke.py: overflow, inert panel, one-row toolbar, Info/Tree row,
-Part 1 visible, one search, coverage thresholds, Home, the nav cube, and
-the 3-hole plate.
+Part 1 visible, one search, coverage thresholds, Home, the nav cube, the
+3-hole plate, and the empty-document origin-plane sketch (Top / Front /
+Right, then Blind 10 mm).
 
 Playwright lives in the gitignored builds/pwvenv. When it cannot be
 imported, exit 77. Exit 1 under CI=1 only when a workflow file installs

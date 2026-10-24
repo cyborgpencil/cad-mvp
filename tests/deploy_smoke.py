@@ -40,7 +40,13 @@ Asserts window.__cadcamExportState.occtReady for:
                         Blind inputs, and Extrude Confirm are at least 44 px; the
                         sketch sheet does not cover the phone tab bar, status bar,
                         or view bar; the top face becomes the plane with no V/E/F
-                        highlight; the check does not extrude and leaves the box
+                        highlight; the origin-plane picker stays off; the check
+                        does not extrude and leaves the box
+  portrait origin plane empty doc (bodies.length === 0, not projectBlank):
+                        Top / Front / Right chips are at least 44 px and do not
+                        cover the phone tab bar, status bar, or view bar; Top is
+                        XY with +Z outward; rectangle 10×10 and circle Ø10 each
+                        Blind 10 mm add a new body that passes OCCT and mm
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
   measure tool          default 20 mm cube: one edge polyline ~20 mm, volume ~8000 mm³,
@@ -1151,6 +1157,9 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (sketchItem) sketchItem.click();
   var st = hook.state();
   if (!st || st.tab !== 'sketch') problems.push('tab after Sketch ' + (st && st.tab));
+  if (!st || st.picker !== false) problems.push('origin picker forced');
+  var originBar = document.getElementById('originPlanes');
+  if (!originBar || originBar.hidden !== true) problems.push('origin picker bar');
   need(document.querySelector('#finishBar [data-action="finishSketch"]'), 'Finish Sketch');
   scrollOk('sketch shell');
   if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener hidden');
@@ -1167,6 +1176,8 @@ SKETCH_PORTRAIT_EXPR = r"""
   st = hook.state();
   if (!st.plane) problems.push('plane not set');
   if (face && st.faceId !== face) problems.push('face ' + st.faceId);
+  if (st.originPlane) problems.push('origin plane ' + st.originPlane);
+  if (st.picker !== false) problems.push('picker after face');
   if (!st.selectedIds || st.selectedIds.length !== 0) problems.push('selected ' + JSON.stringify(st.selectedIds));
   if (st.highlight !== false) problems.push('highlight on');
   if (st.bodies !== 1) problems.push('bodies ' + st.bodies);
@@ -1237,6 +1248,300 @@ SKETCH_PORTRAIT_EXPR = r"""
   return JSON.stringify(problems);
 })()
 """
+
+
+ORIGIN_PLANE_EXPR = r"""
+(function(){
+  var problems = [];
+  function boxOf(el) {
+    if (!el || el.closest('[hidden]')) return null;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    return r;
+  }
+  function need(el, label) {
+    var r = boxOf(el);
+    if (!r) { problems.push(label + ' hidden'); return; }
+    if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+      problems.push(label + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+    }
+  }
+  function overlaps(a, b) {
+    if (!a || !b) return false;
+    return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+  }
+  function near(a, b, eps) {
+    if (!a || !b || a.length < 3 || b.length < 3) return false;
+    return Math.abs(a[0] - b[0]) <= eps && Math.abs(a[1] - b[1]) <= eps && Math.abs(a[2] - b[2]) <= eps;
+  }
+  function cross(a, b) {
+    return [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0]
+    ];
+  }
+  function sheetBtn(name) {
+    var buttons = document.querySelectorAll('#sheetTools button');
+    for (var i = 0; i < buttons.length; i++) {
+      var span = buttons[i].querySelector('span');
+      if (span && span.textContent === name) return buttons[i];
+    }
+    return null;
+  }
+  function visibleClick(selector) {
+    var nodes = document.querySelectorAll(selector);
+    for (var i = 0; i < nodes.length; i++) {
+      if (boxOf(nodes[i])) { nodes[i].click(); return true; }
+    }
+    return false;
+  }
+  function openTools() {
+    if (!visibleClick('[data-action="toolsMenu"]')) {
+      problems.push('tools opener hidden');
+      return false;
+    }
+    var tools = document.getElementById('toolsSheet');
+    if (!tools || tools.hidden) {
+      problems.push('tools sheet hidden');
+      return false;
+    }
+    return true;
+  }
+  function coverChips(label) {
+    var chips = document.querySelectorAll('#originPlanes [data-action="originPlane"]');
+    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    for (var c = 0; c < chips.length; c++) {
+      var chip = chips[c];
+      var text = (chip.textContent || '').replace(/\s+/g, ' ').trim();
+      var r = boxOf(chip);
+      need(chip, label + ' ' + text);
+      if (!r) continue;
+      if (r.left < -0.5 || r.right > window.innerWidth + 0.5) problems.push(label + ' ' + text + ' offscreen');
+      for (var i = 0; i < bars.length; i++) {
+        var bar = document.querySelector(bars[i]);
+        var barBox = boxOf(bar);
+        if (!barBox) { problems.push(label + ' missing ' + bars[i]); continue; }
+        if (overlaps(r, barBox)) problems.push(label + ' ' + text + ' covers ' + bars[i]);
+      }
+    }
+  }
+  function pickPlane(plane, label, outward, u, v) {
+    var chip = document.querySelector('#originPlanes [data-plane="' + plane + '"]');
+    if (!chip) { problems.push('missing ' + label); return; }
+    chip.click();
+    var st = hook.state();
+    if (!st || st.originPlane !== plane) {
+      problems.push(label + ' plane ' + (st && st.originPlane));
+      return;
+    }
+    if (st.faceId) problems.push(label + ' faceId ' + st.faceId);
+    if (!near(st.origin, [0, 0, 0], 1e-6)) problems.push(label + ' origin ' + JSON.stringify(st.origin));
+    if (!near(st.outward, outward, 1e-6)) problems.push(label + ' outward ' + JSON.stringify(st.outward));
+    if (!near(st.u, u, 1e-6)) problems.push(label + ' u ' + JSON.stringify(st.u));
+    if (!near(st.v, v, 1e-6)) problems.push(label + ' v ' + JSON.stringify(st.v));
+    if (!near(cross(st.u, st.v), st.outward, 1e-6)) problems.push(label + ' right-hand');
+    if (!chip.classList.contains('is-on')) problems.push(label + ' not selected');
+    if (st.picker !== true) problems.push(label + ' picker hidden');
+    if (st.bodies !== 0) problems.push(label + ' bodies ' + st.bodies);
+  }
+  function setMm(id, value) {
+    var el = document.getElementById(id);
+    if (!el) { problems.push('missing ' + id); return; }
+    el.value = value;
+    if (el.getAttribute('inputmode') !== 'decimal') problems.push(id + ' inputmode');
+  }
+  function confirmSketch(label) {
+    var btn = document.getElementById('sketchConfirm');
+    need(btn, label + ' confirm');
+    if (!btn) return;
+    if (btn.disabled) {
+      var note = document.getElementById('sketchNote');
+      problems.push(label + ' confirm disabled ' + (note ? note.textContent : ''));
+      return;
+    }
+    btn.click();
+  }
+  function extrude(kind) {
+    var finish = document.querySelector('#finishBar [data-action="finishSketch"]');
+    if (finish) finish.click();
+    else problems.push(kind + ' finish missing');
+    var st = hook.state();
+    if (!st || st.tab !== 'model') problems.push(kind + ' finish tab ' + (st && st.tab));
+    if (!st || st.closed !== true) problems.push(kind + ' profile not closed');
+    if (!openTools()) return;
+    var ext = sheetBtn('Extrude (Push/Pull)');
+    if (!ext) { problems.push(kind + ' extrude missing'); return; }
+    ext.click();
+    setMm('sketchDepth', '10');
+    var depth = document.getElementById('sketchDepth');
+    if (depth && String(depth.value).trim() !== '10') problems.push(kind + ' depth ' + (depth && depth.value));
+    confirmSketch(kind + ' extrude');
+  }
+  function assertSolid(kind, expectVol, checkBounds) {
+    var st = hook.state();
+    var published = window.__cadcamExportState || {};
+    if (!st || st.bodies !== 1) problems.push(kind + ' bodies ' + (st && st.bodies));
+    if (!st || st.picker !== false) problems.push(kind + ' picker still on');
+    if (!st || !st.bounds) problems.push(kind + ' no bounds');
+    else {
+      if (st.bounds.kind !== 'extrude') problems.push(kind + ' kind ' + st.bounds.kind);
+      checkBounds(st.bounds);
+    }
+    if (published.bodyCount !== 1) problems.push(kind + ' bodyCount ' + published.bodyCount);
+    if (published.occtGate !== true || published.gateOcct !== 'PASS') {
+      problems.push(kind + ' occt ' + published.gateOcct + ' ' + (published.occtMessage || ''));
+    }
+    if (published.unitsPass !== true) problems.push(kind + ' unitsPass');
+    var units = document.getElementById('statusUnits');
+    if (!units || !/mm/i.test(units.textContent || '')) problems.push(kind + ' units ' + (units ? units.textContent : 'missing'));
+    if (published.lastError) problems.push(kind + ' error ' + published.lastError);
+    var hint = document.getElementById('statusHint');
+    var hintText = hint ? String(hint.textContent || '') : '';
+    if (hintText.indexOf('OCCT valid') < 0 || hintText.indexOf('mm') < 0) problems.push(kind + ' hint ' + hintText);
+    if (published.primitiveKind) problems.push(kind + ' primitive ' + published.primitiveKind);
+    var vol = Number(published.volumeMm3);
+    if (!(Math.abs(vol - expectVol) < 0.5)) problems.push(kind + ' volume ' + vol);
+  }
+  function ensureEmpty(label) {
+    var st0 = hook.state();
+    if (st0 && st0.bodies === 0) return st0;
+    if (!st0 || st0.bodies !== 1) {
+      problems.push(label + ' bodies ' + (st0 && st0.bodies));
+      return null;
+    }
+    var del = document.getElementById('deleteBtn');
+    if (!del) { problems.push(label + ' delete missing'); return null; }
+    del.click();
+    var st = hook.state();
+    var published = window.__cadcamExportState || {};
+    if (!st || st.bodies !== 0) {
+      problems.push(label + ' left ' + (st && st.bodies) + ' ' + (published.lastError || ''));
+      return null;
+    }
+    if (published.projectBlank === true || st.projectBlank === true) problems.push(label + ' projectBlank');
+    return st;
+  }
+  function startSketch() {
+    if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
+    var menu = document.getElementById('createMenu');
+    var sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+    if (!sketchItem) { problems.push('Create Sketch missing'); return null; }
+    sketchItem.click();
+    var st = hook.state();
+    if (!st || st.tab !== 'sketch') problems.push('tab ' + (st && st.tab));
+    if (!st || st.bodies !== 0) problems.push('sketch bodies ' + (st && st.bodies));
+    if (!st || st.picker !== true) problems.push('picker off on empty doc');
+    if (st && st.projectBlank === true) problems.push('empty doc required projectBlank');
+    return st;
+  }
+  if (Math.abs(window.innerWidth - 390) > 0.5 || Math.abs(window.innerHeight - 844) > 0.5) {
+    problems.push('viewport ' + window.innerWidth + 'x' + window.innerHeight);
+  }
+  var hook = window.__cadcamSketch;
+  if (!hook || typeof hook.state !== 'function') {
+    problems.push('missing sketch hook');
+    return JSON.stringify(problems);
+  }
+  var before = hook.state();
+  if (!before || before.bodies !== 1 || before.picker !== false) {
+    problems.push('cube start bodies ' + (before && before.bodies) + ' picker ' + (before && before.picker));
+  }
+  if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
+  var menu0 = document.getElementById('createMenu');
+  var sketch0 = menu0 ? menu0.querySelector('[data-action="newSketch"]') : null;
+  if (sketch0) sketch0.click();
+  else problems.push('Create Sketch missing');
+  var cube = hook.state();
+  if (!cube || cube.tab !== 'sketch' || cube.picker !== false || cube.bodies !== 1) {
+    problems.push('cube sketch picker ' + (cube && cube.picker) + ' tab ' + (cube && cube.tab) + ' bodies ' + (cube && cube.bodies));
+  }
+  var finish0 = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (finish0) finish0.click();
+  else problems.push('cube finish missing');
+  cube = hook.state();
+  if (!cube || cube.tab !== 'model' || cube.picker !== false) problems.push('cube finish ' + (cube && cube.tab));
+  if (!ensureEmpty('clear cube')) return JSON.stringify(problems);
+  if (!startSketch()) return JSON.stringify(problems);
+  var originBar = document.getElementById('originPlanes');
+  if (!originBar || originBar.hidden === true) problems.push('origin picker hidden');
+  var chips = originBar ? originBar.querySelectorAll('[data-action="originPlane"]') : [];
+  if (chips.length !== 3) problems.push('chip count ' + chips.length);
+  var labels = [];
+  for (var i = 0; i < chips.length; i++) {
+    labels.push(((chips[i].textContent || '').replace(/\s+/g, '') ) + ':' + chips[i].getAttribute('data-plane'));
+  }
+  if (labels.join(',') !== 'Top:xy,Front:xz,Right:yz') problems.push('chips ' + labels.join(','));
+  coverChips('planes');
+  if (document.documentElement.scrollWidth > window.innerWidth + 0.5) {
+    problems.push('chip scrollWidth ' + document.documentElement.scrollWidth);
+  }
+  pickPlane('xz', 'Front', [0, 1, 0], [1, 0, 0], [0, 0, -1]);
+  pickPlane('yz', 'Right', [1, 0, 0], [0, 1, 0], [0, 0, 1]);
+  pickPlane('xy', 'Top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+  if (openTools()) {
+    var rectBtn = sheetBtn('Rectangle');
+    if (!rectBtn) problems.push('Rectangle missing');
+    else rectBtn.click();
+    setMm('sketchL', '10');
+    setMm('sketchW', '10');
+    coverChips('rect sheet');
+    confirmSketch('rect');
+    var drawn = hook.state();
+    if (!drawn || drawn.profile !== 'rect' || drawn.closed !== true) problems.push('rect profile ' + (drawn && drawn.profile));
+    extrude('rect');
+    assertSolid('rect', 1000, function (bounds) {
+      var min = bounds.min;
+      var max = bounds.max;
+      for (var k = 0; k < 3; k++) {
+        if (Math.abs(min[k]) > 0.05) problems.push('rect min ' + k + ' ' + min[k]);
+        if (Math.abs(max[k] - 10) > 0.05) problems.push('rect max ' + k + ' ' + max[k]);
+      }
+    });
+  }
+  if (!ensureEmpty('clear rect')) return JSON.stringify(problems);
+  if (!startSketch()) return JSON.stringify(problems);
+  pickPlane('xy', 'Top circle', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+  if (openTools()) {
+    var circBtn = sheetBtn('Circle');
+    if (!circBtn) problems.push('Circle missing');
+    else circBtn.click();
+    setMm('sketchD', '10');
+    confirmSketch('circle');
+    var circled = hook.state();
+    if (!circled || circled.profile !== 'circle' || circled.closed !== true) problems.push('circle profile ' + (circled && circled.profile));
+    extrude('circle');
+    assertSolid('circle', Math.PI * 25 * 10, function (bounds) {
+      var min = bounds.min;
+      var max = bounds.max;
+      if (Math.abs(min[2]) > 0.2) problems.push('circle zmin ' + min[2]);
+      if (Math.abs(max[2] - 10) > 0.2) problems.push('circle zmax ' + max[2]);
+      if (!(min[0] < -4 && max[0] > 4 && min[1] < -4 && max[1] > 4)) {
+        problems.push('circle xy ' + JSON.stringify(min) + ' ' + JSON.stringify(max));
+      }
+      var reach = Math.max(Math.abs(min[0]), Math.abs(max[0]), Math.abs(min[1]), Math.abs(max[1]));
+      if (reach < 4.5 || reach > 5.2) problems.push('circle radius ' + reach);
+    });
+  }
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def portrait_origin_plane_problems(cdp: Cdp) -> list[str]:
+    """390x844 empty doc: Top/Front/Right, then rect and circle Blind 10 mm."""
+    raw, err = eval_expr(cdp, ORIGIN_PLANE_EXPR, timeout=180)
+    if err or not isinstance(raw, str):
+        return [f"origin plane {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"origin plane {raw}"]
+    if not isinstance(found, list):
+        return [f"origin plane {raw}"]
+    return [str(item) for item in found]
 
 
 def portrait_sketch_problems(cdp: Cdp) -> list[str]:
@@ -2876,6 +3181,13 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         set_portrait(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
         return [f"portrait emulation failed: {exc}"]
+    print(f"load portrait_origin_plane {origin}/", flush=True)
+    _origin_state, origin_load = wait_for_case(cdp, origin, origin + "/", PAGE_TIMEOUT_S)
+    if origin_load:
+        return ["portrait origin plane load", *origin_load[:20]]
+    origin_found = portrait_origin_plane_problems(cdp)
+    if origin_found:
+        return ["portrait origin plane", *origin_found]
     problems: list[str] = []
     inspector_checked = False
     search_checked = False
