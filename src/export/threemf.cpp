@@ -163,7 +163,12 @@ MeshSolid weld_mesh(const MeshSolid& mesh) {
     for (const auto& triangle : mesh.triangles) {
         if (triangle[0] >= remap.size() || triangle[1] >= remap.size() ||
             triangle[2] >= remap.size()) {
-            continue;
+            // Unmapped index must not reach flood-fill. Empty vertices plus
+            // {0,1,2} is what write_3mf's bounds check rejects before opening
+            // the file. Duplicate corners and zero area still drop below.
+            MeshSolid rejected;
+            rejected.triangles.push_back({0, 1, 2});
+            return rejected;
         }
         const std::uint32_t a = remap[triangle[0]];
         const std::uint32_t b = remap[triangle[1]];
