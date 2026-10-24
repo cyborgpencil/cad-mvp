@@ -114,3 +114,10 @@ Needed for Erik's phone acceptance test (picked edges for fillet and chamfer, Bo
 - Delete: removes whatever is selected; undo and redo cover it.
 - Feedback: the selection has a clear highlight, and the panel shows the selected count.
 - Tests: a phone-frame Playwright run for each pick mode and a delete-plus-undo case, with screenshots.
+## Fillet and chamfer on picked edges (team-chosen by 3T and the Chief 2026-10-23; Erik reviews afterward)
+JS only, on `feat/edge-fillet`, using the existing OCCT wrappers. Tapping Fillet or Chamfer switches the pick chip to Edge; the size field and Confirm sit in the phone bottom sheet with 44 px targets. The result is one undo step.
+- Defaults: chamfer 0.5 mm (per the spec), fillet 2 mm. Each tool sets its own default when picked.
+- Size limit: OCCT's own failure. On failure, keep the old shape and show a short message to try a smaller size.
+- Multi picks work within one body only. If picks span bodies, Confirm is disabled with "pick edges on one body".
+- Re-filleting an already filleted edge is allowed; an OCCT failure is handled as above.
+- Checks: units check plus the OCCT validity check after the op (doesn't block Export). No watertight checks (Erik, 2026-10-22).

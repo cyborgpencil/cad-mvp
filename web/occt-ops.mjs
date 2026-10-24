@@ -1745,6 +1745,56 @@ export function checkSolidGate(oc, shape) {
   return { pass: pass, error: error, view: view, solids: solids, volume: volume, bounds: bounds };
 }
 
+// After a fillet or chamfer: OCCT validity and the millimetre lock.
+// A failure is a clean error for the caller. It does not consult the mesh
+// watertight check and it does not change Export.
+function checkEdgeOp(oc, shape) {
+  let view;
+  try {
+    view = inspectSolid(oc, shape);
+  } catch (err) {
+    return {
+      pass: false,
+      error: 'FAIL: OCCT check threw ' + explain(oc, err),
+      view: emptySolid(),
+      solids: 0,
+      volume: 0,
+      bounds: null,
+    };
+  }
+  const units = unitsLockGate();
+  let solids = 0;
+  let volume = 0;
+  let bounds = null;
+  try {
+    solids = countSolids(oc, shape);
+    volume = solidVolumeMm3(oc, shape);
+    bounds = solidBounds(oc, shape);
+  } catch (err) {
+    return {
+      pass: false,
+      error: 'FAIL: volume threw ' + explain(oc, err),
+      view: view,
+      solids: solids,
+      volume: volume,
+      bounds: bounds,
+    };
+  }
+  const valid = !!(view.gate && view.gate.valid === true);
+  const pass = valid
+    && units.pass === true
+    && solids === 1
+    && volume > BOOLEAN_EMPTY_VOLUME_MM3;
+  let error = '';
+  if (!pass) {
+    if (!valid) error = (view.gate && view.gate.message) || 'FAIL: OCCT check failed.';
+    else if (units.pass !== true) error = units.message;
+    else if (solids !== 1) error = 'FAIL: expected one solid, found ' + solids + '.';
+    else error = 'FAIL: result is empty.';
+  }
+  return { pass: pass, error: error, view: view, solids: solids, volume: volume, bounds: bounds };
+}
+
 function matchEdges(oc, shape, segments, trash) {
   const found = collectEdges(oc, shape, trash);
   const chosen = [];
@@ -1801,7 +1851,7 @@ export function applyPickedEdgeOp(oc, shape, segments, kind, size) {
       kept: true,
     };
   }
-  const gated = checkSolidGate(oc, made.shape);
+  const gated = checkEdgeOp(oc, made.shape);
   if (!gated.pass) {
     releaseShape(made.shape);
     return {

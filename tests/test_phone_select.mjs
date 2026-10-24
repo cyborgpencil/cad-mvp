@@ -145,6 +145,89 @@ const along = Math.hypot(mid.x - 25, mid.y - 20);
 expectOk('beside sits between 20 and 32', along > TOUCH && along < phone.EDGE_TOUCH_TOLERANCE_PX);
 expect('degenerate segment', phone.pointBesideSegment(3, 4, 3, 4, 24), { x: 3, y: 4 });
 
+const filletArm = phone.armEdgeTool('fillet');
+expect('fillet arms edge', filletArm.filter, 'edge');
+expect('fillet mode', filletArm.mode, 'edge');
+expect('fillet op', filletArm.op, 'fillet');
+expect('fillet default', filletArm.sizeMm, 2);
+expect('fillet default constant', phone.FILLET_DEFAULT_MM, 2);
+
+const chamferArm = phone.armEdgeTool('chamfer');
+expect('chamfer arms edge', chamferArm.filter, 'edge');
+expect('chamfer mode', chamferArm.mode, 'edge');
+expect('chamfer op', chamferArm.op, 'chamfer');
+expect('chamfer default', chamferArm.sizeMm, 0.5);
+expect('chamfer default constant', phone.CHAMFER_DEFAULT_MM, 0.5);
+expect('unknown tool is fillet', phone.armEdgeTool('nope').op, 'fillet');
+expect('unknown tool default', phone.armEdgeTool('').sizeMm, phone.FILLET_DEFAULT_MM);
+expectOk('tools set different defaults', filletArm.sizeMm !== chamferArm.sizeMm);
+
+expect('size 2', phone.parseEdgeSize('2'), { ok: true, size: 2 });
+expect('size 0.5', phone.parseEdgeSize('0.5'), { ok: true, size: 0.5 });
+expect('size spaced', phone.parseEdgeSize(' 2 '), { ok: true, size: 2 });
+expect('size blank', phone.parseEdgeSize(''), { ok: false, size: NaN });
+expect('size spaces', phone.parseEdgeSize('   '), { ok: false, size: NaN });
+expect('size null', phone.parseEdgeSize(null), { ok: false, size: NaN });
+expect('size zero', phone.parseEdgeSize('0'), { ok: false, size: 0 });
+expect('size negative', phone.parseEdgeSize('-1'), { ok: false, size: -1 });
+expect('size word', phone.parseEdgeSize('big'), { ok: false, size: NaN });
+
+expect('one body id', phone.edgePickId('b1', 'e0', 1), 'e0');
+expect('multi body id', phone.edgePickId('b1', 'e0', 2), 'b1:e0');
+expect('split single', phone.splitEdgePick('e3', 'b1'), { bodyId: 'b1', edgeId: 'e3' });
+expect('split multi', phone.splitEdgePick('b2:e4', 'b1'), { bodyId: 'b2', edgeId: 'e4' });
+
+const oneEdge = phone.confirmEdgeDecision(['e0'], '2', 'b1');
+expect('one edge enabled', oneEdge.enabled, true);
+expect('one edge body', oneEdge.bodyId, 'b1');
+expect('one edge quiet', oneEdge.message, '');
+
+const twoEdges = phone.confirmEdgeDecision(['b1:e0', 'b1:e3'], '2', '');
+expect('multi same body', twoEdges.enabled, true);
+expect('multi same body id', twoEdges.bodyId, 'b1');
+expect('multi same quiet', twoEdges.message, '');
+
+const crossed = phone.confirmEdgeDecision(['b1:e0', 'b2:e1'], '2', '');
+expect('cross body off', crossed.enabled, false);
+expect('cross body message', crossed.message, 'pick edges on one body');
+expect('cross body constant', phone.CROSS_BODY_MESSAGE, 'pick edges on one body');
+expect('cross body no target', crossed.bodyId, '');
+
+const crossObjects = phone.confirmEdgeDecision(
+  [{ bodyId: 'b1', edgeId: 'e0' }, { bodyId: 'b9', edgeId: 'e2' }],
+  '0.5',
+  ''
+);
+expect('cross objects off', crossObjects.enabled, false);
+expect('cross objects message', crossObjects.message, phone.CROSS_BODY_MESSAGE);
+
+const badSize = phone.confirmEdgeDecision(['e0'], '', 'b1');
+expect('blank size blocks', badSize.enabled, false);
+expect('blank size is not cross body', badSize.message, '');
+expect('blank size flag', badSize.sizeOk, false);
+
+const zeroSize = phone.confirmEdgeDecision(['b1:e0'], '0', '');
+expect('zero size blocks', zeroSize.enabled, false);
+expect('zero size flag', zeroSize.sizeOk, false);
+
+const negativeSize = phone.confirmEdgeDecision(['b1:e0', 'b1:e1'], '-2', '');
+expect('negative size blocks', negativeSize.enabled, false);
+
+const noEdge = phone.confirmEdgeDecision([], '2', 'b1');
+expect('no edge blocks', noEdge.enabled, false);
+expect('no edge quiet', noEdge.message, '');
+
+expect('refillet allowed', phone.repeatEdgeOpAllowed(), true);
+expect('smaller message', phone.SMALLER_SIZE_MESSAGE, 'Try a smaller size.');
+expect('occt isdone is size', phone.occtSizeFailure('FAIL: fillet IsDone is false; Shape() was not called.'), true);
+expect('occt invalid is size', phone.occtSizeFailure('FAIL: OCCT BRepCheck_Analyzer is not valid.'), true);
+expect('occt throw is size', phone.occtSizeFailure('FAIL: fillet Build threw boom; Shape() was not called.'), true);
+expect('missing edge is not size', phone.occtSizeFailure('FAIL: fillet has no edge.'), false);
+expect('not found is not size', phone.occtSizeFailure('FAIL: picked edge was not found on the solid. The last good shape was kept.'), false);
+expect('blank is not size', phone.occtSizeFailure(''), false);
+expect('cross text is not size', phone.occtSizeFailure(phone.CROSS_BODY_MESSAGE), false);
+expect('mesh reject is not size', phone.occtSizeFailure('FAIL: the new mesh was rejected. The last good shape was kept.'), false);
+
 if (failures.length) {
   console.error('FAIL ' + failures.length);
   process.exit(1);

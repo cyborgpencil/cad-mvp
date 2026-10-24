@@ -327,6 +327,62 @@
     color: var(--ink);
     padding: 0 6px;
   }
+  .edge-sheet {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 76px;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .edge-sheet[hidden] { display: none !important; }
+  .edge-sheet-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .edge-sheet .edge-size {
+    flex: 1 1 auto;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    margin: 0;
+  }
+  .edge-sheet .edge-size input {
+    width: 100%;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .edge-sheet .edge-confirm {
+    flex: 0 0 auto;
+    min-width: 88px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--ink);
+    border: 1px solid var(--active-border);
+    font-weight: 650;
+  }
+  .edge-sheet .edge-confirm:disabled { opacity: 0.38; }
+  .edge-note {
+    margin: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 650;
+  }
   .bool-badges { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
   .bool-badge {
     position: absolute;
@@ -1727,8 +1783,6 @@
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" id="filletBtn" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet. Pick edges, then Confirm. Default 2 mm."><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
         <button type="button" class="tool-btn" id="chamferBtn" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer. Pick edges, then Confirm. Default 0.5 mm."><svg class="ico"><use href="#i-chamfer"></use></svg><span>Chamfer</span></button>
-        <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="number" min="0.01" step="0.1" value="2" aria-label="Edge size mm"></label>
-        <button type="button" class="tool-btn edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges."><span>Confirm</span></button>
         <button type="button" class="tool-btn" data-tool="Loop Cut" title="Loop Cut"><svg class="ico"><use href="#i-loop"></use></svg><span>Loop Cut</span></button>
         <button type="button" class="tool-btn" data-tool="Knife" title="Knife"><svg class="ico"><use href="#i-knife"></use></svg><span>Knife</span></button>
       </div><div class="group-label">Modify</div></div>
@@ -1942,6 +1996,13 @@
           <button type="button" data-action="hide" data-tool="Hide" title="Hide"><svg class="ico"><use href="#i-eyeoff"></use></svg></button>
         </div>
       </div>
+      <div id="edgeSheet" class="edge-sheet" hidden>
+        <p id="edgeNote" class="edge-note" hidden></p>
+        <div class="edge-sheet-row">
+          <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="number" min="0.01" step="0.1" value="2" inputmode="decimal" aria-label="Edge size mm"></label>
+          <button type="button" class="edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges." disabled aria-disabled="true">Confirm</button>
+        </div>
+      </div>
       <div class="sheet" id="toolsSheet" hidden>
         <div class="sheet-h">
           <button type="button" class="icon-btn" data-action="closeSheet" data-tool="Close tools menu" aria-label="Close"><span>Close</span></button>
@@ -2027,7 +2088,6 @@
     <button type="button" data-action="gizmoMode" data-mode="scale" data-tool="Resize" title="Resize">Resize</button>
     <button type="button" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet">Fillet</button>
     <button type="button" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer">Chamfer</button>
-    <button type="button" data-action="confirmEdge" data-tool="Confirm" title="Confirm">Confirm</button>
     <button type="button" class="bool-op" data-action="boolean" data-op="union" data-tool="Union" title="Union" disabled aria-disabled="true">Union</button>
     <button type="button" class="bool-op" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut" disabled aria-disabled="true">Cut</button>
     <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
@@ -2353,6 +2413,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     edgeOpLog: [],
     droppedHoles: [],
     edgeArm: '',
+    edgeNotice: '',
     edgePickName: 'base-tip',
     lastError: '',
     demo: '',
@@ -3490,12 +3551,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (meshCad && topo && mode === 'face') {
       selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf(selected));
       if (hover) hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf([hover]));
-    } else if (topo && mode === 'edge') {
+    } else if (mode === 'edge') {
       const selPts = [];
       const hoverPts = [];
-      for (let i = 0; i < topo.edges.length; i += 1) {
-        if (selected.indexOf(topo.edges[i].id) >= 0) selPts.push(topo.edges[i].pts);
-        else if (hover === topo.edges[i].id) hoverPts.push(topo.edges[i].pts);
+      const edgeRows = listEdgeRows();
+      for (let i = 0; i < edgeRows.length; i += 1) {
+        if (selected.indexOf(edgeRows[i].id) >= 0) selPts.push(edgeRows[i].pts);
+        else if (hover === edgeRows[i].id) hoverPts.push(edgeRows[i].pts);
       }
       selLine = viewApi.polylineArray(selPts);
       hoverLine = viewApi.polylineArray(hoverPts);
@@ -3686,7 +3748,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     function blocked(client) {
       const el = document.elementFromPoint(client.x, client.y);
       if (!el) return true;
-      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, #viewCube')) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
       if (el !== canvas && el !== viewport) return true;
       if (handles.visible && pickHandle(client.x, client.y)) return true;
       return false;
@@ -3834,23 +3896,51 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
 
     let edgeHit = null;
-    if (topo && topo.edges && phoneApi && typeof phoneApi.pointBesideSegment === 'function') {
+    const namedEdges = { inner: null, tip: null };
+    const bodyEdges = [];
+    const seenEdgeBody = {};
+    function onSpan(p, x, z) {
+      return !!p && Math.abs(p[0] - x) <= 0.25 && Math.abs(p[2] - z) <= 0.25
+        && p[1] >= -0.25 && p[1] <= 20.25;
+    }
+    function spansY(pts, x, z) {
+      if (!pts || pts.length < 2) return false;
+      const a = pts[0];
+      const b = pts[pts.length - 1];
+      if (!onSpan(a, x, z) || !onSpan(b, x, z)) return false;
+      return Math.abs(a[1] - b[1]) > 4;
+    }
+    if (phoneApi && typeof phoneApi.pointBesideSegment === 'function') {
+      const aimRows = listEdgeRows();
       seek('edge', function () {
-        for (let i = 0; i < topo.edges.length && !edgeHit; i += 1) {
-          const edge = topo.edges[i];
-          const pts = edge.pts || [];
-          for (let k = 0; k + 1 < pts.length && !edgeHit; k += 1) {
-            if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
-            const a = screenOfCad(pts[k]);
-            const b = screenOfCad(pts[k + 1]);
+        for (let i = 0; i < aimRows.length; i += 1) {
+          const row = aimRows[i];
+          if (edgeHit && namedEdges.inner && namedEdges.tip && seenEdgeBody[row.bodyId]) continue;
+          const pts = row.pts || [];
+          let bandHit = null;
+          let lineHit = null;
+          const pieces = [];
+          if (pts.length >= 2) {
+            pieces.push([0, pts.length - 1]);
+            const stride = Math.max(1, Math.floor((pts.length - 1) / 4));
+            for (let k = 0; k < pts.length - 1 && pieces.length < 6; k += stride) {
+              pieces.push([k, Math.min(pts.length - 1, k + stride)]);
+            }
+          }
+          for (let p = 0; p < pieces.length && !(bandHit && lineHit); p += 1) {
+            const i0 = pieces[p][0];
+            const i1 = pieces[p][1];
+            if (!inFront(pts[i0]) && !inFront(pts[i1])) continue;
+            const a = screenOfCad(pts[i0]);
+            const b = screenOfCad(pts[i1]);
             const len = Math.hypot(b.x - a.x, b.y - a.y);
             if (!(len > 8)) continue;
             const ts = [0.5, 0.35, 0.65, 0.22, 0.78];
-            const signs = [1, -1];
-            for (let ti = 0; ti < ts.length && !edgeHit; ti += 1) {
-              for (let si = 0; si < signs.length && !edgeHit; si += 1) {
+            const dists = [0, gap, -gap];
+            for (let ti = 0; ti < ts.length && !(bandHit && lineHit); ti += 1) {
+              for (let di = 0; di < dists.length && !(bandHit && lineHit); di += 1) {
                 const along = ts[ti];
-                const dist = gap * signs[si];
+                const dist = dists[di];
                 let local;
                 if (along === 0.5) {
                   local = phoneApi.pointBesideSegment(a.x, a.y, b.x, b.y, dist);
@@ -3864,13 +3954,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
                 }
                 if (!inside(local)) continue;
                 const measured = distToSeg(local.x, local.y, a.x, a.y, b.x, b.y);
-                if (!(measured > touchPx && measured < edgePx)) continue;
+                if (!(measured < edgePx)) continue;
                 const client = toClient(local);
                 if (blocked(client)) continue;
                 const hit = pickElement(client.x, client.y, 'touch');
-                if (hit === edge.id) edgeHit = { id: hit, x: client.x, y: client.y, gap: measured };
+                if (hit !== row.id) continue;
+                const packed = { id: hit, x: client.x, y: client.y, gap: measured, bodyId: row.bodyId, edgeId: row.edgeId };
+                if (!lineHit) lineHit = packed;
+                if (!bandHit && measured > touchPx && measured < edgePx) bandHit = packed;
               }
             }
+          }
+          const rowHit = bandHit || lineHit;
+          if (!rowHit) continue;
+          if (!edgeHit && bandHit) edgeHit = bandHit;
+          if (!namedEdges.inner && spansY(pts, 4, 4)) namedEdges.inner = rowHit;
+          if (!namedEdges.tip && spansY(pts, 40, 4)) namedEdges.tip = rowHit;
+          if (row.bodyId && !seenEdgeBody[row.bodyId]) {
+            seenEdgeBody[row.bodyId] = true;
+            bodyEdges.push(rowHit);
           }
         }
       });
@@ -3902,6 +4004,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       bodies: bodyHits,
       face: faceHit,
       edge: edgeHit,
+      inner: namedEdges.inner,
+      tip: namedEdges.tip,
+      bodyEdges: bodyEdges,
       vertex: vertexHit,
       empty: emptyHit,
       cylinder: cylinderHit,
@@ -4103,6 +4208,115 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(state.lastError || userStatus());
       if (state.lastError) toast(state.lastError);
       return built.pass === true && built.watertight.pass === true && built.gate.pass === true;
+    } catch (err) {
+      state.lastError = err && err.message ? err.message : String(err);
+      window.__cadcamBootNote = state.lastError;
+      publishGateState();
+      setHint(state.lastError);
+      return false;
+    }
+  }
+
+  // Plain fused L for the phone fillet smoke. Not the filleted demo bracket.
+  function installPlainL() {
+    try {
+      clearOwnedBodies();
+      state.demo = '';
+      state.booleanOp = '';
+      state.booleanMessage = '';
+      state.opLog = [];
+      state.edgeOpLog = [];
+      state.lastError = '';
+      state.edgeArm = '';
+      state.edgeNotice = '';
+      state.primitive = null;
+      paintPrimFields();
+      if (!oc || !opsApi || !primApi || typeof opsApi.makeBoxSolid !== 'function' || typeof opsApi.fuseShapes !== 'function') {
+        state.lastError = 'FAIL: L part ops are not loaded.';
+        window.__cadcamBootNote = state.lastError;
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      if (typeof Module.replaceMesh !== 'function') {
+        state.lastError = 'FAIL: mesh replace is not in this wasm build.';
+        window.__cadcamBootNote = state.lastError;
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      const leg = opsApi.makeBoxSolid(oc, 40, 20, 4, [0, 0, 0]);
+      const upright = opsApi.makeBoxSolid(oc, 4, 20, 40, [0, 0, 0]);
+      if (!leg || !upright) {
+        if (leg) dropShape(leg);
+        if (upright) dropShape(upright);
+        state.lastError = 'FAIL: could not build the L.';
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      const fused = opsApi.fuseShapes(oc, leg, upright);
+      dropShape(leg);
+      dropShape(upright);
+      if (!fused || !fused.ok || !fused.shape) {
+        if (fused && fused.shape) dropShape(fused.shape);
+        state.lastError = (fused && fused.error) || 'FAIL: could not fuse the L.';
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      let view = null;
+      try {
+        view = primApi.inspectSolid(oc, fused.shape);
+      } catch (err) {
+        dropShape(fused.shape);
+        state.lastError = err && err.message ? err.message : String(err);
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      const flat = primApi.flattenMesh(view.mesh);
+      if (!view.mesh || !flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, 'lpart')) {
+        dropShape(fused.shape);
+        state.lastError = 'FAIL: L mesh was rejected.';
+        publishGateState();
+        setHint(state.lastError);
+        return false;
+      }
+      state.bodySeq += 1;
+      const body = {
+        id: 'b' + state.bodySeq,
+        name: 'L',
+        kind: 'lpart',
+        params: null,
+        shape: fused.shape,
+        mesh: view.mesh,
+        topology: view.topology,
+        gate: view.gate,
+        watertight: view.watertight,
+        features: [],
+        material: 'PLA',
+        shapeLocal: false,
+        placement: { x: 0, y: 0, z: 0 }
+      };
+      state.bodies = [body];
+      state.assemblyIds = [body.id];
+      state.topology = view.topology;
+      state.topologySource = 'occt';
+      state.shapeGate = view.gate;
+      state.selection = 'item';
+      state.selectedIds = ['item'];
+      state.hoverId = null;
+      state.sceneCleared = false;
+      state.projectBlank = false;
+      syncFromKernel();
+      mountBodyMeshes();
+      refreshAnchor();
+      applyLook();
+      if (typeof window.__cadcamClearUndo === 'function') window.__cadcamClearUndo();
+      state.projectDirty = false;
+      setHint(userStatus());
+      return true;
     } catch (err) {
       state.lastError = err && err.message ? err.message : String(err);
       window.__cadcamBootNote = state.lastError;
@@ -4566,18 +4780,107 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return ok && built.gate.pass === true && built.watertight.pass === true && !state.lastError;
   }
 
-  function selectedEdgeSegments() {
-    const topo = state.topology;
-    const segments = [];
-    if (!topo || state.selection !== 'edge') return segments;
-    for (let i = 0; i < state.selectedIds.length; i += 1) {
-      const id = state.selectedIds[i];
+  function singleBodyId() {
+    return state.bodies.length === 1 && state.bodies[0] ? state.bodies[0].id : '';
+  }
+
+  // One row per body edge. A single body keeps the edge id. Several bodies
+  // use bodyId:edgeId so e0 on two solids does not collide.
+  function listEdgeRows() {
+    const rows = [];
+    const bodies = state.bodies;
+    const count = bodies.length;
+    for (let i = 0; i < count; i += 1) {
+      const body = bodies[i];
+      const topo = body && body.topology && body.topology.edges
+        ? body.topology
+        : (count === 1 ? state.topology : null);
+      if (!topo || !topo.edges) continue;
       for (let k = 0; k < topo.edges.length; k += 1) {
         const edge = topo.edges[k];
-        if (edge.id !== id || !edge.pts || edge.pts.length < 2) continue;
+        if (!edge || !edge.pts || edge.pts.length < 2) continue;
+        const id = phoneApi && typeof phoneApi.edgePickId === 'function'
+          ? phoneApi.edgePickId(body.id, edge.id, count)
+          : (count > 1 ? String(body.id) + ':' + edge.id : String(edge.id));
+        rows.push({ id: id, bodyId: body.id, edgeId: edge.id, pts: edge.pts });
+      }
+    }
+    if (!rows.length && state.topology && state.topology.edges) {
+      const only = count === 1 && bodies[0] ? bodies[0].id : '';
+      for (let k = 0; k < state.topology.edges.length; k += 1) {
+        const edge = state.topology.edges[k];
+        if (!edge || !edge.pts || edge.pts.length < 2) continue;
+        rows.push({ id: edge.id, bodyId: only, edgeId: edge.id, pts: edge.pts });
+      }
+    }
+    return rows;
+  }
+
+  function edgePicksForDecision() {
+    if (state.selection !== 'edge') return [];
+    const segments = selectedEdgeSegments();
+    if (segments.length) return segments;
+    return state.selectedIds;
+  }
+
+  function edgeDecision() {
+    const sizeInput = document.getElementById('edgeSize');
+    const sizeText = sizeInput ? sizeInput.value : '';
+    const picks = edgePicksForDecision();
+    if (phoneApi && typeof phoneApi.confirmEdgeDecision === 'function') {
+      return phoneApi.confirmEdgeDecision(picks, sizeText, singleBodyId());
+    }
+    const size = Number(String(sizeText == null ? '' : sizeText).trim());
+    const sizeOk = Number.isFinite(size) && size > 0;
+    const crossed = state.bodies.length > 1;
+    return {
+      enabled: sizeOk && picks.length > 0 && !crossed && state.bodies.length === 1,
+      message: crossed && picks.length ? 'pick edges on one body' : '',
+      bodyId: singleBodyId(),
+      sizeOk: sizeOk,
+      size: size
+    };
+  }
+
+  function paintEdgeChrome() {
+    const sheet = document.getElementById('edgeSheet');
+    const note = document.getElementById('edgeNote');
+    const confirmBtn = document.getElementById('edgeConfirm');
+    const armed = state.edgeArm === 'fillet' || state.edgeArm === 'chamfer';
+    if (sheet) sheet.hidden = !armed;
+    const decision = edgeDecision();
+    const text = decision.message || '';
+    if (note) {
+      note.hidden = !text;
+      note.textContent = text;
+    }
+    if (confirmBtn) {
+      const on = armed && decision.enabled === true;
+      confirmBtn.disabled = !on;
+      confirmBtn.setAttribute('aria-disabled', on ? 'false' : 'true');
+    }
+    if (text && state.edgeNotice !== text) {
+      state.edgeNotice = text;
+      setHint(text);
+    } else if (!text && state.edgeNotice) {
+      state.edgeNotice = '';
+    }
+  }
+
+  function selectedEdgeSegments() {
+    const segments = [];
+    if (state.selection !== 'edge') return segments;
+    const rows = listEdgeRows();
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      for (let k = 0; k < rows.length; k += 1) {
+        const row = rows[k];
+        if (row.id !== id || !row.pts || row.pts.length < 2) continue;
         segments.push({
-          a: edge.pts[0].slice(),
-          b: edge.pts[edge.pts.length - 1].slice()
+          bodyId: row.bodyId,
+          edgeId: row.edgeId,
+          a: row.pts[0].slice(),
+          b: row.pts[row.pts.length - 1].slice()
         });
       }
     }
@@ -4586,56 +4889,69 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function confirmPickedEdge() {
     const kind = state.edgeArm === 'chamfer' ? 'chamfer' : state.edgeArm === 'fillet' ? 'fillet' : '';
-    const sizeInput = document.getElementById('edgeSize');
-    const size = sizeInput ? Number(sizeInput.value) : NaN;
-    const body = state.bodies.length === 1 ? state.bodies[0] : null;
-    function reject(message) {
-      state.lastError = message;
-      state.edgeOpLog.push({ kind: kind || state.edgeArm || '', size: size, pass: false, kept: true, error: message });
-      toast(message);
-      setHint(message);
+    const decision = edgeDecision();
+    const size = decision.size;
+    function reject(message, asSize) {
+      const shown = asSize && phoneApi && phoneApi.SMALLER_SIZE_MESSAGE
+        ? phoneApi.SMALLER_SIZE_MESSAGE
+        : message;
+      state.lastError = shown;
+      state.edgeNotice = shown;
+      state.edgeOpLog.push({ kind: kind || state.edgeArm || '', size: size, pass: false, kept: true, error: shown });
+      toast(shown);
+      setHint(shown);
       publishGateState();
+      return false;
     }
+    if (decision.message) return reject(decision.message, false);
     if (!oc || !opsApi || typeof opsApi.applyPickedEdgeOp !== 'function') {
-      reject('FAIL: edge ops are not loaded. The last good shape was kept.');
-      return;
+      return reject('FAIL: edge ops are not loaded. The last good shape was kept.', false);
     }
     if (!kind) {
-      reject('FAIL: choose Fillet or Chamfer, then Confirm. The last good shape was kept.');
-      return;
+      return reject('FAIL: choose Fillet or Chamfer, then Confirm. The last good shape was kept.', false);
     }
-    if (!body || !body.shape) {
-      reject('FAIL: there is no solid to fillet. The last good shape was kept.');
-      return;
+    if (!decision.sizeOk) {
+      return reject('FAIL: size must be a positive number. The last good shape was kept.', false);
     }
     const segments = selectedEdgeSegments();
     if (!segments.length) {
-      reject('FAIL: pick an edge, then Confirm. The last good shape was kept.');
-      return;
+      return reject('FAIL: pick an edge, then Confirm. The last good shape was kept.', false);
+    }
+    const body = findBody(decision.bodyId) || (state.bodies.length === 1 ? state.bodies[0] : null);
+    if (!body || !body.shape) {
+      return reject('FAIL: there is no solid to fillet. The last good shape was kept.', false);
+    }
+    const mine = [];
+    for (let i = 0; i < segments.length; i += 1) {
+      if (segments[i].bodyId === body.id) mine.push(segments[i]);
+    }
+    if (!mine.length) {
+      return reject('FAIL: pick an edge, then Confirm. The last good shape was kept.', false);
     }
     const localSegments = body.shapeLocal === true
-      ? segments.map(function (seg) {
+      ? mine.map(function (seg) {
         return { a: toLocalPoint(seg.a, body), b: toLocalPoint(seg.b, body) };
       })
-      : segments;
+      : mine.map(function (seg) { return { a: seg.a, b: seg.b }; });
     let result;
     try {
       result = opsApi.applyPickedEdgeOp(oc, body.shape, localSegments, kind, size);
     } catch (err) {
-      reject('FAIL: ' + kind + ' threw ' + (err && err.message ? err.message : String(err)) + ' The last good shape was kept.');
-      return;
+      const thrown = 'FAIL: ' + kind + ' threw ' + (err && err.message ? err.message : String(err)) + ' The last good shape was kept.';
+      const asSize = phoneApi && typeof phoneApi.occtSizeFailure === 'function' && phoneApi.occtSizeFailure(thrown);
+      return reject(thrown, asSize);
     }
     if (!result || !result.ok || !result.shape) {
       if (result && result.shape) dropShape(result.shape);
-      reject((result && result.error) || ('FAIL: ' + kind + ' was rejected. The last good shape was kept.'));
-      return;
+      const technical = (result && result.error) || ('FAIL: ' + kind + ' was rejected. The last good shape was kept.');
+      const asSize = phoneApi && typeof phoneApi.occtSizeFailure === 'function' && phoneApi.occtSizeFailure(technical);
+      return reject(technical, asSize);
     }
     if (body.shapeLocal === true) {
       const placedView = inspectStored(body, result.shape);
       if (!placedView || !placedView.mesh) {
         dropShape(result.shape);
-        reject('FAIL: the new mesh was rejected. The last good shape was kept.');
-        return;
+        return reject('FAIL: the new mesh was rejected. The last good shape was kept.', false);
       }
       result.mesh = placedView.mesh;
       result.topology = placedView.topology;
@@ -4655,18 +4971,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     body.gate = result.gate;
     body.watertight = result.watertight;
     state.lastError = '';
+    state.edgeNotice = '';
     state.edgeOpLog.push({ kind: kind, size: size, pass: true, kept: false, error: '' });
     state.selection = 'edge';
     state.selectedIds = [];
     state.hoverId = null;
     const partName = state.demo || 'part';
-    const ok = installBodiesAndSync(partName);
-    if (ok) {
-      dropShape(previous.shape);
-      if (result.featureFaces && result.featureFaces.length) {
-        body.features = (body.features || []).concat([{ kind: kind, faces: result.featureFaces }]);
-      }
-    } else {
+    installBodiesAndSync(partName);
+    if (state.lastError) {
       dropShape(result.shape);
       body.shape = previous.shape;
       body.mesh = previous.mesh;
@@ -4678,9 +4990,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.edgeOpLog[state.edgeOpLog.length - 1].kept = true;
       state.edgeOpLog[state.edgeOpLog.length - 1].error = state.lastError;
       installBodiesAndSync(partName);
+      toast(state.lastError);
+      setHint(state.lastError);
+      publishGateState();
+      return false;
     }
-    setHint(state.lastError || (kind === 'chamfer' ? 'Chamfer applied.' : 'Fillet applied.'));
-    if (state.lastError) toast(state.lastError);
+    dropShape(previous.shape);
+    if (result.featureFaces && result.featureFaces.length) {
+      body.features = (body.features || []).concat([{ kind: kind, faces: result.featureFaces }]);
+    }
+    setHint(kind === 'chamfer' ? 'Chamfer applied.' : 'Fillet applied.');
+    publishGateState();
+    return true;
   }
 
   function uniqueOpName(base) {
@@ -5761,7 +6082,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const meshHits = raycaster.intersectObject(mesh, false);
     const hit = meshHits.length ? meshHits[0] : null;
     if (mode === 'item') return hit ? 'item' : null;
-    if (!topo || !selApi) return null;
+    if (!selApi) return null;
     const bounds = canvas.getBoundingClientRect();
     const px = clientX - bounds.left;
     const py = clientY - bounds.top;
@@ -5770,6 +6091,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       : (pointerType === 'touch' && selApi.TOUCH_PICK_TOLERANCE_PX
         ? selApi.TOUCH_PICK_TOLERANCE_PX
         : selApi.PICK_TOLERANCE_PX);
+    if (mode === 'edge') {
+      const rows = listEdgeRows();
+      let best = null;
+      let bestD = limit;
+      for (let i = 0; i < rows.length; i += 1) {
+        const pts = rows[i].pts;
+        for (let k = 0; k + 1 < pts.length; k += 1) {
+          if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
+          const a = screenOfCad(pts[k]);
+          const b = screenOfCad(pts[k + 1]);
+          const d = distToSeg(px, py, a.x, a.y, b.x, b.y);
+          if (d <= bestD) {
+            bestD = d;
+            best = rows[i].id;
+          }
+        }
+      }
+      return best;
+    }
+    if (!topo) return null;
     if (mode === 'vertex') {
       let best = null;
       let bestD = limit;
@@ -5781,24 +6122,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (d <= bestD) {
           bestD = d;
           best = v.id;
-        }
-      }
-      return best;
-    }
-    if (mode === 'edge') {
-      let best = null;
-      let bestD = limit;
-      for (let i = 0; i < topo.edges.length; i += 1) {
-        const pts = topo.edges[i].pts;
-        for (let k = 0; k + 1 < pts.length; k += 1) {
-          if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
-          const a = screenOfCad(pts[k]);
-          const b = screenOfCad(pts[k + 1]);
-          const d = distToSeg(px, py, a.x, a.y, b.x, b.y);
-          if (d <= bestD) {
-            bestD = d;
-            best = topo.edges[i].id;
-          }
         }
       }
       return best;
@@ -7940,6 +8263,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function publishGateState() {
+    paintEdgeChrome();
     paintAssembly();
     const btn = document.getElementById('exportBtn');
     const gateLabel = state.occtReady !== true ? 'PENDING' : (state.occtGate ? 'PASS' : 'FAIL');
@@ -7987,6 +8311,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       edgePickPoint: currentEdgePickPoint(),
       edgeOpLog: state.edgeOpLog || [],
       edgeArm: state.edgeArm || '',
+      edgeSize: (function () {
+        const input = document.getElementById('edgeSize');
+        return input ? String(input.value) : '';
+      })(),
+      edgeSheetOpen: (function () {
+        const sheet = document.getElementById('edgeSheet');
+        return !!(sheet && sheet.hidden !== true);
+      })(),
+      edgeNote: (function () {
+        const note = document.getElementById('edgeNote');
+        return note && note.hidden !== true ? String(note.textContent || '') : '';
+      })(),
+      edgeConfirmEnabled: (function () {
+        const confirmBtn = document.getElementById('edgeConfirm');
+        return !!(confirmBtn && confirmBtn.disabled !== true);
+      })(),
       selectedEdge: selectedEdgeEnds(),
       primitiveKind: state.primitive ? state.primitive.kind : '',
       primitiveParams: state.primitive ? Object.assign({}, state.primitive.params) : null,
@@ -8038,13 +8378,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function selectedEdgeEnds() {
-    const topo = state.topology;
-    if (!topo || state.selection !== 'edge' || !state.selectedIds.length) return null;
+    if (state.selection !== 'edge' || !state.selectedIds.length) return null;
+    const rows = listEdgeRows();
     const id = state.selectedIds[0];
-    for (let i = 0; i < topo.edges.length; i += 1) {
-      const edge = topo.edges[i];
-      if (edge.id === id && edge.pts && edge.pts.length >= 2) {
-        return { a: edge.pts[0], b: edge.pts[edge.pts.length - 1] };
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (row.id === id && row.pts && row.pts.length >= 2) {
+        return { a: row.pts[0], b: row.pts[row.pts.length - 1] };
       }
     }
     return null;
@@ -8169,6 +8509,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     updateHighlights();
     paintPrimFields();
     paintPhoneChrome();
+    paintEdgeChrome();
     writePosFields();
     const readout = document.getElementById('displayReadout');
     if (readout) {
@@ -9179,19 +9520,35 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     } else if (action === 'armEdge') {
       const op = btn.getAttribute('data-op') === 'chamfer' ? 'chamfer' : 'fillet';
-      state.edgeArm = op;
-      state.activeTool = op === 'chamfer' ? 'Chamfer' : 'Fillet';
-      const sizeInput = document.getElementById('edgeSize');
-      if (sizeInput && opsApi) {
-        const sized = op === 'chamfer' ? opsApi.EDGE_CHAMFER_DISTANCE_MM : opsApi.EDGE_FILLET_RADIUS_MM;
-        sizeInput.value = String(sized);
+      const armed = phoneApi && typeof phoneApi.armEdgeTool === 'function'
+        ? phoneApi.armEdgeTool(op)
+        : { op: op, mode: 'edge', sizeMm: op === 'chamfer' ? 0.5 : 2 };
+      const wasEdge = state.selection === 'edge';
+      state.edgeArm = armed.op;
+      state.activeTool = armed.op === 'chamfer' ? 'Chamfer' : 'Fillet';
+      state.selection = armed.mode || 'edge';
+      if (!wasEdge) {
+        const rows = listEdgeRows();
+        state.selectedIds = state.selectedIds.filter(function (id) {
+          for (let i = 0; i < rows.length; i += 1) {
+            if (rows[i].id === id) return true;
+          }
+          return false;
+        });
       }
+      state.hoverId = null;
+      const sizeInput = document.getElementById('edgeSize');
+      if (sizeInput) sizeInput.value = String(armed.sizeMm);
+      const chooser = document.getElementById('pickChooser');
+      if (chooser) chooser.hidden = true;
       message = state.activeTool + ' on confirm';
       setHint('Pick an edge, then Confirm. Nothing changes until Confirm.');
       updateInspector();
+      applyLook();
       publishGateState();
     } else if (action === 'confirmEdge') {
-      confirmPickedEdge();
+      const label = state.edgeArm === 'chamfer' ? 'Chamfer' : 'Fillet';
+      runUndoable(label, function () { return confirmPickedEdge() === true; });
       return;
     } else if (action === 'dimStep') {
       if (state.dimStepFromPointer) {
@@ -10000,6 +10357,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (next.all) toast(label + ': all');
         else if (next.ids.length) toast('Select ' + label + ' ' + next.ids.join(', '));
         else toast(label + ': none');
+        publishGateState();
       }
     }
     gesture = null;
@@ -10049,6 +10407,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (ev.target === searchInput) fillSearch(searchInput.value);
   }
   searchInput.addEventListener('input', onSearchType);
+  const edgeSizeInput = document.getElementById('edgeSize');
+  if (edgeSizeInput) {
+    edgeSizeInput.addEventListener('input', function () {
+      paintEdgeChrome();
+      publishGateState();
+    });
+  }
 
   const docName = document.getElementById('docName');
   function syncDocTitle() {
@@ -10380,6 +10745,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     showPair(shift);
     spherical.radius = fitDistance();
     updateCamera();
+  } else if (params.get('part') === 'l') {
+    loadedQuery = true;
+    installPlainL();
+    spherical.radius = fitDistance();
+    updateCamera();
   }
   if (!loadedQuery) {
     createPrimitive('box', null, 'item', false);
@@ -10420,6 +10790,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       chipMin: phoneApi.CHIP_MIN_PX,
       filters: phoneApi.PICK_FILTERS,
       aims: function () { return phoneAims(); },
+      edges: function () {
+        return listEdgeRows().map(function (row) {
+          const a = row.pts[0];
+          const b = row.pts[row.pts.length - 1];
+          return { id: row.id, bodyId: row.bodyId, n: row.pts.length, a: [a[0], a[1], a[2]], b: [b[0], b[1], b[2]] };
+        });
+      },
       installHole: function () { return installHoleFixture(); }
     };
   }
