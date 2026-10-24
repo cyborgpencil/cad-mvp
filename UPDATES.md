@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #98 (merged at 56c2528): web - measure angle + face area, sketch LxW/O callouts (P6 T1-T6).
 - 2026-10-24 PR #96 (merged at f32d35b): docs - prompts/measure-sketch-next.md (P6 T1-T6 GB feed).
 - 2026-10-24 PR #93 (merged at e03da89): PROGRESS scrub - touch Booleans + fillet/chamfer on main (#91 at 73408c4); next measuring/callouts then sketching.
 - 2026-10-24 PR #94 (merged at b1afab7): research - P6 measure + sketch-callout digest (T1-T6 locked; INDEX bullet).
