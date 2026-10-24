@@ -810,7 +810,7 @@ expect('decimal keypad', pageSrc.indexOf('inputmode="decimal"') !== -1);
 expect('gizmo switch', pageSrc.indexOf('id="gizmoSwitch"') !== -1 && pageSrc.indexOf('data-mode="rotate"') !== -1 && pageSrc.indexOf('data-mode="scale"') !== -1);
 expect('portrait sheet', pageSrc.indexOf('id="dimToggle"') !== -1 && pageSrc.indexOf('id="dimBody"') !== -1 && pageSrc.indexOf('primRz') !== -1);
 expect('hole tool', pageSrc.indexOf('id="holeApply"') !== -1 && pageSrc.indexOf('id="holeDia"') !== -1 && pageSrc.indexOf('data-action="holeTool"') !== -1);
-expect('hole defaults on the page', pageSrc.indexOf('value="4.5"') !== -1 && pageSrc.indexOf('value="9.5"') !== -1 && pageSrc.indexOf('value="82"') !== -1);
+expect('hole defaults on the page', pageSrc.indexOf('value="4.5"') !== -1 && pageSrc.indexOf('value="9.5"') !== -1 && pageSrc.indexOf('value="90"') !== -1);
 expect('closed inspector hidden', pageSrc.indexOf('.inspector:not(.open)') !== -1 && pageSrc.indexOf('visibility: hidden') !== -1);
 expect('tap slop in page', pageSrc.indexOf('tapSlopPx()') !== -1);
 expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);

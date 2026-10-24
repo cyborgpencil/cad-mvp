@@ -1394,11 +1394,11 @@ export const EDGE_FILLET_RADIUS_MM = 2;
 export const EDGE_CHAMFER_DISTANCE_MM = 0.5;
 
 // Hole tool. Team choice, 2026-10-21. 4.5 mm and 9.5 mm are a #8 wood screw
-// clearance and countersink, tagged unverified fit. 82 degrees is the #8
-// flat-head angle. 90 degrees is the metric ISO countersink angle and stays editable.
+// clearance and countersink, tagged unverified fit. 90 degrees is the metric
+// ISO 10642 countersunk screw angle, team-chosen (3T, 2026-10-23).
 export const HOLE_DIAMETER_MM = 4.5;
 export const HOLE_COUNTERSINK_DIAMETER_MM = 9.5;
-export const HOLE_COUNTERSINK_ANGLE_DEG = 82;
+export const HOLE_COUNTERSINK_ANGLE_DEG = 90;
 export const HOLE_BLIND_DEPTH_MM = 6;
 export const HOLE_FIT = 'unverified fit';
 // Plate for the portrait hole test. A flat box, not an Erik measurement.
