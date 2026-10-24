@@ -375,6 +375,9 @@
     font-weight: 650;
   }
   .edge-sheet .edge-confirm:disabled { opacity: 0.38; }
+  .sketch-sheet { z-index: 9; }
+  .sketch-sheet .edge-size span { flex: none; font-weight: 650; }
+  .sketch-sheet .edge-size input { width: auto; flex: 1 1 auto; }
   .edge-note {
     margin: 0;
     min-height: 44px;
@@ -404,12 +407,22 @@
     align-items: center;
     gap: 12px;
     min-height: 52px;
+    min-width: 0;
+    max-width: 100%;
     padding: 4px 12px;
     background: var(--finish);
     border-bottom: 1px solid var(--line-strong);
     flex: none;
   }
+  .finish-bar .muted {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .finish-btn {
+    flex: none;
     min-width: 44px;
     min-height: 44px;
     height: 44px;
@@ -1834,7 +1847,7 @@
 
   <div class="finish-bar" id="finishBar" hidden>
     <button type="button" class="finish-btn" data-action="finishSketch" data-tool="Finish Sketch">Finish Sketch</button>
-    <span class="muted">Sketch1 on XY Plane · returns to Model</span>
+    <span class="muted" id="sketchStatus">Tap a planar face · returns to Model</span>
   </div>
 
   <div class="workspace">
@@ -1852,8 +1865,8 @@
     <div class="tools panel" data-panel="sketch" hidden>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" data-tool="Line" title="Line"><svg class="ico"><use href="#i-line"></use></svg><span>Line</span></button>
-        <button type="button" class="tool-btn" data-tool="Rectangle" title="Rectangle"><svg class="ico"><use href="#i-rect"></use></svg><span>Rectangle</span></button>
-        <button type="button" class="tool-btn" data-tool="Circle" title="Circle"><svg class="ico"><use href="#i-circle"></use></svg><span>Circle</span></button>
+        <button type="button" class="tool-btn" data-action="sketchRect" data-tool="Rectangle" title="Corner rectangle. Length and width in millimetres."><svg class="ico"><use href="#i-rect"></use></svg><span>Rectangle</span></button>
+        <button type="button" class="tool-btn" data-action="sketchCircle" data-tool="Circle" title="Center circle. Diameter in millimetres."><svg class="ico"><use href="#i-circle"></use></svg><span>Circle</span></button>
         <button type="button" class="tool-btn" data-tool="Arc" title="Arc"><svg class="ico"><use href="#i-arc"></use></svg><span>Arc</span></button>
         <button type="button" class="tool-btn" data-tool="Polygon" title="Polygon"><svg class="ico"><use href="#i-poly"></use></svg><span>Polygon</span></button>
       </div><div class="group-label">Draw</div></div>
@@ -1878,7 +1891,7 @@
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
         <button type="button" class="tool-btn wide" id="createDesktop" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
-        <button type="button" class="tool-btn" data-tool="Extrude (Push/Pull)" title="Extrude (Push/Pull)"><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
+        <button type="button" class="tool-btn" data-action="sketchExtrude" data-tool="Extrude (Push/Pull)" title="Extrude. Blind distance, default 10 mm. New body."><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
       <div class="group"><div class="group-btns">
@@ -2122,6 +2135,22 @@
         <div class="vp-cluster" role="group" aria-label="Visibility">
           <button type="button" data-action="isolate" data-tool="Isolate" title="Isolate"><svg class="ico"><use href="#i-isolate"></use></svg></button>
           <button type="button" data-action="hide" data-tool="Hide" title="Hide"><svg class="ico"><use href="#i-eyeoff"></use></svg></button>
+        </div>
+      </div>
+      <div id="sketchSheet" class="edge-sheet sketch-sheet" hidden>
+        <p id="sketchNote" class="edge-note">Rectangle</p>
+        <div class="edge-sheet-row" id="sketchRectRow">
+          <label class="edge-size" title="Length in millimetres"><span>L</span><input id="sketchL" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Length mm"><span>mm</span></label>
+          <label class="edge-size" title="Width in millimetres"><span>W</span><input id="sketchW" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Width mm"><span>mm</span></label>
+        </div>
+        <div class="edge-sheet-row" id="sketchCircRow" hidden>
+          <label class="edge-size" title="Diameter in millimetres"><span>Ø</span><input id="sketchD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Diameter mm"><span>mm</span></label>
+        </div>
+        <div class="edge-sheet-row" id="sketchDepthRow" hidden>
+          <label class="edge-size" title="Blind distance in millimetres"><span>Blind</span><input id="sketchDepth" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Blind distance mm"><span>mm</span></label>
+        </div>
+        <div class="edge-sheet-row">
+          <button type="button" class="edge-confirm" id="sketchConfirm" data-action="confirmSketch" data-tool="Sketch confirm" title="Apply the sketch profile or the blind extrude.">Confirm</button>
         </div>
       </div>
       <div id="edgeSheet" class="edge-sheet" hidden>
@@ -2444,8 +2473,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   };
   const TOOL_CATALOG = [
     { name: 'Line', tab: 'sketch' },
-    { name: 'Rectangle', tab: 'sketch' },
-    { name: 'Circle', tab: 'sketch' },
+    { name: 'Rectangle', tab: 'sketch', action: 'sketchRect' },
+    { name: 'Circle', tab: 'sketch', action: 'sketchCircle' },
     { name: 'Arc', tab: 'sketch' },
     { name: 'Polygon', tab: 'sketch' },
     { name: 'Sketch Fillet', tab: 'sketch' },
@@ -2466,7 +2495,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     { name: 'Cylinder', tab: 'model', action: 'primitive', kind: 'cylinder' },
     { name: 'Disc', tab: 'model', action: 'primitive', kind: 'disc' },
     { name: 'Hole', tab: 'model', action: 'holeTool' },
-    { name: 'Extrude (Push/Pull)', tab: 'model' },
+    { name: 'Extrude (Push/Pull)', tab: 'model', action: 'sketchExtrude' },
     { name: 'Inset', tab: 'model' },
     { name: 'Fillet', tab: 'model', action: 'armEdge', op: 'fillet' },
     { name: 'Chamfer', tab: 'model', action: 'armEdge', op: 'chamfer' },
@@ -2499,8 +2528,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     body: { title: 'Body1', sub: 'Triangle mesh', fine: 'Extents and volume come from the wasm checks.', colors: true, kv: [
       ['Width', 0, 'len'], ['Depth', 0, 'len'], ['Height', 0, 'len'], ['Volume', 0, 'vol']
     ]},
-    sketch: { title: 'Sketch1', sub: 'Rectangle on the top face', fine: 'TBD. Sketch tools do not solve or draw real curves.', kv: [
-      ['Width', 20, 'len'], ['Depth', 20, 'len'], ['Plane', 'XY']
+    sketch: { title: 'Sketch1', sub: 'Closed profile', fine: 'Corner rectangle or center circle on a planar face. No constraint solver.', kv: [
+      ['Length', 10, 'len'], ['Width', 10, 'len'], ['Plane', 'Face']
     ]},
     xz: { title: 'XZ Plane', sub: 'Construction · horizontal', kv: [['Size', 200, 'len']] },
     xy: { title: 'XY Plane', sub: 'Construction · normal +Z', kv: [['Size', 40, 'len']] },
@@ -2508,15 +2537,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   };
   const TOOL_INSP = {
     'Line': { title: 'Line', sub: 'Sketch tool', kv: [['Start', 'click'], ['End', 'click']] },
-    'Rectangle': { title: 'Rectangle', sub: 'Sketch tool', kv: [['Width', 20, 'len'], ['Height', 12, 'len']] },
-    'Circle': { title: 'Circle', sub: 'Sketch tool', kv: [['Radius', 10, 'len']] },
+    'Rectangle': { title: 'Rectangle', sub: 'Corner rectangle', kv: [['Length', 10, 'len'], ['Width', 10, 'len']] },
+    'Circle': { title: 'Circle', sub: 'Center circle', kv: [['Diameter', 10, 'len']] },
     'Arc': { title: 'Arc', sub: 'Sketch tool', kv: [['Radius', 10, 'len']] },
     'Polygon': { title: 'Polygon', sub: 'Sketch tool', kv: [['Sides', '6'], ['Radius', 10, 'len']] },
     'Sketch Fillet': { title: 'Sketch Fillet', sub: 'Sketch tool', kv: [['Radius', 2, 'len']] },
     'Trim': { title: 'Trim', sub: 'Sketch tool', kv: [['Mode', 'first hit']] },
     'Offset': { title: 'Offset', sub: 'Sketch tool', kv: [['Distance', 2, 'len']] },
     'Dimension': { title: 'Dimension', sub: 'Sketch tool', kv: [['Value', 20, 'len']] },
-    'Extrude (Push/Pull)': { title: 'Extrude', sub: 'Push / pull the selected face', kv: [['Distance', 20, 'len'], ['Taper', '0°']] },
+    'Extrude (Push/Pull)': { title: 'Extrude', sub: 'Blind distance. New body.', kv: [['Distance', 10, 'len']] },
     'Inset': { title: 'Inset', sub: 'Model tool', kv: [['Distance', 2, 'len']] },
     'Fillet': { title: 'Fillet', sub: 'Rounds selected edges', kv: [['Radius', 2, 'len']] },
     'Loop Cut': { title: 'Loop Cut', sub: 'Model tool', kv: [['Cuts', '1']] },
@@ -2575,6 +2604,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     holeDepthMode: 'through',
     holeCountersink: true,
     holeLog: [],
+    sketchPlane: null,
+    sketchProfile: null,
+    sketchSheetMode: '',
     projectDirty: false,
     projectError: '',
     projectApplying: false,
@@ -2725,6 +2757,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     new THREE.LineBasicMaterial({ color: 0xf0c14e })
   );
   scene.add(sketch);
+
+  const sketchPlaneMat = new THREE.MeshBasicMaterial({
+    color: 0x6aa2ff,
+    transparent: true,
+    opacity: 0.28,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const sketchPlaneMesh = new THREE.Mesh(new THREE.BufferGeometry(), sketchPlaneMat);
+  sketchPlaneMesh.visible = false;
+  sketchPlaneMesh.renderOrder = 3;
+  scene.add(sketchPlaneMesh);
+  const sketchProfileLine = new THREE.LineLoop(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: 0xf0c14e })
+  );
+  sketchProfileLine.visible = false;
+  sketchProfileLine.renderOrder = 4;
+  scene.add(sketchProfileLine);
 
   const shadowCanvas = document.createElement('canvas');
   shadowCanvas.width = 128;
@@ -4812,6 +4863,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function clearOwnedBodies() {
+    clearSketchGeometry();
     for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
     state.bodies = [];
     state.assemblyIds = [];
@@ -7284,6 +7336,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     syncFromKernel();
     mountBodyMeshes();
     refreshAnchor();
+    clearSketchGeometry();
     applyLook();
     publishProjectHook();
     return true;
@@ -8823,6 +8876,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       gizmoHandles: gizmoHandleState(),
       holeTool: state.holeTool === true,
       holeFaceReady: !!(state.holeFace && state.holeFace.frame),
+      tab: state.tab,
+      sketchPlane: !!state.sketchPlane,
+      sketchFace: state.sketchPlane ? state.sketchPlane.faceId : '',
+      sketchProfile: state.sketchProfile ? state.sketchProfile.kind : '',
+      sketchClosed: !!(state.sketchProfile && state.sketchProfile.closed),
+      sketchSheetOpen: (function () {
+        const sheet = document.getElementById('sketchSheet');
+        return !!(sheet && sheet.hidden !== true);
+      })(),
+      sketchDepthDefault: opsApi && opsApi.SKETCH_BLIND_DEPTH_MM ? opsApi.SKETCH_BLIND_DEPTH_MM : 10,
       holeDepthMode: state.holeDepthMode || 'through',
       holeCountersink: state.holeCountersink === true,
       holeCount: state.holeLog.length,
@@ -8991,6 +9054,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (measureReadout) measureReadout.hidden = !state.measure;
     handles.visible = gizmoShouldShow();
     updateHighlights();
+    paintSketchVisuals();
     paintPrimFields();
     paintPhoneChrome();
     paintEdgeChrome();
@@ -9252,6 +9316,416 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     else if (firstTool) firstTool.focus();
   }
 
+  function clearSketchGeometry() {
+    if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
+    state.sketchProfile = null;
+    state.sketchPlane = null;
+    paintSketchStatus();
+    paintSketchVisuals();
+  }
+
+  function closeSketchSheet() {
+    state.sketchSheetMode = '';
+    const sheet = document.getElementById('sketchSheet');
+    if (sheet) sheet.hidden = true;
+  }
+
+  function paintSketchStatus() {
+    const note = document.getElementById('sketchStatus');
+    if (!note) return;
+    if (state.sketchProfile && state.sketchProfile.closed) {
+      note.textContent = 'Closed profile kept · returns to Model';
+    } else if (state.sketchPlane) {
+      note.textContent = 'Sketch on face · returns to Model';
+    } else {
+      note.textContent = 'Tap a planar face · returns to Model';
+    }
+  }
+
+  function paintSketchVisuals() {
+    const plane = state.sketchPlane;
+    const showPlane = !!(plane && state.selectedIds.length === 0 && state.topology && state.meshCad && viewApi);
+    if (!showPlane || !sketchPlaneMesh) {
+      if (sketchPlaneMesh) sketchPlaneMesh.visible = false;
+    } else {
+      let face = null;
+      const faces = state.topology.faces || [];
+      for (let i = 0; i < faces.length; i += 1) {
+        if (faces[i].id === plane.faceId) face = faces[i];
+      }
+      if (!face || !face.tris) {
+        sketchPlaneMesh.visible = false;
+      } else {
+        const arr = viewApi.faceVertexArray(state.meshCad.vertices, state.meshCad.triangles, face.tris);
+        const n = plane.frame && plane.frame.outward ? plane.frame.outward : [0, 0, 1];
+        const shifted = new Float32Array(arr.length);
+        const ox = n[0] * 0.08;
+        const oy = n[2] * 0.08;
+        const oz = n[1] * 0.08;
+        for (let i = 0; i < arr.length; i += 3) {
+          shifted[i] = arr[i] + ox;
+          shifted[i + 1] = arr[i + 1] + oy;
+          shifted[i + 2] = arr[i + 2] + oz;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(shifted, 3));
+        sketchPlaneMesh.geometry.dispose();
+        sketchPlaneMesh.geometry = geo;
+        sketchPlaneMesh.visible = true;
+      }
+    }
+    const profile = state.sketchProfile;
+    if (!sketchProfileLine) return;
+    if (!profile || !profile.loop || profile.loop.length < 3) {
+      sketchProfileLine.visible = false;
+      return;
+    }
+    const pts = [];
+    for (let i = 0; i < profile.loop.length; i += 1) {
+      const p = profile.loop[i];
+      pts.push(new THREE.Vector3(p[0], p[2] + 0.12, p[1]));
+    }
+    sketchProfileLine.geometry.dispose();
+    sketchProfileLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    sketchProfileLine.visible = true;
+  }
+
+  function openSketchSheet(mode) {
+    state.sketchSheetMode = mode;
+    const sheet = document.getElementById('sketchSheet');
+    const rectRow = document.getElementById('sketchRectRow');
+    const circRow = document.getElementById('sketchCircRow');
+    const depthRow = document.getElementById('sketchDepthRow');
+    const note = document.getElementById('sketchNote');
+    const confirmBtn = document.getElementById('sketchConfirm');
+    if (rectRow) rectRow.hidden = mode !== 'rect';
+    if (circRow) circRow.hidden = mode !== 'circle';
+    if (depthRow) depthRow.hidden = mode !== 'extrude';
+    if (mode === 'extrude') {
+      const depth = document.getElementById('sketchDepth');
+      const fallback = opsApi && opsApi.SKETCH_BLIND_DEPTH_MM ? opsApi.SKETCH_BLIND_DEPTH_MM : 10;
+      if (depth && !String(depth.value).trim()) depth.value = String(fallback);
+    }
+    let text = 'Rectangle';
+    let enabled = false;
+    if (mode === 'rect') {
+      text = state.sketchPlane ? 'Corner rectangle' : 'Tap a planar face';
+      enabled = !!state.sketchPlane;
+    } else if (mode === 'circle') {
+      text = state.sketchPlane ? 'Center circle' : 'Tap a planar face';
+      enabled = !!state.sketchPlane;
+    } else {
+      text = state.sketchProfile && state.sketchProfile.closed ? 'Blind' : 'Finish a closed profile first';
+      enabled = !!(state.sketchProfile && state.sketchProfile.closed);
+    }
+    if (note) note.textContent = text;
+    if (confirmBtn) {
+      confirmBtn.disabled = !enabled;
+      confirmBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    }
+    if (sheet) sheet.hidden = false;
+    publishGateState();
+  }
+
+  function setSketchPlane(faceId) {
+    const meshCad = state.meshCad;
+    const topo = state.topology;
+    if (!meshCad || !topo || !viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') {
+      setHint('Tap a planar face');
+      return false;
+    }
+    let face = null;
+    const faces = topo.faces || [];
+    for (let i = 0; i < faces.length; i += 1) {
+      if (faces[i].id === faceId) face = faces[i];
+    }
+    if (!face) return false;
+    const body = state.bodies.length === 1 ? state.bodies[0] : null;
+    const centre = body ? bodyCentroid(body) : [0, 0, 0];
+    const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
+    if (!frame) {
+      const why = 'That face is not planar.';
+      setHint(why);
+      toast(why);
+      return false;
+    }
+    state.sketchPlane = { faceId: face.id, bodyId: body ? body.id : '', frame: frame };
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.lastError = '';
+    paintSketchStatus();
+    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') openSketchSheet(state.sketchSheetMode);
+    refreshAnchor();
+    applyLook();
+    publishGateState();
+    setHint('Sketch plane');
+    toast('Sketch plane');
+    return true;
+  }
+
+  function topSketchFaceId() {
+    const faces = state.topology && state.topology.faces ? state.topology.faces : [];
+    let best = '';
+    let bestZ = -Infinity;
+    for (let i = 0; i < faces.length; i += 1) {
+      const c = faces[i].centroid;
+      if (!c || !(c[2] > bestZ)) continue;
+      bestZ = c[2];
+      best = faces[i].id;
+    }
+    return best;
+  }
+
+  // Phone miss ring. Diameter is 44 CSS px. A direct ray still hits the face.
+  // Mouse picks stay on the ray. This does not change Vertex / Edge / Face outside Sketch.
+  function pickSketchFace(clientX, clientY, pointerType) {
+    const saved = state.selection;
+    state.selection = 'face';
+    try {
+      const direct = pickElement(clientX, clientY, pointerType);
+      if (direct) return direct;
+      if (pointerType !== 'touch' && pointerType !== 'pen') return null;
+      const radius = 22;
+      for (let k = 0; k < 8; k += 1) {
+        const ang = (Math.PI * 2 * k) / 8;
+        const id = pickElement(
+          clientX + Math.cos(ang) * radius,
+          clientY + Math.sin(ang) * radius,
+          pointerType
+        );
+        if (id) return id;
+      }
+      return null;
+    } finally {
+      state.selection = saved;
+    }
+  }
+
+  function rectLoop(frame, lengthMm, widthMm) {
+    const pts = [];
+    const corners = [[0, 0], [lengthMm, 0], [lengthMm, widthMm], [0, widthMm]];
+    for (let i = 0; i < corners.length; i += 1) {
+      pts.push(frame.point(corners[i][0], corners[i][1]));
+    }
+    return pts;
+  }
+
+  function circleLoop(center, normal, diameterMm) {
+    const n = normal;
+    let ux = 1;
+    let uy = 0;
+    let uz = 0;
+    if (Math.abs(n[0]) > 0.9) {
+      ux = 0;
+      uy = 1;
+      uz = 0;
+    }
+    let tx = uy * n[2] - uz * n[1];
+    let ty = uz * n[0] - ux * n[2];
+    let tz = ux * n[1] - uy * n[0];
+    const tlen = Math.hypot(tx, ty, tz) || 1;
+    tx /= tlen;
+    ty /= tlen;
+    tz /= tlen;
+    const bx = n[1] * tz - n[2] * ty;
+    const by = n[2] * tx - n[0] * tz;
+    const bz = n[0] * ty - n[1] * tx;
+    const radius = diameterMm / 2;
+    const pts = [];
+    const steps = 48;
+    for (let i = 0; i < steps; i += 1) {
+      const ang = (Math.PI * 2 * i) / steps;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      pts.push([
+        center[0] + (tx * c + bx * s) * radius,
+        center[1] + (ty * c + by * s) * radius,
+        center[2] + (tz * c + bz * s) * radius
+      ]);
+    }
+    return pts;
+  }
+
+  function storeSketchProfile(kind, shape, loop, fields) {
+    if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
+    state.sketchProfile = {
+      kind: kind,
+      shape: shape,
+      loop: loop,
+      closed: true,
+      lengthMm: fields.lengthMm || 0,
+      widthMm: fields.widthMm || 0,
+      diameterMm: fields.diameterMm || 0
+    };
+    paintSketchStatus();
+    applyLook();
+    publishGateState();
+  }
+
+  function commitSketchRect() {
+    const plane = state.sketchPlane;
+    if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makeRectFace !== 'function') {
+      setHint('Tap a planar face');
+      return 'Tap a planar face';
+    }
+    const lengthMm = readField('sketchL');
+    const widthMm = readField('sketchW');
+    if (!(lengthMm > 0) || !(widthMm > 0)) {
+      const why = 'Length and width must be millimetres above 0.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const shape = opsApi.makeRectFace(oc, plane.frame.origin, plane.frame.u, plane.frame.v, lengthMm, widthMm);
+    if (!shape) {
+      const why = 'FAIL: the rectangle was rejected.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    storeSketchProfile('rect', shape, rectLoop(plane.frame, lengthMm, widthMm), {
+      lengthMm: lengthMm,
+      widthMm: widthMm
+    });
+    closeSketchSheet();
+    const note = 'Rectangle ' + lengthMm + ' × ' + widthMm + ' mm';
+    setHint(note);
+    toast(note);
+    return note;
+  }
+
+  function commitSketchCircle() {
+    const plane = state.sketchPlane;
+    if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makeCircleFace !== 'function') {
+      setHint('Tap a planar face');
+      return 'Tap a planar face';
+    }
+    const diameterMm = readField('sketchD');
+    if (!(diameterMm > 0)) {
+      const why = 'Diameter must be millimetres above 0.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const center = plane.frame.point(plane.frame.uSpan / 2, plane.frame.vSpan / 2);
+    const shape = opsApi.makeCircleFace(oc, center, plane.frame.outward, diameterMm);
+    if (!shape) {
+      const why = 'FAIL: the circle was rejected.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    storeSketchProfile('circle', shape, circleLoop(center, plane.frame.outward, diameterMm), {
+      diameterMm: diameterMm
+    });
+    closeSketchSheet();
+    const note = 'Circle Ø' + diameterMm + ' mm';
+    setHint(note);
+    toast(note);
+    return note;
+  }
+
+  function commitSketchExtrude() {
+    const profile = state.sketchProfile;
+    const plane = state.sketchPlane;
+    if (!profile || !profile.closed || !profile.shape || !plane || !plane.frame) {
+      const why = 'Finish a closed profile first.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    if (!oc || !opsApi || !primApi || typeof opsApi.makePrismSolid !== 'function') {
+      const why = 'FAIL: extrude ops are not loaded. The profile was kept.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const depth = readField('sketchDepth');
+    if (!(depth > 0)) {
+      const why = 'Blind distance must be millimetres above 0. The profile was kept.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const n = plane.frame.outward;
+    const shape = opsApi.makePrismSolid(oc, profile.shape, n[0] * depth, n[1] * depth, n[2] * depth);
+    if (!shape) {
+      const why = 'FAIL: extrude was rejected. The profile was kept.';
+      state.lastError = why;
+      setHint(why);
+      toast(why);
+      publishGateState();
+      return why;
+    }
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, shape);
+    } catch (err) {
+      dropShape(shape);
+      const why = 'FAIL: extrude gate threw ' + (err && err.message ? err.message : String(err)) + ' The profile was kept.';
+      state.lastError = why;
+      setHint(why);
+      toast(why);
+      publishGateState();
+      return why;
+    }
+    if (!view || !view.gate || view.gate.pass !== true || view.units !== 'mm' || !view.mesh) {
+      dropShape(shape);
+      const why = (view && view.gate && view.gate.message) || 'FAIL: OCCT validity or millimetre units rejected the extrude. The profile was kept.';
+      state.lastError = why;
+      setHint(why);
+      toast(why);
+      publishGateState();
+      return why;
+    }
+    if (state.bodies.length === 1 && state.bodies[0].name.indexOf(' ') < 0) {
+      state.bodies[0].name = state.bodies[0].name + ' 1';
+    }
+    state.bodySeq += 1;
+    const body = {
+      id: 'b' + state.bodySeq,
+      name: 'Extrude ' + (state.bodies.length + 1),
+      kind: 'extrude',
+      params: {
+        depthMm: depth,
+        profile: profile.kind,
+        lengthMm: profile.lengthMm,
+        widthMm: profile.widthMm,
+        diameterMm: profile.diameterMm,
+        units: 'mm'
+      },
+      shape: shape,
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight,
+      features: [],
+      material: 'PLA',
+      shapeLocal: false,
+      placement: { x: 0, y: 0, z: 0 }
+    };
+    state.bodies.push(body);
+    state.selection = 'item';
+    state.selectedIds = [body.id];
+    state.hoverId = null;
+    state.primitive = null;
+    state.lastError = '';
+    state.booleanOp = '';
+    state.sceneCleared = false;
+    state.projectBlank = false;
+    const synced = installBodiesAndSync('extrude');
+    clearSketchGeometry();
+    closeSketchSheet();
+    paintPrimFields();
+    const note = synced
+      ? 'Extrude ' + depth + ' mm. New body. OCCT valid, mm.'
+      : (state.lastError || 'FAIL: the new body did not pass the gate.');
+    setHint(note);
+    toast(note);
+    publishGateState();
+    return note;
+  }
+
   function setTab(tab, opts) {
     opts = opts || {};
     state.tab = tab;
@@ -9266,6 +9740,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       panels[i].hidden = panels[i].getAttribute('data-panel') !== tab;
     }
     document.getElementById('finishBar').hidden = tab !== 'sketch';
+    if (tab !== 'sketch') closeSketchSheet();
+    paintSketchStatus();
     if (tab !== 'export' && exportMenu) exportMenu.hidden = true;
     if (!opts.keepTool) state.activeTool = '';
     updateInspector();
@@ -10172,15 +10648,44 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const swatches = document.querySelectorAll('.swatch');
       for (let i = 0; i < swatches.length; i++) swatches[i].classList.toggle('is-on', swatches[i] === btn);
     } else if (action === 'newSketch') {
+      clearSketchGeometry();
+      closeSketchSheet();
       setTab('sketch');
       selectNode('sketch');
       message = 'New Sketch';
-      setHint('Sketch mode');
+      setHint('Tap a planar face');
     } else if (action === 'finishSketch') {
+      closeSketchSheet();
       setTab('model');
       selectNode('body');
-      message = 'Finish Sketch';
-      setHint('Model');
+      message = state.sketchProfile && state.sketchProfile.closed
+        ? 'Finish Sketch. Closed profile kept.'
+        : 'Finish Sketch';
+      setHint(message);
+    } else if (action === 'sketchRect') {
+      setTab('sketch');
+      state.activeTool = 'Rectangle';
+      openSketchSheet('rect');
+      message = state.sketchPlane ? 'Rectangle' : 'Tap a planar face';
+      setHint(message);
+      updateInspector();
+    } else if (action === 'sketchCircle') {
+      setTab('sketch');
+      state.activeTool = 'Circle';
+      openSketchSheet('circle');
+      message = state.sketchPlane ? 'Circle' : 'Tap a planar face';
+      setHint(message);
+      updateInspector();
+    } else if (action === 'sketchExtrude') {
+      state.activeTool = 'Extrude (Push/Pull)';
+      openSketchSheet('extrude');
+      message = state.sketchProfile && state.sketchProfile.closed ? 'Extrude' : 'Finish a closed profile first';
+      setHint(message);
+      updateInspector();
+    } else if (action === 'confirmSketch') {
+      if (state.sketchSheetMode === 'circle') message = commitSketchCircle();
+      else if (state.sketchSheetMode === 'extrude') message = commitSketchExtrude();
+      else message = commitSketchRect();
     } else if (action === 'checkShape') {
       message = Module.checkShape();
       applyReport(Module.gate());
@@ -11339,6 +11844,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           pinch = null;
           return;
         }
+        if (state.tab === 'sketch' && !(ev.shiftKey || ev.ctrlKey || ev.metaKey)) {
+          const faceId = pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
+          if (faceId) {
+            setSketchPlane(faceId);
+            gesture = null;
+            pinch = null;
+            return;
+          }
+        }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
         if (state.measure) noteMeasureTap(ev.clientX, ev.clientY, ev.pointerType);
         const modified = !!(ev.shiftKey || ev.ctrlKey || ev.metaKey);
@@ -11397,7 +11911,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const btn = ev.target.closest('[data-tool]');
     if (!btn) {
-      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu, .pick-chooser')) {
+      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
         const searchWasOpen = !searchDlg.hidden;
         closePopups();
         if (searchWasOpen && searchBtn) searchBtn.focus();
@@ -11712,6 +12226,23 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     });
   }
   publishProjectHook();
+
+  window.__cadcamSketch = {
+    topFace: function () { return topSketchFaceId(); },
+    tapFace: function (id) { return setSketchPlane(id || topSketchFaceId()); },
+    state: function () {
+      return {
+        tab: state.tab,
+        plane: !!state.sketchPlane,
+        faceId: state.sketchPlane ? state.sketchPlane.faceId : '',
+        selectedIds: state.selectedIds.slice(),
+        highlight: selectionHighlighted(),
+        profile: state.sketchProfile ? state.sketchProfile.kind : '',
+        closed: !!(state.sketchProfile && state.sketchProfile.closed),
+        bodies: state.bodies.length
+      };
+    }
+  };
 
   onViewportChange();
   syncFromKernel();
