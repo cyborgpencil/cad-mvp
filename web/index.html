@@ -635,6 +635,60 @@
     line-height: 1.3;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
   }
+  .callout-layer {
+    position: absolute;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(280px, calc(100% - 16px));
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+  .callout-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .callout-tag {
+    width: 28px;
+    flex: none;
+    text-align: center;
+    color: var(--measure);
+    font-size: 15px;
+    font-weight: 750;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  }
+  .callout-hit, .callout-value, .callout-entry input {
+    flex: none;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(18, 22, 30, 0.9);
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 700;
+    touch-action: manipulation;
+  }
+  .callout-hit {
+    width: 44px;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .callout-value {
+    min-width: 96px;
+    padding: 0 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .callout-entry { display: flex; }
+  .callout-entry input {
+    min-width: 120px;
+    padding: 0 10px;
+  }
   .backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 20; }
   .prop { padding: 0 12px 16px; }
   .prop h3 { margin: 10px 0 2px; font-size: 15px; }
@@ -1928,6 +1982,29 @@
       <div id="measureReadout" class="measure-readout" hidden>
         <div id="measureSpanLabel"></div>
         <div id="measureVolume"></div>
+      </div>
+      <div id="calloutLayer" class="callout-layer" hidden aria-label="Live callouts">
+        <div class="callout-row" id="calloutRow0" hidden>
+          <span class="callout-tag" id="calloutTag0">L</span>
+          <button type="button" class="callout-hit" id="calloutMinus0" data-action="dimStep" data-dim="boxSx" data-delta="-1" data-unit="mm" data-tool="Length minus" aria-label="Length minus">−</button>
+          <button type="button" class="callout-value" id="calloutValue0" data-action="calloutEdit" data-dim="boxSx" data-tool="Edit length" aria-label="Length">…</button>
+          <button type="button" class="callout-hit" id="calloutPlus0" data-action="dimStep" data-dim="boxSx" data-delta="1" data-unit="mm" data-tool="Length plus" aria-label="Length plus">+</button>
+        </div>
+        <div class="callout-row" id="calloutRow1" hidden>
+          <span class="callout-tag" id="calloutTag1">W</span>
+          <button type="button" class="callout-hit" id="calloutMinus1" data-action="dimStep" data-dim="boxSy" data-delta="-1" data-unit="mm" data-tool="Width minus" aria-label="Width minus">−</button>
+          <button type="button" class="callout-value" id="calloutValue1" data-action="calloutEdit" data-dim="boxSy" data-tool="Edit width" aria-label="Width">…</button>
+          <button type="button" class="callout-hit" id="calloutPlus1" data-action="dimStep" data-dim="boxSy" data-delta="1" data-unit="mm" data-tool="Width plus" aria-label="Width plus">+</button>
+        </div>
+        <div class="callout-row" id="calloutRow2" hidden>
+          <span class="callout-tag" id="calloutTag2">H</span>
+          <button type="button" class="callout-hit" id="calloutMinus2" data-action="dimStep" data-dim="boxSz" data-delta="-1" data-unit="mm" data-tool="Height minus" aria-label="Height minus">−</button>
+          <button type="button" class="callout-value" id="calloutValue2" data-action="calloutEdit" data-dim="boxSz" data-tool="Edit height" aria-label="Height">…</button>
+          <button type="button" class="callout-hit" id="calloutPlus2" data-action="dimStep" data-dim="boxSz" data-delta="1" data-unit="mm" data-tool="Height plus" aria-label="Height plus">+</button>
+        </div>
+        <form id="calloutEntryForm" class="callout-entry" hidden>
+          <input id="calloutEntry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Callout value">
+        </form>
       </div>
       <div class="hud">
         <div><b id="hudName">Body1</b></div>
@@ -3362,6 +3439,306 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return !!(prim && (prim.kind === 'box' || prim.kind === 'cylinder' || prim.kind === 'disc'));
   }
 
+  let calloutDimId = '';
+  let calloutCommitLock = false;
+
+  function calloutSpecs() {
+    const prim = sheetPrimitive();
+    if (!prim || !prim.params) return [];
+    if (prim.kind === 'box') {
+      return [
+        { tag: 'L', dim: 'boxSx', label: 'Length', mm: Number(prim.params.sx) },
+        { tag: 'W', dim: 'boxSy', label: 'Width', mm: Number(prim.params.sy) },
+        { tag: 'H', dim: 'boxSz', label: 'Height', mm: Number(prim.params.sz) }
+      ];
+    }
+    if (prim.kind === 'cylinder') {
+      return [
+        { tag: 'Ø', dim: 'cylD', label: 'Diameter', mm: Number(prim.params.radius) * 2 },
+        { tag: 'H', dim: 'cylH', label: 'Height', mm: Number(prim.params.height) }
+      ];
+    }
+    if (prim.kind === 'disc') {
+      return [
+        { tag: 'Ø', dim: 'discD', label: 'Diameter', mm: Number(prim.params.diameter) },
+        { tag: 'T', dim: 'discT', label: 'Thickness', mm: Number(prim.params.thickness) }
+      ];
+    }
+    return [];
+  }
+
+  function clientBox(el) {
+    if (!el || el.hidden) return null;
+    if (el.closest && el.closest('[hidden]')) return null;
+    const st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    return r;
+  }
+
+  function hideCalloutEntry() {
+    calloutDimId = '';
+    const form = document.getElementById('calloutEntryForm');
+    if (form) form.hidden = true;
+  }
+
+  function commitCalloutEntry() {
+    if (calloutCommitLock) return;
+    const dimId = calloutDimId;
+    const entry = document.getElementById('calloutEntry');
+    const form = document.getElementById('calloutEntryForm');
+    if (!dimId || !entry || !form || form.hidden) return;
+    const typed = entry.value;
+    calloutCommitLock = true;
+    hideCalloutEntry();
+    try {
+      const field = document.getElementById(dimId);
+      if (!field || field.disabled || !editingBasicShape()) return;
+      field.value = typed;
+      delete field.dataset.preferStored;
+      onPrimitiveCommit();
+    } finally {
+      calloutCommitLock = false;
+    }
+  }
+
+  function openCalloutEntry(dimId) {
+    if (!editingBasicShape() || !dimId) return;
+    const field = document.getElementById(dimId);
+    const form = document.getElementById('calloutEntryForm');
+    const entry = document.getElementById('calloutEntry');
+    if (!field || field.disabled || !form || !entry) return;
+    const stored = Number(field.getAttribute('data-mm'));
+    calloutDimId = dimId;
+    entry.value = Number.isFinite(stored) ? formatEntry(stored) : '';
+    entry.setAttribute('aria-label', (field.getAttribute('aria-label') || 'Dimension') + ' callout');
+    form.hidden = false;
+    placeCallouts();
+    entry.focus();
+    if (entry.select) entry.select();
+  }
+
+  // Keep the stack off Home, Export, units, the dim sheet, and the phone cube
+  // hit pad (CUBE_HIT_PX past the visible cube). Same gate as editingBasicShape.
+  function placeCallouts() {
+    const layer = document.getElementById('calloutLayer');
+    if (!layer || layer.hidden) return;
+    const vp = viewport.getBoundingClientRect();
+    const gap = 8;
+    layer.style.right = 'auto';
+    layer.style.bottom = 'auto';
+    if (!layer.style.left) layer.style.left = gap + 'px';
+    if (!layer.style.top) layer.style.top = gap + 'px';
+    const w = layer.offsetWidth;
+    const h = layer.offsetHeight;
+    if (!(w > 0) || !(h > 0) || !(vp.width > 0) || !(vp.height > 0)) return;
+    const phonePad = isPhoneCube() ? { left: CUBE_HIT_PX, bottom: CUBE_HIT_PX } : null;
+
+    function local(el, grow) {
+      const r = clientBox(el);
+      if (!r) return null;
+      const box = { x: r.left - vp.left, y: r.top - vp.top, w: r.width, h: r.height };
+      if (grow) {
+        box.x -= grow.left || 0;
+        box.y -= grow.top || 0;
+        box.w += (grow.left || 0) + (grow.right || 0);
+        box.h += (grow.top || 0) + (grow.bottom || 0);
+      }
+      return box;
+    }
+
+    const pad = 6;
+    const obstacles = [];
+    function add(el, grow) {
+      const box = local(el, grow);
+      if (!box) return;
+      obstacles.push({
+        x: box.x - pad,
+        y: box.y - pad,
+        w: box.w + pad * 2,
+        h: box.h + pad * 2
+      });
+    }
+    add(document.getElementById('vcHome'));
+    add(document.getElementById('exportBtn'));
+    add(document.getElementById('statusUnits'));
+    add(document.getElementById('dimPanel'));
+    add(document.getElementById('measureReadout'));
+    add(document.getElementById('viewCube'), phonePad);
+    add(viewport.querySelector('.vp-bar'));
+    add(viewport.querySelector('.hud'));
+    add(document.getElementById('edgeSheet'));
+
+    function clearAt(x, y) {
+      if (x < gap || y < gap) return false;
+      if (x + w > vp.width - gap || y + h > vp.height - gap) return false;
+      for (let i = 0; i < obstacles.length; i += 1) {
+        const o = obstacles[i];
+        if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return false;
+      }
+      return true;
+    }
+
+    const hud = local(viewport.querySelector('.hud'));
+    const home = local(document.getElementById('vcHome'));
+    const panel = local(document.getElementById('dimPanel'));
+    const cube = local(document.getElementById('viewCube'), phonePad);
+    const bar = local(viewport.querySelector('.vp-bar'));
+    let belowTop = gap;
+    if (hud) belowTop = Math.max(belowTop, hud.y + hud.h + gap);
+    if (home) belowTop = Math.max(belowTop, home.y + home.h + gap);
+    const candidates = [{ x: gap, y: belowTop }];
+    if (cube) candidates.push({ x: gap, y: cube.y + cube.h + gap });
+    if (panel) {
+      candidates.push({ x: gap, y: panel.y + panel.h + gap });
+      candidates.push({ x: panel.x + panel.w + gap, y: belowTop });
+    }
+    if (bar) candidates.push({ x: gap, y: bar.y - h - gap });
+    let placed = null;
+    for (let i = 0; i < candidates.length; i += 1) {
+      if (clearAt(candidates[i].x, candidates[i].y)) {
+        placed = candidates[i];
+        break;
+      }
+    }
+    if (!placed) {
+      const step = 12;
+      for (let y = gap; y + h <= vp.height - gap && !placed; y += step) {
+        for (let x = gap; x + w <= vp.width - gap; x += step) {
+          if (clearAt(x, y)) {
+            placed = { x: x, y: y };
+            break;
+          }
+        }
+      }
+    }
+    if (!placed) placed = { x: gap, y: belowTop };
+    layer.style.left = Math.round(placed.x) + 'px';
+    layer.style.top = Math.round(placed.y) + 'px';
+  }
+
+  function paintCallouts() {
+    const layer = document.getElementById('calloutLayer');
+    if (!layer) return;
+    const specs = editingBasicShape() ? calloutSpecs() : [];
+    let shown = 0;
+    for (let i = 0; i < 3; i += 1) {
+      const spec = specs[i];
+      const row = document.getElementById('calloutRow' + i);
+      if (!row) continue;
+      if (!spec || !Number.isFinite(spec.mm)) {
+        row.hidden = true;
+        continue;
+      }
+      row.hidden = false;
+      shown += 1;
+      const tag = document.getElementById('calloutTag' + i);
+      if (tag) tag.textContent = spec.tag;
+      const text = formatLength(spec.mm);
+      const value = document.getElementById('calloutValue' + i);
+      const minus = document.getElementById('calloutMinus' + i);
+      const plus = document.getElementById('calloutPlus' + i);
+      const buttons = [minus, value, plus];
+      for (let b = 0; b < buttons.length; b += 1) {
+        if (buttons[b]) buttons[b].setAttribute('data-dim', spec.dim);
+      }
+      if (minus) {
+        minus.setAttribute('aria-label', spec.label + ' minus');
+        minus.setAttribute('data-tool', spec.label + ' minus');
+      }
+      if (plus) {
+        plus.setAttribute('aria-label', spec.label + ' plus');
+        plus.setAttribute('data-tool', spec.label + ' plus');
+      }
+      if (value) {
+        value.textContent = text;
+        value.setAttribute('aria-label', spec.label + ' ' + text);
+        value.setAttribute('data-tool', 'Edit ' + spec.label);
+      }
+    }
+    if (calloutDimId) {
+      let still = false;
+      for (let i = 0; i < specs.length; i += 1) {
+        if (specs[i] && specs[i].dim === calloutDimId && Number.isFinite(specs[i].mm)) still = true;
+      }
+      if (!still) hideCalloutEntry();
+    }
+    layer.hidden = shown < 1;
+    if (layer.hidden) {
+      hideCalloutEntry();
+      return;
+    }
+    placeCallouts();
+  }
+
+  function calloutProbe() {
+    const layer = document.getElementById('calloutLayer');
+    const prim = sheetPrimitive();
+    const hidden = !layer || layer.hidden === true;
+    const rows = [];
+    if (!hidden && layer) {
+      for (let i = 0; i < 3; i += 1) {
+        const row = document.getElementById('calloutRow' + i);
+        if (!row || row.hidden) continue;
+        const value = document.getElementById('calloutValue' + i);
+        const minus = document.getElementById('calloutMinus' + i);
+        const plus = document.getElementById('calloutPlus' + i);
+        const tag = document.getElementById('calloutTag' + i);
+        const dim = value ? (value.getAttribute('data-dim') || '') : '';
+        const field = dim ? document.getElementById(dim) : null;
+        const mm = field ? Number(field.getAttribute('data-mm')) : NaN;
+        const valueRect = value ? value.getBoundingClientRect() : null;
+        const minusRect = minus ? minus.getBoundingClientRect() : null;
+        const plusRect = plus ? plus.getBoundingClientRect() : null;
+        rows.push({
+          tag: tag ? String(tag.textContent || '').trim() : '',
+          dim: dim,
+          text: value ? String(value.textContent || '').trim() : '',
+          formatted: Number.isFinite(mm) ? formatLength(mm) : '',
+          mm: Number.isFinite(mm) ? mm : null,
+          valueW: valueRect ? valueRect.width : 0,
+          valueH: valueRect ? valueRect.height : 0,
+          minusW: minusRect ? minusRect.width : 0,
+          minusH: minusRect ? minusRect.height : 0,
+          plusW: plusRect ? plusRect.width : 0,
+          plusH: plusRect ? plusRect.height : 0,
+          fontPx: value ? parseFloat(getComputedStyle(value).fontSize) || 0 : 0
+        });
+      }
+    }
+    const vp = viewport.getBoundingClientRect();
+    const lr = hidden ? null : clientBox(layer);
+    function covers(id) {
+      const other = clientBox(document.getElementById(id));
+      if (!lr || !other) return false;
+      return lr.left < other.right - 0.5 && lr.right > other.left + 0.5
+        && lr.top < other.bottom - 0.5 && lr.bottom > other.top + 0.5;
+    }
+    const inside = !lr || (
+      lr.left >= vp.left - 1 && lr.top >= vp.top - 1
+      && lr.right <= vp.right + 1 && lr.bottom <= vp.bottom + 1
+      && lr.left >= -1 && lr.top >= -1
+      && lr.right <= window.innerWidth + 1 && lr.bottom <= window.innerHeight + 1
+    );
+    return {
+      editing: editingBasicShape(),
+      hidden: hidden,
+      kind: prim && prim.kind ? prim.kind : '',
+      rows: rows,
+      coversHome: covers('vcHome'),
+      coversExport: covers('exportBtn'),
+      coversUnits: covers('statusUnits'),
+      inside: inside
+    };
+  }
+
+  function publishCalloutHook() {
+    window.__cadcamCallouts = {
+      probe: function () { return calloutProbe(); }
+    };
+  }
+
   function paintHudSize() {
     const hud = document.getElementById('hudSize');
     const sep = document.getElementById('hudSizeSep');
@@ -3379,6 +3756,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', show ? 'true' : 'false');
     }
+    paintCallouts();
   }
 
   function paintPropSheet() {
@@ -3850,7 +4228,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     function blocked(client) {
       const el = document.elementFromPoint(client.x, client.y);
       if (!el) return true;
-      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
       if (el !== canvas && el !== viewport) return true;
       if (handles.visible && pickHandle(client.x, client.y)) return true;
       return false;
@@ -7217,6 +7595,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     layoutDimSheet();
     placeCreateMenu();
     syncClosedPanels();
+    placeCallouts();
   }
 
   function placeViewCube() {
@@ -9676,6 +10055,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const label = state.edgeArm === 'chamfer' ? 'Chamfer' : 'Fillet';
       runUndoable(label, function () { return confirmPickedEdge() === true; });
       return;
+    } else if (action === 'calloutEdit') {
+      openCalloutEntry(btn.getAttribute('data-dim') || '');
+      return;
     } else if (action === 'dimStep') {
       if (state.dimStepFromPointer) {
         state.dimStepFromPointer = false;
@@ -10724,7 +11106,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   // Three-finger undo/redo (web/three-finger.mjs). One finger still orbits.
   // Two fingers still pinch. A third finger cancels that pinch without a camera step.
   viewport.addEventListener('pointerdown', function (ev) {
-    if (ev.target.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar')) return;
+    if (ev.target.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar')) return;
     if (typeof viewport.focus === 'function') {
       try { viewport.focus({ preventScroll: true }); } catch (_err) { viewport.focus(); }
     }
@@ -11161,6 +11543,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') {
+      const calloutEntry = document.getElementById('calloutEntry');
+      if (calloutEntry && document.activeElement === calloutEntry) {
+        ev.preventDefault();
+        hideCalloutEntry();
+        calloutEntry.blur();
+        return;
+      }
       const searchWasOpen = !searchDlg.hidden;
       setModifyOpen(false, true);
       state.dimSheetOpen = false;
@@ -11430,6 +11819,23 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
   window.__cadcamNavCube = navCubeState;
   publishMeasureHook();
+  publishCalloutHook();
+  const calloutForm = document.getElementById('calloutEntryForm');
+  const calloutEntry = document.getElementById('calloutEntry');
+  if (calloutForm && calloutEntry) {
+    calloutForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      commitCalloutEntry();
+    });
+    calloutEntry.addEventListener('blur', function () {
+      commitCalloutEntry();
+    });
+    calloutEntry.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      commitCalloutEntry();
+    });
+  }
   renderFrame();
 
   function frame() {

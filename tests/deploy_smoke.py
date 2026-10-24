@@ -22,14 +22,19 @@ Asserts window.__cadcamExportState.occtReady for:
                         unless the viewport is focused, and inputs ignore hotkeys
   portrait 390x844      Create menu (Box, Cylinder, Disc, Hole, Sketch; no primitive
                         buttons left outside it), then box, cylinder, and disc;
+                        live callouts while that shape is the active edit (box L×W×H,
+                        cylinder Ø×H, disc Ø×T) match formatLength of the sheet fields,
+                        update after the sheet edit, hide when the body is deleted,
+                        and keep 44px hit targets off Home, Export, and units;
                         uncovered viewport >= 70% with the dimension panel collapsed
                         and >= 50% with it open; the panel stays shut until a tap;
                         build stamp is visible and matches the script ?v= param;
                         bottom sheet does not cover Home; move, rotate, and resize
-                        a box with taps and typed values; no page-level horizontal
-                        scroll; visible buttons and the status line stay inside the
-                        width; the sheet and toolbar do not scroll sideways unless
-                        marked data-hscroll; Part 1 is fully visible, min-width 96px
+                        a box with taps and typed values; a callout plus writes boxSx;
+                        no page-level horizontal scroll; visible buttons and the status
+                        line stay inside the width; the sheet and toolbar do not scroll
+                        sideways unless marked data-hscroll; Part 1 is fully visible,
+                        min-width 96px
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
   measure tool          default 20 mm cube: one edge polyline ~20 mm, volume ~8000 mm³,
@@ -2571,6 +2576,115 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+CALLOUT_PROBE_EXPR = (
+    "(function(){"
+    "var hook=window.__cadcamCallouts;"
+    "if(!hook||typeof hook.probe!=='function') return 'missing';"
+    "return JSON.stringify(hook.probe());"
+    "})()"
+)
+
+CALLOUT_FIELDS = {
+    "box": (("L", "boxSx"), ("W", "boxSy"), ("H", "boxSz")),
+    "cylinder": (("Ø", "cylD"), ("H", "cylH")),
+    "disc": (("Ø", "discD"), ("T", "discT")),
+}
+
+
+def _callout_probe(cdp: Cdp) -> tuple[dict[str, Any] | None, list[str]]:
+    raw, err = eval_expr(cdp, CALLOUT_PROBE_EXPR)
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return None, [f"callout probe {raw or err}"]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, [f"callout probe {raw}"]
+    if not isinstance(data, dict):
+        return None, [f"callout probe {raw}"]
+    return data, []
+
+
+def callout_problems(
+    cdp: Cdp,
+    kind: str,
+    expect_mm: dict[str, float] | None = None,
+) -> list[str]:
+    """Visible L×W×H or Ø×H/Ø×T callouts match the sheet fields."""
+    data, problems = _callout_probe(cdp)
+    if problems or not isinstance(data, dict):
+        return problems
+    if data.get("hidden") is not False:
+        problems.append(f"callouts hidden during {kind} edit")
+    if data.get("editing") is not True:
+        problems.append(f"callouts editing flag {data.get('editing')!r}")
+    if data.get("kind") != kind:
+        problems.append(f"callouts kind {data.get('kind')!r}")
+    if data.get("inside") is not True:
+        problems.append("callouts outside the viewport")
+    for name, key in (("Home", "coversHome"), ("Export", "coversExport"), ("units", "coversUnits")):
+        if data.get(key) is True:
+            problems.append(f"callouts cover {name}")
+    rows = data.get("rows")
+    expect = CALLOUT_FIELDS.get(kind)
+    if not isinstance(rows, list) or expect is None:
+        problems.append(f"callout rows {rows!r}")
+        return problems
+    if len(rows) != len(expect):
+        problems.append(f"callout rows {len(rows)} != {len(expect)}")
+    for index, (tag, dim) in enumerate(expect):
+        if index >= len(rows) or not isinstance(rows[index], dict):
+            break
+        row = rows[index]
+        if row.get("tag") != tag:
+            problems.append(f"callout tag {row.get('tag')!r} != {tag}")
+        if row.get("dim") != dim:
+            problems.append(f"callout dim {row.get('dim')!r} != {dim}")
+        text = str(row.get("text") or "")
+        formatted = str(row.get("formatted") or "")
+        if not text or text != formatted:
+            problems.append(f"callout {dim} text {text!r} formatted {formatted!r}")
+        if not text.endswith(" mm"):
+            problems.append(f"callout {dim} units {text!r}")
+        if expect_mm and dim in expect_mm:
+            try:
+                mm = float(row.get("mm"))
+            except (TypeError, ValueError):
+                mm = float("nan")
+            if abs(mm - float(expect_mm[dim])) > 0.02:
+                problems.append(f"callout {dim} mm {row.get('mm')!r}")
+        try:
+            font_px = float(row.get("fontPx") or 0)
+        except (TypeError, ValueError):
+            font_px = 0.0
+        if font_px + 0.5 < 13:
+            problems.append(f"callout {dim} font {font_px}")
+        for part in ("value", "minus", "plus"):
+            try:
+                width = float(row.get(part + "W") or 0)
+                height = float(row.get(part + "H") or 0)
+            except (TypeError, ValueError):
+                width = 0.0
+                height = 0.0
+            if width + 0.5 < 44 or height + 0.5 < 44:
+                problems.append(f"callout {dim} {part} {width:.1f}x{height:.1f}")
+    return problems
+
+
+def callout_hidden_problems(cdp: Cdp) -> list[str]:
+    """Callouts leave when the basic-shape edit ends."""
+    data, problems = _callout_probe(cdp)
+    if problems or not isinstance(data, dict):
+        return problems
+    if data.get("hidden") is not True:
+        problems.append(f"callouts still visible {data.get('hidden')!r}")
+    if data.get("editing") is not False:
+        problems.append(f"editing flag {data.get('editing')!r}")
+    rows = data.get("rows")
+    if isinstance(rows, list) and rows:
+        problems.append(f"callout rows left {len(rows)}")
+    return problems
+
+
 def run_portrait(cdp: Cdp, origin: str) -> list[str]:
     """390x844 touch emulation. Tap primitives, bottom sheet, move/rotate/resize a box."""
     try:
@@ -2627,6 +2741,11 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
                     problems.append(f"portrait {kind} clear")
                     problems.extend(cleared[:12])
                     return problems
+                hidden = callout_hidden_problems(cdp)
+                if hidden:
+                    problems.append(f"portrait {kind} callouts hidden")
+                    problems.extend(hidden)
+                    return problems
             raw, err = eval_expr(cdp, toolbar_point_expr(kind))
             if err or not isinstance(raw, str) or not raw.startswith("{"):
                 problems.append(f"portrait {kind} toolbar {raw or err}")
@@ -2657,6 +2776,16 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if fit_problems:
             problems.append(f"portrait {kind} overflow")
             problems.extend(fit_problems)
+            return problems
+        fresh_mm = {
+            "box": {"boxSx": 20.0, "boxSy": 20.0, "boxSz": 20.0},
+            "cylinder": {"cylD": 20.0, "cylH": 20.0},
+            "disc": {"discD": 18.0, "discT": 4.0},
+        }[kind]
+        shown = callout_problems(cdp, kind, fresh_mm)
+        if shown:
+            problems.append(f"portrait {kind} callouts")
+            problems.extend(shown)
             return problems
         if kind == "box":
             home_found = home_aim_round(cdp, "portrait")
@@ -2722,6 +2851,16 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if edit_problems or not isinstance(done, dict):
             problems.append(f"portrait {kind} edited")
             problems.extend(edit_problems[:20])
+            return problems
+        live_mm = {
+            "box": {"boxSx": 30.0},
+            "cylinder": {"cylH": 24.0},
+            "disc": {"discD": 22.0},
+        }[kind]
+        live = callout_problems(cdp, kind, live_mm)
+        if live:
+            problems.append(f"portrait {kind} callouts live")
+            problems.extend(live)
             return problems
         print(
             f"portrait_{kind}: gate PASS, {spec['field']} {spec['fresh']} -> {spec['want']}, "
@@ -2803,8 +2942,31 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if stepped.get("snap") is not True:
             problems.append(f"portrait box snap {stepped.get('snap')!r}")
             return problems
+        callout_step = tap_selector(
+            cdp,
+            '#calloutLayer button[data-dim="boxSx"][data-delta="1"]',
+            "callout length plus",
+        )
+        if callout_step:
+            problems.extend(callout_step)
+            return problems
+        callout_done, callout_wait = wait_portrait(
+            cdp, origin, "box", {"cx": 6.0, "rz": 15.0, "sy": 22.0, "sx": 31.0}, PAGE_TIMEOUT_S
+        )
+        if callout_wait or not isinstance(callout_done, dict):
+            problems.append("portrait callout step")
+            problems.extend(callout_wait[:20])
+            return problems
+        stepped_callouts = callout_problems(
+            cdp, "box", {"boxSx": 31.0, "boxSy": 22.0, "boxSz": 30.0}
+        )
+        if stepped_callouts:
+            problems.append("portrait callout step text")
+            problems.extend(stepped_callouts)
+            return problems
         print(
-            "portrait_box transforms: move cx 5 stepper 6, rotate z 15, resize sy 22, snap on, gate PASS",
+            "portrait_box transforms: move cx 5 stepper 6, rotate z 15, resize sy 22, "
+            "callout sx 31, snap on, gate PASS",
             flush=True,
         )
     return problems
