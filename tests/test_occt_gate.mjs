@@ -47,7 +47,7 @@ let blinkMod = null;
 if (existsSync(blinkPath)) {
   try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
 }
-const { applyPointerSelection, groupMeshFaces, modeFromHotkey, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
+const { applyPointerSelection, groupMeshFaces, modeFromHotkey, isTypingTarget, isViewportHotkeyTarget, selectionHotkeyAllowed, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
 const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles, viewerBuffersFromCad, viewerVertexNormals } = await import(viewUrl);
 const blinkJsonPath = path.join(root, 'tests', 'fixtures', 'blink.json');
 let blinkFile = null;
@@ -286,6 +286,53 @@ expect('hotkey 2', modeFromHotkey('2') === 'edge');
 expect('hotkey 3', modeFromHotkey('3') === 'face');
 expect('hotkey 4 item', modeFromHotkey('4') === 'item');
 expect('hotkey 5', modeFromHotkey('5') === 'item');
+
+function fakeEl(tag, extra) {
+  const el = Object.assign({
+    tagName: tag,
+    nodeType: 1,
+    id: '',
+    isContentEditable: false,
+    parentElement: null,
+    getAttribute: function (name) {
+      if (name === 'contenteditable') {
+        if (extra && Object.prototype.hasOwnProperty.call(extra, 'contentEditableAttr')) {
+          return extra.contentEditableAttr;
+        }
+        return null;
+      }
+      return null;
+    }
+  }, extra || {});
+  return el;
+}
+const bodyEl = fakeEl('BODY');
+const inputEl = fakeEl('INPUT');
+const textareaEl = fakeEl('TEXTAREA');
+const selectEl = fakeEl('SELECT');
+const editEl = fakeEl('DIV', { isContentEditable: true, contentEditableAttr: 'true' });
+const editChild = fakeEl('SPAN');
+editChild.parentElement = editEl;
+const canvasEl = fakeEl('CANVAS', { id: 'canvas' });
+const viewportEl = fakeEl('MAIN', { id: 'viewport' });
+expect('typing input', isTypingTarget(inputEl) === true);
+expect('typing textarea', isTypingTarget(textareaEl) === true);
+expect('typing select', isTypingTarget(selectEl) === true);
+expect('typing contenteditable', isTypingTarget(editEl) === true);
+expect('typing contenteditable child', isTypingTarget(editChild) === true);
+expect('body is not typing', isTypingTarget(bodyEl) === false);
+expect('viewport is not typing', isTypingTarget(viewportEl) === false);
+expect('canvas hotkey target', isViewportHotkeyTarget(canvasEl) === true);
+expect('viewport hotkey target', isViewportHotkeyTarget(viewportEl) === true);
+expect('body is not viewport hotkey', isViewportHotkeyTarget(bodyEl) === false);
+expect('input blocks digit hotkey', selectionHotkeyAllowed('1', inputEl, inputEl) === false);
+expect('textarea blocks digit hotkey', selectionHotkeyAllowed('4', textareaEl, textareaEl) === false);
+expect('select blocks digit hotkey', selectionHotkeyAllowed('2', selectEl, selectEl) === false);
+expect('contenteditable blocks digit hotkey', selectionHotkeyAllowed('3', editEl, editChild) === false);
+expect('unfocused digit does not change selection', selectionHotkeyAllowed('1', bodyEl, bodyEl) === false);
+expect('unfocused 4 does not change selection', selectionHotkeyAllowed('4', bodyEl, bodyEl) === false);
+expect('viewport digit 4 allowed', selectionHotkeyAllowed('4', viewportEl, canvasEl) === true);
+expect('canvas digit 1 allowed', selectionHotkeyAllowed('1', canvasEl, canvasEl) === true);
 expect('pick tolerance 8', PICK_TOLERANCE_PX === 8);
 expect('touch pick tolerance 20', TOUCH_PICK_TOLERANCE_PX === 20);
 

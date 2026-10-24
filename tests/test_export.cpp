@@ -2,14 +2,19 @@
 #include "export_files.hpp"
 #include "fixtures.hpp"
 #include "stl.hpp"
+#include "threemf.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -81,6 +86,63 @@ int main() {
     }
     expect("3mf unit", contains_unit(wrote.threemf_path));
 
+    MeshSolid exploded;
+    for (const auto& triangle : box.triangles) {
+        const std::uint32_t base = static_cast<std::uint32_t>(exploded.vertices.size());
+        exploded.vertices.push_back(box.vertices[triangle[0]]);
+        exploded.vertices.push_back(box.vertices[triangle[1]]);
+        exploded.vertices.push_back(box.vertices[triangle[2]]);
+        exploded.triangles.push_back({base, base + 1, base + 2});
+    }
+    if (!exploded.triangles.empty()) {
+        auto& first = exploded.triangles[0];
+        const auto saved = first[1];
+        first[1] = first[2];
+        first[2] = saved;
+    }
+    const MeshSolid welded = weld_mesh(exploded);
+    expect("weld drops duplicate vertices", welded.vertices.size() == 8);
+    {
+        std::map<std::array<long long, 3>, int> seen;
+        bool dup = false;
+        for (const Vec3& vertex : welded.vertices) {
+            const std::array<long long, 3> key = {
+                std::llround(vertex.x / 1e-6),
+                std::llround(vertex.y / 1e-6),
+                std::llround(vertex.z / 1e-6),
+            };
+            if (seen[key] > 0) {
+                dup = true;
+            }
+            seen[key] += 1;
+        }
+        expect("weld no coincident vertices", !dup && !welded.vertices.empty());
+    }
+    {
+        std::map<std::pair<std::uint32_t, std::uint32_t>, int> directed;
+        bool twice = false;
+        double sum = 0.0;
+        for (const auto& triangle : welded.triangles) {
+            for (int corner = 0; corner < 3; ++corner) {
+                const std::uint32_t from = triangle[static_cast<std::size_t>(corner)];
+                const std::uint32_t to = triangle[static_cast<std::size_t>((corner + 1) % 3)];
+                directed[{from, to}] += 1;
+                if (directed[{from, to}] > 1) {
+                    twice = true;
+                }
+            }
+            const Vec3& a = welded.vertices[triangle[0]];
+            const Vec3& b = welded.vertices[triangle[1]];
+            const Vec3& c = welded.vertices[triangle[2]];
+            const double cx = b.y * c.z - b.z * c.y;
+            const double cy = b.z * c.x - b.x * c.z;
+            const double cz = b.x * c.y - b.y * c.x;
+            sum += a.x * cx + a.y * cy + a.z * cz;
+        }
+        expect("weld no directed edge twice", !twice && !welded.triangles.empty());
+        expect("weld positive signed volume", sum > 0.0);
+    }
+
     // box_mm rejects a non-positive size and returns no triangles.
     const std::filesystem::path bad_dir = fresh_dir("bad-size");
     const ExportAttempt bad_size = export_mesh_if_closed(box_mm(0.0, 20.0, 20.0), bad_dir);
@@ -126,6 +188,18 @@ int main() {
     expect("inside-out does not write", !inward.wrote);
     expect("inside-out stl absent", !std::filesystem::is_regular_file(inward.stl_path));
     expect("inside-out 3mf absent", !std::filesystem::is_regular_file(inward.threemf_path));
+
+    MeshSolid bad_index = box_mm(20.0, 20.0, 20.0);
+    bad_index.triangles.push_back(
+        {0, 1, static_cast<std::uint32_t>(bad_index.vertices.size()) + 5});
+    const std::filesystem::path bad_index_dir = fresh_dir("bad-index");
+    std::error_code bad_index_dir_error;
+    std::filesystem::create_directories(bad_index_dir, bad_index_dir_error);
+    expect("bad vertex index dir",
+           !bad_index_dir_error && std::filesystem::is_directory(bad_index_dir));
+    const std::filesystem::path bad_index_path = bad_index_dir / "model.3mf";
+    expect("bad vertex index write_3mf fails", !write_3mf(bad_index_path, bad_index));
+    expect("bad vertex index 3mf absent", !std::filesystem::is_regular_file(bad_index_path));
 
     std::error_code error;
     std::filesystem::remove_all(std::filesystem::temp_directory_path() / "cadcam-mvp-export", error);

@@ -27,6 +27,8 @@ export const EXPORT_MESH_DEFLECTION_MM = 0.01;
 export const EXPORT_MESH_ANGLE_RAD = 0.2;
 export const VOLUME_TOL_MM3 = 0.01;
 export const BOUNDS_TOL_MM = 0.01;
+// Weld quantum for 3MF object vertices. Team choice for this export path.
+export const VERTEX_WELD_MM = 1e-6;
 
 export const ERR_NEED = 'Select two or more parts. The model was not changed.';
 export const ERR_MIXED = 'These parts use different materials. The model was not changed.';
@@ -223,6 +225,168 @@ function track(trash, obj) {
   return obj;
 }
 
+function weldKey(x, y, z, quantumMm) {
+  const q = quantumMm > 0 ? quantumMm : VERTEX_WELD_MM;
+  return Math.round(x / q) + ',' + Math.round(y / q) + ',' + Math.round(z / q);
+}
+
+function triangleArea2(a, b, c) {
+  const ux = b[0] - a[0];
+  const uy = b[1] - a[1];
+  const uz = b[2] - a[2];
+  const vx = c[0] - a[0];
+  const vy = c[1] - a[1];
+  const vz = c[2] - a[2];
+  const cx = uy * vz - uz * vy;
+  const cy = uz * vx - ux * vz;
+  const cz = ux * vy - uy * vx;
+  return cx * cx + cy * cy + cz * cz;
+}
+
+// Weld vertices that round to the same millimetre quantum, remap triangles,
+// and drop degenerates. Does not require a watertight mesh.
+export function weldMesh(vertices, triangles, quantumMm) {
+  const q = quantumMm > 0 ? quantumMm : VERTEX_WELD_MM;
+  const list = vertices || [];
+  const tris = triangles || [];
+  const map = new Map();
+  const outV = [];
+  const remap = new Array(list.length);
+  for (let i = 0; i < list.length; i += 1) {
+    const p = list[i];
+    const key = weldKey(p[0], p[1], p[2], q);
+    if (map.has(key)) {
+      remap[i] = map.get(key);
+    } else {
+      remap[i] = outV.length;
+      map.set(key, outV.length);
+      outV.push([p[0], p[1], p[2]]);
+    }
+  }
+  const outT = [];
+  for (let i = 0; i < tris.length; i += 1) {
+    const tri = tris[i];
+    const a = remap[tri[0]];
+    const b = remap[tri[1]];
+    const c = remap[tri[2]];
+    if (a === undefined || b === undefined || c === undefined) continue;
+    if (a === b || b === c || a === c) continue;
+    if (triangleArea2(outV[a], outV[b], outV[c]) <= 0) continue;
+    outT.push([a, b, c]);
+  }
+  return { vertices: outV, triangles: outT };
+}
+
+export function meshHasDuplicateVertices(vertices, quantumMm) {
+  const q = quantumMm > 0 ? quantumMm : VERTEX_WELD_MM;
+  const seen = new Set();
+  const list = vertices || [];
+  for (let i = 0; i < list.length; i += 1) {
+    const p = list[i];
+    const key = weldKey(p[0], p[1], p[2], q);
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
+export function meshSignedVolumeMm3(vertices, triangles) {
+  const list = vertices || [];
+  const tris = triangles || [];
+  let sum = 0;
+  for (let i = 0; i < tris.length; i += 1) {
+    const tri = tris[i];
+    const a = list[tri[0]];
+    const b = list[tri[1]];
+    const c = list[tri[2]];
+    if (!a || !b || !c) continue;
+    const cx = b[1] * c[2] - b[2] * c[1];
+    const cy = b[2] * c[0] - b[0] * c[2];
+    const cz = b[0] * c[1] - b[1] * c[0];
+    sum += a[0] * cx + a[1] * cy + a[2] * cz;
+  }
+  return sum / 6;
+}
+
+// True when no directed edge is used twice. Does not require every edge to
+// be used twice (that would be a watertight check).
+export function meshHasConsistentWinding(vertices, triangles) {
+  const tris = triangles || [];
+  const directed = new Map();
+  for (let i = 0; i < tris.length; i += 1) {
+    const tri = tris[i];
+    for (let k = 0; k < 3; k += 1) {
+      const from = tri[k];
+      const to = tri[(k + 1) % 3];
+      const key = from + '>' + to;
+      if (directed.has(key)) return false;
+      directed.set(key, 1);
+    }
+  }
+  return meshSignedVolumeMm3(vertices, triangles) > 0;
+}
+
+// Single-body export: if the solid is more than twice as tall as its thinner
+// horizontal AABB, rotate +90 deg about Y so a tall wall (L-bracket upright)
+// lies on the bed. Truck parts do not match. Spec: test-only heuristic, no
+// per-fixture millimetres.
+export const PRINT_BED_TALL_RATIO = 2;
+
+export function meshBounds(vertices) {
+  const list = vertices || [];
+  if (!list.length) return null;
+  let xmin = Infinity;
+  let ymin = Infinity;
+  let zmin = Infinity;
+  let xmax = -Infinity;
+  let ymax = -Infinity;
+  let zmax = -Infinity;
+  for (let i = 0; i < list.length; i += 1) {
+    const p = list[i];
+    if (p[0] < xmin) xmin = p[0];
+    if (p[1] < ymin) ymin = p[1];
+    if (p[2] < zmin) zmin = p[2];
+    if (p[0] > xmax) xmax = p[0];
+    if (p[1] > ymax) ymax = p[1];
+    if (p[2] > zmax) zmax = p[2];
+  }
+  return { xmin: xmin, ymin: ymin, zmin: zmin, xmax: xmax, ymax: ymax, zmax: zmax };
+}
+
+export function shouldLayTallPartOnBed(bounds) {
+  if (!bounds) return false;
+  const dx = bounds.xmax - bounds.xmin;
+  const dy = bounds.ymax - bounds.ymin;
+  const dz = bounds.zmax - bounds.zmin;
+  const thin = Math.min(dx, dy);
+  return thin > 0 && dz > PRINT_BED_TALL_RATIO * thin && dy <= dx + 1e-9;
+}
+
+// (x, y, z) -> (z, y, -x), then shift so zmin is 0.
+export function rotateMeshPlusY90OntoBed(vertices) {
+  const list = vertices || [];
+  const rotated = [];
+  let zmin = Infinity;
+  for (let i = 0; i < list.length; i += 1) {
+    const p = list[i];
+    const next = [p[2], p[1], -p[0]];
+    if (next[2] < zmin) zmin = next[2];
+    rotated.push(next);
+  }
+  if (!Number.isFinite(zmin) || zmin === 0) return rotated;
+  for (let i = 0; i < rotated.length; i += 1) rotated[i][2] -= zmin;
+  return rotated;
+}
+
+function faceIsReversed(oc, face) {
+  if (!face || typeof face.Orientation !== 'function') return false;
+  let ori = null;
+  try { ori = face.Orientation(); } catch (_err) { ori = null; }
+  if (ori === 'TopAbs_REVERSED') return true;
+  const table = oc && oc.TopAbs_Orientation ? oc.TopAbs_Orientation : null;
+  return !!(table && ori === table.TopAbs_REVERSED);
+}
+
 function meshShape(oc, shape) {
   const trash = [];
   try {
@@ -264,6 +428,7 @@ function meshShape(oc, shape) {
       if (tri && typeof tri.delete === 'function') trash.push(tri);
       if (tri && !(typeof tri.IsNull === 'function' && tri.IsNull()) && tri.NbNodes && tri.NbNodes() > 0) {
         const trsf = track(trash, loc.Transformation());
+        const reversed = faceIsReversed(oc, face);
         const base = vertices.length;
         const nNodes = tri.NbNodes();
         for (let i = 1; i <= nNodes; i += 1) {
@@ -274,16 +439,16 @@ function meshShape(oc, shape) {
         const nTri = tri.NbTriangles();
         for (let i = 1; i <= nTri; i += 1) {
           const poly = track(trash, tri.Triangle(i));
-          triangles.push([
-            base + poly.Value(1) - 1,
-            base + poly.Value(2) - 1,
-            base + poly.Value(3) - 1,
-          ]);
+          const v1 = base + poly.Value(1) - 1;
+          const v2 = base + poly.Value(2) - 1;
+          const v3 = base + poly.Value(3) - 1;
+          // TopAbs_REVERSED faces store the triangulation in forward order.
+          triangles.push(reversed ? [v1, v3, v2] : [v1, v2, v3]);
         }
       }
       explorer.Next();
     }
-    return { vertices: vertices, triangles: triangles };
+    return weldMesh(vertices, triangles);
   } finally {
     for (let i = trash.length - 1; i >= 0; i -= 1) release(trash[i]);
   }
@@ -461,12 +626,22 @@ export function exportAssembly3mf(oc, parts, options) {
       if (!mesh.vertices.length || !mesh.triangles.length) {
         return { ok: false, bytes: null, xml: '', error: ERR_EXPORT };
       }
+      let vertices = mesh.vertices;
+      let placement = placementFor(part);
+      const autoBed = !(options && options.autoBed === false);
+      if (autoBed && list.length === 1) {
+        const localBounds = meshBounds(vertices);
+        if (shouldLayTallPartOnBed(localBounds)) {
+          vertices = rotateMeshPlusY90OntoBed(vertices);
+          placement = { x: 0, y: 0, z: 0 };
+        }
+      }
       objects.push({
         name: part.name ? String(part.name) : 'Part',
         material: materialTag(part),
-        vertices: mesh.vertices,
+        vertices: vertices,
         triangles: mesh.triangles,
-        placement: placementFor(part),
+        placement: placement,
       });
     }
     const xml = modelXml(objects);

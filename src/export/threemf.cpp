@@ -2,10 +2,15 @@
 
 #include "units.hpp"
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <map>
+#include <queue>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -132,10 +137,129 @@ std::string model_xml(const MeshSolid& mesh) {
 
 }  // namespace
 
-bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
+MeshSolid weld_mesh(const MeshSolid& mesh) {
+    constexpr double kQuantumMm = 1e-6;
+    MeshSolid out;
+    std::map<std::array<long long, 3>, std::uint32_t> index;
+    std::vector<std::uint32_t> remap(mesh.vertices.size(), 0);
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const Vec3& vertex = mesh.vertices[i];
+        const std::array<long long, 3> key = {
+            std::llround(vertex.x / kQuantumMm),
+            std::llround(vertex.y / kQuantumMm),
+            std::llround(vertex.z / kQuantumMm),
+        };
+        const auto found = index.find(key);
+        if (found == index.end()) {
+            const auto id = static_cast<std::uint32_t>(out.vertices.size());
+            index.emplace(key, id);
+            remap[i] = id;
+            out.vertices.push_back(vertex);
+        } else {
+            remap[i] = found->second;
+        }
+    }
+
     for (const auto& triangle : mesh.triangles) {
-        if (triangle[0] >= mesh.vertices.size() || triangle[1] >= mesh.vertices.size() ||
-            triangle[2] >= mesh.vertices.size()) {
+        if (triangle[0] >= remap.size() || triangle[1] >= remap.size() ||
+            triangle[2] >= remap.size()) {
+            // Unmapped index must not reach flood-fill. Empty vertices plus
+            // {0,1,2} is what write_3mf's bounds check rejects before opening
+            // the file. Duplicate corners and zero area still drop below.
+            MeshSolid rejected;
+            rejected.triangles.push_back({0, 1, 2});
+            return rejected;
+        }
+        const std::uint32_t a = remap[triangle[0]];
+        const std::uint32_t b = remap[triangle[1]];
+        const std::uint32_t c = remap[triangle[2]];
+        if (a == b || b == c || a == c) {
+            continue;
+        }
+        if (exact_zero_area(out.vertices[a], out.vertices[b], out.vertices[c])) {
+            continue;
+        }
+        out.triangles.push_back({a, b, c});
+    }
+
+    using Undirected = std::pair<std::uint32_t, std::uint32_t>;
+    std::map<Undirected, std::vector<std::size_t>> incident;
+    auto undirected = [](std::uint32_t from, std::uint32_t to) {
+        return from < to ? Undirected{from, to} : Undirected{to, from};
+    };
+    for (std::size_t t = 0; t < out.triangles.size(); ++t) {
+        const auto& tri = out.triangles[t];
+        incident[undirected(tri[0], tri[1])].push_back(t);
+        incident[undirected(tri[1], tri[2])].push_back(t);
+        incident[undirected(tri[2], tri[0])].push_back(t);
+    }
+    auto uses_directed = [](const std::array<std::uint32_t, 3>& tri, std::uint32_t from,
+                            std::uint32_t to) {
+        return (tri[0] == from && tri[1] == to) || (tri[1] == from && tri[2] == to) ||
+               (tri[2] == from && tri[0] == to);
+    };
+    auto flip = [&](std::size_t t) {
+        auto& tri = out.triangles[t];
+        const auto saved = tri[1];
+        tri[1] = tri[2];
+        tri[2] = saved;
+    };
+    std::vector<char> seen(out.triangles.size(), 0);
+    for (std::size_t seed = 0; seed < out.triangles.size(); ++seed) {
+        if (seen[seed]) {
+            continue;
+        }
+        std::queue<std::size_t> wait;
+        wait.push(seed);
+        seen[seed] = 1;
+        while (!wait.empty()) {
+            const std::size_t t = wait.front();
+            wait.pop();
+            const auto tri = out.triangles[t];
+            const std::array<std::pair<std::uint32_t, std::uint32_t>, 3> edges = {{
+                {tri[0], tri[1]}, {tri[1], tri[2]}, {tri[2], tri[0]}
+            }};
+            for (const auto& edge : edges) {
+                const auto found = incident.find(undirected(edge.first, edge.second));
+                if (found == incident.end()) {
+                    continue;
+                }
+                for (const std::size_t other : found->second) {
+                    if (other == t || seen[other]) {
+                        continue;
+                    }
+                    if (uses_directed(out.triangles[other], edge.first, edge.second)) {
+                        flip(other);
+                    }
+                    seen[other] = 1;
+                    wait.push(other);
+                }
+            }
+        }
+    }
+    double sum = 0.0;
+    for (const auto& triangle : out.triangles) {
+        const Vec3& p = out.vertices[triangle[0]];
+        const Vec3& q = out.vertices[triangle[1]];
+        const Vec3& r = out.vertices[triangle[2]];
+        const double cx = q.y * r.z - q.z * r.y;
+        const double cy = q.z * r.x - q.x * r.z;
+        const double cz = q.x * r.y - q.y * r.x;
+        sum += p.x * cx + p.y * cy + p.z * cz;
+    }
+    if (sum < 0.0) {
+        for (std::size_t t = 0; t < out.triangles.size(); ++t) {
+            flip(t);
+        }
+    }
+    return out;
+}
+
+bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
+    const MeshSolid welded = weld_mesh(mesh);
+    for (const auto& triangle : welded.triangles) {
+        if (triangle[0] >= welded.vertices.size() || triangle[1] >= welded.vertices.size() ||
+            triangle[2] >= welded.vertices.size()) {
             return false;
         }
     }
@@ -159,7 +283,7 @@ bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh) {
     std::vector<ZipItem> items = {
         {"[Content_Types].xml", types, 0, 0},
         {"_rels/.rels", rels, 0, 0},
-        {"3D/3dmodel.model", model_xml(mesh), 0, 0},
+        {"3D/3dmodel.model", model_xml(welded), 0, 0},
     };
     const std::string package = zip_store(items);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);

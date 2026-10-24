@@ -29,6 +29,41 @@ export function modeFromHotkey(key) {
   return SELECTION_HOTKEYS[key] || '';
 }
 
+export function isTypingTarget(el) {
+  let node = el;
+  while (node && node.nodeType !== 9) {
+    if (node.nodeType === 1) {
+      const tag = String(node.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (node.isContentEditable === true) return true;
+      const ce = typeof node.getAttribute === 'function' ? node.getAttribute('contenteditable') : null;
+      if (ce != null && String(ce).toLowerCase() !== 'false') return true;
+    }
+    node = node.parentElement || node.parentNode || null;
+    if (node && node.nodeType === 11) node = node.host || null;
+  }
+  return false;
+}
+
+export function isViewportHotkeyTarget(el) {
+  if (!el || el.nodeType !== 1) return false;
+  const id = el.id || '';
+  if (id === 'viewport' || id === 'canvas') return true;
+  return String(el.tagName || '').toUpperCase() === 'CANVAS';
+}
+
+// Digit keys 1-5 switch Vertex/Edge/Face/Item only when the 3D viewport or
+// canvas is the focused target. Typing in an input, or with nothing focused,
+// must not change the selection.
+export function selectionHotkeyAllowed(key, activeEl, eventTarget) {
+  if (!modeFromHotkey(key)) return false;
+  if (isTypingTarget(activeEl) || isTypingTarget(eventTarget)) return false;
+  if (/^[0-9]$/.test(String(key))) {
+    return isViewportHotkeyTarget(activeEl) || isViewportHotkeyTarget(eventTarget);
+  }
+  return true;
+}
+
 export function occtShapeType(mode) {
   if (mode === 'vertex') return 'TopAbs_VERTEX';
   if (mode === 'edge') return 'TopAbs_EDGE';

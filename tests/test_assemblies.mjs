@@ -229,6 +229,80 @@ if (xml) {
   expect('3mf cylinder transform', xml.indexOf('transform="1 0 0 0 1 0 0 0 1 40 5 12"') >= 0);
 }
 
+function parseObjectMeshes(modelXml) {
+  const objects = [];
+  const blocks = String(modelXml || '').split('<object ').slice(1);
+  for (let i = 0; i < blocks.length; i += 1) {
+    const vertices = [];
+    const triangles = [];
+    const vre = /<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g;
+    let match = vre.exec(blocks[i]);
+    while (match) {
+      vertices.push([Number(match[1]), Number(match[2]), Number(match[3])]);
+      match = vre.exec(blocks[i]);
+    }
+    const tre = /<triangle v1="([^"]+)" v2="([^"]+)" v3="([^"]+)"\/>/g;
+    match = tre.exec(blocks[i]);
+    while (match) {
+      triangles.push([Number(match[1]), Number(match[2]), Number(match[3])]);
+      match = tre.exec(blocks[i]);
+    }
+    objects.push({ vertices: vertices, triangles: triangles });
+  }
+  return objects;
+}
+
+const weldedDup = asm.weldMesh(
+  [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 1, 0]],
+  [[0, 1, 2], [3, 5, 4], [0, 0, 1]]
+);
+expect('weld merges coincident vertices', weldedDup.vertices.length === 3);
+expect('weld drops a degenerate triangle', weldedDup.triangles.length === 2);
+expect('weld has no duplicate vertices', asm.meshHasDuplicateVertices(weldedDup.vertices) === false);
+
+if (xml) {
+  const meshes = parseObjectMeshes(xml);
+  expect('3mf mesh objects', meshes.length === 2);
+  for (let i = 0; i < meshes.length; i += 1) {
+    const mesh = meshes[i];
+    const label = i === 0 ? 'box' : 'cylinder';
+    expect('3mf ' + label + ' vertices', mesh.vertices.length > 0 && mesh.triangles.length > 0);
+    expect('3mf ' + label + ' no duplicate vertices', asm.meshHasDuplicateVertices(mesh.vertices) === false);
+    expect('3mf ' + label + ' consistent winding', asm.meshHasConsistentWinding(mesh.vertices, mesh.triangles) === true);
+    expect('3mf ' + label + ' positive volume', asm.meshSignedVolumeMm3(mesh.vertices, mesh.triangles) > 0);
+  }
+  if (meshes[0] && meshes[0].vertices.length) {
+    expect('3mf box welded vertex count', meshes[0].vertices.length === 8);
+  }
+}
+
+const tallShape = ops.makeBoxSolid(oc, 10, 8, 40, [0, 0, 0]);
+const tallExport = asm.exportAssembly3mf(oc, [
+  { name: 'Tall', material: 'PLA', shape: tallShape, placement: { x: 0, y: 0, z: 0 }, shapeLocal: true },
+], { units: 'mm', autoBed: true });
+expect('tall 3mf written', tallExport.ok === true);
+const tallXml = tallExport.ok ? asm.modelXmlFrom3mf(tallExport.bytes) : '';
+const tallMeshes = parseObjectMeshes(tallXml);
+expect('tall 3mf one object', tallMeshes.length === 1);
+if (tallMeshes[0] && tallMeshes[0].vertices.length) {
+  const tb = asm.meshBounds(tallMeshes[0].vertices);
+  const tdx = tb.xmax - tb.xmin;
+  const tdy = tb.ymax - tb.ymin;
+  const tdz = tb.zmax - tb.zmin;
+  expect('tall part laid on bed', tdz < tdx && tdz <= 10 + asm.BOUNDS_TOL_MM && tdx >= 40 - asm.BOUNDS_TOL_MM);
+  expect('tall part still welded', asm.meshHasDuplicateVertices(tallMeshes[0].vertices) === false);
+  expect('tall part winding', asm.meshHasConsistentWinding(tallMeshes[0].vertices, tallMeshes[0].triangles) === true);
+}
+const tallSkip = asm.exportAssembly3mf(oc, [
+  { name: 'Tall', material: 'PLA', shape: tallShape, placement: { x: 0, y: 0, z: 0 }, shapeLocal: true },
+], { units: 'mm', autoBed: false });
+const skipXml = tallSkip.ok ? asm.modelXmlFrom3mf(tallSkip.bytes) : '';
+const skipMeshes = parseObjectMeshes(skipXml);
+if (skipMeshes[0] && skipMeshes[0].vertices.length) {
+  const sb = asm.meshBounds(skipMeshes[0].vertices);
+  expect('autoBed off keeps height', (sb.zmax - sb.zmin) >= 40 - asm.BOUNDS_TOL_MM);
+}
+
 const inch = asm.exportAssembly3mf(oc, exportParts, { units: 'in' });
 expect('inch export refused', inch.ok === false && inch.error === asm.ERR_UNITS && near(volume(exportBox), boxVol, 1e-6));
 
@@ -301,6 +375,7 @@ release(mixA);
 release(mixB);
 release(exportBox);
 release(exportCyl);
+release(tallShape);
 release(primLocal);
 if (primPlaced.shape) release(primPlaced.shape);
 
