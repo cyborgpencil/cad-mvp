@@ -369,8 +369,35 @@ Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37
 
 | # | Item | Status | Source | Date |
 |---|---|---|---|---|
-| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Parked / not started | Erik | 2026-10-23 |
+| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Team-chosen: exclusive V/E/F, click replaces; multi-filter later. Not started | Erik | 2026-10-23 |
 | P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Parked / not started | Erik | 2026-10-23 |
-| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Parked / not started | Erik | 2026-10-23 |
-| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Parked / not started | Erik | 2026-10-23 |
-| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Parked / not started | Erik | 2026-10-23 |
+| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Team-chosen: metalness 0, roughness 0.55–0.65. Not implemented | Erik | 2026-10-23 |
+| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Spec ready / waiting Pilot after P1 | Erik | 2026-10-23 |
+| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Team-chosen: measure + live callouts first; sketch after P2. Not implemented | Erik | 2026-10-23 |
+
+- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P1, P3, P4, and P5 locks below are team-chosen. None of them are implemented. P2 stays parked with no approach chosen.
+
+### P1 — exclusive highlight (3T final, 2026-10-24)
+Clicking a vertex, edge, or face highlights that component and unselects the others. A click replaces the highlight. A multi-filter is later. This matches Erik's parked wording. On main, `applyPointerSelection` in `web/selection.mjs` already replaces on a plain click; Shift adds and Ctrl removes. That modifier behaviour stays as it is on main. The selection-clarity pass itself is not started.
+
+### P3 — flatter default (3T final, 2026-10-24)
+Default solid material is metalness 0 and roughness about 0.55–0.65. That range is the lock. On main the body material in `web/index.html` is metalness 0.1 and roughness 0.42. Not implemented.
+
+### P4 — shelf show/hide (Doc Steward slice; team-chosen by Doc Steward / 3T map, 2026-10-24)
+Spec ready / waiting Pilot after P1. Prompt: `prompts/p4-tool-shelf-show-hide.md`. Not implemented. JS, CSS, and HTML only when it is built. No kernel, C++, or WASM change.
+
+- One show/hide (collapse) control per cluttering shelf: the Create menu/panel, Modify tools, property/dim panels, and the center perimeter/size box for primitives.
+- A shelf opens only while that tool or edit is active. Collapse clears viewport clutter. No shelf is always on. The only open shelf is the active tool's shelf.
+- The show/hide affordance stays in the Tools sheet. Do not add another always-on shelf.
+- Reuse the Search and Tools disclosure already on main (`aria-expanded`, Escape, click outside) where it exists. Touch targets at least 44 px. On portrait, an open sheet stays at most about 40% of the view and never covers Home.
+- Modify already has a toggle. Extend that pattern to every other cluttering shelf.
+- Export and the units status may stay visible. They are status chrome, not shelves. Do not hide them, and do not invent any other always-on shelf.
+- On main, Create (`[data-action="createMenu"]`) and Search (`#searchBtn`) already collapse on Escape and an outside click. `#modifyShelf` starts hidden on phones and shown on desktop. `#dimPanel` in portrait is capped at 40% of the viewport by `layoutDimSheet()` and stays clear of `#vcHome`. The viewport size line is `.hud` `#hudSize`.
+
+### P5 — measure, callouts, then sketch (3T final, 2026-10-24 ~1:14 AM MT)
+Team-chosen. Not implemented.
+
+- Measure first: two-point distance, selected-edge length, and volume. Values stay millimetres.
+- Callouts: live L×W×H, or diameter×height, on the active primitive while it is being edited (Fusion-style). The property sheet is not the only place those sizes appear.
+- Sketch stays parked until the P2 UI-gap digest lands. After that, a follow-on PR does the minimum: a rectangle or circle on a face, then extrude.
+- On main, the Measure toggle shows `#measureSvg`, and `updateMeasure` draws a fixed 20 mm span. That is not this measure set.
