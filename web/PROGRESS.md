@@ -361,3 +361,14 @@ Error strings: empty file "This file is empty. The model was not changed."; unre
 - 2026-10-22 wrap-up: the logged volume is BRepGProp on the solid, the default model is the centred 20 mm box, debug badges and File fixture loaders are gone, phone Undo/Redo sit on the bottom bar, and Modify toggles the one-row shelf. gizmo_drag_smoke is in CTest.
 - Phone selection: EDGE_TOUCH_TOLERANCE_PX is 32 (larger than the 20 px touch pick). Team-locked (3T, 2026-10-23).
 - 2026-10-23 20:05 MT (3T/Erik phone; Doc Steward): PR preview banner moves to the top (safe-area), dismissible, never covers the phone bottom bar. Copy is "needs team review" (Erik no longer reviews). JS-only previews (#31, #34) drop the review flag in preview-prs.txt.
+
+## Parked queue (Erik 2026-10-23 ~9:17 PM MT)
+Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37 etc.). Picked up only when that stack has bandwidth; team decides approach. UPDATES.md logged only on pickup.
+
+| # | Item | Status | Source | Date |
+|---|---|---|---|---|
+| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Parked / not started | Erik | 2026-10-23 |
+| P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Parked / not started | Erik | 2026-10-23 |
+| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Parked / not started | Erik | 2026-10-23 |
+| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Parked / not started | Erik | 2026-10-23 |
+| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Parked / not started | Erik | 2026-10-23 |
