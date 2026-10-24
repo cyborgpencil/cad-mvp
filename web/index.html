@@ -1037,6 +1037,37 @@
   }
   .sheet-h { display: flex; gap: 8px; align-items: center; }
   .sheet-h .icon-btn { background: var(--panel-2); }
+  .sheet-shelves {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .sheet-shelves button {
+    flex: 1 1 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    font-weight: 650;
+  }
+  .prop-toggle {
+    width: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 0 8px;
+    border-radius: 8px;
+    text-align: left;
+    font-weight: 650;
+    background: var(--tab-bg);
+  }
   .phone-tabbar {
     display: none;
     flex: none;
@@ -1745,7 +1776,7 @@
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (Alt+4)">Export</button>
       </nav>
       <div class="ribbon">
-    <button type="button" class="tool-btn show-narrow tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools">
+    <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
       <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
     </button>
     <div class="tools panel" data-panel="sketch" hidden>
@@ -1880,7 +1911,7 @@
       </svg>
       <div class="hud">
         <div><b id="hudName">Body1</b></div>
-        <div><span id="hudSize">…</span> · <span id="viewLabel">Iso</span></div>
+        <div><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel">Iso</span></div>
       </div>
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
@@ -2007,6 +2038,12 @@
         <div class="sheet-h">
           <button type="button" class="icon-btn" data-action="closeSheet" data-tool="Close tools menu" aria-label="Close"><span>Close</span></button>
         </div>
+        <div class="sheet-shelves" role="group" aria-label="Shelves">
+          <button type="button" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create">Create</button>
+          <button type="button" data-action="dimSheet" data-tool="Dimensions" title="Dimensions" aria-expanded="false" aria-controls="dimPanel" aria-label="Dimensions">Dimensions</button>
+          <button type="button" id="propShelfBtn" data-action="propShelf" data-tool="Properties" title="Properties" aria-expanded="false" aria-controls="propBody" aria-label="Properties">Properties</button>
+          <button type="button" id="hudSizeToggle" data-action="hudSizeShelf" data-tool="Shape size" title="Shape size" aria-expanded="false" aria-controls="hudSize" aria-label="Shape size">Size</button>
+        </div>
         <div class="sheet-grid" id="sheetTools"></div>
       </div>
     </main>
@@ -2022,6 +2059,8 @@
         <button type="button" class="preview-btn" id="previewBtn" data-action="preview" data-tool="Preview" aria-pressed="false" title="Preview tool handles">Preview</button>
       </div>
       <div class="prop" id="toolProp" data-side-panel="properties">
+        <button type="button" class="prop-toggle" id="propToggle" data-action="propShelf" data-tool="Properties" title="Properties" aria-expanded="false" aria-controls="propBody" aria-label="Properties">Properties</button>
+        <div id="propBody" hidden>
         <h3 id="inspTitle">Body1</h3>
         <div class="muted" id="inspSub">Solid body · placeholder cube</div>
         <div class="kv" id="inspKv"></div>
@@ -2044,6 +2083,7 @@
         <button type="button" class="lock-btn is-on" id="lockProportionsSide" data-action="lockProportions" data-tool="Lock proportions" aria-pressed="true">Lock proportions</button>
         <p class="fine" id="primNote">Dimensions for a box, cylinder, or disc open on the model.</p>
         <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
+        </div>
         <div id="assemblyPanel" class="assembly-panel">
           <div class="muted">Parts</div>
           <p class="fine" id="selectionCountSide">0 selected</p>
@@ -2431,6 +2471,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     bboxMm: null,
     gizmoMode: 'move',
     dimSheetOpen: false,
+    propSheetOpen: false,
+    hudSizeCollapsed: false,
     holeTool: false,
     holeFace: null,
     holeDepthMode: 'through',
@@ -2871,10 +2913,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.getElementById('statusUnits').textContent = state.unit;
     const locked = document.getElementById('gateUnitLocked');
     if (locked) locked.textContent = state.exportUnit + ' (locked for export)';
-    const hud = document.getElementById('hudSize');
-    if (hud) {
-      hud.textContent = formatLength(state.widthMm) + ' × ' + formatLength(state.depthMm) + ' × ' + formatLength(state.heightMm);
-    }
+    paintHudSize();
     updateInspector();
     updateGate();
   }
@@ -3281,12 +3320,55 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     paintLock();
     paintHoleChrome();
-    host.classList.toggle('is-open', state.dimSheetOpen === true);
-    const toggle = document.getElementById('dimToggle');
-    if (toggle) toggle.setAttribute('aria-expanded', host.classList.contains('is-open') ? 'true' : 'false');
+    if (host.hidden) {
+      state.dimSheetOpen = false;
+      state.propSheetOpen = false;
+    }
+    const expanded = state.dimSheetOpen === true && host.hidden !== true;
+    host.classList.toggle('is-open', expanded);
+    const dimButtons = document.querySelectorAll('[data-action="dimSheet"]');
+    for (let di = 0; di < dimButtons.length; di += 1) {
+      dimButtons[di].setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
     layoutDimSheet();
     paintSelectionCount();
+    paintPropSheet();
+    paintHudSize();
     publishGateState();
+  }
+
+  function editingBasicShape() {
+    const prim = sheetPrimitive();
+    return !!(prim && (prim.kind === 'box' || prim.kind === 'cylinder' || prim.kind === 'disc'));
+  }
+
+  function paintHudSize() {
+    const hud = document.getElementById('hudSize');
+    const sep = document.getElementById('hudSizeSep');
+    const editing = editingBasicShape();
+    if (!editing) state.hudSizeCollapsed = false;
+    const show = editing && state.hudSizeCollapsed !== true;
+    if (hud) {
+      if (show) {
+        hud.textContent = formatLength(state.widthMm) + ' × ' + formatLength(state.depthMm) + ' × ' + formatLength(state.heightMm);
+      }
+      hud.hidden = !show;
+    }
+    if (sep) sep.hidden = !show;
+    const buttons = document.querySelectorAll('[data-action="hudSizeShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', show ? 'true' : 'false');
+    }
+  }
+
+  function paintPropSheet() {
+    const body = document.getElementById('propBody');
+    const open = state.propSheetOpen === true;
+    if (body) body.hidden = !open;
+    const buttons = document.querySelectorAll('[data-action="propShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
   }
 
   function paintHoleChrome() {
@@ -7044,6 +7126,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       sheetOpen: !!(panel && panel.classList.contains('is-open')),
       homeOverlap: overlap,
       viewClearPx: Math.max(0, panelTop),
+      viewportH: vp.height,
       home: homeBox,
       panel: panelBox
     };
@@ -8656,7 +8739,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function applyModifyDefault() {
     if (modifyUserSet) return;
-    setModifyOpen(!phoneWidth(), false);
+    setModifyOpen(false, false);
   }
 
   function toggleCreateMenu(opener) {
@@ -8666,12 +8749,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     closePopups();
     if (!willOpen) return;
     setModifyOpen(false, true);
+    state.dimSheetOpen = false;
+    state.propSheetOpen = false;
     menu.hidden = false;
     const openers = document.querySelectorAll('[data-action="createMenu"]');
     for (let i = 0; i < openers.length; i += 1) {
       openers[i].setAttribute('aria-expanded', openers[i] === opener ? 'true' : 'false');
     }
     placeCreateMenu();
+    paintPrimFields();
+  }
+
+  function setToolsOpen(open) {
+    if (!toolsSheet) return;
+    toolsSheet.hidden = open !== true;
+    const buttons = document.querySelectorAll('[data-action="toolsMenu"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
   }
 
   function closePopups() {
@@ -8680,7 +8775,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (exportMenu) exportMenu.hidden = true;
     searchDlg.hidden = true;
     if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
-    toolsSheet.hidden = true;
+    setToolsOpen(false);
     closeCreateMenu();
     const chooser = document.getElementById('pickChooser');
     if (chooser) chooser.hidden = true;
@@ -8715,7 +8810,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
-    toolsSheet.hidden = true;
+    setToolsOpen(false);
     closeCreateMenu();
     closeDrawers();
     searchDlg.hidden = false;
@@ -8746,10 +8841,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
     closeCreateMenu();
-    toolsSheet.hidden = false;
+    setToolsOpen(true);
     fillSheet('');
+    const firstShelf = document.querySelector('#toolsSheet .sheet-shelves button');
     const firstTool = document.querySelector('#sheetTools button');
-    if (firstTool) firstTool.focus();
+    if (firstShelf) firstShelf.focus();
+    else if (firstTool) firstTool.focus();
   }
 
   function setTab(tab, opts) {
@@ -9385,13 +9482,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const shelf = document.getElementById('modifyShelf');
       const willOpen = !shelf || shelf.hidden === true;
       closeCreateMenu();
+      if (willOpen) {
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+      }
       setModifyOpen(willOpen, true);
+      paintPrimFields();
       message = willOpen ? 'Modify' : 'Modify closed';
     } else if (action === 'downloadLog') {
       downloadText(window.__cadcamLogText || '', 'cadmvp-log.txt', 'text/plain');
       message = 'Download log';
     } else if (action === 'closeSheet') {
-      toolsSheet.hidden = true;
+      setToolsOpen(false);
       message = 'Close tools menu';
     } else if (action === 'units') {
       const want = btn.getAttribute('data-unit') === 'in' ? 'in' : 'mm';
@@ -9562,9 +9664,40 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       message = state.gizmoMode === 'rotate' ? 'Rotate' : state.gizmoMode === 'scale' ? 'Scale' : 'Move';
       applyLook();
     } else if (action === 'dimSheet') {
-      state.dimSheetOpen = !state.dimSheetOpen;
+      const host = document.getElementById('dimPanel');
+      const canEdit = !!(host && host.hidden !== true);
+      const willOpen = state.dimSheetOpen !== true && canEdit;
+      state.dimSheetOpen = willOpen;
+      if (willOpen) {
+        closeCreateMenu();
+        setModifyOpen(false, true);
+        state.propSheetOpen = false;
+      }
       paintPrimFields();
-      message = state.dimSheetOpen ? 'Dimensions' : 'Hide dimensions';
+      message = willOpen ? 'Dimensions' : 'Hide dimensions';
+    } else if (action === 'propShelf') {
+      const willOpen = state.propSheetOpen !== true;
+      state.propSheetOpen = willOpen;
+      if (willOpen) {
+        closeCreateMenu();
+        setModifyOpen(false, true);
+        state.dimSheetOpen = false;
+      }
+      paintPrimFields();
+      message = willOpen ? 'Properties' : 'Hide properties';
+    } else if (action === 'hudSizeShelf') {
+      if (!editingBasicShape()) {
+        state.hudSizeCollapsed = false;
+        message = 'Size shows while editing a box, cylinder, or disc';
+      } else {
+        state.hudSizeCollapsed = state.hudSizeCollapsed !== true;
+        if (state.hudSizeCollapsed !== true) {
+          closeCreateMenu();
+          setModifyOpen(false, true);
+        }
+        message = state.hudSizeCollapsed ? 'Hide size' : 'Shape size';
+      }
+      paintHudSize();
     } else if (action === 'lockProportions') {
       state.lockProportions = state.lockProportions === false;
       paintLock();
@@ -10538,9 +10671,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') {
       const searchWasOpen = !searchDlg.hidden;
-      if (window.matchMedia('(min-width: 821px)').matches) setModifyOpen(false, true);
+      setModifyOpen(false, true);
+      state.dimSheetOpen = false;
+      state.propSheetOpen = false;
+      if (editingBasicShape()) state.hudSizeCollapsed = true;
       closePopups();
       closeDrawers();
+      paintPrimFields();
       if (searchWasOpen && searchBtn) searchBtn.focus();
       else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return;

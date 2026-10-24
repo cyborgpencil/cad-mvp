@@ -657,6 +657,31 @@ def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
             open_path = shots / "wasm-webkit-portrait-open.png"
             page.screenshot(path=str(open_path))
             print(f"screenshot {open_path}", flush=True)
+            cap = page.evaluate(
+                """() => {
+                  const panel = document.getElementById('dimPanel');
+                  const home = document.getElementById('vcHome');
+                  const vp = document.getElementById('viewport');
+                  if (!panel || !home || !vp) return {ok:false, why:'missing'};
+                  const pr = panel.getBoundingClientRect();
+                  const hr = home.getBoundingClientRect();
+                  const vr = vp.getBoundingClientRect();
+                  const overlap = !(hr.right <= pr.left + 0.5 || hr.left >= pr.right - 0.5
+                    || hr.bottom <= pr.top + 0.5 || hr.top >= pr.bottom - 0.5);
+                  const limit = vr.height * 0.4 + 1;
+                  return {
+                    ok: panel.classList.contains('is-open') && !overlap && pr.height <= limit
+                      && pr.top + 0.5 >= hr.bottom,
+                    h: pr.height,
+                    limit: limit,
+                    overlap: overlap,
+                    top: pr.top,
+                    homeBottom: hr.bottom
+                  };
+                }"""
+            )
+            if not isinstance(cap, dict) or cap.get("ok") is not True:
+                return [f"webkit screenshot: portrait dim sheet {cap!r}"]
             return []
     return ["webkit screenshot: dimension panel did not open"]
 

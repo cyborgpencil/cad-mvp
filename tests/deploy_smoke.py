@@ -2180,6 +2180,13 @@ def portrait_layout_ok(state: dict[str, Any], expanded: bool) -> list[str]:
     if home and panel and float(panel.get("y") or 0) < float(home.get("bottom") or 0) + 4:
         if layout.get("homeOverlap") is True:
             problems.append("sheet top meets Home")
+    if expanded and panel:
+        panel_h = float(panel.get("h") or 0)
+        viewport_h = float(layout.get("viewportH") or 0)
+        if viewport_h <= 0:
+            problems.append("viewport height missing")
+        elif panel_h > viewport_h * 0.4 + 1.5:
+            problems.append(f"sheet {panel_h:.1f}px over 40% of {viewport_h:.1f}px")
     return problems
 
 
@@ -2352,17 +2359,21 @@ WRAPUP_DESK_EXPR = r"""
 (function(){
   var problems = [];
   var shelf = document.getElementById('modifyShelf');
-  if (!shelf || shelf.hidden) problems.push('shelf hidden on desktop');
+  if (!shelf || shelf.hidden !== true) problems.push('shelf not collapsed at load');
   var btn = document.getElementById('modifyDesktop');
   if (!btn) problems.push('missing modifyDesktop');
   else {
     var st = getComputedStyle(btn);
     var rect = btn.getBoundingClientRect();
     if (st.display === 'none' || rect.width < 1) problems.push('modifyDesktop hidden');
-    if (btn.getAttribute('aria-expanded') !== 'true') problems.push('desktop aria ' + btn.getAttribute('aria-expanded'));
+    if (rect.width + 0.5 < 44 || rect.height + 0.5 < 44) {
+      problems.push('modifyDesktop ' + rect.width.toFixed(1) + 'x' + rect.height.toFixed(1));
+    }
+    if (btn.getAttribute('aria-expanded') !== 'false') problems.push('desktop aria ' + btn.getAttribute('aria-expanded'));
     if (btn.getAttribute('aria-controls') !== 'modifyShelf') problems.push('aria-controls ' + btn.getAttribute('aria-controls'));
   }
   if (shelf) {
+    shelf.hidden = false;
     var cs = getComputedStyle(shelf);
     if (cs.flexWrap !== 'nowrap') problems.push('wrap ' + cs.flexWrap);
     var top = null;
@@ -2370,11 +2381,15 @@ WRAPUP_DESK_EXPR = r"""
     for (var i = 0; i < buttons.length; i++) {
       var br = buttons[i].getBoundingClientRect();
       if (br.width < 1) continue;
+      if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
+        problems.push('shelf button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
+      }
       if (top === null) top = br.top;
       else if (Math.abs(br.top - top) > 0.5) problems.push('shelf top ' + br.top.toFixed(1) + ' vs ' + top.toFixed(1));
     }
     var sr = shelf.getBoundingClientRect();
     if (sr.height < 44 || sr.height > 64) problems.push('shelf height ' + sr.height.toFixed(1));
+    shelf.hidden = true;
   }
   var desk = document.querySelector('.desk-bottom');
   var kids = desk ? desk.querySelectorAll('button') : [];
