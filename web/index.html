@@ -9295,6 +9295,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             }
           }
         }
+        // A committed swipe is not the second tap of a double-tap. Drop the
+        // earlier timestamp so a following tap inside 320 ms does not go Home.
+        if (didSwipe) cubeTapMs = 0;
         // A drag past the tap slop must not pick at the release point.
         // On the phone cube that point sits on a side zone.
         if (!didSwipe && ev.type !== 'pointercancel' && !pastSlop) {
