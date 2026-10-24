@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #85 (merged at 3bce5b2): PROGRESS scrub - Extrude Join/Cut on main (#83 at 99063c9); P1-P5 stay done.
 - 2026-10-24 PR #83 (merged at 99063c9): Extrude Join/Cut - New/Join/Cut chips, one commitSketchExtrude + fuseShapes/cutShapes (T1-T5; JS + deploy/phone smoke).
 - 2026-10-24 PR #80 (merged at 9fce2a8): docs - prompts/extrude-join-cut.md (T1-T5 Extrude Join/Cut GB feed).
 - 2026-10-24 PR #79 (merged at 23aee4c): research/gui/extrude-join-cut.md + INDEX - Extrude Join/Cut prep (T1-T5 locks).
