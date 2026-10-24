@@ -1144,6 +1144,52 @@ SKETCH_PORTRAIT_EXPR = r"""
     if (el.getAttribute('inputmode') !== 'decimal') problems.push(label + ' inputmode');
     if (String(el.value).trim() !== '10') problems.push(label + ' value ' + el.value);
   }
+  function calloutRows() {
+    var rows = [];
+    var layer = document.getElementById('calloutLayer');
+    if (!layer || layer.hidden) return rows;
+    for (var i = 0; i < 3; i++) {
+      var row = document.getElementById('calloutRow' + i);
+      if (!row || row.hidden) continue;
+      var value = document.getElementById('calloutValue' + i);
+      var tag = document.getElementById('calloutTag' + i);
+      rows.push({
+        tag: tag ? String(tag.textContent || '').trim() : '',
+        dim: value ? (value.getAttribute('data-dim') || '') : '',
+        text: value ? String(value.textContent || '').trim() : '',
+        value: value,
+        minus: document.getElementById('calloutMinus' + i),
+        plus: document.getElementById('calloutPlus' + i)
+      });
+    }
+    return rows;
+  }
+  function assertSketchCallouts(label, expected) {
+    var rows = calloutRows();
+    if (rows.length !== expected.length) problems.push(label + ' rows ' + rows.length);
+    for (var i = 0; i < expected.length; i++) {
+      var row = rows[i];
+      if (!row) continue;
+      if (row.tag !== expected[i].tag) problems.push(label + ' tag ' + row.tag);
+      if (row.dim !== expected[i].dim) problems.push(label + ' dim ' + row.dim);
+      if (row.text !== expected[i].text) problems.push(label + ' text ' + row.text);
+      need(row.value, label + ' ' + expected[i].tag);
+      need(row.minus, label + ' ' + expected[i].tag + ' minus');
+      need(row.plus, label + ' ' + expected[i].tag + ' plus');
+    }
+    var layerBox = boxOf(document.getElementById('calloutLayer'));
+    if (overlaps(layerBox, boxOf(document.getElementById('vcHome')))) problems.push(label + ' covers home');
+    if (overlaps(layerBox, boxOf(document.getElementById('exportBtn')))) problems.push(label + ' covers export');
+    if (overlaps(layerBox, boxOf(document.getElementById('statusUnits')))) problems.push(label + ' covers units');
+  }
+  function noSketchDims(label) {
+    var rows = calloutRows();
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dim === 'sketchL' || rows[i].dim === 'sketchW' || rows[i].dim === 'sketchD') {
+        problems.push(label + ' sketch callout ' + rows[i].dim);
+      }
+    }
+  }
   function cover(label) {
     var sheet = document.getElementById('sketchSheet');
     var sheetBox = boxOf(sheet);
@@ -1246,6 +1292,43 @@ SKETCH_PORTRAIT_EXPR = r"""
   else problems.push('Rectangle click missing');
   decimal('sketchL', 'Length');
   decimal('sketchW', 'Width');
+  assertSketchCallouts('rect callout', [
+    { tag: 'L', dim: 'sketchL', text: '10 mm' },
+    { tag: 'W', dim: 'sketchW', text: '10 mm' }
+  ]);
+  var sketchLEl = document.getElementById('sketchL');
+  var sketchWEl = document.getElementById('sketchW');
+  var volBeforeCallout = window.__cadcamExportState ? Number(window.__cadcamExportState.volumeMm3) : null;
+  var bodiesBeforeCallout = hook.state() ? hook.state().bodies : null;
+  if (sketchLEl) {
+    sketchLEl.value = '12';
+    sketchLEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  var editedRows = calloutRows();
+  var lengthRow = null;
+  for (var ri = 0; ri < editedRows.length; ri++) if (editedRows[ri].dim === 'sketchL') lengthRow = editedRows[ri];
+  if (!lengthRow || lengthRow.text !== '12 mm') problems.push('rect edit ' + (lengthRow && lengthRow.text));
+  var plusBtn = document.getElementById('calloutPlus0');
+  if (plusBtn) plusBtn.click();
+  else problems.push('rect plus missing');
+  editedRows = calloutRows();
+  lengthRow = null;
+  for (var rj = 0; rj < editedRows.length; rj++) if (editedRows[rj].dim === 'sketchL') lengthRow = editedRows[rj];
+  if (!lengthRow || lengthRow.text !== '13 mm') problems.push('rect plus ' + (lengthRow && lengthRow.text));
+  var afterPlus = hook.state();
+  if (!afterPlus || afterPlus.closed !== false) problems.push('rect plus closed ' + (afterPlus && afterPlus.closed));
+  if (!afterPlus || afterPlus.profile) problems.push('rect plus profile ' + (afterPlus && afterPlus.profile));
+  if (!afterPlus || afterPlus.bodies !== bodiesBeforeCallout) problems.push('rect plus bodies ' + (afterPlus && afterPlus.bodies));
+  var volAfterCallout = window.__cadcamExportState ? Number(window.__cadcamExportState.volumeMm3) : null;
+  if (!(Math.abs(Number(volAfterCallout) - Number(volBeforeCallout)) < 0.5)) problems.push('rect plus volume ' + volAfterCallout);
+  if (sketchLEl) {
+    sketchLEl.value = '10';
+    sketchLEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (sketchWEl && String(sketchWEl.value).trim() !== '10') {
+    sketchWEl.value = '10';
+    sketchWEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
   need(document.getElementById('sketchConfirm'), 'Rectangle confirm');
   cover('rectangle');
   scrollOk('rectangle sheet');
@@ -1254,6 +1337,22 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (circBtn) circBtn.click();
   else problems.push('Circle click missing');
   decimal('sketchD', 'Diameter');
+  assertSketchCallouts('circle callout', [
+    { tag: 'Ø', dim: 'sketchD', text: '10 mm' }
+  ]);
+  var sketchDEl = document.getElementById('sketchD');
+  if (sketchDEl) {
+    sketchDEl.value = '14';
+    sketchDEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  var circleRows = calloutRows();
+  if (!circleRows.length || circleRows[0].dim !== 'sketchD' || circleRows[0].text !== '14 mm') {
+    problems.push('circle edit ' + (circleRows[0] && circleRows[0].text));
+  }
+  if (sketchDEl) {
+    sketchDEl.value = '10';
+    sketchDEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
   need(document.getElementById('sketchConfirm'), 'Circle confirm');
   cover('circle');
   scrollOk('circle sheet');
@@ -1262,6 +1361,7 @@ SKETCH_PORTRAIT_EXPR = r"""
   else problems.push('Finish Sketch missing');
   st = hook.state();
   if (st.tab !== 'model') problems.push('finish tab ' + st.tab);
+  noSketchDims('finish');
   if (st.closed) problems.push('profile committed');
   if (st.bodies !== 1) problems.push('bodies after finish ' + st.bodies);
   if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener for extrude hidden');
@@ -1269,6 +1369,7 @@ SKETCH_PORTRAIT_EXPR = r"""
   need(ext, 'Extrude');
   if (ext) ext.click();
   decimal('sketchDepth', 'Blind');
+  noSketchDims('extrude');
   var confirmBtn = document.getElementById('sketchConfirm');
   need(confirmBtn, 'Extrude confirm');
   if (confirmBtn && confirmBtn.disabled !== true) problems.push('Extrude confirm enabled without a profile');
@@ -6244,6 +6345,16 @@ MEASURE_PROBE_EXPR = (
 )
 
 
+def _measure_degrees(label: str) -> float | None:
+    text = str(label or "").strip()
+    if not text.endswith("°") or "mm" in text.lower():
+        return None
+    try:
+        return float(text[:-1])
+    except ValueError:
+        return None
+
+
 def measure_tool_problems(cdp: Cdp) -> list[str]:
     """Default 20 mm cube. Measure is read-only: edge polyline, two-point, volume."""
     raw, err = eval_expr(cdp, MEASURE_PROBE_EXPR, timeout=60)
@@ -6307,6 +6418,59 @@ def measure_tool_problems(cdp: Cdp) -> list[str]:
     inch_volume = str(data.get("inchVolume") or "")
     if not inch_text.endswith(" in") or "in" not in inch_volume:
         problems.append(f"inch display {inch_text!r} {inch_volume!r}")
+    if data.get("angleEdgeError"):
+        problems.append(f"angle binding {data.get('angleEdgeError')}")
+    else:
+        edge_deg = _measure_degrees(str(data.get("angleEdgeLabel") or ""))
+        try:
+            edge_rad = float(data.get("angleEdgeRad"))
+        except (TypeError, ValueError):
+            edge_rad = float("nan")
+        if edge_deg is None or not _near(edge_deg, math.degrees(edge_rad), 0.05):
+            problems.append(
+                f"edge angle {data.get('angleEdgeLabel')!r} rad {data.get('angleEdgeRad')!r}"
+            )
+        elif not _near(edge_deg, 90, 0.5):
+            problems.append(f"edge angle not right {edge_deg}")
+        if str(data.get("angleVolumeText") or "") != "Volume " + volume_formatted:
+            problems.append(f"angle volume {data.get('angleVolumeText')!r}")
+    if data.get("angleEdgeFaceError"):
+        problems.append(f"edge-face binding {data.get('angleEdgeFaceError')}")
+    else:
+        face_deg = _measure_degrees(str(data.get("angleEdgeFaceLabel") or ""))
+        try:
+            face_rad = float(data.get("angleEdgeFaceRad"))
+        except (TypeError, ValueError):
+            face_rad = float("nan")
+        face_label = str(data.get("angleEdgeFaceLabel") or "")
+        if (
+            face_deg is None
+            or face_deg < -0.05
+            or face_deg > 180.05
+            or not _near(face_deg, math.degrees(face_rad), 0.05)
+            or "mm" in face_label.lower()
+        ):
+            problems.append(
+                f"edge-face angle {face_label!r} rad {data.get('angleEdgeFaceRad')!r}"
+            )
+    if data.get("faceAreaError"):
+        problems.append(f"area binding {data.get('faceAreaError')}")
+    else:
+        if not _near(data.get("faceAreaMm2"), 400, 0.5):
+            problems.append(f"face area {data.get('faceAreaMm2')!r}")
+        area_label = str(data.get("faceAreaLabel") or "")
+        area_formatted = str(data.get("faceAreaFormatted") or "")
+        if area_label != area_formatted or "400" not in area_label or "mm²" not in area_label:
+            problems.append(f"face area label {area_label!r} formatted {area_formatted!r}")
+        if area_label.startswith("Length") or area_label.startswith("Distance"):
+            problems.append(f"face area looked like a length {area_label!r}")
+        if str(data.get("faceVolumeText") or "") != "Volume " + volume_formatted:
+            problems.append(f"area volume {data.get('faceVolumeText')!r}")
+        edge_face_label = str(data.get("angleEdgeFaceLabel") or "")
+        if edge_face_label and edge_face_label == area_label:
+            problems.append(f"edge-face showed area {edge_face_label!r}")
+    if int(data.get("shapesAfter") or 0) != 0:
+        problems.append(f"shapes left {data.get('shapesAfter')!r}")
     if data.get("hiddenAfter") is not True or data.get("readoutAfter") is not True:
         problems.append(f"measure cleared hidden {data.get('hiddenAfter')!r} readout {data.get('readoutAfter')!r}")
     if int(data.get("picksAfter") or 0) != 0:
