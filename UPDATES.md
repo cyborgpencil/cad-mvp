@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #68 (merged at 465d7d9): docs - prompts/p5c-sketch-extrude.md (Blind 10 mm).
 - 2026-10-24 PR #66 (merged at d3faf0f): web/PROGRESS.md - P5b #64 on main; P5c sketch unblocked (Blind 10 mm).
 - 2026-10-24 PR #64 (merged at 7bcb81d): P5b live callouts - edit-scoped LxWxH / OxH (disc OxT) HTML overlays, tappable >=44 px (JS + deploy_smoke; no P5c).
 - 2026-10-24 PR #60 (merged at ec00e2f): P5a Measure - two-point distance, one-edge polyline length, volume via state.volumeMm3 (JS + deploy_smoke; no P5b/P5c).
