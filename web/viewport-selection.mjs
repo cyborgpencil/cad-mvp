@@ -28,6 +28,15 @@ export const STEPPER_FINE_DEG = 1;
 export const LONG_PRESS_MS = 400;
 export const MIN_SIZE_MM = 0.1;
 
+// Selection overlay sizes. PointsMaterial size is in pixels (sizeAttenuation
+// is off). Edge width is CSS pixels. LineBasicMaterial.linewidth is ignored
+// on Windows WebGL, so edges are screen-space triangle ribbons. Hover stays
+// slightly smaller than selected. Team choice, 2026-10-24, for P1.
+export const SEL_POINT_SIZE = 18;
+export const HOVER_POINT_SIZE = 14;
+export const SEL_EDGE_PX = 6;
+export const HOVER_EDGE_PX = 4;
+
 export function snapNumber(value, step, on) {
   const n = Number(value);
   if (!on || !(Number(step) > 0) || !Number.isFinite(n)) return n;
@@ -444,6 +453,146 @@ export function gizmoHandleZones(pickables, camera, width, height, zonePx) {
   return { minPx: minPx, zones: zones };
 }
 
+// One segment (6 floats) becomes a 6-vertex quad. fatA/fatB stay in segment
+// order on every vertex so the screen-space direction does not flip at the
+// far end. fatEnd is -1 on the start and +1 on the end. fatSide is the
+// ribbon side, -1 or +1.
+export function expandEdgeOverlay(positions) {
+  const src = positions || [];
+  const count = Math.floor(src.length / 6);
+  const position = new Float32Array(count * 18);
+  const fatA = new Float32Array(count * 18);
+  const fatB = new Float32Array(count * 18);
+  const side = new Float32Array(count * 6);
+  const end = new Float32Array(count * 6);
+  const pattern = [
+    [0, -1, -1],
+    [0, 1, -1],
+    [1, 1, 1],
+    [0, -1, -1],
+    [1, 1, 1],
+    [1, -1, 1],
+  ];
+  for (let i = 0; i < count; i += 1) {
+    const o = i * 6;
+    const ax = src[o];
+    const ay = src[o + 1];
+    const az = src[o + 2];
+    const bx = src[o + 3];
+    const by = src[o + 4];
+    const bz = src[o + 5];
+    for (let v = 0; v < 6; v += 1) {
+      const spec = pattern[v];
+      const at = (i * 6 + v) * 3;
+      const vi = i * 6 + v;
+      if (spec[0] === 0) {
+        position[at] = ax;
+        position[at + 1] = ay;
+        position[at + 2] = az;
+      } else {
+        position[at] = bx;
+        position[at + 1] = by;
+        position[at + 2] = bz;
+      }
+      fatA[at] = ax;
+      fatA[at + 1] = ay;
+      fatA[at + 2] = az;
+      fatB[at] = bx;
+      fatB[at + 1] = by;
+      fatB[at + 2] = bz;
+      side[vi] = spec[1];
+      end[vi] = spec[2];
+    }
+  }
+  return { count: count, position: position, fatA: fatA, fatB: fatB, side: side, end: end };
+}
+
+const FAT_EDGE_GLSL = [
+  'vec4 fatClipA = projectionMatrix * modelViewMatrix * vec4(fatA, 1.0);',
+  'vec4 fatClipB = projectionMatrix * modelViewMatrix * vec4(fatB, 1.0);',
+  'if (fatClipA.w > 0.0 && fatClipB.w > 0.0) {',
+  '  vec2 fatRes = max(edgeResolution, vec2(1.0));',
+  '  vec2 fatSA = fatClipA.xy / fatClipA.w * fatRes * 0.5;',
+  '  vec2 fatSB = fatClipB.xy / fatClipB.w * fatRes * 0.5;',
+  '  vec2 fatDelta = fatSB - fatSA;',
+  '  float fatLen = length(fatDelta);',
+  '  vec2 fatDir = fatLen > 0.001 ? fatDelta / fatLen : vec2(1.0, 0.0);',
+  '  vec2 fatNrm = vec2(-fatDir.y, fatDir.x);',
+  '  float fatHalf = edgeThickness * 0.5;',
+  '  vec2 fatPix = fatNrm * fatSide * fatHalf + fatDir * fatEnd * fatHalf;',
+  '  gl_Position.xy += fatPix * 2.0 / fatRes * gl_Position.w;',
+  '}',
+].join('\n');
+
+function edgePixelScale(renderer, resolution) {
+  if (!renderer || !resolution) return 1;
+  let width = resolution.x || 1;
+  let height = resolution.y || 1;
+  if (typeof renderer.getDrawingBufferSize === 'function') {
+    renderer.getDrawingBufferSize(resolution);
+    width = resolution.x || 1;
+    height = resolution.y || 1;
+  } else if (renderer.domElement) {
+    width = renderer.domElement.width || width;
+    height = renderer.domElement.height || height;
+    resolution.set(width, height);
+  }
+  const canvas = renderer.domElement;
+  if (canvas && canvas.clientWidth) {
+    const dpr = width / canvas.clientWidth;
+    if (dpr > 0) return dpr;
+  }
+  return 1;
+}
+
+function fatEdgeMaterial(THREE, edgePx) {
+  const material = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 1,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  material.forceSinglePass = true;
+  const resolution = new THREE.Vector2(1, 1);
+  material.userData.edgePx = edgePx;
+  material.userData.edgeResolution = resolution;
+  material.customProgramCacheKey = function () {
+    return 'fat-edge-overlay';
+  };
+  material.onBeforeCompile = function (shader, renderer) {
+    if (!shader.uniforms) shader.uniforms = {};
+    const dpr = edgePixelScale(renderer, resolution);
+    shader.uniforms.edgeThickness = { value: edgePx * dpr };
+    shader.uniforms.edgeResolution = { value: resolution };
+    material.userData.edgeThickness = shader.uniforms.edgeThickness;
+    if (shader.vertexShader.indexOf('edgeThickness') < 0) {
+      shader.vertexShader =
+        'uniform float edgeThickness;\n' +
+        'uniform vec2 edgeResolution;\n' +
+        'attribute vec3 fatA;\n' +
+        'attribute vec3 fatB;\n' +
+        'attribute float fatSide;\n' +
+        'attribute float fatEnd;\n' +
+        shader.vertexShader.replace(
+          '#include <project_vertex>',
+          '#include <project_vertex>\n' + FAT_EDGE_GLSL
+        );
+    }
+  };
+  return material;
+}
+
+function bindFatEdge(mesh) {
+  mesh.userData.fatEdge = true;
+  mesh.onBeforeRender = function (renderer) {
+    const ud = mesh.material && mesh.material.userData;
+    if (!ud || !ud.edgeThickness) return;
+    const dpr = edgePixelScale(renderer, ud.edgeResolution);
+    ud.edgeThickness.value = ud.edgePx * dpr;
+  };
+}
+
 export function makeOverlays(THREE) {
   function mat(opacity) {
     return new THREE.MeshBasicMaterial({
@@ -461,21 +610,17 @@ export function makeOverlays(THREE) {
   // Whole-item fill sits under the gizmo. 0.72 washes the cylinder arrows out.
   selFace.userData.faceOpacity = 0.72;
   selFace.userData.itemOpacity = 0.35;
-  const selLines = new THREE.LineSegments(
-    new THREE.BufferGeometry(),
-    new THREE.LineBasicMaterial({ depthTest: false, transparent: true, opacity: 1 })
-  );
-  const hoverLines = new THREE.LineSegments(
-    new THREE.BufferGeometry(),
-    new THREE.LineBasicMaterial({ depthTest: false, transparent: true, opacity: 1 })
-  );
+  const selLines = new THREE.Mesh(new THREE.BufferGeometry(), fatEdgeMaterial(THREE, SEL_EDGE_PX));
+  const hoverLines = new THREE.Mesh(new THREE.BufferGeometry(), fatEdgeMaterial(THREE, HOVER_EDGE_PX));
+  bindFatEdge(selLines);
+  bindFatEdge(hoverLines);
   const selPoints = new THREE.Points(
     new THREE.BufferGeometry(),
-    new THREE.PointsMaterial({ size: 10, sizeAttenuation: false, depthTest: false })
+    new THREE.PointsMaterial({ size: SEL_POINT_SIZE, sizeAttenuation: false, depthTest: false })
   );
   const hoverPoints = new THREE.Points(
     new THREE.BufferGeometry(),
-    new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, depthTest: false })
+    new THREE.PointsMaterial({ size: HOVER_POINT_SIZE, sizeAttenuation: false, depthTest: false })
   );
   const nodes = [selFace, hoverFace, selLines, hoverLines, selPoints, hoverPoints];
   for (let i = 0; i < nodes.length; i += 1) {
@@ -495,6 +640,19 @@ export function makeOverlays(THREE) {
   function setBuffer(obj, positions, itemSize) {
     obj.geometry.dispose();
     const geo = new THREE.BufferGeometry();
+    if (obj.userData.fatEdge) {
+      const built = expandEdgeOverlay(positions);
+      if (built.count > 0) {
+        geo.setAttribute('position', new THREE.BufferAttribute(built.position, 3));
+        geo.setAttribute('fatA', new THREE.BufferAttribute(built.fatA, 3));
+        geo.setAttribute('fatB', new THREE.BufferAttribute(built.fatB, 3));
+        geo.setAttribute('fatSide', new THREE.BufferAttribute(built.side, 1));
+        geo.setAttribute('fatEnd', new THREE.BufferAttribute(built.end, 1));
+      }
+      obj.geometry = geo;
+      obj.visible = built.count > 0;
+      return;
+    }
     if (positions && positions.length) {
       geo.setAttribute('position', new THREE.BufferAttribute(positions, itemSize));
     }
