@@ -3,6 +3,16 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-24
+- 2026-10-24 PR #37 (merged at a688c71): countersink default 90° (ISO 10642) in web/occt-ops.mjs and the hole angle field, occt_gate assert updated, and edge_fillet_smoke registered in CTest.
+- 2026-10-24 PR #34 (merged at 540cc07): phone fillet and chamfer on picked edges, edge_fillet_smoke.py, and related web/phone-select wiring.
+- 2026-10-24 PR #41 (merged at a8d3ac1): AGENTS.md and ORGANIZATION.md log the stuck+backup standing rule (Chief + 3T, 2026-10-24).
+- 2026-10-24 PR #31 (merged at 80858f6): phone selection — tap, pick filter chip, Multi, delete/undo, with phone-select.mjs and tests.
+- 2026-10-24 PR #24 (merged at 0e73596): field nudge swipe on focused value fields.
+- 2026-10-23 PR #22 (merged at b61b881): three-finger swipe undo/redo.
+- 2026-10-23 PR #21 (merged at 50980eb): view cube swipe to the next face, with cubeTapMs clear-on-swipe.
+- 2026-10-23 PR #40 (merged at f85bf00): parks Erik's P1–P5 queue in tracked web/PROGRESS.md.
+
 ## 2026-10-23
 - 2026-10-23 PR #38 (merged at 4dcf789): Moves the Pages PR preview banner to the top (dismissible), replaces NEEDS ERIK'S REVIEW / unreviewed C++ with needs team review, drops the review flag for JS-only #31/#34, and logs the owed UPDATES line for #35.
 - 2026-10-23 PR #35 (merged at 2025cbd): adds PR #34 to the Pages previews at /cad-mvp/pr34/ with the needs-review banner, since #34 is stacked on #31/#24 and so carries #20's C++.
