@@ -41,11 +41,8 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [gui/ui-gap-p2.md](gui/ui-gap-p2.md): P2 UI gap analysis vs Fusion/Onshape/FreeCAD — selection, measure/callouts, shaders, shelf show/hide, sketch; feeds parked P1/P3/P4/P5 (2026-10-24).
 - [gui/measure-callouts-p5.md](gui/measure-callouts-p5.md): P5a/P5b Measure + live callouts implementation prep — two-point distance, edge length, volume (mm); viewport L×W×H / Ø×H while editing; before P5c sketch (2026-10-24).
 - [gui/sketch-mvp-p5c.md](gui/sketch-mvp-p5c.md): P5c minimal sketch→extrude follow-on after P2 — rect/circle on face, Blind extrude mm, no constraint solver; phone 44 px; OCCT MakePrism + validity/units (2026-10-24).
-<<<<<<< HEAD
-- [gui/origin-plane-sketch.md](gui/origin-plane-sketch.md): origin-plane empty-doc sketch prep after P5c — world XY/XZ/YZ picker TBD, reuse Blind 10 mm MakePrism + OCCT/mm (2026-10-24).
-=======
-- [gui/post-p5c-next.md](gui/post-p5c-next.md): post-P5c next-queue candidates after P1–P5 close (#70) — deferred opens + ready digests for 3T pickup (2026-10-24).
->>>>>>> origin/main
+- [gui/post-p5c-next.md](gui/post-p5c-next.md): post-P5c next-queue candidates after P1-P5 close (#70) - deferred opens + ready digests for 3T pickup (2026-10-24).
+- [gui/origin-plane-sketch.md](gui/origin-plane-sketch.md): origin-plane empty-doc sketch prep after P5c - world XY/XZ/YZ picker TBD, reuse Blind 10 mm MakePrism + OCCT/mm (2026-10-24).
 - [occt-wasm/booleans.md](occt-wasm/booleans.md): why Modo mesh Booleans fail, OCCT 8.0.1 Fuzzy/Glue/NonDestructive/SimplifyResult with libcascade 3.1.0 bindings, live-drag preview (ghost or manifold-3d) and exact OCCT on release (2026-10-21).
 - [gui/booleans-fillet-chamfer.md](gui/booleans-fillet-chamfer.md): MODO MeshFusion strengths/limits (no source says it "failed"; Modo discontinued after 17.1), OCCT MakeFillet/MakeChamfer/Fuse + BRepCheck/FreeBounds gate, libcascade 3.1.0 bindings verified, L-bracket PROPOSAL with dims TBD (2026-10-21).
 - [mobile-touch-cad.md](mobile-touch-cad.md): mobile touch patterns for the CAD viewport: hit sizes (WCAG 24/44 px, HIG 44 pt, Material 48 dp), tap vs drag (Android 8 dp slop), decimal entry in mm, next steps for step 2 gizmo (2026-10-21).
