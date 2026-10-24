@@ -2584,8 +2584,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   const bodyMat = new THREE.MeshStandardMaterial({
     color: 0x5aa4d6,
-    metalness: 0.1,
-    roughness: 0.42
+    metalness: 0,
+    roughness: 0.6
   });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), bodyMat);
   mesh.position.y = 10;
