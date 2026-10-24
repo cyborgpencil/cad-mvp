@@ -228,6 +228,169 @@ expect('blank is not size', phone.occtSizeFailure(''), false);
 expect('cross text is not size', phone.occtSizeFailure(phone.CROSS_BODY_MESSAGE), false);
 expect('mesh reject is not size', phone.occtSizeFailure('FAIL: the new mesh was rejected. The last good shape was kept.'), false);
 
+expect('sel point size', view.SEL_POINT_SIZE, 18);
+expect('hover point size', view.HOVER_POINT_SIZE, 14);
+expectOk('points thicker than the old 10 and 9', view.SEL_POINT_SIZE > 10 && view.HOVER_POINT_SIZE > 9);
+expectOk('hover point is smaller', view.HOVER_POINT_SIZE < view.SEL_POINT_SIZE);
+expect('sel edge px', view.SEL_EDGE_PX, 6);
+expect('hover edge px', view.HOVER_EDGE_PX, 4);
+expectOk('edges thicker than a 1px webgl line', view.SEL_EDGE_PX > 1 && view.HOVER_EDGE_PX > 1);
+expectOk('hover edge is thinner', view.HOVER_EDGE_PX < view.SEL_EDGE_PX);
+
+const ribbon = view.expandEdgeOverlay([1, 2, 3, 4, 5, 6]);
+expect('ribbon count', ribbon.count, 1);
+expect('ribbon position length', ribbon.position.length, 18);
+expect('ribbon side', Array.from(ribbon.side), [-1, 1, 1, -1, 1, -1]);
+expect('ribbon end', Array.from(ribbon.end), [-1, -1, 1, -1, 1, 1]);
+expect('ribbon start', [ribbon.position[0], ribbon.position[1], ribbon.position[2]], [1, 2, 3]);
+expect('ribbon far', [ribbon.position[6], ribbon.position[7], ribbon.position[8]], [4, 5, 6]);
+expect('fatA stays start', [ribbon.fatA[6], ribbon.fatA[7], ribbon.fatA[8]], [1, 2, 3]);
+expect('fatB stays end', [ribbon.fatB[0], ribbon.fatB[1], ribbon.fatB[2]], [4, 5, 6]);
+expect('empty ribbon', view.expandEdgeOverlay([]).count, 0);
+expect('two ribbons', view.expandEdgeOverlay([0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0]).count, 2);
+
+function StubColor() {
+  this.r = 1;
+  this.g = 1;
+  this.b = 1;
+  this.copy = function (c) {
+    this.r = c.r;
+    this.g = c.g;
+    this.b = c.b;
+    return this;
+  };
+}
+function StubVector2(x, y) {
+  this.x = x || 0;
+  this.y = y || 0;
+  this.set = function (nx, ny) {
+    this.x = nx;
+    this.y = ny;
+    return this;
+  };
+}
+function StubGeometry() {
+  this.attributes = {};
+  this.setAttribute = function (name, attr) {
+    this.attributes[name] = attr;
+    return this;
+  };
+  this.dispose = function () {};
+}
+function StubAttr(array, itemSize) {
+  this.array = array;
+  this.itemSize = itemSize;
+}
+function StubBasic(params) {
+  this.opacity = params.opacity;
+  this.depthTest = params.depthTest;
+  this.depthWrite = params.depthWrite;
+  this.transparent = params.transparent;
+  this.side = params.side;
+  this.color = new StubColor();
+  this.userData = {};
+  this.isMeshBasicMaterial = true;
+}
+function StubPoints(params) {
+  this.size = params.size;
+  this.sizeAttenuation = params.sizeAttenuation;
+  this.depthTest = params.depthTest;
+  this.color = new StubColor();
+}
+function StubObject(geo, mat) {
+  this.geometry = geo;
+  this.material = mat;
+  this.userData = {};
+  this.visible = true;
+  this.renderOrder = 0;
+  this.frustumCulled = true;
+}
+const stubThree = {
+  DoubleSide: 2,
+  Vector2: StubVector2,
+  BufferGeometry: StubGeometry,
+  BufferAttribute: StubAttr,
+  MeshBasicMaterial: StubBasic,
+  PointsMaterial: StubPoints,
+  Mesh: StubObject,
+  Points: StubObject,
+};
+const overlays = view.makeOverlays(stubThree);
+expect('sel point material', overlays.selPoints.material.size, view.SEL_POINT_SIZE);
+expect('hover point material', overlays.hoverPoints.material.size, view.HOVER_POINT_SIZE);
+expect('sel edge material', overlays.selLines.material.userData.edgePx, view.SEL_EDGE_PX);
+expect('hover edge material', overlays.hoverLines.material.userData.edgePx, view.HOVER_EDGE_PX);
+expect('item opacity stays', overlays.selFace.userData.itemOpacity, 0.35);
+expect('face opacity stays', overlays.selFace.userData.faceOpacity, 0.72);
+expectOk('edge overlay is a fat mesh', overlays.selLines.userData.fatEdge === true && overlays.selLines.material.isMeshBasicMaterial === true);
+expect('fat cache key', overlays.selLines.material.customProgramCacheKey(), 'fat-edge-overlay');
+expectOk('hover cache matches', overlays.hoverLines.material.customProgramCacheKey() === overlays.selLines.material.customProgramCacheKey());
+
+overlays.setBuffer(overlays.selFace, new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3);
+expect('face buffer length', overlays.selFace.geometry.attributes.position.array.length, 9);
+expectOk('face is not a ribbon', overlays.selFace.geometry.attributes.fatA == null);
+expect('face visible', overlays.selFace.visible, true);
+
+overlays.setBuffer(overlays.selLines, new Float32Array([0, 0, 0, 10, 0, 0]), 3);
+expect('edge visible', overlays.selLines.visible, true);
+expect('edge expanded', overlays.selLines.geometry.attributes.position.array.length, 18);
+expect('edge fatSide', overlays.selLines.geometry.attributes.fatSide.array.length, 6);
+overlays.setBuffer(overlays.hoverLines, new Float32Array(0), 3);
+expect('hover edge hidden', overlays.hoverLines.visible, false);
+overlays.setBuffer(overlays.selLines, new Float32Array(0), 3);
+expect('sel edge hidden', overlays.selLines.visible, false);
+expectOk('cleared edge has no position', overlays.selLines.geometry.attributes.position == null);
+
+const shader = {
+  uniforms: {},
+  vertexShader: 'void main(){\n#include <project_vertex>\n}\n',
+};
+overlays.selLines.material.onBeforeCompile(shader, {
+  getDrawingBufferSize: function (target) { return target.set(200, 100); },
+  domElement: { clientWidth: 100, width: 200, height: 100 },
+});
+expect('thickness tracks device pixels', shader.uniforms.edgeThickness.value, view.SEL_EDGE_PX * 2);
+expect('resolution width', shader.uniforms.edgeResolution.value.x, 200);
+expectOk('project include stays', shader.vertexShader.indexOf('#include <project_vertex>') >= 0);
+expectOk('ribbon shader injected', shader.vertexShader.indexOf('fatClipA') >= 0 && shader.vertexShader.indexOf('fatA') >= 0);
+expectOk('shader has no colour literal', shader.vertexShader.indexOf('#ff4fd8') < 0 && shader.vertexShader.indexOf('linewidth') < 0);
+const injected = shader.vertexShader;
+overlays.selLines.material.onBeforeCompile(shader, null);
+expect('shader injects once', shader.vertexShader, injected);
+overlays.selLines.onBeforeRender({
+  getDrawingBufferSize: function (target) { return target.set(300, 150); },
+  domElement: { clientWidth: 100 },
+});
+expect('resize keeps css width', overlays.selLines.material.userData.edgeThickness.value, view.SEL_EDGE_PX * 3);
+
+const vertexClick = selection.applyPointerSelection('vertex', ['v0', 'v1'], 'v2', {});
+expect('vertex click replaces', vertexClick.ids, ['v2']);
+expect('vertex click highlight', vertexClick.highlight, true);
+expect('vertex click not all', vertexClick.all, false);
+const edgeClick = selection.applyPointerSelection('edge', ['e0'], 'e4', {});
+expect('edge click replaces', edgeClick.ids, ['e4']);
+expect('edge click highlight', edgeClick.highlight, true);
+expect('edge click not all', edgeClick.all, false);
+const faceClick = selection.applyPointerSelection('face', ['f0', 'f4'], 'f1', {});
+expect('face click replaces', faceClick.ids, ['f1']);
+expect('face click highlight', faceClick.highlight, true);
+expect('face click not all', faceClick.all, false);
+const shiftEdge = selection.applyPointerSelection('edge', ['e0'], 'e1', { shift: true });
+expect('shift still adds', shiftEdge.ids, ['e0', 'e1']);
+expect('shift highlight', shiftEdge.highlight, true);
+const emptyVertex = selection.applyPointerSelection('vertex', ['v0'], null, {});
+expect('empty vertex ids', emptyVertex.ids, []);
+expect('empty vertex all', emptyVertex.all, true);
+expect('empty vertex highlight', emptyVertex.highlight, false);
+const emptyEdge = selection.applyPointerSelection('edge', ['e0', 'e1'], null, {});
+expect('empty edge ids', emptyEdge.ids, []);
+expect('empty edge all', emptyEdge.all, true);
+expect('empty edge highlight', emptyEdge.highlight, false);
+const emptyFace = selection.applyPointerSelection('face', ['f0'], null, {});
+expect('empty face ids', emptyFace.ids, []);
+expect('empty face all', emptyFace.all, true);
+expect('empty face highlight', emptyFace.highlight, false);
+
 if (failures.length) {
   console.error('FAIL ' + failures.length);
   process.exit(1);

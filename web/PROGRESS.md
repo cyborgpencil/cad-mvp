@@ -369,16 +369,18 @@ Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37
 
 | # | Item | Status | Source | Date |
 |---|---|---|---|---|
-| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Team-chosen: exclusive V/E/F, click replaces; multi-filter later. Not started | Erik | 2026-10-23 |
+| P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others. Vertex points are 18 px selected and 14 px hover. Edges are screen-space ribbons, 6 px selected and 4 px hover, because WebGL ignores line width. Face fill is unchanged (item opacity 0.35). | Team-chosen: exclusive V/E/F, click replaces; multi-filter later. Overlay sizes on feat/selection-clarity (draft PR #47) | Erik | 2026-10-24 |
 | P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Digest on main (#43); research done | Erik | 2026-10-23 |
 | P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Team-chosen: metalness 0, roughness 0.55–0.65. Not implemented | Erik | 2026-10-23 |
 | P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Spec ready / waiting Pilot after P1 | Erik | 2026-10-23 |
 | P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Team-chosen: measure + live callouts first; sketch after P2. Not implemented | Erik | 2026-10-23 |
 
-- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P2 UI-gap digest is on main via #43 (`research/gui/ui-gap-p2.md`). P1, P3, and P5 locks below remain team-chosen and not implemented. P4 stays spec ready / waiting Pilot after P1.
+- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P2 UI-gap digest is on main via #43 (`research/gui/ui-gap-p2.md`). P1 overlay sizes are on branch feat/selection-clarity (draft PR #47). P3 and P5 locks remain team-chosen and not implemented. P4 stays spec ready / waiting Pilot after P1.
 
 ### P1 — exclusive highlight (3T final, 2026-10-24)
-Clicking a vertex, edge, or face highlights that component and unselects the others. A click replaces the highlight. A multi-filter is later. This matches Erik's parked wording. On main, `applyPointerSelection` in `web/selection.mjs` already replaces on a plain click; Shift adds and Ctrl removes. That modifier behaviour stays as it is on main. The selection-clarity pass itself is not started.
+Clicking a vertex, edge, or face highlights that component and unselects the others. A click replaces the highlight. A multi-filter is later. This matches Erik's parked wording. `applyPointerSelection` in `web/selection.mjs` replaces on a plain click; Shift adds and Ctrl removes. That modifier behaviour stays. Empty Vertex, Edge, or Face still means all, with the highlight cleared.
+
+Overlay sizes chosen 2026-10-24 (America/Denver) on feat/selection-clarity (draft PR #47): vertex points are 18 px selected and 14 px hover. Edges are screen-space ribbons, 6 CSS px selected and 4 CSS px hover, because WebGL ignores line width. Face fill is unchanged (item opacity 0.35).
 
 ### P3 — flatter default (3T final, 2026-10-24)
 Default solid material is metalness 0 and roughness about 0.55–0.65. That range is the lock. On main the body material in `web/index.html` is metalness 0.1 and roughness 0.42. Not implemented.

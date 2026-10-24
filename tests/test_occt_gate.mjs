@@ -48,7 +48,7 @@ if (existsSync(blinkPath)) {
   try { blinkMod = await import(blinkUrl); } catch (e) { blinkMod = null; }
 }
 const { applyPointerSelection, groupMeshFaces, modeFromHotkey, isTypingTarget, isViewportHotkeyTarget, selectionHotkeyAllowed, PICK_TOLERANCE_PX, TOUCH_PICK_TOLERANCE_PX } = await import(selUrl);
-const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles, viewerBuffersFromCad, viewerVertexNormals } = await import(viewUrl);
+const { threeDeltaToCad, GIZMO_AXIS_THREE, TAP_SLOP_PX, GIZMO_TOUCH_ZONE_PX, SNAP_MM, SNAP_DEG, STEPPER_MM, STEPPER_FINE_MM, STEPPER_DEG, STEPPER_FINE_DEG, LONG_PRESS_MS, snapNumber, isTapMove, handleKind, GIZMO_MODES, faceFrameFromTriangles, viewerBuffersFromCad, viewerVertexNormals, SEL_POINT_SIZE, HOVER_POINT_SIZE, SEL_EDGE_PX, HOVER_EDGE_PX } = await import(viewUrl);
 const blinkJsonPath = path.join(root, 'tests', 'fixtures', 'blink.json');
 let blinkFile = null;
 if (existsSync(blinkJsonPath)) {
@@ -280,6 +280,16 @@ const allFaces = applyPointerSelection('face', ['f0'], null, {});
 expect('empty face is all', allFaces.ids.length === 0 && allFaces.all === true && allFaces.highlight === false);
 const clearedItem = applyPointerSelection('item', ['item'], null, {});
 expect('empty item is not all', clearedItem.ids.length === 0 && clearedItem.all === false && clearedItem.highlight === false);
+const vertexClick = applyPointerSelection('vertex', ['v0', 'v1'], 'v2', {});
+expect('vertex click replaces', vertexClick.ids.length === 1 && vertexClick.ids[0] === 'v2' && vertexClick.highlight === true && vertexClick.all === false);
+const edgeClick = applyPointerSelection('edge', ['e0'], 'e4', {});
+expect('edge click replaces', edgeClick.ids.length === 1 && edgeClick.ids[0] === 'e4' && edgeClick.highlight === true && edgeClick.all === false);
+const emptyVertex = applyPointerSelection('vertex', ['v0'], null, {});
+expect('empty vertex clears highlight', emptyVertex.ids.length === 0 && emptyVertex.all === true && emptyVertex.highlight === false);
+const emptyEdge = applyPointerSelection('edge', ['e0', 'e1'], null, {});
+expect('empty edge clears highlight', emptyEdge.ids.length === 0 && emptyEdge.all === true && emptyEdge.highlight === false);
+expect('overlay point sizes', SEL_POINT_SIZE === 18 && HOVER_POINT_SIZE === 14 && HOVER_POINT_SIZE < SEL_POINT_SIZE && SEL_POINT_SIZE > 10);
+expect('overlay edge sizes', SEL_EDGE_PX === 6 && HOVER_EDGE_PX === 4 && HOVER_EDGE_PX < SEL_EDGE_PX && SEL_EDGE_PX > 1);
 
 expect('hotkey 1', modeFromHotkey('1') === 'vertex');
 expect('hotkey 2', modeFromHotkey('2') === 'edge');
