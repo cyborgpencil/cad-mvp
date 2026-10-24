@@ -89,13 +89,13 @@ jobs:
           python3 web/assemble_site.py _site
           sha=$(git rev-parse --short HEAD)
           if [ "$REVIEW" = "true" ]; then
-            label="PR #${PR} preview (${sha}) - NEEDS ERIK'S REVIEW: contains unreviewed C++"
+            label="PR #${PR} preview (${sha}) — needs team review"
             color="#b00020"
           else
             label="PR #${PR} preview (${sha})"
             color="#5a3d00"
           fi
-          banner="<div id=\"prPreviewBanner\" style=\"position:fixed;left:0;right:0;bottom:0;z-index:99999;background:${color};color:#fff;font:600 12px system-ui;padding:3px 8px;text-align:center;pointer-events:none\">${label}</div>"
+                    banner="<div id=\"prPreviewBanner\" role=\"status\" style=\"position:fixed;left:0;right:0;top:0;z-index:99999;background:${color};color:#fff;font:600 12px system-ui;padding:calc(3px + env(safe-area-inset-top,0px)) 36px 3px 8px;text-align:center\"><span>${label}</span><button type=\"button\" aria-label=\"Dismiss preview banner\" onclick=\"this.parentElement.remove()\" style=\"position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#fff;font:700 16px/1 system-ui;padding:8px;min-width:44px;min-height:44px\">×</button></div>"
           python3 - "$banner" <<'PY'
           import sys, pathlib
           p = pathlib.Path("_site/index.html")
@@ -175,7 +175,7 @@ jobs:
               read -r pr sha review subject < "$m"
               [ -d "previews-in/pr${pr}" ] || continue
               rm -rf "_site/pr${pr}" && cp -r "previews-in/pr${pr}" "_site/pr${pr}"
-              note=""; [ "$review" = "true" ] && note=' <strong style="color:#b00020">NEEDS ERIK&#39;S REVIEW (unreviewed C++)</strong>'
+              note=""; [ "$review" = "true" ] && note=' <strong style="color:#b00020">needs team review</strong>'
               echo "<li><a href=\"../pr${pr}/\">PR #${pr}</a> at ${sha}: ${subject}${note}</li>"
             done
             echo '</ul>'
