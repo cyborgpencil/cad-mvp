@@ -5,7 +5,8 @@ Uses Playwright's iPhone 13 device (390x844) and the portrait checks in
 deploy_smoke.py: overflow, inert panel, one-row toolbar, Info/Tree row,
 Part 1 visible, one search, coverage thresholds, Home, the nav cube, the
 3-hole plate, and the empty-document origin-plane sketch (Top / Front /
-Right, then Blind 10 mm).
+Right, then Blind 10 mm). Those portrait runs also check the Extrude
+New / Join / Cut chips are at least 44 CSS px and stay off the bottom bar.
 
 Playwright lives in the gitignored builds/pwvenv. When it cannot be
 imported, exit 77. Exit 1 under CI=1 only when a workflow file installs

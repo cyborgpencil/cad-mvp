@@ -40,13 +40,21 @@ Asserts window.__cadcamExportState.occtReady for:
                         Blind inputs, and Extrude Confirm are at least 44 px; the
                         sketch sheet does not cover the phone tab bar, status bar,
                         or view bar; the top face becomes the plane with no V/E/F
-                        highlight; the origin-plane picker stays off; the check
-                        does not extrude and leaves the box
+                        highlight; the origin-plane picker stays off; Extrude on
+                        that face opens on Join, and New / Join / Cut are each at
+                        least 44 px; a 10×10 top-face rect Blind 10 mm Join leaves
+                        one body at 9000 mm³; the same profile overridden to New
+                        leaves two bodies; the page is restored to the 20 mm box
   portrait origin plane empty doc (bodies.length === 0, not projectBlank):
                         Top / Front / Right chips are at least 44 px and do not
                         cover the phone tab bar, status bar, or view bar; Top is
                         XY with +Z outward; rectangle 10×10 and circle Ø10 each
-                        Blind 10 mm add a new body that passes OCCT and mm
+                        open Extrude on New and Blind 10 mm add a new body that
+                        passes OCCT and mm; Join or Cut with no body, or without
+                        exactly one Item-selected body, rejects; one Item-selected
+                        20 mm box Cut by that 10×10 prism is 7000 mm³; a Ø40
+                        circle Blind 30 mm that contains the box is rejected and
+                        the 8000 mm³ box stays
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
   measure tool          default 20 mm cube: one edge polyline ~20 mm, volume ~8000 mm³,
@@ -1145,6 +1153,49 @@ SKETCH_PORTRAIT_EXPR = r"""
       if (overlaps(sheetBox, barBox)) problems.push(label + ' covers ' + bars[i]);
     }
   }
+  function assertExtrudeChips(label, mode) {
+    var row = document.getElementById('sketchModeRow');
+    if (!row || row.hidden) { problems.push(label + ' mode row hidden'); return; }
+    var chips = row.querySelectorAll('[data-action="sketchExtrudeMode"]');
+    if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
+    var names = [];
+    var on = '';
+    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    for (var i = 0; i < chips.length; i++) {
+      var text = (chips[i].textContent || '').replace(/\s+/g, '');
+      names.push(text);
+      if (/intersect/i.test(text)) problems.push(label + ' intersect chip');
+      var r = boxOf(chips[i]);
+      if (!r) { problems.push(label + ' ' + text + ' hidden'); continue; }
+      if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+        problems.push(label + ' ' + text + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+      }
+      if (r.left < -0.5 || r.right > window.innerWidth + 0.5) problems.push(label + ' ' + text + ' offscreen');
+      for (var b = 0; b < bars.length; b++) {
+        var bar = document.querySelector(bars[b]);
+        var barBox = boxOf(bar);
+        if (barBox && overlaps(r, barBox)) problems.push(label + ' ' + text + ' covers ' + bars[b]);
+      }
+      if (chips[i].classList.contains('is-on')) on = chips[i].getAttribute('data-mode') || '';
+    }
+    if (names.join(',') !== 'New,Join,Cut') problems.push(label + ' chips ' + names.join(','));
+    if (on !== mode) problems.push(label + ' mode ' + on + ' wanted ' + mode);
+    var chipState = hook.state();
+    if (!chipState || chipState.extrudeMode !== mode) {
+      problems.push(label + ' state mode ' + (chipState && chipState.extrudeMode));
+    }
+  }
+  function tapExtrudeMode(mode) {
+    var btn = document.querySelector('#sketchModeRow [data-mode="' + mode + '"]');
+    if (!btn) { problems.push('missing mode ' + mode); return; }
+    btn.click();
+    if (!btn.classList.contains('is-on')) problems.push(mode + ' not on');
+  }
+  function openCreate() {
+    var menu = document.getElementById('createMenu');
+    if (menu && menu.hidden !== true) return true;
+    return visibleClick('[data-action="createMenu"]');
+  }
   var hook = window.__cadcamSketch;
   if (!hook || typeof hook.tapFace !== 'function' || typeof hook.state !== 'function') {
     problems.push('missing sketch hook');
@@ -1221,6 +1272,7 @@ SKETCH_PORTRAIT_EXPR = r"""
   var published = window.__cadcamExportState || {};
   if (published.sketchDepthDefault !== 10) problems.push('depth default ' + published.sketchDepthDefault);
   cover('extrude');
+  assertExtrudeChips('extrude', 'join');
   scrollOk('extrude sheet');
   if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener for cleanup hidden');
   menu = document.getElementById('createMenu');
@@ -1245,6 +1297,154 @@ SKETCH_PORTRAIT_EXPR = r"""
   var menuLeft = document.getElementById('createMenu');
   if (menuLeft && menuLeft.hidden !== true) problems.push('create menu left open');
   scrollOk('cleanup');
+  if (!openCreate()) problems.push('face join create hidden');
+  menu = document.getElementById('createMenu');
+  sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+  if (sketchItem) sketchItem.click();
+  else problems.push('face join sketch missing');
+  var faceJoin = hook.topFace();
+  if (!faceJoin) problems.push('face join no top');
+  var tappedJoin = faceJoin ? hook.tapFace(faceJoin) : false;
+  if (tappedJoin !== true) problems.push('face join tap ' + String(tappedJoin));
+  st = hook.state();
+  if (!st || !st.faceId) problems.push('face join faceId ' + (st && st.faceId));
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('face join tools hidden');
+  rectBtn = sheetBtn('Rectangle');
+  if (rectBtn) rectBtn.click();
+  else problems.push('face join rectangle missing');
+  var joinL = document.getElementById('sketchL');
+  var joinW = document.getElementById('sketchW');
+  if (joinL) joinL.value = '10';
+  if (joinW) joinW.value = '10';
+  confirmBtn = document.getElementById('sketchConfirm');
+  if (confirmBtn && confirmBtn.disabled !== true) confirmBtn.click();
+  else problems.push('face join rect confirm');
+  finish = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (finish) finish.click();
+  else problems.push('face join finish missing');
+  st = hook.state();
+  if (!st || st.tab !== 'model' || st.profile !== 'rect' || st.closed !== true) {
+    problems.push('face join profile ' + (st && st.profile) + ' tab ' + (st && st.tab));
+  }
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('face join extrude tools');
+  ext = sheetBtn('Extrude (Push/Pull)');
+  if (ext) ext.click();
+  else problems.push('face join extrude missing');
+  var joinDepth = document.getElementById('sketchDepth');
+  if (joinDepth) joinDepth.value = '10';
+  assertExtrudeChips('face join', 'join');
+  confirmBtn = document.getElementById('sketchConfirm');
+  if (confirmBtn && confirmBtn.disabled !== true) confirmBtn.click();
+  else problems.push('face join confirm disabled');
+  st = hook.state();
+  published = window.__cadcamExportState || {};
+  if (!st || st.bodies !== 1) problems.push('face join bodies ' + (st && st.bodies));
+  if (!st || st.emptyBodies !== 0) problems.push('face join empty ' + (st && st.emptyBodies));
+  if (st && st.closed) problems.push('face join profile kept');
+  if (published.bodyCount !== 1) problems.push('face join count ' + published.bodyCount);
+  if (published.occtGate !== true || published.gateOcct !== 'PASS') {
+    problems.push('face join occt ' + published.gateOcct + ' ' + (published.occtMessage || ''));
+  }
+  if (published.unitsPass !== true) problems.push('face join units');
+  if (published.lastError) problems.push('face join error ' + published.lastError);
+  var joinHintEl = document.getElementById('statusHint');
+  var joinHint = joinHintEl ? String(joinHintEl.textContent || '') : '';
+  if (joinHint.indexOf('OCCT valid') < 0 || joinHint.indexOf('mm') < 0 || joinHint.indexOf('Join') < 0) {
+    problems.push('face join hint ' + joinHint);
+  }
+  var joinVol = Number(published.volumeMm3);
+  if (!(Math.abs(joinVol - 9000) < 0.5)) problems.push('face join volume ' + joinVol);
+  if (!st || !st.bounds) problems.push('face join no bounds');
+  else {
+    if (Math.abs(st.bounds.min[2]) > 0.25) problems.push('face join zmin ' + st.bounds.min[2]);
+    if (Math.abs(st.bounds.max[2] - 30) > 0.25) problems.push('face join zmax ' + st.bounds.max[2]);
+  }
+  var joinDel = document.getElementById('deleteBtn');
+  if (joinDel) joinDel.click();
+  else problems.push('face join delete missing');
+  st = hook.state();
+  if (!st || st.bodies !== 0) problems.push('face reset bodies ' + (st && st.bodies));
+  if (!openCreate()) problems.push('face new create hidden');
+  menu = document.getElementById('createMenu');
+  var faceBox = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
+  if (faceBox) faceBox.click();
+  else problems.push('face new box missing');
+  st = hook.state();
+  if (!st || st.bodies !== 1) problems.push('face new box bodies ' + (st && st.bodies));
+  if (!openCreate()) problems.push('face new sketch create');
+  menu = document.getElementById('createMenu');
+  sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+  if (sketchItem) sketchItem.click();
+  var faceNew = hook.topFace();
+  var tappedNew = faceNew ? hook.tapFace(faceNew) : false;
+  if (tappedNew !== true) problems.push('face new tap ' + String(tappedNew));
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('face new tools');
+  rectBtn = sheetBtn('Rectangle');
+  if (rectBtn) rectBtn.click();
+  else problems.push('face new rectangle missing');
+  if (joinL) joinL.value = '10';
+  if (joinW) joinW.value = '10';
+  confirmBtn = document.getElementById('sketchConfirm');
+  if (confirmBtn && confirmBtn.disabled !== true) confirmBtn.click();
+  else problems.push('face new rect confirm');
+  finish = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (finish) finish.click();
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('face new extrude tools');
+  ext = sheetBtn('Extrude (Push/Pull)');
+  if (ext) ext.click();
+  if (joinDepth) joinDepth.value = '10';
+  assertExtrudeChips('face new', 'join');
+  tapExtrudeMode('new');
+  confirmBtn = document.getElementById('sketchConfirm');
+  if (confirmBtn && confirmBtn.disabled !== true) confirmBtn.click();
+  else problems.push('face new confirm disabled');
+  st = hook.state();
+  published = window.__cadcamExportState || {};
+  if (!st || st.bodies !== 2) problems.push('face new bodies ' + (st && st.bodies));
+  if (!st || st.emptyBodies !== 0) problems.push('face new empty ' + (st && st.emptyBodies));
+  if (published.bodyCount !== 2) problems.push('face new count ' + published.bodyCount);
+  if (published.occtGate !== true || published.gateOcct !== 'PASS') {
+    problems.push('face new occt ' + published.gateOcct + ' ' + (published.occtMessage || ''));
+  }
+  if (published.unitsPass !== true) problems.push('face new units');
+  if (published.lastError) problems.push('face new error ' + published.lastError);
+  var newHintEl = document.getElementById('statusHint');
+  var newHint = newHintEl ? String(newHintEl.textContent || '') : '';
+  if (newHint.indexOf('New body') < 0 || newHint.indexOf('OCCT valid') < 0) problems.push('face new hint ' + newHint);
+  var itemBtnRestore = document.querySelector('[data-action="select"][data-mode="item"]');
+  var restoreDel = document.getElementById('deleteBtn');
+  var restoreGuard = 0;
+  while (hook.state() && hook.state().bodies > 0 && restoreGuard < 4) {
+    if (itemBtnRestore) itemBtnRestore.click();
+    var beforeBodies = hook.state().bodies;
+    if (restoreDel) restoreDel.click();
+    var afterState = hook.state();
+    if (!afterState || afterState.bodies >= beforeBodies) break;
+    restoreGuard += 1;
+  }
+  st = hook.state();
+  if (!st || st.bodies !== 0) problems.push('restore empty ' + (st && st.bodies));
+  if (!openCreate()) problems.push('restore create hidden');
+  menu = document.getElementById('createMenu');
+  var restoreBox = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
+  if (restoreBox) restoreBox.click();
+  else problems.push('restore box missing');
+  st = hook.state();
+  published = window.__cadcamExportState || {};
+  if (!st || st.bodies !== 1 || st.tab !== 'model' || st.plane || st.profile) {
+    problems.push('restore model bodies ' + (st && st.bodies) + ' tab ' + (st && st.tab));
+  }
+  if (published.primitiveKind !== 'box' || published.bodyCount !== 1) {
+    problems.push('restore ' + published.primitiveKind + ' bodies ' + published.bodyCount);
+  }
+  if (published.sketchSheetOpen) problems.push('restore sheet open');
+  if (published.sketchPlane) problems.push('restore plane set');
+  if (published.lastError) problems.push('restore error ' + published.lastError);
+  var toolsRestore = document.getElementById('toolsSheet');
+  if (toolsRestore && toolsRestore.hidden !== true) problems.push('restore tools open');
+  var menuRestore = document.getElementById('createMenu');
+  if (menuRestore && menuRestore.hidden !== true) problems.push('restore menu open');
+  scrollOk('restore');
   return JSON.stringify(problems);
 })()
 """
@@ -1364,6 +1564,86 @@ ORIGIN_PLANE_EXPR = r"""
     }
     btn.click();
   }
+  function assertExtrudeChips(label, mode) {
+    var row = document.getElementById('sketchModeRow');
+    if (!row || row.hidden) { problems.push(label + ' mode row hidden'); return; }
+    var chips = row.querySelectorAll('[data-action="sketchExtrudeMode"]');
+    if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
+    var names = [];
+    var on = '';
+    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    for (var i = 0; i < chips.length; i++) {
+      var text = (chips[i].textContent || '').replace(/\s+/g, '');
+      names.push(text);
+      if (/intersect/i.test(text)) problems.push(label + ' intersect chip');
+      var r = boxOf(chips[i]);
+      if (!r) { problems.push(label + ' ' + text + ' hidden'); continue; }
+      if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+        problems.push(label + ' ' + text + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+      }
+      if (r.left < -0.5 || r.right > window.innerWidth + 0.5) problems.push(label + ' ' + text + ' offscreen');
+      for (var b = 0; b < bars.length; b++) {
+        var bar = document.querySelector(bars[b]);
+        var barBox = boxOf(bar);
+        if (barBox && overlaps(r, barBox)) problems.push(label + ' ' + text + ' covers ' + bars[b]);
+      }
+      if (chips[i].classList.contains('is-on')) on = chips[i].getAttribute('data-mode') || '';
+    }
+    if (names.join(',') !== 'New,Join,Cut') problems.push(label + ' chips ' + names.join(','));
+    if (on !== mode) problems.push(label + ' mode ' + on + ' wanted ' + mode);
+    var chipState = hook.state();
+    if (!chipState || chipState.extrudeMode !== mode) {
+      problems.push(label + ' state mode ' + (chipState && chipState.extrudeMode));
+    }
+  }
+  function tapExtrudeMode(mode) {
+    var btn = document.querySelector('#sketchModeRow [data-mode="' + mode + '"]');
+    if (!btn) { problems.push('missing mode ' + mode); return; }
+    btn.click();
+    if (!btn.classList.contains('is-on')) problems.push(mode + ' not on');
+  }
+  function hintText() {
+    var hint = document.getElementById('statusHint');
+    return hint ? String(hint.textContent || '') : '';
+  }
+  function addBox(label) {
+    if (!visibleClick('[data-action="createMenu"]')) { problems.push(label + ' create hidden'); return false; }
+    var menu = document.getElementById('createMenu');
+    var boxBtn = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
+    if (!boxBtn) { problems.push(label + ' box missing'); return false; }
+    boxBtn.click();
+    return true;
+  }
+  function selectItem(label) {
+    var itemBtn = document.querySelector('[data-action="select"][data-mode="item"]');
+    if (!itemBtn) { problems.push(label + ' item missing'); return false; }
+    itemBtn.click();
+    return true;
+  }
+  function deleteAll(label) {
+    var guard = 0;
+    while (hook.state() && hook.state().bodies > 0 && guard < 6) {
+      if (!selectItem(label)) return false;
+      var del = document.getElementById('deleteBtn');
+      if (!del) { problems.push(label + ' delete missing'); return false; }
+      var before = hook.state().bodies;
+      del.click();
+      var after = hook.state();
+      if (!after || after.bodies >= before) {
+        problems.push(label + ' delete stuck ' + (after && after.bodies));
+        return false;
+      }
+      guard += 1;
+    }
+    return !!(hook.state() && hook.state().bodies === 0);
+  }
+  function openExtrude(label) {
+    if (!openTools()) return false;
+    var ext = sheetBtn('Extrude (Push/Pull)');
+    if (!ext) { problems.push(label + ' extrude missing'); return false; }
+    ext.click();
+    return true;
+  }
   function extrude(kind) {
     var finish = document.querySelector('#finishBar [data-action="finishSketch"]');
     if (finish) finish.click();
@@ -1378,6 +1658,7 @@ ORIGIN_PLANE_EXPR = r"""
     setMm('sketchDepth', '10');
     var depth = document.getElementById('sketchDepth');
     if (depth && String(depth.value).trim() !== '10') problems.push(kind + ' depth ' + (depth && depth.value));
+    assertExtrudeChips(kind, 'new');
     confirmSketch(kind + ' extrude');
   }
   function assertSolid(kind, expectVol, checkBounds) {
@@ -1525,6 +1806,138 @@ ORIGIN_PLANE_EXPR = r"""
       if (reach < 4.5 || reach > 5.2) problems.push('circle radius ' + reach);
     });
   }
+  if (!ensureEmpty('join empty')) return JSON.stringify(problems);
+  if (startSketch()) {
+    pickPlane('xy', 'Join empty', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+    if (openTools()) {
+      var emptyRect = sheetBtn('Rectangle');
+      if (!emptyRect) problems.push('join empty rectangle missing');
+      else emptyRect.click();
+      setMm('sketchL', '10');
+      setMm('sketchW', '10');
+      confirmSketch('join empty rect');
+      var emptyFinish = document.querySelector('#finishBar [data-action="finishSketch"]');
+      if (emptyFinish) emptyFinish.click();
+      else problems.push('join empty finish missing');
+      var emptySt = hook.state();
+      if (!emptySt || emptySt.bodies !== 0 || emptySt.profile !== 'rect' || emptySt.faceId) {
+        problems.push('join empty profile ' + (emptySt && emptySt.profile) + ' bodies ' + (emptySt && emptySt.bodies) + ' face ' + (emptySt && emptySt.faceId));
+      }
+      if (openExtrude('join empty')) {
+        assertExtrudeChips('join empty', 'new');
+        tapExtrudeMode('join');
+        confirmSketch('join empty');
+        emptySt = hook.state();
+        var emptyHint = hintText();
+        if (!emptySt || emptySt.bodies !== 0) problems.push('join empty bodies ' + (emptySt && emptySt.bodies));
+        if (!emptySt || emptySt.profile !== 'rect') problems.push('join empty kept ' + (emptySt && emptySt.profile));
+        if (emptyHint.indexOf('need a body') < 0) problems.push('join empty hint ' + emptyHint);
+        tapExtrudeMode('cut');
+        confirmSketch('cut empty');
+        emptySt = hook.state();
+        emptyHint = hintText();
+        if (!emptySt || emptySt.bodies !== 0) problems.push('cut empty bodies ' + (emptySt && emptySt.bodies));
+        if (!emptySt || emptySt.profile !== 'rect') problems.push('cut empty kept ' + (emptySt && emptySt.profile));
+        if (emptyHint.indexOf('need a body') < 0) problems.push('cut empty hint ' + emptyHint);
+      }
+    }
+  }
+  if (addBox('origin box')) {
+    var boxSt = hook.state();
+    var boxPub = window.__cadcamExportState || {};
+    if (!boxSt || boxSt.bodies !== 1) problems.push('origin box bodies ' + (boxSt && boxSt.bodies));
+    if (!boxSt || boxSt.picker !== false) problems.push('origin box picker');
+    if (!boxSt || boxSt.faceId) problems.push('origin box face ' + (boxSt && boxSt.faceId));
+    if (!boxSt || (boxSt.selectedIds && boxSt.selectedIds.length !== 0)) {
+      problems.push('origin box selected ' + JSON.stringify(boxSt && boxSt.selectedIds));
+    }
+    if (!(Math.abs(Number(boxPub.volumeMm3) - 8000) < 0.5)) problems.push('origin box volume ' + boxPub.volumeMm3);
+    if (boxSt && boxSt.profile !== 'rect') problems.push('origin box profile ' + (boxSt && boxSt.profile));
+    if (openExtrude('origin none')) {
+      assertExtrudeChips('origin none', 'new');
+      tapExtrudeMode('join');
+      confirmSketch('origin none');
+      boxSt = hook.state();
+      boxPub = window.__cadcamExportState || {};
+      if (!boxSt || boxSt.bodies !== 1) problems.push('origin none bodies ' + (boxSt && boxSt.bodies));
+      if (!(Math.abs(Number(boxPub.volumeMm3) - 8000) < 0.5)) problems.push('origin none volume ' + boxPub.volumeMm3);
+      if (!boxSt || boxSt.profile !== 'rect') problems.push('origin none profile ' + (boxSt && boxSt.profile));
+      if (hintText().indexOf('exactly one') < 0) problems.push('origin none hint ' + hintText());
+      if (boxPub.occtGate !== true) problems.push('origin none occt ' + boxPub.gateOcct);
+    }
+  }
+  if (addBox('origin second')) {
+    var twoSt = hook.state();
+    if (!twoSt || twoSt.bodies !== 2) problems.push('origin second bodies ' + (twoSt && twoSt.bodies));
+    if (selectItem('origin two') && openExtrude('origin two')) {
+      assertExtrudeChips('origin two', 'new');
+      tapExtrudeMode('cut');
+      confirmSketch('origin two');
+      twoSt = hook.state();
+      if (!twoSt || twoSt.bodies !== 2) problems.push('origin two after ' + (twoSt && twoSt.bodies));
+      if (!twoSt || twoSt.profile !== 'rect') problems.push('origin two profile ' + (twoSt && twoSt.profile));
+      if (hintText().indexOf('exactly one') < 0) problems.push('origin two hint ' + hintText());
+    }
+  }
+  if (deleteAll('origin clear') && addBox('overlap box')) {
+    var cutSt = hook.state();
+    var cutPub = window.__cadcamExportState || {};
+    if (!cutSt || cutSt.bodies !== 1 || cutSt.profile !== 'rect') {
+      problems.push('overlap setup bodies ' + (cutSt && cutSt.bodies) + ' profile ' + (cutSt && cutSt.profile));
+    }
+    if (!(Math.abs(Number(cutPub.volumeMm3) - 8000) < 0.5)) problems.push('overlap box volume ' + cutPub.volumeMm3);
+    if (selectItem('overlap') && openExtrude('overlap')) {
+      assertExtrudeChips('overlap', 'new');
+      setMm('sketchDepth', '10');
+      tapExtrudeMode('cut');
+      confirmSketch('overlap cut');
+      cutSt = hook.state();
+      cutPub = window.__cadcamExportState || {};
+      if (!cutSt || cutSt.bodies !== 1) problems.push('overlap bodies ' + (cutSt && cutSt.bodies));
+      if (!cutSt || cutSt.emptyBodies !== 0) problems.push('overlap empty ' + (cutSt && cutSt.emptyBodies));
+      if (cutPub.bodyCount !== 1) problems.push('overlap count ' + cutPub.bodyCount);
+      if (!(Math.abs(Number(cutPub.volumeMm3) - 7000) < 0.5)) problems.push('overlap volume ' + cutPub.volumeMm3);
+      if (cutPub.occtGate !== true || cutPub.gateOcct !== 'PASS') {
+        problems.push('overlap occt ' + cutPub.gateOcct + ' ' + (cutPub.occtMessage || ''));
+      }
+      if (cutPub.unitsPass !== true) problems.push('overlap units');
+      if (cutPub.lastError) problems.push('overlap error ' + cutPub.lastError);
+      var overlapHint = hintText();
+      if (overlapHint.indexOf('OCCT valid') < 0 || overlapHint.indexOf('mm') < 0) problems.push('overlap hint ' + overlapHint);
+    }
+  }
+  if (!ensureEmpty('contain clear')) return JSON.stringify(problems);
+  if (startSketch()) {
+    pickPlane('xy', 'Contain', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+    if (openTools()) {
+      var containCirc = sheetBtn('Circle');
+      if (!containCirc) problems.push('contain circle missing');
+      else containCirc.click();
+      setMm('sketchD', '40');
+      confirmSketch('contain circle');
+      var containFinish = document.querySelector('#finishBar [data-action="finishSketch"]');
+      if (containFinish) containFinish.click();
+      var containSt = hook.state();
+      if (!containSt || containSt.profile !== 'circle' || containSt.bodies !== 0) {
+        problems.push('contain profile ' + (containSt && containSt.profile) + ' bodies ' + (containSt && containSt.bodies));
+      }
+      if (addBox('contain box') && selectItem('contain') && openExtrude('contain')) {
+        assertExtrudeChips('contain', 'new');
+        tapExtrudeMode('cut');
+        setMm('sketchDepth', '30');
+        confirmSketch('contain cut');
+        containSt = hook.state();
+        var containPub = window.__cadcamExportState || {};
+        if (!containSt || containSt.bodies !== 1) problems.push('contain bodies ' + (containSt && containSt.bodies));
+        if (!containSt || containSt.emptyBodies !== 0) problems.push('contain empty ' + (containSt && containSt.emptyBodies));
+        if (containPub.bodyCount !== 1) problems.push('contain count ' + containPub.bodyCount);
+        if (!(Math.abs(Number(containPub.volumeMm3) - 8000) < 0.5)) problems.push('contain volume ' + containPub.volumeMm3);
+        if (hintText().indexOf('Cut removed the whole body') < 0) problems.push('contain hint ' + hintText());
+        if (!containSt || containSt.profile !== 'circle') problems.push('contain profile kept ' + (containSt && containSt.profile));
+        if (containSt && containSt.picker !== false) problems.push('contain picker');
+      }
+    }
+  }
   return JSON.stringify(problems);
 })()
 """
@@ -1532,7 +1945,7 @@ ORIGIN_PLANE_EXPR = r"""
 
 def portrait_origin_plane_problems(cdp: Cdp) -> list[str]:
     """390x844 empty doc: Top/Front/Right, then rect and circle Blind 10 mm."""
-    raw, err = eval_expr(cdp, ORIGIN_PLANE_EXPR, timeout=180)
+    raw, err = eval_expr(cdp, ORIGIN_PLANE_EXPR, timeout=300)
     if err or not isinstance(raw, str):
         return [f"origin plane {raw or err}"]
     try:
@@ -1545,7 +1958,7 @@ def portrait_origin_plane_problems(cdp: Cdp) -> list[str]:
 
 
 def portrait_sketch_problems(cdp: Cdp) -> list[str]:
-    raw, err = eval_expr(cdp, SKETCH_PORTRAIT_EXPR, timeout=60)
+    raw, err = eval_expr(cdp, SKETCH_PORTRAIT_EXPR, timeout=180)
     if err or not isinstance(raw, str):
         return [f"portrait sketch {raw or err}"]
     try:
