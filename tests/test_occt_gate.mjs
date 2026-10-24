@@ -894,6 +894,105 @@ console.log('lbracket mesh settings', JSON.stringify(bracket.meshSettings));
 console.log('overlap volumes', JSON.stringify(overlapVolumes));
 console.log('demo volumes', JSON.stringify(demoVolumes));
 
+function shapeMapCount(oc, shape, typeName) {
+  const Ctor = oc.TopTools_IndexedMapOfShape
+    || oc.NCollection_IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher;
+  const map = new Ctor();
+  let count = -1;
+  try {
+    oc.TopExp.MapShapes(shape, oc.TopAbs_ShapeEnum[typeName], map);
+    count = map.Extent();
+  } finally {
+    try { map.delete(); } catch (_err) { /* already released */ }
+  }
+  return count;
+}
+
+function segmentOf(edge) {
+  const pts = edge && edge.pts ? edge.pts : [];
+  if (pts.length < 2) return null;
+  return { a: pts[0].slice(), b: pts[pts.length - 1].slice() };
+}
+
+function edgeLen(edge) {
+  const seg = segmentOf(edge);
+  if (!seg) return 0;
+  const dx = seg.a[0] - seg.b[0];
+  const dy = seg.a[1] - seg.b[1];
+  const dz = seg.a[2] - seg.b[2];
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+// 20 mm cube, one edge, r = d = 2 mm. Volumes are the straight-edge formulas
+// (fillet removes r^2*(1-pi/4)*L, chamfer removes d^2/2*L). Tolerance 0.1%.
+// Free edges are a topology assert on the result, not an export gate.
+const cubeOrigin = [-10, -10, 0];
+const cubeFilletWant = 7982.832;
+const cubeChamferWant = 7960;
+const cube = ops.makeBoxSolid(oc, 20, 20, 20, cubeOrigin);
+expect('cube built', !!cube && Math.abs(ops.solidVolumeMm3(oc, cube) - 8000) <= 1e-6);
+const cubeView = cube ? inspectSolid(oc, cube) : null;
+const cubeEdge = cubeView
+  ? cubeView.topology.edges.filter(function (edge) { return Math.abs(edgeLen(edge) - 20) < 0.05; })[0]
+  : null;
+const cubeSeg = segmentOf(cubeEdge);
+const cubeHuge = cube && cubeSeg
+  ? ops.applyPickedEdgeOp(oc, cube, [cubeSeg], 'fillet', 100)
+  : { ok: true, kept: false, shape: {} };
+expect('cube oversized rejected', cubeHuge.ok === false && cubeHuge.shape === null && cubeHuge.kept === true);
+expect('cube oversized keeps 8000', !!cube && Math.abs(ops.solidVolumeMm3(oc, cube) - 8000) <= 1e-6);
+const cubeFillet = cube && cubeSeg
+  ? ops.applyPickedEdgeOp(oc, cube, [cubeSeg], 'fillet', 2)
+  : { ok: false, error: 'no edge', topology: { faces: [], edges: [], vertices: [] }, gate: {} };
+const cubeFilletTol = cubeFilletWant * 0.001;
+expect(
+  'cube fillet volume ' + (cubeFillet.volumeMm3 || '') + ' ' + (cubeFillet.error || ''),
+  cubeFillet.ok === true && Math.abs(cubeFillet.volumeMm3 - cubeFilletWant) <= cubeFilletTol
+);
+expect('cube fillet faces', cubeFillet.ok === true && shapeMapCount(oc, cubeFillet.shape, 'TopAbs_FACE') === 7);
+expect('cube fillet edges', cubeFillet.ok === true && shapeMapCount(oc, cubeFillet.shape, 'TopAbs_EDGE') === 15);
+expect('cube fillet vertices', cubeFillet.ok === true && shapeMapCount(oc, cubeFillet.shape, 'TopAbs_VERTEX') === 10);
+expect('cube fillet free edges', cubeFillet.gate && cubeFillet.gate.freeEdges === 0);
+expect('cube fillet units', cubeFillet.units === 'mm');
+const cubeAgainEdge = cubeFillet.ok && cubeFillet.topology
+  ? cubeFillet.topology.edges.filter(function (edge) { return edgeLen(edge) > 1; })[0]
+  : null;
+const cubeAgain = cubeFillet.ok && cubeAgainEdge
+  ? ops.applyPickedEdgeOp(oc, cubeFillet.shape, [segmentOf(cubeAgainEdge)], 'fillet', 50)
+  : { ok: false, kept: false, shape: {} };
+if (cubeAgain.ok) {
+  expect('cube refillet allowed', !!cubeAgain.shape);
+  if (cubeAgain.shape) cubeAgain.shape.delete();
+} else {
+  expect('cube refillet kept', cubeAgain.kept === true && cubeAgain.shape === null);
+  expect(
+    'cube refillet volume',
+    Math.abs(ops.solidVolumeMm3(oc, cubeFillet.shape) - cubeFillet.volumeMm3) <= 1e-4
+  );
+}
+const cubeB = ops.makeBoxSolid(oc, 20, 20, 20, cubeOrigin);
+const cubeBView = cubeB ? inspectSolid(oc, cubeB) : null;
+const cubeBEdge = cubeBView
+  ? cubeBView.topology.edges.filter(function (edge) { return Math.abs(edgeLen(edge) - 20) < 0.05; })[0]
+  : null;
+const cubeChamfer = cubeB && cubeBEdge
+  ? ops.applyPickedEdgeOp(oc, cubeB, [segmentOf(cubeBEdge)], 'chamfer', 2)
+  : { ok: false, error: 'no edge', gate: {} };
+const cubeChamferTol = cubeChamferWant * 0.001;
+expect(
+  'cube chamfer volume ' + (cubeChamfer.volumeMm3 || '') + ' ' + (cubeChamfer.error || ''),
+  cubeChamfer.ok === true && Math.abs(cubeChamfer.volumeMm3 - cubeChamferWant) <= cubeChamferTol
+);
+expect('cube chamfer faces', cubeChamfer.ok === true && shapeMapCount(oc, cubeChamfer.shape, 'TopAbs_FACE') === 7);
+expect('cube chamfer edges', cubeChamfer.ok === true && shapeMapCount(oc, cubeChamfer.shape, 'TopAbs_EDGE') === 15);
+expect('cube chamfer vertices', cubeChamfer.ok === true && shapeMapCount(oc, cubeChamfer.shape, 'TopAbs_VERTEX') === 10);
+expect('cube chamfer free edges', cubeChamfer.gate && cubeChamfer.gate.freeEdges === 0);
+expect('cube input kept', !!cube && Math.abs(ops.solidVolumeMm3(oc, cube) - 8000) <= 1e-6);
+if (cubeFillet.shape) cubeFillet.shape.delete();
+if (cubeChamfer.shape) cubeChamfer.shape.delete();
+if (cube) cube.delete();
+if (cubeB) cubeB.delete();
+
 function projectNear(a, b) {
   return typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= 0.01;
 }
