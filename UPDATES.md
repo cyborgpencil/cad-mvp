@@ -4,6 +4,10 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #75 (merged at bcecd56): docs - prompts/origin-plane-empty-doc.md (T1-T5 locked).
+- 2026-10-24 PR #73 (merged at 58f502f): web/PROGRESS.md - P5c #70 on main; sketch rect/circle Blind 10 mm.
+- 2026-10-24 PR #74 (merged at fa4aeeb): research/gui/origin-plane-sketch.md + INDEX - empty-doc origin-plane prep (research only).
+- 2026-10-24 PR #72 (merged at f45bace): research/gui/post-p5c-next.md + INDEX - post-P5c next-queue candidates.
 - 2026-10-24 PR #70 (merged at 7c83b2a): P5c sketch rect/circle on face -> Blind 10 mm MakePrism (JS + occt_gate + deploy_smoke; no constraint solver).
 - 2026-10-24 PR #68 (merged at 465d7d9): docs - prompts/p5c-sketch-extrude.md (Blind 10 mm).
 - 2026-10-24 PR #66 (merged at d3faf0f): web/PROGRESS.md - P5b #64 on main; P5c sketch unblocked (Blind 10 mm).
