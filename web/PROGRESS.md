@@ -370,12 +370,12 @@ Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37
 | # | Item | Status | Source | Date |
 |---|---|---|---|---|
 | P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others | Team-chosen: exclusive V/E/F, click replaces; multi-filter later. Not started | Erik | 2026-10-23 |
-| P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Parked / not started | Erik | 2026-10-23 |
+| P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Digest on main (#43); research done | Erik | 2026-10-23 |
 | P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Team-chosen: metalness 0, roughness 0.55–0.65. Not implemented | Erik | 2026-10-23 |
 | P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Spec ready / waiting Pilot after P1 | Erik | 2026-10-23 |
 | P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Team-chosen: measure + live callouts first; sketch after P2. Not implemented | Erik | 2026-10-23 |
 
-- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P1, P3, P4, and P5 locks below are team-chosen. None of them are implemented. P2 stays parked with no approach chosen.
+- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P2 UI-gap digest is on main via #43 (`research/gui/ui-gap-p2.md`). P1, P3, and P5 locks below remain team-chosen and not implemented. P4 stays spec ready / waiting Pilot after P1.
 
 ### P1 — exclusive highlight (3T final, 2026-10-24)
 Clicking a vertex, edge, or face highlights that component and unselects the others. A click replaces the highlight. A multi-filter is later. This matches Erik's parked wording. On main, `applyPointerSelection` in `web/selection.mjs` already replaces on a plain click; Shift adds and Ctrl removes. That modifier behaviour stays as it is on main. The selection-clarity pass itself is not started.
@@ -399,5 +399,5 @@ Team-chosen. Not implemented.
 
 - Measure first: two-point distance, selected-edge length, and volume. Values stay millimetres.
 - Callouts: live L×W×H, or diameter×height, on the active primitive while it is being edited (Fusion-style). The property sheet is not the only place those sizes appear.
-- Sketch stays parked until the P2 UI-gap digest lands. After that, a follow-on PR does the minimum: a rectangle or circle on a face, then extrude.
+- Sketch (P5c) stays after Measure and callouts (P5a/P5b). The P2 UI-gap digest is on main via #43. The minimum is still a rectangle or circle on a face, then extrude.
 - On main, the Measure toggle shows `#measureSvg`, and `updateMeasure` draws a fixed 20 mm span. That is not this measure set.
