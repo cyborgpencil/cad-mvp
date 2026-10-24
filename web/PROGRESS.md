@@ -371,12 +371,12 @@ Appended at the tail; no interrupt of the current stack (#21/#22/#24/#31/#34/#37
 |---|---|---|---|---|
 | P1 | Selection clarity: clicking a vertex, edge, or face highlights that component and unselects the others. Vertex points are 18 px selected and 14 px hover. Edges are screen-space ribbons, 6 px selected and 4 px hover, because WebGL ignores line width. Face fill is unchanged (item opacity 0.35). | Team-chosen: exclusive V/E/F, click replaces; multi-filter later. On main via #47 (`cc769e1`): exclusive V/E/F; vertex 18/14; edge ribbons 6/4; face fill unchanged. | Erik | 2026-10-24 |
 | P2 | UI gap analysis: analyze current UI, then discuss what's missing vs typical CAD software (Fusion / similar) | Digest on main (#43); research done | Erik | 2026-10-23 |
-| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | Team-chosen: metalness 0, roughness 0.55–0.65. Not implemented | Erik | 2026-10-23 |
-| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | Spec ready / Pilot building (P1 landed) | Erik | 2026-10-23 |
-| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Team-chosen: measure + live callouts first; sketch after P2. Spec ready / waiting Pilot after P4. Research on main via #52 (`research/gui/measure-callouts-p5.md`); prompt `prompts/p5-measure-callouts.md`. | Erik | 2026-10-23 |
+| P3 | Default shaders: flatter, easier-to-see solid bodies (Fusion-like), not shiny/hard-to-read | On main via #58 (`aa36137`): bodyMat metalness 0, roughness 0.6 (team-chosen midpoint of the locked 0.55–0.65 range) | Erik | 2026-10-23 |
+| P4 | Show/hide for every tool shelf: each menu's tools get a show/hide button (e.g. the center shape perimeter/size box toggles, open only when editing a basic shape) | On main via #54 (`1578ad0`) | Erik | 2026-10-23 |
+| P5 | Measure + callouts, then sketching: discuss measuring tools and visual callouts so dimensions are obvious while modifying boxes/shapes; then implement sketching (team decides approach) | Team-chosen: measure + live callouts first; sketch after P2. Spec ready / Pilot building P5a (after P4). Research on main via #52 (`research/gui/measure-callouts-p5.md`); prompt on main via #56 (`prompts/p5-measure-callouts.md`). | Erik | 2026-10-23 |
 
-- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P2 UI-gap digest is on main via #43 (`research/gui/ui-gap-p2.md`). P1 overlay sizes are on main via #47 (`cc769e1`): vertex 18 px selected / 14 px hover; edge ribbons 6 px selected / 4 px hover; face fill unchanged (item opacity 0.35). P3 and P5 locks remain team-chosen and not implemented. P4 is spec ready / Pilot building (P1 landed).
-- 2026-10-24: P5a/P5b research is on main via #52 (`4cdf7c0`, `research/gui/measure-callouts-p5.md`). Prompt: `prompts/p5-measure-callouts.md`. Spec ready / waiting Pilot after P4. Not implemented.
+- 2026-10-24 (3T final; Doc Steward / 3T map for P4): P2 UI-gap digest is on main via #43 (`research/gui/ui-gap-p2.md`). P1 overlay sizes are on main via #47 (`cc769e1`): vertex 18 px selected / 14 px hover; edge ribbons 6 px selected / 4 px hover; face fill unchanged (item opacity 0.35). P3 is on main via #58 (`aa36137`): bodyMat metalness 0, roughness 0.6. P4 is on main via #54 (`1578ad0`). P5 is spec ready / Pilot building P5a (P4 done).
+- 2026-10-24: P5a/P5b research is on main via #52 (`4cdf7c0`, `research/gui/measure-callouts-p5.md`). Prompt on main via #56 (`prompts/p5-measure-callouts.md`). Spec ready / Pilot building P5a (P4 done).
 
 ### P1 — exclusive highlight (3T final, 2026-10-24)
 On main via merged #47 (`cc769e1`). Clicking a vertex, edge, or face highlights that component and unselects the others. A click replaces the highlight. A multi-filter is later. This matches Erik's parked wording. `applyPointerSelection` in `web/selection.mjs` replaces on a plain click; Shift adds and Ctrl removes. That modifier behaviour stays. Empty Vertex, Edge, or Face still means all, with the highlight cleared.
@@ -384,10 +384,10 @@ On main via merged #47 (`cc769e1`). Clicking a vertex, edge, or face highlights 
 Overlay sizes on main via #47 (`cc769e1`), chosen 2026-10-24 (America/Denver): vertex points are 18 px selected and 14 px hover. Edges are screen-space ribbons, 6 CSS px selected and 4 CSS px hover, because WebGL ignores line width. Face fill is unchanged (item opacity 0.35).
 
 ### P3 — flatter default (3T final, 2026-10-24)
-Default solid material is metalness 0 and roughness about 0.55–0.65. That range is the lock. On main the body material in `web/index.html` is metalness 0.1 and roughness 0.42. Not implemented.
+Implemented on main via #58 (merge `aa36137`, tip `2829acb`). `bodyMat` in `web/index.html` is metalness 0 and roughness 0.6, the team-chosen midpoint of the locked 0.55–0.65 range. JS-only.
 
 ### P4 — shelf show/hide (Doc Steward slice; team-chosen by Doc Steward / 3T map, 2026-10-24)
-Spec ready / Pilot building (P1 landed). Prompt: `prompts/p4-tool-shelf-show-hide.md`. Not implemented. JS, CSS, and HTML only when it is built. No kernel, C++, or WASM change.
+On main via #54 (`1578ad0`). Prompt: `prompts/p4-tool-shelf-show-hide.md`. JS, CSS, and HTML only. No kernel, C++, or WASM change.
 
 - One show/hide (collapse) control per cluttering shelf: the Create menu/panel, Modify tools, property/dim panels, and the center perimeter/size box for primitives.
 - A shelf opens only while that tool or edit is active. Collapse clears viewport clutter. No shelf is always on. The only open shelf is the active tool's shelf.
@@ -395,10 +395,10 @@ Spec ready / Pilot building (P1 landed). Prompt: `prompts/p4-tool-shelf-show-hid
 - Reuse the Search and Tools disclosure already on main (`aria-expanded`, Escape, click outside) where it exists. Touch targets at least 44 px. On portrait, an open sheet stays at most about 40% of the view and never covers Home.
 - Modify already has a toggle. Extend that pattern to every other cluttering shelf.
 - Export and the units status may stay visible. They are status chrome, not shelves. Do not hide them, and do not invent any other always-on shelf.
-- On main, Create (`[data-action="createMenu"]`) and Search (`#searchBtn`) already collapse on Escape and an outside click. `#modifyShelf` starts hidden on phones and shown on desktop. `#dimPanel` in portrait is capped at 40% of the viewport by `layoutDimSheet()` and stays clear of `#vcHome`. The viewport size line is `.hud` `#hudSize`.
+- On main via #54: shelves start collapsed. Create (`[data-action="createMenu"]`) and Search (`#searchBtn`) still collapse on Escape and an outside click. `#modifyShelf` starts hidden. `#dimPanel` in portrait is capped at 40% of the viewport by `layoutDimSheet()` and stays clear of `#vcHome`. `#hudSize` shows only while editing a box, cylinder, or disc.
 
 ### P5 — measure, callouts, then sketch (3T final, 2026-10-24 ~1:14 AM MT)
-Spec ready / waiting Pilot after P4. Research on main via #52 (`research/gui/measure-callouts-p5.md`, `4cdf7c0`). Prompt: `prompts/p5-measure-callouts.md`. Not implemented.
+Spec ready / Pilot building P5a (P4 done). Research on main via #52 (`research/gui/measure-callouts-p5.md`, `4cdf7c0`). Prompt on main via #56 (`prompts/p5-measure-callouts.md`).
 
 - Measure first: two-point distance, selected-edge length, and volume. Values stay millimetres.
 - Callouts: live L×W×H, or diameter×height, on the active primitive while it is being edited (Fusion-style). The property sheet is not the only place those sizes appear.
