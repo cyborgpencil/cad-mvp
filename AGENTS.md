@@ -57,7 +57,7 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 ## Mobile test links (Erik's rule, 2026-10-23)
 Links for phone testing come only from https://cyborgpencil.github.io/cad-mvp/: main at the root, and open PR builds under `/cad-mvp/prN/` (index at `/cad-mvp/previews/`). Never post LAN or localhost links. Previews deploy as a GitHub Actions Pages artifact (no `gh-pages` branch, no committed `.wasm`), and a guard step blocks fixtures, `builds/`, Blink files and secrets. A preview containing C++ that hasn't passed the team's C++ review carries a review banner; Repo Keeper drops eview for that PR once its C++ merges. A PR gets a preview only once Repo Keeper adds it to `.github/preview-prs.txt` on main (with `review` for the banner). Previews refresh on main pushes, the daily 3:17 AM MT run, or a manual run; after a PR push that needs a fresh preview, ask Repo Keeper for a manual run.
 
-## Self-serve review and merge (Erik via 3T, 2026-10-23; plan team-chosen by the Chief)
+## Self-serve review and merge (confirmed by Erik to 3T, 2026-10-23 7:21 PM MT; plan team-chosen by the Chief)
 Erik no longer reviews repo pushes, C++ included. The team owns review and merge approval. Only something truly irreversible or outside scope goes to Erik.
 - Reviewers (the author never reviews its own PR):
   - C++ core (`src/`): Research Digest first, checking OCCT usage against the official docs; Pilot second, with Grok Build in read-only plan mode. Both approve.
