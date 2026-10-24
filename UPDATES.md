@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-23
+- 2026-10-23 PR #33 (merged at dc1f953): AGENTS.md says a PR gets a Pages preview only once Repo Keeper lists it in .github/preview-prs.txt on main, and it logs the UPDATES lines for #29, #30 and #32.
 - 2026-10-23 PR #32 (merged at 8501f93): adds PR #31 (phone selection) to the Pages previews at /cad-mvp/pr31/ with the needs-review banner, since #31 is stacked on #24, which carries #20's C++.
 - 2026-10-23 PR #30 (merged at e5e603c): adds PR #20 to the Pages previews at /cad-mvp/pr20/ with the needs-review banner, for Erik's phone check.
 - 2026-10-23 PR #29 (merged at 2df266e): AGENTS.md says mobile test links come only from https://cyborgpencil.github.io/cad-mvp/ (no LAN or localhost), and it logs #28's UPDATES line.
