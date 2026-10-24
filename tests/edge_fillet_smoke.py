@@ -92,6 +92,64 @@ def tap(page: Any, selector: str) -> None:
     page.locator(selector).first.tap()
 
 
+def edge_sheet_problems(page: Any, kind: str) -> list[str]:
+    info = page.evaluate(
+        """() => {
+          function shown(el) {
+            if (!el || (el.closest && el.closest('[hidden]'))) return false;
+            const st = getComputedStyle(el);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            const r = el.getBoundingClientRect();
+            return r.width >= 1 && r.height >= 1;
+          }
+          function boxOf(el) {
+            if (!shown(el)) return null;
+            const r = el.getBoundingClientRect();
+            return {left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height};
+          }
+          function overlaps(a, b) {
+            if (!a || !b) return false;
+            return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+          }
+          const input = document.getElementById('edgeSize');
+          const sheet = document.getElementById('edgeSheet');
+          const span = sheet ? sheet.querySelector('.edge-size span') : null;
+          const sheetBox = boxOf(sheet);
+          const covers = [];
+          for (const sel of ['.vp-bar', '.phone-tabbar']) {
+            const bar = boxOf(document.querySelector(sel));
+            if (!bar) covers.push('missing ' + sel);
+            else if (sheetBox && overlaps(sheetBox, bar)) covers.push(sel);
+          }
+          return {
+            type: input ? input.getAttribute('type') : '',
+            inputmode: input ? input.getAttribute('inputmode') : '',
+            autocomplete: input ? input.getAttribute('autocomplete') : '',
+            spellcheck: input ? input.getAttribute('spellcheck') : '',
+            min: !!(input && input.hasAttribute('min')),
+            step: !!(input && input.hasAttribute('step')),
+            mm: span ? String(span.textContent || '').trim() : '',
+            covers: covers,
+            sheet: !!sheetBox
+          };
+        }"""
+    )
+    if not isinstance(info, dict):
+        return [f"{kind} edge sheet {info!r}"]
+    problems: list[str] = []
+    if info.get("type") != "text" or info.get("inputmode") != "decimal":
+        problems.append(f"{kind} edge field {info.get('type')!r} {info.get('inputmode')!r}")
+    if info.get("autocomplete") != "off" or info.get("spellcheck") != "false":
+        problems.append(f"{kind} edge field attrs {info.get('autocomplete')!r} {info.get('spellcheck')!r}")
+    if info.get("min") is True or info.get("step") is True:
+        problems.append(f"{kind} edge field stepper {info!r}")
+    if info.get("mm") != "mm":
+        problems.append(f"{kind} edge suffix {info.get('mm')!r}")
+    if info.get("sheet") is not True or info.get("covers"):
+        problems.append(f"{kind} edge sheet clearance {info.get('covers')!r}")
+    return problems
+
+
 def box_ok(page: Any, selector: str) -> dict[str, float] | None:
     box = page.locator(selector).first.bounding_box()
     if not box:
@@ -183,6 +241,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} edge size target {size_box!r}")
     if not confirm_box or confirm_box["w"] + 0.5 < 44 or confirm_box["h"] + 0.5 < 44:
         problems.append(f"{kind} confirm target {confirm_box!r}")
+    problems.extend(edge_sheet_problems(page, kind))
     shot(page, kind, "02-fillet-armed")
 
     inner = pick_named(page, "inner", problems, kind)
@@ -196,6 +255,17 @@ def run_case(page: Any, kind: str) -> list[str]:
         }"""
     )
     depth = int(read_state(page).get("undoDepth") or 0)
+    page.locator("#edgeSize").fill("1,5")
+    try:
+        page.wait_for_function(
+            """() => {
+              const state = window.__cadcamExportState || {};
+              return state.edgeSize === '1,5' && state.edgeConfirmEnabled === true;
+            }""",
+            timeout=8000,
+        )
+    except Exception as exc:
+        problems.append(f"{kind} comma size {exc}")
     page.locator("#edgeSize").fill("80")
     page.wait_for_function("() => (window.__cadcamExportState || {}).edgeSize === '80'")
     tap(page, "#edgeConfirm")

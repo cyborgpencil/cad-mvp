@@ -159,7 +159,7 @@ export function armEdgeTool(op) {
 // A size OCCT cannot build is not decided here.
 export function parseEdgeSize(text) {
   if (text == null) return { ok: false, size: NaN };
-  const raw = String(text).trim();
+  const raw = String(text).trim().replace(',', '.');
   if (!raw) return { ok: false, size: NaN };
   const n = Number(raw);
   if (!Number.isFinite(n) || !(n > 0)) return { ok: false, size: n };

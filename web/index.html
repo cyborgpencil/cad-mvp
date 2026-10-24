@@ -378,6 +378,8 @@
   .sketch-sheet { z-index: 9; }
   .sketch-sheet .edge-size span { flex: none; font-weight: 650; }
   .sketch-sheet .edge-size input { width: auto; flex: 1 1 auto; }
+  #edgeSheet .edge-size span { flex: none; font-weight: 650; }
+  #edgeSheet .edge-size input { width: auto; flex: 1 1 auto; }
   .edge-note {
     margin: 0;
     min-height: 44px;
@@ -1259,6 +1261,18 @@
     padding: 0 10px;
     border-radius: 8px;
     background: var(--tab-bg);
+  }
+  .modify-order {
+    flex: 0 0 auto;
+    align-self: center;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--muted);
+    padding: 0 8px;
   }
   .desk-bottom { display: none; flex: none; }
   /* Stay out of the flex column. Hiding the banner on a passing OCCT gate
@@ -2210,7 +2224,7 @@
       <div id="edgeSheet" class="edge-sheet" hidden>
         <p id="edgeNote" class="edge-note" hidden></p>
         <div class="edge-sheet-row">
-          <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="number" min="0.01" step="0.1" value="2" inputmode="decimal" aria-label="Edge size mm"></label>
+          <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="2" aria-label="Edge size mm"><span>mm</span></label>
           <button type="button" class="edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges." disabled aria-disabled="true">Confirm</button>
         </div>
       </div>
@@ -2303,6 +2317,7 @@
   </footer>
 
   <div id="modifyShelf" class="modify-shelf" data-hscroll hidden>
+    <span id="modifyOrder" class="modify-order">1 = target, 2 = tool</span>
     <button type="button" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move">Move</button>
     <button type="button" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate">Rotate</button>
     <button type="button" data-action="gizmoMode" data-mode="scale" data-tool="Resize" title="Resize">Resize</button>
@@ -5612,7 +5627,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(state.lastError);
       setHint(state.lastError);
       publishGateState();
-      return;
+      return false;
     }
     const which = opsApi.normalizeBooleanOp(op);
     const selected = orderedBodies();
@@ -5622,26 +5637,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(state.lastError);
       setHint(state.lastError);
       publishGateState();
-      return;
+      return false;
     }
     if (selected.length !== 2) {
       state.booleanMessage = 'Select exactly two bodies. 1 is the target and 2 is the tool.';
       toast(state.booleanMessage);
       setHint(state.booleanMessage);
       publishGateState();
-      return;
+      return false;
     }
-    function placedOperand(body) {
-      if (!body || !body.shape) return { shape: null, owned: false };
-      if (body.shapeLocal === true && assemblyApi && typeof assemblyApi.placedCopy === 'function') {
-        const placed = assemblyApi.placedCopy(oc, body.shape, body.placement || { x: 0, y: 0, z: 0 });
-        if (!placed.ok || !placed.shape) return { shape: null, owned: false };
-        return { shape: placed.shape, owned: true };
-      }
-      return { shape: body.shape, owned: false };
-    }
-    const operandA = placedOperand(selected[0]);
-    const operandB = placedOperand(selected[1]);
+    const operandA = worldOperand(selected[0]);
+    const operandB = worldOperand(selected[1]);
     if (!operandA.shape || !operandB.shape) {
       if (operandA.owned) dropShape(operandA.shape);
       if (operandB.owned) dropShape(operandB.shape);
@@ -5650,7 +5656,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(state.lastError);
       setHint(state.lastError);
       publishGateState();
-      return;
+      return false;
     }
     const result = opsApi.applyBooleanSolids(oc, which.ui, operandA.shape, operandB.shape);
     if (operandA.owned) dropShape(operandA.shape);
@@ -5664,7 +5670,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(state.lastError);
       publishGateState();
       paintBooleanChrome();
-      return;
+      return false;
     }
     const dropIds = {};
     dropIds[selected[0].id] = true;
@@ -5696,7 +5702,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(state.lastError);
       setHint(state.lastError);
       publishGateState();
-      return;
+      return false;
     }
     for (let i = 0; i < state.bodies.length; i += 1) {
       if (dropIds[state.bodies[i].id]) dropShape(state.bodies[i].shape);
@@ -5722,6 +5728,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     paintAssembly();
     toast(name);
     setHint(state.booleanMessage);
+    return true;
   }
 
   const commandStack = undoApi && typeof undoApi.createCommandStack === 'function'
@@ -10957,7 +10964,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       });
       message = primitiveLabel(kind);
     } else if (action === 'boolean') {
-      applySceneBoolean(btn.getAttribute('data-op') || '');
+      const opName = btn.getAttribute('data-op') || '';
+      const whichOp = opsApi && typeof opsApi.normalizeBooleanOp === 'function'
+        ? opsApi.normalizeBooleanOp(opName)
+        : null;
+      const boolLabel = !whichOp
+        ? 'Boolean'
+        : whichOp.ui === 'intersect'
+          ? 'Intersect'
+          : whichOp.ui === 'cut'
+            ? 'Cut'
+            : 'Union';
+      runUndoable(boolLabel, function () { return applySceneBoolean(opName) === true; });
       return;
     } else if (action === 'armEdge') {
       const op = btn.getAttribute('data-op') === 'chamfer' ? 'chamfer' : 'fillet';
