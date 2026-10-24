@@ -32,6 +32,8 @@ Asserts window.__cadcamExportState.occtReady for:
                         marked data-hscroll; Part 1 is fully visible, min-width 96px
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
+  measure tool          default 20 mm cube: one edge polyline ~20 mm, volume ~8000 mm³,
+                        opposite-corner distance ~sqrt(3)*20; Measure control >= 44 px
   portrait nav cube     88 px cube, 6 face and 8 corner taps, each face within 1 degree,
                         clear-view fraction held; prints NAVCUBE_DONE
   portrait inspector    closed right panel is inert, not rendered, not tappable, and not focusable
@@ -1702,6 +1704,8 @@ TOOLBAR_ROW_EXPR = r"""
   }
   var buttons = bar.querySelectorAll('button');
   if (!buttons.length) problems.push('toolbar has no buttons');
+  var measureBtn = bar.querySelector('[data-action="measure"]');
+  if (!measureBtn) problems.push('missing Measure');
   var top = null;
   var btnH = 0;
   for (var i = 0; i < buttons.length; i++) {
@@ -4930,6 +4934,91 @@ def digit_hotkey_guard_problems(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+MEASURE_PROBE_EXPR = (
+    "(function(){"
+    "var hook=window.__cadcamMeasure;"
+    "if(!hook||typeof hook.probe!=='function') return 'missing';"
+    "return JSON.stringify(hook.probe());"
+    "})()"
+)
+
+
+def measure_tool_problems(cdp: Cdp) -> list[str]:
+    """Default 20 mm cube. Measure is read-only: edge polyline, two-point, volume."""
+    raw, err = eval_expr(cdp, MEASURE_PROBE_EXPR, timeout=60)
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return [f"measure probe {raw or err}"]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"measure probe {raw}"]
+    if not isinstance(data, dict):
+        return [f"measure probe {raw}"]
+    problems: list[str] = []
+    button_w = float(data.get("buttonW") or 0)
+    button_h = float(data.get("buttonH") or 0)
+    if button_w < 44 or button_h < 44:
+        problems.append(f"Measure control {button_w:.1f}x{button_h:.1f}")
+    if data.get("hiddenOff") is not True or data.get("readoutOff") is not True:
+        problems.append(f"measure off hidden {data.get('hiddenOff')!r} readout {data.get('readoutOff')!r}")
+    if data.get("hiddenOn") is not True or data.get("readoutOn") is not True:
+        problems.append(f"measure on hidden {data.get('hiddenOn')!r} readout {data.get('readoutOn')!r}")
+    idle = str(data.get("idleText") or "")
+    if idle:
+        problems.append(f"idle dimension {idle!r}")
+    if data.get("idleSpanHidden") is not True:
+        problems.append("idle span still drawn")
+    if not _near(data.get("edgeMm"), 20, 0.05):
+        problems.append(f"edge length {data.get('edgeMm')!r}")
+    if int(data.get("edgePts") or 0) < 3:
+        problems.append(f"edge samples {data.get('edgePts')!r}")
+    edge_text = str(data.get("edgeText") or "")
+    edge_formatted = str(data.get("edgeFormatted") or "")
+    if not edge_text or edge_text != edge_formatted:
+        problems.append(f"edge text {edge_text!r} formatted {edge_formatted!r}")
+    if str(data.get("edgeLabel") or "") != "Length " + edge_text:
+        problems.append(f"edge label {data.get('edgeLabel')!r}")
+    diagonal = 20 * math.sqrt(3)
+    if not _near(data.get("vertexMm"), diagonal, 0.05):
+        problems.append(f"vertex distance {data.get('vertexMm')!r}")
+    vertex_text = str(data.get("vertexText") or "")
+    if not vertex_text or vertex_text != str(data.get("vertexFormatted") or ""):
+        problems.append(f"vertex text {vertex_text!r} formatted {data.get('vertexFormatted')!r}")
+    if data.get("pickPath") != "tap" or int(data.get("pickCount") or 0) != 2:
+        problems.append(f"picks {data.get('pickPath')!r} {data.get('pickCount')!r}")
+    if not _near(data.get("pickMm"), diagonal, 0.05):
+        problems.append(f"pick distance {data.get('pickMm')!r}")
+    if str(data.get("pickText") or "") != vertex_text:
+        problems.append(f"pick text {data.get('pickText')!r} vertex {vertex_text!r}")
+    if not _near(data.get("volumeMm3"), 8000, 0.01):
+        problems.append(f"volume {data.get('volumeMm3')!r}")
+    if not _near(data.get("volumeBefore"), data.get("volumeMm3"), 0.01):
+        problems.append(f"volume changed {data.get('volumeBefore')!r} -> {data.get('volumeMm3')!r}")
+    volume_text = str(data.get("volumeText") or "")
+    volume_formatted = str(data.get("volumeFormatted") or "")
+    if volume_text != "Volume " + volume_formatted:
+        problems.append(f"volume text {volume_text!r} formatted {volume_formatted!r}")
+    if "8000" not in volume_formatted:
+        problems.append(f"volume format {volume_formatted!r}")
+    if data.get("propsHasVolume") is not True:
+        problems.append("properties volume missing")
+    inch_text = str(data.get("inchText") or "")
+    inch_volume = str(data.get("inchVolume") or "")
+    if not inch_text.endswith(" in") or "in" not in inch_volume:
+        problems.append(f"inch display {inch_text!r} {inch_volume!r}")
+    if data.get("hiddenAfter") is not True or data.get("readoutAfter") is not True:
+        problems.append(f"measure cleared hidden {data.get('hiddenAfter')!r} readout {data.get('readoutAfter')!r}")
+    if int(data.get("picksAfter") or 0) != 0:
+        problems.append(f"picks left {data.get('picksAfter')!r}")
+    if data.get("exportBefore") is not True or data.get("exportAfter") is not True:
+        problems.append(f"export {data.get('exportBefore')!r} -> {data.get('exportAfter')!r}")
+    if int(data.get("bodiesBefore") or 0) != 1 or int(data.get("bodiesAfter") or 0) != 1:
+        problems.append(f"bodies {data.get('bodiesBefore')!r} -> {data.get('bodiesAfter')!r}")
+    if data.get("shelfBefore") != data.get("shelfAfter"):
+        problems.append(f"shelf {data.get('shelfBefore')!r} -> {data.get('shelfAfter')!r}")
+    return problems
+
+
 def run(omit: list[str]) -> int:
     browser = find_browser()
     reasons: list[str] = []
@@ -5173,6 +5262,19 @@ def run(omit: list[str]) -> int:
                         if home_found:
                             failures.append("desktop home")
                             failures.extend(home_found[:40])
+        if not failures:
+            try:
+                set_portrait(cdp)
+            except (RuntimeError, TimeoutError, OSError) as exc:
+                failures.append(f"measure portrait {exc}")
+            else:
+                time.sleep(0.3)
+                measure_found = measure_tool_problems(cdp)
+                if measure_found:
+                    failures.append("measure")
+                    failures.extend(measure_found[:40])
+                else:
+                    print("MEASURE_DONE", flush=True)
         if not failures:
             portrait_problems = run_portrait(cdp, origin)
             if portrait_problems:
