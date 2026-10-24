@@ -66,3 +66,13 @@ Erik no longer reviews repo pushes, C++ included. The team owns review and merge
   - CI and CMake: Doc Steward reviews; Pilot confirms the CTest count.
 - Required before any merge: green `build`, CTest count on the branch's own build, units pass, non-author written approval on the PR, phone preview pass for UI, clean secret scan with no `.wasm` or root `PROGRESS.md`.
 - Merging: only Repo Keeper (or 3T for #20/#26 when Repo Keeper's standing rules block a relayed confirmation), plain merges, no force-push. Stacked children retarget to `main` and re-check after the parent merges.
+
+## Stuck detection and backup (Chief + 3T, 2026-10-24)
+Standing rule. It supplements self-serve review and merge above; those reviewer and merge bullets stay as written.
+- Clock starts when a bot is named for a step. No tip, CI, or room progress for 10 minutes: the Chief pings once. At 20 minutes, or at 5 minutes after CI is green and both APPROVEs are in with no undraft or merge, the named backup takes over and announces in the CAD CAM MVP room.
+- Serial Digest → Doc Steward → Repo Keeper is not stuck. A HOLD review must name the tip SHA and the unblocker. When the tip moves and the required `build` is green, Digest auto re-primaries. No poke is needed.
+- Backups:
+  - Digest ↔ Doc Steward for JS review (primary and second swap if the owner is silent past the clock).
+  - Repo Keeper offline → Grok Build Pilot does undraft, plain merge, and Z13 ff when the gates are green. Doc Steward backup for Keeper is title/body scrub and an undraft ping only (not merge).
+  - Pilot offline for implement → Cursor cloud. Pilot silent as C++ second inside the window → Digest primary alone is enough if the review is clean.
+- Safety and irreversible rules are unchanged (no force-push; Erik for anything truly irreversible).
