@@ -768,6 +768,15 @@
     justify-content: flex-end;
     color: var(--muted);
   }
+  .dim-count {
+    flex: none;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--ink);
+    font-weight: 650;
+  }
   .delete-btn {
     width: 44px;
     min-width: 44px;
@@ -976,8 +985,40 @@
     display: none;
     flex: none;
     flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
     background: var(--top);
     border-top: 1px solid var(--line-strong);
+  }
+  .phone-tabbar::-webkit-scrollbar { display: none; }
+  .pick-chooser {
+    position: fixed;
+    left: 8px;
+    bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px);
+    z-index: 42;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .pick-chooser button {
+    min-width: 120px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 14px;
+    text-align: left;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    font-weight: 650;
+  }
+  .pick-chooser button.is-on {
+    background: var(--active-fill);
+    color: var(--ink);
   }
   .phone-tabs { display: flex; flex: 1; min-width: 0; }
   .modify-shelf {
@@ -1790,6 +1831,7 @@
       <form id="dimPanel" class="dim-panel" hidden>
         <div class="dim-head">
           <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
+          <span id="selectionCount" class="dim-count" aria-live="polite">0 selected</span>
           <button type="button" class="delete-btn" id="deleteBtn" data-action="delete" data-tool="Delete" aria-label="Delete" title="Delete" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1 2h4v2H4V6h4l1-2zM6 9h12l-1 11H7L6 9z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
           <span class="dim-unit" id="dimUnit">mm</span>
         </div>
@@ -1943,6 +1985,7 @@
         <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
         <div id="assemblyPanel" class="assembly-panel">
           <div class="muted">Parts</div>
+          <p class="fine" id="selectionCountSide">0 selected</p>
           <button type="button" id="combineBtn" data-action="combine" data-tool="Combine" disabled aria-disabled="true">Combine</button>
           <div id="partList" class="part-list" role="listbox" aria-label="Parts" aria-multiselectable="true"></div>
           <label class="assembly-material">Material
@@ -1995,7 +2038,9 @@
     <button type="button" class="tool-btn" id="modifyDesktop" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg><span>Modify</span></button>
   </div>
 
-  <nav class="phone-tabbar" aria-label="Workbench">
+  <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
+    <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
+    <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
     <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
     <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
     <button type="button" class="tab" id="createBtn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg>Create</button>
@@ -2006,6 +2051,12 @@
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
     </div>
   </nav>
+  <div id="pickChooser" class="pick-chooser" hidden role="menu" aria-label="Pick filter">
+    <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="body" data-tool="Pick Body" aria-checked="true">Body</button>
+    <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="face" data-tool="Pick Face" aria-checked="false">Face</button>
+    <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="edge" data-tool="Pick Edge" aria-checked="false">Edge</button>
+    <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="vertex" data-tool="Pick Vertex" aria-checked="false">Vertex</button>
+  </div>
 </div>
 
 <div id="createMenu" class="create-menu" hidden role="menu" aria-label="Create">
@@ -2128,9 +2179,13 @@ async function boot() {
       console.error('field-nudge failed', err);
       return null;
     });
+    const phonePromise = import('./phone-select.mjs').catch(function (err) {
+      console.error('phone-select failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise, nudgePromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10], occtLoaded[11]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise, nudgePromise, phonePromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10], occtLoaded[11], occtLoaded[12]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -2138,7 +2193,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi, nudgeApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi, nudgeApi, phoneApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -2286,6 +2341,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     unit: 'mm',
     selection: 'item',
     selectedIds: [],
+    phoneMulti: false,
     sceneCleared: false,
     hoverId: null,
     topology: null,
@@ -3168,6 +3224,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const toggle = document.getElementById('dimToggle');
     if (toggle) toggle.setAttribute('aria-expanded', host.classList.contains('is-open') ? 'true' : 'false');
     layoutDimSheet();
+    paintSelectionCount();
     publishGateState();
   }
 
@@ -3462,6 +3519,347 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     overlays.setBuffer(overlays.hoverLines, hoverLine, 3);
     overlays.setBuffer(overlays.selPoints, selPt, 3);
     overlays.setBuffer(overlays.hoverPoints, hoverPt, 3);
+  }
+
+  function paintSelectionCount() {
+    const count = state.selectedIds.length;
+    const text = phoneApi && typeof phoneApi.countText === 'function'
+      ? phoneApi.countText(count)
+      : (count === 1 ? '1 selected' : count + ' selected');
+    const head = document.getElementById('selectionCount');
+    const side = document.getElementById('selectionCountSide');
+    if (head) head.textContent = text;
+    if (side) side.textContent = text;
+  }
+
+  function paintPhoneChrome() {
+    const filter = phoneApi && typeof phoneApi.filterForMode === 'function'
+      ? phoneApi.filterForMode(state.selection)
+      : 'body';
+    const label = phoneApi && typeof phoneApi.filterLabel === 'function'
+      ? phoneApi.filterLabel(filter)
+      : 'Body';
+    const chip = document.getElementById('pickFilter');
+    const chooser = document.getElementById('pickChooser');
+    if (chip) {
+      chip.textContent = label;
+      chip.setAttribute('aria-label', 'Pick ' + label);
+      chip.setAttribute('aria-expanded', chooser && chooser.hidden !== true ? 'true' : 'false');
+    }
+    const multi = document.getElementById('multiToggle');
+    if (multi) {
+      const on = state.phoneMulti === true;
+      multi.classList.toggle('is-on', on);
+      multi.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    if (chooser) {
+      const buttons = chooser.querySelectorAll('[data-filter]');
+      for (let i = 0; i < buttons.length; i += 1) {
+        const on = buttons[i].getAttribute('data-filter') === filter;
+        buttons[i].classList.toggle('is-on', on);
+        buttons[i].setAttribute('aria-checked', on ? 'true' : 'false');
+      }
+    }
+  }
+
+  function setPhoneFilter(filter) {
+    const mode = phoneApi && typeof phoneApi.modeForFilter === 'function'
+      ? phoneApi.modeForFilter(filter)
+      : 'item';
+    state.selection = mode;
+    state.selectedIds = [];
+    state.hoverId = null;
+    const chooser = document.getElementById('pickChooser');
+    if (chooser) chooser.hidden = true;
+    refreshAnchor();
+    applyLook();
+  }
+
+  function selectionHighlighted() {
+    if (!state.selectedIds.length) return false;
+    if (state.bodies.length > 1 && state.selection === 'item') {
+      if (!bodyRoot) return false;
+      for (let i = 0; i < bodyRoot.children.length; i += 1) {
+        const child = bodyRoot.children[i];
+        if (state.selectedIds.indexOf(child.userData.bodyId) < 0) continue;
+        if (child.material && Number(child.material.emissiveIntensity) > 0) return true;
+      }
+      return false;
+    }
+    if (!overlays) return false;
+    if (state.selection === 'edge') return overlays.selLines.visible === true;
+    if (state.selection === 'vertex') return overlays.selPoints.visible === true;
+    return overlays.selFace.visible === true;
+  }
+
+  function installHoleFixture() {
+    if (!oc || !opsApi || !primApi || typeof opsApi.buildHoleDeleteFixture !== 'function') {
+      return { ok: false, error: 'hole fixture unavailable', faceId: '', plain: 0, volume: 0 };
+    }
+    let fixture = null;
+    try {
+      fixture = opsApi.buildHoleDeleteFixture(oc);
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : String(err), faceId: '', plain: 0, volume: 0 };
+    }
+    if (!fixture || !fixture.ok || !fixture.shape) {
+      return { ok: false, error: (fixture && fixture.error) || 'fixture failed', faceId: '', plain: 0, volume: 0 };
+    }
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, fixture.shape);
+    } catch (err) {
+      dropShape(fixture.shape);
+      return { ok: false, error: err && err.message ? err.message : String(err), faceId: '', plain: 0, volume: 0 };
+    }
+    const flat = primApi.flattenMesh(view.mesh);
+    if (!flat.indices.length || !Module.replaceMesh(flat.positions, flat.indices, 'hole-box')) {
+      dropShape(fixture.shape);
+      return { ok: false, error: 'mesh rejected', faceId: '', plain: 0, volume: 0 };
+    }
+    clearOwnedBodies();
+    state.bodySeq += 1;
+    const body = {
+      id: 'b' + state.bodySeq,
+      name: 'Hole box',
+      kind: 'hole-box',
+      params: null,
+      shape: fixture.shape,
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight,
+      features: []
+    };
+    state.bodies = [body];
+    state.assemblyIds = [body.id];
+    state.primitive = null;
+    state.sceneCleared = false;
+    state.topology = view.topology;
+    state.topologySource = 'occt';
+    state.shapeGate = view.gate;
+    state.selection = 'face';
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.lastError = '';
+    state.phoneMulti = false;
+    syncFromKernel();
+    mountBodyMeshes();
+    spherical.radius = fitDistance();
+    updateCamera();
+    refreshAnchor();
+    applyLook();
+    let faceId = '';
+    const faces = state.topology && state.topology.faces ? state.topology.faces : [];
+    for (let i = 0; i < faces.length; i += 1) {
+      if (String(faces[i].surface || '').indexOf('Cylinder') >= 0) faceId = faces[i].id;
+    }
+    return {
+      ok: !!faceId,
+      error: faceId ? '' : 'no cylinder face',
+      faceId: faceId,
+      plain: fixture.plainVolumeMm3,
+      volume: fixture.volumeMm3
+    };
+  }
+
+  function phoneAims() {
+    const savedMode = state.selection;
+    const savedPick = lastPick;
+    const savedVis = handles.visible;
+    if (mesh) mesh.updateMatrixWorld(true);
+    if (bodyRoot) bodyRoot.updateMatrixWorld(true);
+    updateCamera();
+    const rect = canvas.getBoundingClientRect();
+    const touchPx = selApi && selApi.TOUCH_PICK_TOLERANCE_PX ? selApi.TOUCH_PICK_TOLERANCE_PX : 20;
+    const edgePx = phoneApi ? phoneApi.EDGE_TOUCH_TOLERANCE_PX : 32;
+    const gap = (Number(touchPx) + Number(edgePx)) / 2;
+
+    function toClient(local) {
+      return { x: rect.left + local.x, y: rect.top + local.y };
+    }
+
+    function inside(local) {
+      return local.x >= 2 && local.y >= 2 && local.x <= rect.width - 2 && local.y <= rect.height - 2;
+    }
+
+    function blocked(client) {
+      const el = document.elementFromPoint(client.x, client.y);
+      if (!el) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, #viewCube')) return true;
+      if (el !== canvas && el !== viewport) return true;
+      if (handles.visible && pickHandle(client.x, client.y)) return true;
+      return false;
+    }
+
+    function ring(local, radius) {
+      const pts = [];
+      if (!(radius > 0)) {
+        pts.push(local);
+        return pts;
+      }
+      for (let k = 0; k < 8; k += 1) {
+        const ang = (Math.PI * 2 * k) / 8;
+        pts.push({ x: local.x + Math.cos(ang) * radius, y: local.y + Math.sin(ang) * radius });
+      }
+      return pts;
+    }
+
+    function seek(mode, accept) {
+      state.selection = mode;
+      handles.visible = gizmoShouldShow();
+      try {
+        return accept();
+      } finally {
+        state.selection = savedMode;
+        handles.visible = savedVis;
+        lastPick = savedPick;
+      }
+    }
+
+    function firstHit(mode, locals, want) {
+      return seek(mode, function () {
+        for (let i = 0; i < locals.length; i += 1) {
+          const local = locals[i];
+          if (!inside(local)) continue;
+          const client = toClient(local);
+          if (blocked(client)) continue;
+          const hit = pickElement(client.x, client.y, 'touch');
+          if (want == null) {
+            if (hit == null) return { id: null, x: client.x, y: client.y };
+          } else if (hit === want) {
+            return { id: hit, x: client.x, y: client.y };
+          }
+        }
+        return null;
+      });
+    }
+
+    function triPoint(triIndex) {
+      const meshCad = state.meshCad;
+      const tri = meshCad && meshCad.triangles ? meshCad.triangles[triIndex] : null;
+      if (!tri || !meshCad.vertices) return null;
+      const a = meshCad.vertices[tri[0]];
+      const b = meshCad.vertices[tri[1]];
+      const c = meshCad.vertices[tri[2]];
+      if (!a || !b || !c) return null;
+      return [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+    }
+
+    const bodyHits = [];
+    if (state.bodies.length > 1) {
+      for (let i = 0; i < state.bodies.length; i += 1) {
+        const local = screenOfCad(bodyCentroid(state.bodies[i]));
+        const locals = ring(local, 0).concat(ring(local, 12), ring(local, 24), ring(local, 40), ring(local, 56));
+        const hit = firstHit('item', locals, state.bodies[i].id);
+        if (hit) bodyHits.push(hit);
+      }
+    } else if (state.bodies.length === 1) {
+      const local = screenOfCad(bodyCentroid(state.bodies[0]));
+      const locals = ring(local, 0).concat(ring(local, 12), ring(local, 24), ring(local, 40), ring(local, 56));
+      const hit = firstHit('item', locals, 'item');
+      if (hit) bodyHits.push(hit);
+    }
+
+    let faceHit = null;
+    let cylinderHit = null;
+    const topo = state.topology;
+    if (topo && topo.faces) {
+      for (let f = 0; f < topo.faces.length; f += 1) {
+        const face = topo.faces[f];
+        const locals = [];
+        const tris = face.tris || [];
+        const limit = Math.min(tris.length, 24);
+        for (let t = 0; t < limit; t += 1) {
+          const cad = triPoint(tris[t]);
+          if (!cad || !inFront(cad)) continue;
+          const local = screenOfCad(cad);
+          const around = ring(local, 0).concat(ring(local, 8));
+          for (let p = 0; p < around.length; p += 1) locals.push(around[p]);
+        }
+        const hit = firstHit('face', locals, face.id);
+        const surface = String(face.surface || '');
+        if (hit && surface.indexOf('Cylinder') >= 0 && !cylinderHit) cylinderHit = hit;
+        if (hit && !faceHit) faceHit = hit;
+        if (faceHit && cylinderHit) break;
+      }
+    }
+
+    let edgeHit = null;
+    if (topo && topo.edges && phoneApi && typeof phoneApi.pointBesideSegment === 'function') {
+      seek('edge', function () {
+        for (let i = 0; i < topo.edges.length && !edgeHit; i += 1) {
+          const edge = topo.edges[i];
+          const pts = edge.pts || [];
+          for (let k = 0; k + 1 < pts.length && !edgeHit; k += 1) {
+            if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
+            const a = screenOfCad(pts[k]);
+            const b = screenOfCad(pts[k + 1]);
+            const len = Math.hypot(b.x - a.x, b.y - a.y);
+            if (!(len > 8)) continue;
+            const ts = [0.5, 0.35, 0.65, 0.22, 0.78];
+            const signs = [1, -1];
+            for (let ti = 0; ti < ts.length && !edgeHit; ti += 1) {
+              for (let si = 0; si < signs.length && !edgeHit; si += 1) {
+                const along = ts[ti];
+                const dist = gap * signs[si];
+                let local;
+                if (along === 0.5) {
+                  local = phoneApi.pointBesideSegment(a.x, a.y, b.x, b.y, dist);
+                } else {
+                  const px = a.x + (b.x - a.x) * along;
+                  const py = a.y + (b.y - a.y) * along;
+                  local = {
+                    x: px + (-(b.y - a.y) / len) * dist,
+                    y: py + ((b.x - a.x) / len) * dist
+                  };
+                }
+                if (!inside(local)) continue;
+                const measured = distToSeg(local.x, local.y, a.x, a.y, b.x, b.y);
+                if (!(measured > touchPx && measured < edgePx)) continue;
+                const client = toClient(local);
+                if (blocked(client)) continue;
+                const hit = pickElement(client.x, client.y, 'touch');
+                if (hit === edge.id) edgeHit = { id: hit, x: client.x, y: client.y, gap: measured };
+              }
+            }
+          }
+        }
+      });
+    }
+
+    let vertexHit = null;
+    if (topo && topo.vertices) {
+      for (let i = 0; i < topo.vertices.length && !vertexHit; i += 1) {
+        const vertex = topo.vertices[i];
+        if (!vertex.p || !inFront(vertex.p)) continue;
+        const local = screenOfCad(vertex.p);
+        vertexHit = firstHit('vertex', ring(local, 0).concat(ring(local, 6), ring(local, 12)), vertex.id);
+      }
+    }
+
+    const emptyLocals = [];
+    for (let gy = 1; gy <= 7; gy += 1) {
+      for (let gx = 1; gx <= 5; gx += 1) {
+        emptyLocals.push({ x: (rect.width * gx) / 6, y: (rect.height * gy) / 8 });
+      }
+    }
+    const emptyHit = firstHit('item', emptyLocals, null);
+
+    state.selection = savedMode;
+    handles.visible = savedVis;
+    lastPick = savedPick;
+    return {
+      body: bodyHits[0] || null,
+      bodies: bodyHits,
+      face: faceHit,
+      edge: edgeHit,
+      vertex: vertexHit,
+      empty: emptyHit,
+      cylinder: cylinderHit,
+      touchPx: touchPx,
+      edgePx: edgePx
+    };
   }
 
   function setSelectionMode(mode) {
@@ -5319,9 +5717,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const bounds = canvas.getBoundingClientRect();
     const px = clientX - bounds.left;
     const py = clientY - bounds.top;
-    const limit = pointerType === 'touch' && selApi.TOUCH_PICK_TOLERANCE_PX
-      ? selApi.TOUCH_PICK_TOLERANCE_PX
-      : selApi.PICK_TOLERANCE_PX;
+    const limit = phoneApi && typeof phoneApi.pickTolerancePx === 'function'
+      ? phoneApi.pickTolerancePx(mode, pointerType, selApi.TOUCH_PICK_TOLERANCE_PX, selApi.PICK_TOLERANCE_PX)
+      : (pointerType === 'touch' && selApi.TOUCH_PICK_TOLERANCE_PX
+        ? selApi.TOUCH_PICK_TOLERANCE_PX
+        : selApi.PICK_TOLERANCE_PX);
     if (mode === 'vertex') {
       let best = null;
       let bestD = limit;
@@ -7514,7 +7914,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       modifyOpen: !!(shelf && shelf.hidden !== true),
       selectionMode: state.selection,
       selectionCount: state.selectedIds.length,
+      selectedIds: state.selectedIds.slice(),
       selectionAll: state.selection !== 'item' && state.selectedIds.length === 0,
+      phoneFilter: phoneApi && typeof phoneApi.filterForMode === 'function' ? phoneApi.filterForMode(state.selection) : 'body',
+      phoneMulti: state.phoneMulti === true,
+      selectionHighlight: selectionHighlighted(),
       bootNote: window.__cadcamBootNote || '',
       demo: state.demo || '',
       lastError: state.lastError || '',
@@ -7716,6 +8120,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     handles.visible = gizmoShouldShow();
     updateHighlights();
     paintPrimFields();
+    paintPhoneChrome();
     writePosFields();
     const readout = document.getElementById('displayReadout');
     if (readout) {
@@ -7888,6 +8293,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
     toolsSheet.hidden = true;
     closeCreateMenu();
+    const chooser = document.getElementById('pickChooser');
+    if (chooser) chooser.hidden = true;
+    const chip = document.getElementById('pickFilter');
+    if (chip) chip.setAttribute('aria-expanded', 'false');
   }
 
   function placeSearch() {
@@ -8554,7 +8963,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu' && action !== 'loadProject') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter') {
       closePopups();
     }
     if (action === 'tab') {
@@ -8675,6 +9084,28 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'applyHole') {
       applyHole();
       message = state.lastError || ('Hole ' + state.holeLog.length);
+    } else if (action === 'pickFilter') {
+      const chooser = document.getElementById('pickChooser');
+      const opening = !chooser || chooser.hidden === true;
+      closePopups();
+      if (chooser && opening) chooser.hidden = false;
+      paintPhoneChrome();
+      message = 'Pick ' + (phoneApi && typeof phoneApi.filterLabel === 'function'
+        ? phoneApi.filterLabel(phoneApi.filterForMode(state.selection))
+        : cap(state.selection));
+    } else if (action === 'pickChoose') {
+      const filter = btn.getAttribute('data-filter') || 'body';
+      setPhoneFilter(filter);
+      message = 'Pick ' + (phoneApi && typeof phoneApi.filterLabel === 'function'
+        ? phoneApi.filterLabel(filter)
+        : filter);
+      setHint(message);
+    } else if (action === 'multiToggle') {
+      state.phoneMulti = state.phoneMulti !== true;
+      paintPhoneChrome();
+      publishGateState();
+      message = state.phoneMulti ? 'Multi on' : 'Multi off';
+      setHint(message);
     } else if (action === 'select') {
       const mode = btn.getAttribute('data-mode') || 'item';
       const normalized = mode === 'body' ? 'item' : mode;
@@ -9479,12 +9910,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           }
         }
       }
-      else if (g.type === 'orbit' && !g.moved && g.button === 0 && (ev.button === 0 || ev.pointerType === 'touch')) {
+      else if (g.type === 'orbit' && g.button === 0 && (ev.button === 0 || ev.pointerType === 'touch')) {
+        const dx = ev.clientX - g.sx;
+        const dy = ev.clientY - g.sy;
+        const cancelled = ev.type === 'pointercancel';
+        const tap = phoneApi && typeof phoneApi.shouldSelect === 'function'
+          ? phoneApi.shouldSelect(dx, dy, tapSlopPx(), cancelled)
+          : (!g.moved && !cancelled);
+        if (!tap || !selApi) {
+          gesture = null;
+          pinch = null;
+          return;
+        }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
-        const next = selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
-          shift: ev.shiftKey,
-          ctrl: ev.ctrlKey
-        });
+        const modified = !!(ev.shiftKey || ev.ctrlKey || ev.metaKey);
+        const next = (!modified && phoneApi && typeof phoneApi.selectionFromTap === 'function')
+          ? phoneApi.selectionFromTap(state.selection, state.selectedIds, hitId, state.phoneMulti === true)
+          : selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
+            shift: ev.shiftKey,
+            ctrl: ev.ctrlKey || ev.metaKey
+          });
         if (state.bodies.length > 1 && state.selection === 'item') {
           applyPickedIds(next.ids);
         } else {
@@ -9533,7 +9978,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const btn = ev.target.closest('[data-tool]');
     if (!btn) {
-      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu')) {
+      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu, .pick-chooser')) {
         const searchWasOpen = !searchDlg.hidden;
         closePopups();
         if (searchWasOpen && searchBtn) searchBtn.focus();
@@ -9910,6 +10355,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       mm: nudgeApi.MM_STEP,
       deg: nudgeApi.DEG_STEP,
       min: nudgeApi.MIN_SIZE_MM
+    };
+  }
+  if (phoneApi) {
+    window.__cadcamPhoneSelect = {
+      edgePx: phoneApi.EDGE_TOUCH_TOLERANCE_PX,
+      touchPx: selApi ? selApi.TOUCH_PICK_TOLERANCE_PX : 20,
+      slopPx: tapSlopPx(),
+      chipMin: phoneApi.CHIP_MIN_PX,
+      filters: phoneApi.PICK_FILTERS,
+      aims: function () { return phoneAims(); },
+      installHole: function () { return installHoleFixture(); }
     };
   }
   window.__cadcamNavCube = navCubeState;

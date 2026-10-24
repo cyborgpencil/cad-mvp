@@ -155,6 +155,20 @@ else()
     message(STATUS "field_nudge skipped locally: Node was not found.")
 endif()
 
+# Phone pick filter, tap-vs-drag, and Multi. Pure JS, no libcascade.
+if(CADCAM_NODE)
+    add_test(NAME phone_select COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_phone_select.mjs")
+    set_tests_properties(phone_select PROPERTIES
+        TIMEOUT 30
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "phone_select requires Node. CI must not skip this test when Node is missing.")
+else()
+    message(STATUS "phone_select skipped locally: Node was not found.")
+endif()
+
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
 # gizmo_drag_smoke exits 77 when Playwright cannot be imported. Prefer the
