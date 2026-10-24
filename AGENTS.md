@@ -22,7 +22,7 @@ Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns
 - Before every push: check `git status` for build, SDK, or mesh files; scan for keys, tokens, and local user paths; then do a normal `git push` to `main`.
 - Never: push a failing build or test, force-push, amend or rebase pushed commits, or push while a Grok Build session is still editing the tree.
 - A rejected push, conflict, or login prompt means stop and report in the group.
-- After each push, post the commit links and the changed core files so Erik can review them.
+- After each push, post the commit links and the changed core files in the CAD CAM MVP group.
 
 ## Keep finished work (Erik's rule, 2026-10-21)
 - Keep everything Grok Build has already finished (the Qt app, export, units, tests in dfb46b7, and the rest) unless something actually needs to change.
@@ -53,7 +53,22 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 - Green docs PRs merge right away, with no merge-order queue.
 - Each bot posts one status line per milestone; Repo Keeper posts the single post-merge line. No "waiting" posts.
 - When Z13 is down, docs edits go to a Cursor cloud agent that 3T launches. No new GitHub access.
-- Erik's C++ review commits stay separate.
 - Small direct C++ edits that skip Grok Build: waiting on Erik's answer. Until then, all C++ goes through Grok Build or Cursor.
 ## Mobile test links (Erik's rule, 2026-10-23)
-Links for phone testing come only from https://cyborgpencil.github.io/cad-mvp/: main at the root, and open PR builds under `/cad-mvp/prN/` (index at `/cad-mvp/previews/`). Never post LAN or localhost links. Previews deploy as a GitHub Actions Pages artifact (no `gh-pages` branch, no committed `.wasm`), and a guard step blocks fixtures, `builds/`, Blink files and secrets. A preview containing C++ that Erik hasn't reviewed carries a "needs Erik's review" banner. A PR gets a preview only once Repo Keeper adds it to `.github/preview-prs.txt` on main (with `review` for the banner). Previews refresh on main pushes, the daily 3:17 AM MT run, or a manual run; after a PR push that needs a fresh preview, ask Repo Keeper for a manual run.
+Links for phone testing come only from https://cyborgpencil.github.io/cad-mvp/: main at the root, and open PR builds under `/cad-mvp/prN/` (index at `/cad-mvp/previews/`). Never post LAN or localhost links. Previews deploy as a GitHub Actions Pages artifact (no `gh-pages` branch, no committed `.wasm`), and a guard step blocks fixtures, `builds/`, Blink files and secrets. A preview containing C++ that hasn't passed the team's C++ review carries a review banner; Repo Keeper drops eview for that PR once its C++ merges. A PR gets a preview only once Repo Keeper adds it to `.github/preview-prs.txt` on main (with `review` for the banner). Previews refresh on main pushes, the daily 3:17 AM MT run, or a manual run; after a PR push that needs a fresh preview, ask Repo Keeper for a manual run.
+
+## Self-serve review and merge (Erik via 3T, 2026-10-23; plan team-chosen by the Chief)
+Erik no longer reviews repo pushes, C++ included. The team owns review and merge approval. Only something truly irreversible or outside scope goes to Erik.
+- Reviewers (the author never reviews its own PR):
+  - C++ core (`src/`): Research Digest first, checking OCCT usage against the official docs; Pilot second, with Grok Build in read-only plan mode. Both approve.
+  - JS (`web/`): Research Digest first, Doc Steward second.
+  - Docs: Repo Keeper.
+  - CI and CMake: Doc Steward reviews; Pilot confirms the CTest count.
+- Required before any merge:
+  1. The `build` check is green.
+  2. CTest passes on the branch's own build, and the PR states the count.
+  3. Units checks pass. The OCCT validity check stays error handling only.
+  4. A non-author bot posts a written approval as a PR comment.
+  5. UI changes: Research Digest does a phone pass on the `/prNN/` preview and names the screenshots.
+  6. The secret scan is clean, and no `.wasm` or root `PROGRESS.md` is in the diff.
+- Merging: only Repo Keeper, plain merges, no force-push or history rewrite. When a parent PR merges, its stacked children are retargeted to `main` and re-checked before they merge.
