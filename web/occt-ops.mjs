@@ -1136,6 +1136,63 @@ export function makeRectFace(oc, origin, axisU, axisV, lengthMm, widthMm) {
   }
 }
 
+// Closed wire. 3 and 4 corners use the constructors already called from the
+// gate and from makeRectFace. Any other count uses MakePolygon Add and Close.
+function closedPolygonWire(oc, pnts, trash) {
+  let poly = null;
+  if (pnts.length === 3) {
+    poly = track(trash, new oc.BRepBuilderAPI_MakePolygon(pnts[0], pnts[1], pnts[2], true));
+  } else if (pnts.length === 4) {
+    poly = track(trash, new oc.BRepBuilderAPI_MakePolygon(pnts[0], pnts[1], pnts[2], pnts[3], true));
+  } else {
+    if (typeof oc.BRepBuilderAPI_MakePolygon !== 'function') return null;
+    poly = track(trash, new oc.BRepBuilderAPI_MakePolygon());
+    if (!poly || typeof poly.Add !== 'function' || typeof poly.Close !== 'function') return null;
+    for (let i = 0; i < pnts.length; i += 1) poly.Add(pnts[i]);
+    poly.Close();
+  }
+  try {
+    poly.Build();
+  } catch (_err) {
+    return null;
+  }
+  if (!poly || poly.IsDone() !== true || typeof poly.Wire !== 'function') return null;
+  return track(trash, poly.Wire());
+}
+
+// Closed click-click polyline on a plane. points are millimetre corners.
+// The first point is not repeated. Returns a face the caller owns, or null.
+export function makeLineFace(oc, points) {
+  if (!oc || !points || points.length < 3) return null;
+  const trash = [];
+  let owned = null;
+  try {
+    const pnts = [];
+    for (let i = 0; i < points.length; i += 1) {
+      const p = points[i];
+      if (!p || p.length < 3) return null;
+      const x = Number(p[0]);
+      const y = Number(p[1]);
+      const z = Number(p[2]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+      pnts.push(track(trash, new oc.gp_Pnt(x, y, z)));
+    }
+    const wire = closedPolygonWire(oc, pnts, trash);
+    if (!wire) return null;
+    const faceMaker = track(trash, new oc.BRepBuilderAPI_MakeFace(wire, true));
+    owned = ownedFace(oc, faceMaker, trash);
+    if (!owned) return null;
+    const keep = owned;
+    owned = null;
+    return keep;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
 // Closed center circle. diameterMm is the full diameter. normal is the
 // plane normal. Returns a face the caller owns, or null.
 export function makeCircleFace(oc, center, normal, diameterMm) {
