@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #91 (merged at 73408c4): feat - touch Booleans + fillet/chamfer (T1-T7; phone order; edgeSize text+mm).
 - 2026-10-24 PR #89 (merged at 49101c7): docs - prompts/touch-booleans-fillet.md (T1-T7 GB feed).
 - 2026-10-24 PR #87 (merged at 0c795bd): research - touch Booleans + fillet/chamfer prep (T1-T7 locked; INDEX row).
 - 2026-10-24 PR #85 (merged at 3bce5b2): PROGRESS scrub - Extrude Join/Cut on main (#83 at 99063c9); P1-P5 stay done.
