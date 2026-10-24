@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #58 (merged at aa36137): P3 flatter Fusion-like default shaders - bodyMat metalness 0, roughness 0.6 (JS-only web/).
 - 2026-10-24 PR #54 (merged at 1578ad0): P4 tool-shelf show/hide - shelves collapsed at load; Tools-sheet toggles; #hudSize only while editing box/cyl/disc.
 - 2026-10-24 PR #56 (merged at 672cb10): prompts/p5-measure-callouts.md + PROGRESS P5 link (measure/callouts impl prep after research #52).
 - 2026-10-24 PR #52 (merged at 4cdf7c0): research/gui/measure-callouts-p5.md + INDEX - P5a/P5b measure and callouts impl prep (research only).
