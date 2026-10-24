@@ -503,6 +503,18 @@ int main() {
         expect("L raw stl has vertices", false);
     }
 
+    MeshSolid bad_index = box_mm(20.0, 20.0, 20.0);
+    bad_index.triangles.push_back(
+        {0, 1, static_cast<std::uint32_t>(bad_index.vertices.size()) + 5});
+    const std::filesystem::path bad_index_dir = fresh_dir("bad-index");
+    std::error_code bad_index_dir_error;
+    std::filesystem::create_directories(bad_index_dir, bad_index_dir_error);
+    expect("bad vertex index dir",
+           !bad_index_dir_error && std::filesystem::is_directory(bad_index_dir));
+    const std::filesystem::path bad_index_path = bad_index_dir / "model.3mf";
+    expect("bad vertex index write_3mf fails", !write_3mf(bad_index_path, bad_index));
+    expect("bad vertex index 3mf absent", !std::filesystem::is_regular_file(bad_index_path));
+
     std::error_code error;
     std::filesystem::remove_all(std::filesystem::temp_directory_path() / "cadcam-mvp-export", error);
 

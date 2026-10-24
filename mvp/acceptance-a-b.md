@@ -20,7 +20,7 @@ Preconditions: assemblies (prompts/assemblies.md) are merged, plus A's tool set.
 Steps and checks:
 1. B1 build: build the truck in the app as separate parts: the team-chosen parts below (10-21 rule).
 2. B2 per-part checks: each part passes the validity check, and units read mm.
-3. B3 combine: Combine fuses the body parts that are meant to be one piece. The fused part is valid, its volume is within 0.01 of the summed exact volumes minus overlaps, and undo restores the separate parts.
+3. B3 combine: Combine fuses the body parts that are meant to be one piece. The fused part is valid, its volume is within 1% (relative) of the summed exact volumes minus overlaps (Chief ruling, 2026-10-22), and undo restores the separate parts.
 4. B4 save/load: save and reload. Part count, names, material tags, placements and volumes match.
 5. B5 export: the 3MF has one object per part with its material tag, unit="millimeter", and placements kept.
 6. B6 Orca plates: in OrcaSlicer on Z13, PLA parts go on one plate and TPU parts on another, PLA plate on Bambu PLA Basic, TPU plate on stock TPU 95A (3T 07:06; the Chief said Generic TPU, use the stock TPU 95A profile and note it) (the filament/plate check moved here, Chief 02:21). Screenshot each plate.
@@ -38,4 +38,5 @@ After the cab Combine the parts list is 11 parts. Combine of a hub with a tire m
 
 ## Wrap-up additions (Erik 2026-10-22 08:40 MT)
 - For A (Blink bracket) and B (11-part truck), take Orca screenshots of every sliced plate. Stage them in the Z13 staging folder (cadmvp-shots). Don't send anything to the printer.
+- Orca CLI workarounds (Pilot rerun, 2026-10-22): the CLI needs a temporary copy of the "Ermo X1C" printer preset with a `type` field added (the real preset stays untouched), and slicing needs `--before-layer-change-gcode "G92 E0"`.
 - Item 4 project file check: follow research/project-save-load.md (save as .cadmvp, reload in a fresh tab, compare). Fix any gaps before sign-off.
