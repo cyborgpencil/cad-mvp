@@ -34,7 +34,13 @@ Asserts window.__cadcamExportState.occtReady for:
                         no page-level horizontal scroll; visible buttons and the status
                         line stay inside the width; the sheet and toolbar do not scroll
                         sideways unless marked data-hscroll; Part 1 is fully visible,
-                        min-width 96px
+                        min-width 96px;
+                        before those primitive taps, sketch on the default cube:
+                        Finish Sketch, Tools-sheet Rectangle and Circle, L×W / Ø /
+                        Blind inputs, and Extrude Confirm are at least 44 px; the
+                        sketch sheet does not cover the phone tab bar, status bar,
+                        or view bar; the top face becomes the plane with no V/E/F
+                        highlight; the check does not extrude and leaves the box
   portrait holes        three countersunk holes on a plate; volumes logged; same overflow
                         and coverage checks
   measure tool          default 20 mm cube: one edge polyline ~20 mm, volume ~8000 mm³,
@@ -1068,6 +1074,185 @@ def create_menu_problems(cdp: Cdp) -> list[str]:
     if not isinstance(found, list):
         return [f"create menu {raw}"]
     return [str(item) for item in found]
+
+
+# Portrait sketch chrome only. Does not confirm a profile or extrude, so the
+# default 20 mm box is still the only body when this returns.
+SKETCH_PORTRAIT_EXPR = r"""
+(function(){
+  var problems = [];
+  function boxOf(el) {
+    if (!el || el.closest('[hidden]')) return null;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    return r;
+  }
+  function need(el, label) {
+    var r = boxOf(el);
+    if (!r) { problems.push(label + ' hidden'); return; }
+    if (r.width + 0.5 < 44 || r.height + 0.5 < 44) {
+      problems.push(label + ' ' + r.width.toFixed(1) + 'x' + r.height.toFixed(1));
+    }
+  }
+  function sheetBtn(name) {
+    var buttons = document.querySelectorAll('#sheetTools button');
+    for (var i = 0; i < buttons.length; i++) {
+      var span = buttons[i].querySelector('span');
+      if (span && span.textContent === name) return buttons[i];
+    }
+    return null;
+  }
+  function visibleClick(selector) {
+    var nodes = document.querySelectorAll(selector);
+    for (var i = 0; i < nodes.length; i++) {
+      if (boxOf(nodes[i])) { nodes[i].click(); return true; }
+    }
+    return false;
+  }
+  function overlaps(a, b) {
+    if (!a || !b) return false;
+    return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+  }
+  function scrollOk(label) {
+    if (document.documentElement.scrollWidth > window.innerWidth + 0.5) {
+      problems.push(label + ' scrollWidth ' + document.documentElement.scrollWidth);
+    }
+  }
+  function decimal(id, label) {
+    var el = document.getElementById(id);
+    need(el, label);
+    if (!el) return;
+    if (el.getAttribute('inputmode') !== 'decimal') problems.push(label + ' inputmode');
+    if (String(el.value).trim() !== '10') problems.push(label + ' value ' + el.value);
+  }
+  function cover(label) {
+    var sheet = document.getElementById('sketchSheet');
+    var sheetBox = boxOf(sheet);
+    if (!sheetBox) { problems.push(label + ' sheet hidden'); return; }
+    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    for (var i = 0; i < bars.length; i++) {
+      var bar = document.querySelector(bars[i]);
+      var barBox = boxOf(bar);
+      if (!barBox) { problems.push(label + ' missing ' + bars[i]); continue; }
+      if (overlaps(sheetBox, barBox)) problems.push(label + ' covers ' + bars[i]);
+    }
+  }
+  var hook = window.__cadcamSketch;
+  if (!hook || typeof hook.tapFace !== 'function' || typeof hook.state !== 'function') {
+    problems.push('missing sketch hook');
+    return JSON.stringify(problems);
+  }
+  if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
+  var menu = document.getElementById('createMenu');
+  var sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+  need(sketchItem, 'Create Sketch');
+  if (sketchItem) sketchItem.click();
+  var st = hook.state();
+  if (!st || st.tab !== 'sketch') problems.push('tab after Sketch ' + (st && st.tab));
+  need(document.querySelector('#finishBar [data-action="finishSketch"]'), 'Finish Sketch');
+  scrollOk('sketch shell');
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener hidden');
+  var tools = document.getElementById('toolsSheet');
+  if (!tools || tools.hidden) problems.push('tools sheet hidden');
+  var rectBtn = sheetBtn('Rectangle');
+  var circBtn = sheetBtn('Circle');
+  need(rectBtn, 'Rectangle');
+  need(circBtn, 'Circle');
+  var face = hook.topFace();
+  if (!face) problems.push('no top face');
+  var tapped = face ? hook.tapFace(face) : false;
+  if (tapped !== true) problems.push('tapFace ' + String(tapped));
+  st = hook.state();
+  if (!st.plane) problems.push('plane not set');
+  if (face && st.faceId !== face) problems.push('face ' + st.faceId);
+  if (!st.selectedIds || st.selectedIds.length !== 0) problems.push('selected ' + JSON.stringify(st.selectedIds));
+  if (st.highlight !== false) problems.push('highlight on');
+  if (st.bodies !== 1) problems.push('bodies ' + st.bodies);
+  if (st.tab !== 'sketch') problems.push('tab during plane ' + st.tab);
+  var itemBtn = document.querySelector('[data-action="select"][data-mode="item"]');
+  if (itemBtn) itemBtn.click();
+  if (!rectBtn || !boxOf(rectBtn)) {
+    visibleClick('[data-action="toolsMenu"]');
+    rectBtn = sheetBtn('Rectangle');
+  }
+  if (rectBtn) rectBtn.click();
+  else problems.push('Rectangle click missing');
+  decimal('sketchL', 'Length');
+  decimal('sketchW', 'Width');
+  need(document.getElementById('sketchConfirm'), 'Rectangle confirm');
+  cover('rectangle');
+  scrollOk('rectangle sheet');
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener for circle hidden');
+  circBtn = sheetBtn('Circle');
+  if (circBtn) circBtn.click();
+  else problems.push('Circle click missing');
+  decimal('sketchD', 'Diameter');
+  need(document.getElementById('sketchConfirm'), 'Circle confirm');
+  cover('circle');
+  scrollOk('circle sheet');
+  var finish = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (finish) finish.click();
+  else problems.push('Finish Sketch missing');
+  st = hook.state();
+  if (st.tab !== 'model') problems.push('finish tab ' + st.tab);
+  if (st.closed) problems.push('profile committed');
+  if (st.bodies !== 1) problems.push('bodies after finish ' + st.bodies);
+  if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener for extrude hidden');
+  var ext = sheetBtn('Extrude (Push/Pull)');
+  need(ext, 'Extrude');
+  if (ext) ext.click();
+  decimal('sketchDepth', 'Blind');
+  var confirmBtn = document.getElementById('sketchConfirm');
+  need(confirmBtn, 'Extrude confirm');
+  if (confirmBtn && confirmBtn.disabled !== true) problems.push('Extrude confirm enabled without a profile');
+  var published = window.__cadcamExportState || {};
+  if (published.sketchDepthDefault !== 10) problems.push('depth default ' + published.sketchDepthDefault);
+  cover('extrude');
+  scrollOk('extrude sheet');
+  if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener for cleanup hidden');
+  menu = document.getElementById('createMenu');
+  sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+  if (sketchItem) sketchItem.click();
+  finish = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (finish) finish.click();
+  st = hook.state();
+  published = window.__cadcamExportState || {};
+  if (st.tab !== 'model') problems.push('cleanup tab ' + st.tab);
+  if (st.plane) problems.push('plane left set');
+  if (st.profile) problems.push('profile left ' + st.profile);
+  if (st.bodies !== 1) problems.push('cleanup bodies ' + st.bodies);
+  if (published.primitiveKind !== 'box' || published.bodyCount !== 1) {
+    problems.push('model ' + published.primitiveKind + ' bodies ' + published.bodyCount);
+  }
+  if (published.tab !== 'model') problems.push('published tab ' + published.tab);
+  if (published.sketchSheetOpen) problems.push('sketch sheet left open');
+  if (published.sketchPlane) problems.push('published plane left set');
+  var toolsLeft = document.getElementById('toolsSheet');
+  if (toolsLeft && toolsLeft.hidden !== true) problems.push('tools sheet left open');
+  var menuLeft = document.getElementById('createMenu');
+  if (menuLeft && menuLeft.hidden !== true) problems.push('create menu left open');
+  scrollOk('cleanup');
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def portrait_sketch_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, SKETCH_PORTRAIT_EXPR, timeout=60)
+    if err or not isinstance(raw, str):
+        return [f"portrait sketch {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"portrait sketch {raw}"]
+    if not isinstance(found, list):
+        return [f"portrait sketch {raw}"]
+    problems = [str(item) for item in found]
+    if problems:
+        return problems
+    return portrait_fit_problems(cdp)
 
 
 COVERAGE_EXPR = r"""
@@ -2696,6 +2881,7 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
     search_checked = False
     stamp_checked = False
     create_checked = False
+    sketch_checked = False
     for spec in PORTRAIT:
         kind = str(spec["kind"])
         url = origin + "/"
@@ -2732,6 +2918,13 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             if menu_found:
                 problems.append(f"portrait {kind} create menu")
                 problems.extend(menu_found)
+                return problems
+        if not sketch_checked:
+            sketch_checked = True
+            sketch_found = portrait_sketch_problems(cdp)
+            if sketch_found:
+                problems.append(f"portrait {kind} sketch")
+                problems.extend(sketch_found)
                 return problems
         # The default page is already the 20 mm box. Another Box tap adds a body.
         if not (kind == "box" and _is_default_box(_state)):

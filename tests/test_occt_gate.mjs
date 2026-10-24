@@ -1072,6 +1072,69 @@ expect('project missing units', projectFile.parseProject(JSON.stringify(projectI
 releaseProjectShape(projectBox);
 releaseProjectShape(projectCyl);
 
+// P5c: 20 mm cube face. Corner rect 10×10 mm × Blind 10 mm is a new solid.
+// Center circle Ø10 mm × the same depth. The cube is not consumed.
+const sketchCube = ops.makeBoxSolid(oc, 20, 20, 20, [-10, -10, 0]);
+expect('sketch cube', !!sketchCube && Math.abs(ops.solidVolumeMm3(oc, sketchCube) - 8000) <= 1e-4);
+const sketchView = sketchCube ? inspectSolid(oc, sketchCube) : null;
+let sketchFace = null;
+const sketchFaces = sketchView && sketchView.topology ? sketchView.topology.faces : [];
+for (let si = 0; si < sketchFaces.length; si += 1) {
+  const face = sketchFaces[si];
+  if (!sketchFace || (face.centroid && sketchFace.centroid && face.centroid[2] > sketchFace.centroid[2])) {
+    sketchFace = face;
+  }
+}
+const sketchFrame = sketchView && sketchFace
+  ? faceFrameFromTriangles(sketchView.mesh.vertices, sketchView.mesh.triangles, sketchFace.tris, [0, 0, 10])
+  : null;
+expect('sketch plane', !!sketchFrame && sketchFrame.uSpan > 19 && sketchFrame.vSpan > 19);
+expect('sketch blind default', ops.SKETCH_BLIND_DEPTH_MM === 10);
+const sketchDepth = ops.SKETCH_BLIND_DEPTH_MM;
+const sketchRect = sketchFrame
+  ? ops.makeRectFace(oc, sketchFrame.origin, sketchFrame.u, sketchFrame.v, 10, 10)
+  : null;
+const sketchVec = sketchFrame
+  ? [
+    sketchFrame.outward[0] * sketchDepth,
+    sketchFrame.outward[1] * sketchDepth,
+    sketchFrame.outward[2] * sketchDepth,
+  ]
+  : [0, 0, 0];
+const sketchPrism = sketchRect
+  ? ops.makePrismSolid(oc, sketchRect, sketchVec[0], sketchVec[1], sketchVec[2])
+  : null;
+const sketchInspect = sketchPrism ? inspectSolid(oc, sketchPrism) : null;
+expect(
+  'sketch rect volume ' + (sketchPrism ? ops.solidVolumeMm3(oc, sketchPrism) : ''),
+  !!sketchPrism && Math.abs(ops.solidVolumeMm3(oc, sketchPrism) - 1000) <= 0.05
+);
+expect(
+  'sketch rect occt',
+  !!(sketchInspect && sketchInspect.units === 'mm' && sketchInspect.gate && sketchInspect.gate.pass === true && sketchInspect.gate.valid === true)
+);
+expect('sketch cube kept', !!sketchCube && Math.abs(ops.solidVolumeMm3(oc, sketchCube) - 8000) <= 1e-4);
+const sketchMid = sketchFrame ? sketchFrame.point(sketchFrame.uSpan / 2, sketchFrame.vSpan / 2) : null;
+const sketchCirc = sketchMid ? ops.makeCircleFace(oc, sketchMid, sketchFrame.outward, 10) : null;
+const sketchCyl = sketchCirc
+  ? ops.makePrismSolid(oc, sketchCirc, sketchVec[0], sketchVec[1], sketchVec[2])
+  : null;
+const sketchCylView = sketchCyl ? inspectSolid(oc, sketchCyl) : null;
+const sketchCylWant = Math.PI * 25 * sketchDepth;
+expect(
+  'sketch circle volume ' + (sketchCyl ? ops.solidVolumeMm3(oc, sketchCyl) : ''),
+  !!sketchCyl && Math.abs(ops.solidVolumeMm3(oc, sketchCyl) - sketchCylWant) <= sketchCylWant * 0.001
+);
+expect(
+  'sketch circle occt',
+  !!(sketchCylView && sketchCylView.units === 'mm' && sketchCylView.gate && sketchCylView.gate.pass === true && sketchCylView.gate.valid === true)
+);
+if (sketchRect) sketchRect.delete();
+if (sketchCirc) sketchCirc.delete();
+if (sketchPrism) sketchPrism.delete();
+if (sketchCyl) sketchCyl.delete();
+if (sketchCube) sketchCube.delete();
+
 if (failures !== 0) {
   console.error(failures + ' failed');
   console.error('closed', closed);

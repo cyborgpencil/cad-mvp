@@ -1061,6 +1061,158 @@ export function normalizeBooleanOp(op) {
   return null;
 }
 
+// Blind sketch extrude. 3T lock 2026-10-24: default depth 10 mm.
+export const SKETCH_BLIND_DEPTH_MM = 10;
+
+function unit3(v) {
+  if (!v) return null;
+  const x = Number(v[0]);
+  const y = Number(v[1]);
+  const z = Number(v[2]);
+  const len = Math.hypot(x, y, z);
+  if (!(len > 1e-12)) return null;
+  return [x / len, y / len, z / len];
+}
+
+function pointAt(origin, u, v, su, sv) {
+  return [
+    origin[0] + u[0] * su + v[0] * sv,
+    origin[1] + u[1] * su + v[1] * sv,
+    origin[2] + u[2] * su + v[2] * sv,
+  ];
+}
+
+function ownedFace(oc, faceMaker, trash) {
+  try {
+    faceMaker.Build();
+  } catch (_err) {
+    return null;
+  }
+  const taken = takeDoneShape(oc, faceMaker, 'BRepBuilderAPI_MakeFace');
+  if (!taken.ok || !taken.shape) return null;
+  track(trash, taken.shape);
+  const copied = copyOwned(oc, taken.shape, trash);
+  if (!copied.ok || !copied.shape) return null;
+  return copied.shape;
+}
+
+// Closed corner rectangle on a plane. origin is one corner; u and v are
+// in-plane axes. Length runs along u, width along v. Returns a face the
+// caller owns, or null.
+export function makeRectFace(oc, origin, axisU, axisV, lengthMm, widthMm) {
+  if (!origin || !(lengthMm > 0) || !(widthMm > 0)) return null;
+  const u = unit3(axisU);
+  const v = unit3(axisV);
+  if (!u || !v) return null;
+  const trash = [];
+  let owned = null;
+  try {
+    const p1 = track(trash, new oc.gp_Pnt(origin[0], origin[1], origin[2]));
+    const a2 = pointAt(origin, u, v, lengthMm, 0);
+    const a3 = pointAt(origin, u, v, lengthMm, widthMm);
+    const a4 = pointAt(origin, u, v, 0, widthMm);
+    const p2 = track(trash, new oc.gp_Pnt(a2[0], a2[1], a2[2]));
+    const p3 = track(trash, new oc.gp_Pnt(a3[0], a3[1], a3[2]));
+    const p4 = track(trash, new oc.gp_Pnt(a4[0], a4[1], a4[2]));
+    const poly = track(trash, new oc.BRepBuilderAPI_MakePolygon(p1, p2, p3, p4, true));
+    try {
+      poly.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (poly.IsDone() !== true) return null;
+    const wire = track(trash, poly.Wire());
+    const faceMaker = track(trash, new oc.BRepBuilderAPI_MakeFace(wire, true));
+    owned = ownedFace(oc, faceMaker, trash);
+    if (!owned) return null;
+    const keep = owned;
+    owned = null;
+    return keep;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Closed center circle. diameterMm is the full diameter. normal is the
+// plane normal. Returns a face the caller owns, or null.
+export function makeCircleFace(oc, center, normal, diameterMm) {
+  if (!center || !(diameterMm > 0)) return null;
+  const dir = unit3(normal);
+  if (!dir) return null;
+  const trash = [];
+  let owned = null;
+  try {
+    const origin = track(trash, new oc.gp_Pnt(center[0], center[1], center[2]));
+    const gpDir = track(trash, new oc.gp_Dir(dir[0], dir[1], dir[2]));
+    const axes = track(trash, new oc.gp_Ax2(origin, gpDir));
+    const circ = track(trash, new oc.gp_Circ(axes, diameterMm / 2));
+    const edgeMaker = track(trash, new oc.BRepBuilderAPI_MakeEdge(circ));
+    try {
+      edgeMaker.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (edgeMaker.IsDone() !== true) return null;
+    const edge = track(trash, edgeMaker.Edge());
+    const wireMaker = track(trash, new oc.BRepBuilderAPI_MakeWire(edge));
+    try {
+      wireMaker.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (wireMaker.IsDone() !== true) return null;
+    const wire = track(trash, wireMaker.Wire());
+    const faceMaker = track(trash, new oc.BRepBuilderAPI_MakeFace(wire, true));
+    owned = ownedFace(oc, faceMaker, trash);
+    if (!owned) return null;
+    const keep = owned;
+    owned = null;
+    return keep;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Linear prism of a closed face or wire. Same trash / takeDoneShape / copy
+// pattern as makeBoxSolid. The base stays with the caller. Copy is true so
+// the result does not share the profile. Returns a solid the caller owns,
+// or null. dx, dy, dz are the prism vector in millimetres.
+export function makePrismSolid(oc, base, dx, dy, dz) {
+  if (!base) return null;
+  if (!(Math.hypot(Number(dx) || 0, Number(dy) || 0, Number(dz) || 0) > 1e-9)) return null;
+  const trash = [];
+  let owned = null;
+  try {
+    const vec = track(trash, new oc.gp_Vec(Number(dx) || 0, Number(dy) || 0, Number(dz) || 0));
+    const maker = track(trash, new oc.BRepPrimAPI_MakePrism(base, vec, true, true));
+    try {
+      maker.Build();
+    } catch (_err) {
+      return null;
+    }
+    const taken = takeDoneShape(oc, maker, 'BRepPrimAPI_MakePrism');
+    if (!taken.ok || !taken.shape) return null;
+    track(trash, taken.shape);
+    const copied = copyOwned(oc, taken.shape, trash);
+    if (!copied.ok || !copied.shape) return null;
+    owned = copied.shape;
+    const keep = owned;
+    owned = null;
+    return keep;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
 export function makeCylinderSolid(oc, radius, height, base, direction) {
   if (!(radius > 0) || !(height > 0)) return null;
   const at = base || [0, 0, 0];
