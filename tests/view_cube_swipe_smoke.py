@@ -6,6 +6,8 @@ Desktop Chromium uses a mouse drag on the cube overlay. WebKit and a
 left, right, up, and down is reset through the Front button, then swiped
 40 px, including a slow drag longer than 400 ms. The camera direction and
 cubeFaceName must match the next face. A 10 px nudge stays on Front.
+A tap, then a swipe, then another tap inside one turn must land on the
+swiped face, not Home.
 
 Wired into CTest next to gizmo_drag_smoke. Playwright lives in the pwvenv.
 Exit 77 when it cannot be imported.
@@ -101,6 +103,43 @@ CUBE_SWIPE = """({down, up, phase}) => {
   }
   fire('pointerup', up.x, up.y);
   return 'up';
+}"""
+
+# Tap, swipe, tap in one turn. Separate CDP calls can miss the 320 ms window.
+TAP_SWIPE_TAP = """({x, y, dx, dy, pointerType}) => {
+  const el = document.getElementById('viewCube');
+  if (!el) return 'missing';
+  const kind = pointerType || 'touch';
+  function fire(type, px, py) {
+    const ending = type === 'pointerup' || type === 'pointercancel';
+    el.dispatchEvent(new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 21,
+      pointerType: kind,
+      isPrimary: true,
+      button: 0,
+      buttons: ending ? 0 : 1,
+      clientX: px,
+      clientY: py,
+      width: 24,
+      height: 24
+    }));
+  }
+  function tap(px, py) {
+    fire('pointerdown', px, py);
+    fire('pointerup', px, py);
+  }
+  function swipe(px, py, ex, ey) {
+    fire('pointerdown', px, py);
+    fire('pointermove', (px + ex) / 2, (py + ey) / 2);
+    fire('pointermove', ex, ey);
+    fire('pointerup', ex, ey);
+  }
+  tap(x, y);
+  swipe(x, y, x + dx, y + dy);
+  tap(x, y);
+  return 'done';
 }"""
 
 TAP_AT = """({x, y}) => {
@@ -325,6 +364,35 @@ def run_phone_swipes(page: Any, kind: str) -> list[str]:
     return problems
 
 
+def run_tap_swipe_tap(page: Any, kind: str) -> list[str]:
+    """Tap, swipe left, tap again. The tap after the swipe must not go Home."""
+    go_front(page)
+    reset = wait_face(page, FRONT, f"{kind} tap-swipe-tap front")
+    if reset:
+        return reset
+    cube = cube_center(page)
+    if not cube:
+        return [f"{kind} tap-swipe-tap cube missing"]
+    fired = page.evaluate(
+        TAP_SWIPE_TAP,
+        {
+            "x": cube["x"],
+            "y": cube["y"],
+            "dx": -SWIPE_PX,
+            "dy": 0.0,
+            "pointerType": "mouse" if kind == "mouse" else "touch",
+        },
+    )
+    if fired != "done":
+        return [f"{kind} tap-swipe-tap {fired!r}"]
+    problems = face_problems(page, RIGHT, "right", "Right", f"{kind} tap-swipe-tap")
+    after = read_nav(page)
+    hint = str(after.get("hint") or "")
+    if "Home" in hint:
+        problems.append(f"{kind} tap-swipe-tap hint {hint!r}")
+    return problems
+
+
 def go_front(page: Any) -> None:
     page.evaluate(
         """() => {
@@ -397,6 +465,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} viewLabel {after.get('viewLabel')!r}")
     if kind == "touch":
         problems.extend(run_phone_swipes(page, kind))
+    problems.extend(run_tap_swipe_tap(page, kind))
     return problems
 
 
