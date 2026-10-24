@@ -1255,6 +1255,120 @@ export function solidVolumeMm3(oc, shape) {
   }
 }
 
+// 1-based TopExp index. Copies the sub-shape into trash. Does not delete `shape`.
+function mappedSubshape(oc, shape, type, index, castName, trash) {
+  if (!shape || !(index > 0) || !oc || !oc.TopoDS || typeof oc.TopoDS[castName] !== 'function') return null;
+  const map = mapShapes(oc, shape, type, trash);
+  if (!map || typeof map.Extent !== 'function' || index > map.Extent()) return null;
+  const key = map.FindKey(index);
+  if (!key) return null;
+  return track(trash, oc.TopoDS[castName](key));
+}
+
+// Mid-parameter tangent as a gp_Lin. Radians later come from gp_Lin.Angle / gp_Dir.Angle.
+function edgeLine(oc, edge, trash) {
+  let env = null;
+  try {
+    if (!oc.BRep_Tool || typeof oc.BRep_Tool.Curve !== 'function' || !oc.gp_Lin || !oc.gp_Dir) return null;
+    env = oc.BRep_Tool.Curve(edge);
+    const curve = env && env.returnValue;
+    if (!curve || (typeof curve.IsNull === 'function' && curve.IsNull()) || typeof curve.EvalD1 !== 'function') return null;
+    const first = Number(env.First);
+    const last = Number(env.Last);
+    if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
+    const sample = curve.EvalD1((first + last) / 2);
+    const point = sample && sample.Point;
+    const deriv = sample && sample.D1;
+    if (!point || !deriv || typeof deriv.Magnitude !== 'function' || typeof deriv.X !== 'function') return null;
+    if (!(deriv.Magnitude() > 1e-9)) return null;
+    const origin = track(trash, new oc.gp_Pnt(point.X(), point.Y(), point.Z()));
+    const dir = track(trash, new oc.gp_Dir(deriv.X(), deriv.Y(), deriv.Z()));
+    if (typeof point.delete === 'function') {
+      try { point.delete(); } catch (_pointErr) { /* released with the curve */ }
+    }
+    if (typeof deriv.delete === 'function') {
+      try { deriv.delete(); } catch (_derivErr) { /* released with the curve */ }
+    }
+    return track(trash, new oc.gp_Lin(origin, dir));
+  } catch (_err) {
+    return null;
+  } finally {
+    if (env && typeof env[Symbol.dispose] === 'function') {
+      try { env[Symbol.dispose](); } catch (_disposeErr) { /* envelope already released */ }
+    }
+  }
+}
+
+// Face area in mm². Mass() after BRepGProp.SurfaceProperties. Null when the binding is missing.
+export function faceAreaMm2(oc, shape, faceIndex) {
+  if (!oc || !shape || !oc.BRepGProp || typeof oc.BRepGProp.SurfaceProperties !== 'function' || !oc.GProp_GProps) return null;
+  const trash = [];
+  try {
+    const face = mappedSubshape(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, faceIndex, 'Face', trash);
+    if (!face) return null;
+    const props = track(trash, new oc.GProp_GProps());
+    oc.BRepGProp.SurfaceProperties(face, props, false, false);
+    const mass = Number(props.Mass());
+    return Number.isFinite(mass) ? mass : null;
+  } catch (_err) {
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Angle between two edges, radians, from gp_Lin.Angle. Null when the binding is missing.
+export function edgeEdgeAngleRad(oc, shape, indexA, indexB) {
+  if (!oc || !shape || !oc.gp_Lin) return null;
+  const trash = [];
+  try {
+    const edgeA = mappedSubshape(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, indexA, 'Edge', trash);
+    const edgeB = mappedSubshape(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, indexB, 'Edge', trash);
+    if (!edgeA || !edgeB) return null;
+    const lineA = edgeLine(oc, edgeA, trash);
+    const lineB = edgeLine(oc, edgeB, trash);
+    if (!lineA || !lineB || typeof lineA.Angle !== 'function') return null;
+    const rad = Number(lineA.Angle(lineB));
+    return Number.isFinite(rad) ? rad : null;
+  } catch (_err) {
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Angle between an edge direction and a face normal, radians, from gp_Dir.Angle.
+export function edgeFaceAngleRad(oc, shape, edgeIndex, faceIndex) {
+  if (!oc || !shape || !oc.BRepGProp_Face || !oc.gp_Dir || !oc.gp_Vec || !oc.gp_Pnt) return null;
+  const trash = [];
+  try {
+    const edge = mappedSubshape(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, edgeIndex, 'Edge', trash);
+    const face = mappedSubshape(oc, shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, faceIndex, 'Face', trash);
+    if (!edge || !face) return null;
+    const line = edgeLine(oc, edge, trash);
+    if (!line || typeof line.Direction !== 'function') return null;
+    const gprop = track(trash, new oc.BRepGProp_Face(face));
+    const bounds = gprop.Bounds();
+    if (!bounds) return null;
+    const u = (Number(bounds.U1) + Number(bounds.U2)) / 2;
+    const v = (Number(bounds.V1) + Number(bounds.V2)) / 2;
+    if (!Number.isFinite(u) || !Number.isFinite(v)) return null;
+    const point = track(trash, new oc.gp_Pnt(0, 0, 0));
+    const normal = track(trash, new oc.gp_Vec(0, 0, 1));
+    gprop.Normal(u, v, point, normal);
+    if (typeof normal.Magnitude !== 'function' || !(normal.Magnitude() > 1e-9)) return null;
+    const edgeDir = track(trash, line.Direction());
+    const faceDir = track(trash, new oc.gp_Dir(normal));
+    if (!edgeDir || typeof edgeDir.Angle !== 'function') return null;
+    const rad = Number(edgeDir.Angle(faceDir));
+    return Number.isFinite(rad) ? rad : null;
+  } catch (_err) {
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
 export function solidBounds(oc, shape) {
   const trash = [];
   try {

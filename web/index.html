@@ -2688,6 +2688,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     section: false,
     measure: false,
     measurePicks: [],
+    measureShapes: [],
     display: 'edges',
     isolated: false,
     node: 'body',
@@ -3563,6 +3564,30 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   let calloutDimId = '';
   let calloutCommitLock = false;
 
+  function isSketchDimId(dimId) {
+    return dimId === 'sketchL' || dimId === 'sketchW' || dimId === 'sketchD';
+  }
+
+  function sketchCalloutActive(dimId) {
+    if (state.sketchSheetMode === 'rect') return dimId === 'sketchL' || dimId === 'sketchW';
+    if (state.sketchSheetMode === 'circle') return dimId === 'sketchD';
+    return false;
+  }
+
+  // Null when the sheet is not a rect or circle edit, so primitive rows can show.
+  function sketchCalloutSpecs() {
+    if (state.sketchSheetMode === 'rect') {
+      return [
+        { tag: 'L', dim: 'sketchL', label: 'Length', mm: readField('sketchL') },
+        { tag: 'W', dim: 'sketchW', label: 'Width', mm: readField('sketchW') }
+      ];
+    }
+    if (state.sketchSheetMode === 'circle') {
+      return [{ tag: 'Ø', dim: 'sketchD', label: 'Diameter', mm: readField('sketchD') }];
+    }
+    return null;
+  }
+
   function calloutSpecs() {
     const prim = sheetPrimitive();
     if (!prim || !prim.params) return [];
@@ -3615,7 +3640,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     hideCalloutEntry();
     try {
       const field = document.getElementById(dimId);
-      if (!field || field.disabled || !editingBasicShape()) return;
+      if (!field || field.disabled) return;
+      if (isSketchDimId(dimId)) {
+        if (!sketchCalloutActive(dimId)) return;
+        const parsed = Number(String(typed).trim().replace(',', '.'));
+        if (!Number.isFinite(parsed) || !(parsed > 0)) return;
+        field.value = String(parsed);
+        paintCallouts();
+        return;
+      }
+      if (!editingBasicShape()) return;
       field.value = typed;
       delete field.dataset.preferStored;
       onPrimitiveCommit();
@@ -3625,12 +3659,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function openCalloutEntry(dimId) {
-    if (!editingBasicShape() || !dimId) return;
+    if (!dimId) return;
+    const sketch = isSketchDimId(dimId) && sketchCalloutActive(dimId);
+    if (!sketch && !editingBasicShape()) return;
     const field = document.getElementById(dimId);
     const form = document.getElementById('calloutEntryForm');
     const entry = document.getElementById('calloutEntry');
     if (!field || field.disabled || !form || !entry) return;
-    const stored = Number(field.getAttribute('data-mm'));
+    const stored = sketch ? readField(dimId) : Number(field.getAttribute('data-mm'));
     calloutDimId = dimId;
     entry.value = Number.isFinite(stored) ? formatEntry(stored) : '';
     entry.setAttribute('aria-label', (field.getAttribute('aria-label') || 'Dimension') + ' callout');
@@ -3690,6 +3726,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     add(viewport.querySelector('.vp-bar'));
     add(viewport.querySelector('.hud'));
     add(document.getElementById('edgeSheet'));
+    add(document.getElementById('sketchSheet'));
 
     function clearAt(x, y) {
       if (x < gap || y < gap) return false;
@@ -3742,7 +3779,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function paintCallouts() {
     const layer = document.getElementById('calloutLayer');
     if (!layer) return;
-    const specs = editingBasicShape() ? calloutSpecs() : [];
+    const sketchSpecs = sketchCalloutSpecs();
+    const specs = sketchSpecs || (editingBasicShape() ? calloutSpecs() : []);
     let shown = 0;
     for (let i = 0; i < 3; i += 1) {
       const spec = specs[i];
@@ -5404,7 +5442,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const id = phoneApi && typeof phoneApi.edgePickId === 'function'
           ? phoneApi.edgePickId(body.id, edge.id, count)
           : (count > 1 ? String(body.id) + ':' + edge.id : String(edge.id));
-        rows.push({ id: id, bodyId: body.id, edgeId: edge.id, pts: edge.pts });
+        rows.push({
+          id: id,
+          bodyId: body.id,
+          edgeId: edge.id,
+          pts: edge.pts,
+          occtIndex: edge.occtIndex || 0
+        });
       }
     }
     if (!rows.length && state.topology && state.topology.edges) {
@@ -5412,8 +5456,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       for (let k = 0; k < state.topology.edges.length; k += 1) {
         const edge = state.topology.edges[k];
         if (!edge || !edge.pts || edge.pts.length < 2) continue;
-        rows.push({ id: edge.id, bodyId: only, edgeId: edge.id, pts: edge.pts });
+        rows.push({
+          id: edge.id,
+          bodyId: only,
+          edgeId: edge.id,
+          pts: edge.pts,
+          occtIndex: edge.occtIndex || 0
+        });
       }
+    }
+    return rows;
+  }
+
+  function listFaceRows() {
+    const rows = [];
+    const bodies = state.bodies;
+    const count = bodies.length;
+    function pushFace(face, bodyId) {
+      if (!face || !face.id) return;
+      rows.push({
+        id: face.id,
+        bodyId: bodyId || '',
+        faceId: face.id,
+        occtIndex: face.occtIndex || 0
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
+      const body = bodies[i];
+      const topo = body && body.topology && body.topology.faces
+        ? body.topology
+        : (count === 1 ? state.topology : null);
+      if (!topo || !topo.faces) continue;
+      for (let k = 0; k < topo.faces.length; k += 1) pushFace(topo.faces[k], body.id);
+    }
+    if (!rows.length && state.topology && state.topology.faces) {
+      const only = count === 1 && bodies[0] ? bodies[0].id : '';
+      for (let k = 0; k < state.topology.faces.length; k += 1) pushFace(state.topology.faces[k], only);
     }
     return rows;
   }
@@ -7534,6 +7612,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const custom = Number(btn.getAttribute('data-step'));
     const used = custom > 0 ? (fine && unit === 'deg' ? 1 : custom) : step;
     const amount = sign * (fine && !(custom > 0) ? step : used);
+    if (isSketchDimId(dimId)) {
+      if (!sketchCalloutActive(dimId)) return false;
+      const current = readField(dimId);
+      if (current == null) return false;
+      const next = Math.round((current + amount) * 1000) / 1000;
+      if (!(next > 0)) return false;
+      field.value = String(next);
+      paintCallouts();
+      return true;
+    }
     if (unit === 'deg' || dimId.indexOf('hole') === 0) {
       const current = readField(dimId);
       if (current == null) return false;
@@ -9392,6 +9480,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchSheetMode = '';
     const sheet = document.getElementById('sketchSheet');
     if (sheet) sheet.hidden = true;
+    paintCallouts();
   }
 
   function sketchPlanePrompt() {
@@ -9861,6 +9950,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (sheet) sheet.hidden = false;
     publishGateState();
+    paintCallouts();
   }
 
   function setSketchPlane(faceId) {
@@ -11462,6 +11552,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function clearMeasurePicks() {
     state.measurePicks = [];
+    state.measureShapes = [];
   }
 
   function clearMeasureGraphics() {
@@ -11726,16 +11817,188 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   }
 
+  function measureBody(bodyId) {
+    if (bodyId) {
+      for (let i = 0; i < state.bodies.length; i += 1) {
+        if (state.bodies[i] && state.bodies[i].id === bodyId) return state.bodies[i];
+      }
+    }
+    return state.bodies.length === 1 ? state.bodies[0] : null;
+  }
+
+  function measureShapeRecord(kind, row) {
+    if (!kind || !row || !(row.occtIndex > 0)) return null;
+    return { kind: kind, bodyId: row.bodyId || '', occtIndex: row.occtIndex, id: row.id };
+  }
+
+  function sameMeasureShape(a, b) {
+    return !!a && !!b && a.kind === b.kind && a.bodyId === b.bodyId && a.occtIndex === b.occtIndex;
+  }
+
+  function isAnglePair(shapes) {
+    if (!shapes || shapes.length !== 2) return false;
+    const a = shapes[0];
+    const b = shapes[1];
+    if (!a || !b) return false;
+    if (a.kind === 'edge' && b.kind === 'edge') return true;
+    return (a.kind === 'edge' && b.kind === 'face') || (a.kind === 'face' && b.kind === 'edge');
+  }
+
+  function rowsForMeasureKind(kind) {
+    if (kind === 'edge') return listEdgeRows();
+    if (kind === 'face') return listFaceRows();
+    return [];
+  }
+
+  function selectedMeasureShapes() {
+    if (state.selection === 'edge' && state.selectedIds.length >= 2) {
+      const rows = listEdgeRows();
+      const out = [];
+      for (let i = 0; i < state.selectedIds.length && out.length < 2; i += 1) {
+        for (let k = 0; k < rows.length; k += 1) {
+          if (rows[k].id !== state.selectedIds[i]) continue;
+          const rec = measureShapeRecord('edge', rows[k]);
+          if (rec) out.push(rec);
+          break;
+        }
+      }
+      return out.length >= 2 ? out : [];
+    }
+    if (state.selection === 'face' && state.selectedIds.length === 1) {
+      const rows = listFaceRows();
+      for (let k = 0; k < rows.length; k += 1) {
+        if (rows[k].id !== state.selectedIds[0]) continue;
+        const rec = measureShapeRecord('face', rows[k]);
+        return rec ? [rec] : [];
+      }
+    }
+    return [];
+  }
+
+  function activeMeasureShapes() {
+    const stored = state.measureShapes || [];
+    if (stored.length) return stored;
+    return selectedMeasureShapes();
+  }
+
+  function pushMeasureShape(shape) {
+    if (!shape || !(shape.occtIndex > 0)) return;
+    const list = state.measureShapes || [];
+    if (!list.length) {
+      state.measureShapes = [shape];
+      return;
+    }
+    if (list.length === 1) {
+      if (sameMeasureShape(list[0], shape)) return;
+      const a = list[0];
+      const pair = (a.kind === 'edge' && shape.kind === 'edge')
+        || (a.kind === 'edge' && shape.kind === 'face')
+        || (a.kind === 'face' && shape.kind === 'edge');
+      state.measureShapes = pair ? [a, shape] : [shape];
+      return;
+    }
+    state.measureShapes = [shape];
+  }
+
+  function noteMeasureSelection() {
+    if (!state.measure) return;
+    if (state.selection === 'edge' && state.selectedIds.length >= 2) {
+      const both = selectedMeasureShapes();
+      if (both.length >= 2) {
+        state.measureShapes = both.slice(0, 2);
+        return;
+      }
+    }
+    const kind = state.selection === 'edge' || state.selection === 'face' ? state.selection : '';
+    if (!kind || state.selectedIds.length !== 1) return;
+    const rows = rowsForMeasureKind(kind);
+    let row = null;
+    for (let i = 0; i < rows.length; i += 1) {
+      if (rows[i].id === state.selectedIds[0]) {
+        row = rows[i];
+        break;
+      }
+    }
+    const rec = measureShapeRecord(kind, row);
+    if (rec) pushMeasureShape(rec);
+  }
+
+  function measureHostShape(shapes) {
+    let host = null;
+    for (let i = 0; i < shapes.length; i += 1) {
+      const body = measureBody(shapes[i] && shapes[i].bodyId);
+      if (!body || !body.shape) return null;
+      if (host && host !== body.shape) return null;
+      host = body.shape;
+    }
+    return host;
+  }
+
+  // Degree text for the measure label. Not a unit formatter and not a radian display.
+  function degreeLabel(radians) {
+    if (!Number.isFinite(radians)) return '';
+    const deg = radians * 180 / Math.PI;
+    const rounded = Math.round(deg * 1000) / 1000;
+    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(3);
+    return text + '°';
+  }
+
+  function measureAngleRadians(shapes) {
+    if (!isAnglePair(shapes) || !oc || !opsApi) return null;
+    const host = measureHostShape(shapes);
+    if (!host) return null;
+    const a = shapes[0];
+    const b = shapes[1];
+    try {
+      if (a.kind === 'edge' && b.kind === 'edge') {
+        if (typeof opsApi.edgeEdgeAngleRad !== 'function') return null;
+        const rad = opsApi.edgeEdgeAngleRad(oc, host, a.occtIndex, b.occtIndex);
+        return Number.isFinite(rad) ? rad : null;
+      }
+      const edge = a.kind === 'edge' ? a : b;
+      const face = a.kind === 'face' ? a : b;
+      if (typeof opsApi.edgeFaceAngleRad !== 'function') return null;
+      const rad = opsApi.edgeFaceAngleRad(oc, host, edge.occtIndex, face.occtIndex);
+      return Number.isFinite(rad) ? rad : null;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function measureFaceArea(shapes) {
+    if (!shapes || shapes.length !== 1 || !shapes[0] || shapes[0].kind !== 'face') return null;
+    if (!oc || !opsApi || typeof opsApi.faceAreaMm2 !== 'function') return null;
+    const host = measureHostShape(shapes);
+    if (!host) return null;
+    try {
+      const area = opsApi.faceAreaMm2(oc, host, shapes[0].occtIndex);
+      return Number.isFinite(area) ? area : null;
+    } catch (_err) {
+      return null;
+    }
+  }
+
   function updateMeasure() {
     if (measureSvg.hidden) return;
     measureSvg.style.opacity = '1';
     placeMeasureReadout();
-    const span = activeMeasureSpan();
-    paintMeasureSpan(span);
+    const shapes = activeMeasureShapes();
     const kindEl = document.getElementById('measureSpanLabel');
-    if (kindEl) {
-      if (!span || !Number.isFinite(span.mm)) kindEl.textContent = '';
-      else kindEl.textContent = (span.kind === 'length' ? 'Length ' : 'Distance ') + formatLength(span.mm);
+    if (isAnglePair(shapes)) {
+      paintMeasureSpan(null);
+      const rad = measureAngleRadians(shapes);
+      if (kindEl) kindEl.textContent = rad == null ? '' : degreeLabel(rad);
+    } else if (shapes.length === 1 && shapes[0] && shapes[0].kind === 'face') {
+      paintMeasureSpan(null);
+      const area = measureFaceArea(shapes);
+      if (kindEl) kindEl.textContent = area == null ? '' : formatArea(area);
+    } else {
+      const span = activeMeasureSpan();
+      paintMeasureSpan(span);
+      if (kindEl) {
+        if (!span || !Number.isFinite(span.mm)) kindEl.textContent = '';
+        else kindEl.textContent = (span.kind === 'length' ? 'Length ' : 'Distance ') + formatLength(span.mm);
+      }
     }
     const volEl = document.getElementById('measureVolume');
     if (volEl) {
@@ -11763,6 +12026,170 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
     }
     return best;
+  }
+
+  function probeBinding(fn) {
+    if (typeof fn !== 'function') return { value: null, error: 'missing binding' };
+    try {
+      const value = fn();
+      if (!Number.isFinite(value)) return { value: null, error: 'missing binding' };
+      return { value: value, error: '' };
+    } catch (err) {
+      const message = err && err.message ? String(err.message) : String(err);
+      return { value: null, error: message || 'missing binding' };
+    }
+  }
+
+  function probeMeasureAngleArea() {
+    const report = {
+      angleEdgeRad: null,
+      angleEdgeLabel: '',
+      angleEdgeError: '',
+      angleVolumeText: '',
+      angleEdgeFaceRad: null,
+      angleEdgeFaceLabel: '',
+      angleEdgeFaceError: '',
+      faceAreaMm2: null,
+      faceAreaLabel: '',
+      faceAreaFormatted: '',
+      faceAreaError: '',
+      faceVolumeText: ''
+    };
+    const spanLabel = document.getElementById('measureSpanLabel');
+    const volEl = document.getElementById('measureVolume');
+    function labelText() {
+      return spanLabel ? String(spanLabel.textContent || '').trim() : '';
+    }
+    function volumeText() {
+      return volEl ? String(volEl.textContent || '').trim() : '';
+    }
+    const edges = listEdgeRows();
+    const faces = listFaceRows();
+    let indexedEdges = 0;
+    for (let i = 0; i < edges.length; i += 1) {
+      if (edges[i].occtIndex > 0) indexedEdges += 1;
+    }
+    if (!oc || !opsApi || typeof opsApi.edgeEdgeAngleRad !== 'function') {
+      report.angleEdgeError = 'missing binding';
+    } else if (indexedEdges < 2) {
+      report.angleEdgeError = 'missing occt index';
+    } else {
+      let sawNumber = false;
+      let sawError = '';
+      let found = false;
+      for (let i = 0; i < edges.length && !found && !sawError; i += 1) {
+        for (let k = i + 1; k < edges.length; k += 1) {
+          const a = edges[i];
+          const b = edges[k];
+          if (!(a.occtIndex > 0) || !(b.occtIndex > 0)) continue;
+          if ((a.bodyId || '') !== (b.bodyId || '')) continue;
+          const body = measureBody(a.bodyId);
+          if (!body || !body.shape) continue;
+          const got = probeBinding(function () {
+            return opsApi.edgeEdgeAngleRad(oc, body.shape, a.occtIndex, b.occtIndex);
+          });
+          if (got.error) {
+            sawError = got.error;
+            break;
+          }
+          sawNumber = true;
+          if (Math.abs((got.value * 180 / Math.PI) - 90) > 0.5) continue;
+          state.measurePicks = [];
+          state.measureShapes = [measureShapeRecord('edge', a), measureShapeRecord('edge', b)];
+          updateMeasure();
+          report.angleEdgeRad = got.value;
+          report.angleEdgeLabel = labelText();
+          report.angleVolumeText = volumeText();
+          found = true;
+          break;
+        }
+      }
+      if (!found) report.angleEdgeError = sawError || (sawNumber ? 'no perpendicular edge pair' : 'missing binding');
+    }
+    let indexedFaces = 0;
+    for (let i = 0; i < faces.length; i += 1) {
+      if (faces[i].occtIndex > 0) indexedFaces += 1;
+    }
+    if (!oc || !opsApi || typeof opsApi.edgeFaceAngleRad !== 'function') {
+      report.angleEdgeFaceError = 'missing binding';
+    } else if (indexedEdges < 1 || indexedFaces < 1) {
+      report.angleEdgeFaceError = 'missing occt index';
+    } else {
+      let sawNumber = false;
+      let sawError = '';
+      let found = false;
+      for (let i = 0; i < edges.length && !found && !sawError; i += 1) {
+        const edge = edges[i];
+        if (!(edge.occtIndex > 0)) continue;
+        for (let k = 0; k < faces.length; k += 1) {
+          const face = faces[k];
+          if (!(face.occtIndex > 0)) continue;
+          if ((edge.bodyId || '') !== (face.bodyId || '')) continue;
+          const body = measureBody(edge.bodyId);
+          if (!body || !body.shape) continue;
+          const got = probeBinding(function () {
+            return opsApi.edgeFaceAngleRad(oc, body.shape, edge.occtIndex, face.occtIndex);
+          });
+          if (got.error) {
+            sawError = got.error;
+            break;
+          }
+          if (!Number.isFinite(got.value)) continue;
+          sawNumber = true;
+          state.measurePicks = [];
+          state.measureShapes = [measureShapeRecord('edge', edge), measureShapeRecord('face', face)];
+          updateMeasure();
+          report.angleEdgeFaceRad = got.value;
+          report.angleEdgeFaceLabel = labelText();
+          found = true;
+          break;
+        }
+      }
+      if (!found) report.angleEdgeFaceError = sawError || (sawNumber ? 'missing binding' : 'missing binding');
+    }
+    if (!oc || !opsApi || typeof opsApi.faceAreaMm2 !== 'function') {
+      report.faceAreaError = 'missing binding';
+    } else if (indexedFaces < 1) {
+      report.faceAreaError = 'missing occt index';
+    } else {
+      let chosen = null;
+      let chosenFace = null;
+      let sawError = '';
+      for (let i = 0; i < faces.length && !sawError; i += 1) {
+        const face = faces[i];
+        if (!(face.occtIndex > 0)) continue;
+        const body = measureBody(face.bodyId);
+        if (!body || !body.shape) continue;
+        const got = probeBinding(function () {
+          return opsApi.faceAreaMm2(oc, body.shape, face.occtIndex);
+        });
+        if (got.error) {
+          sawError = got.error;
+          break;
+        }
+        if (!chosen) {
+          chosen = got.value;
+          chosenFace = face;
+        }
+        if (Math.abs(got.value - 400) <= 0.5) {
+          chosen = got.value;
+          chosenFace = face;
+          break;
+        }
+      }
+      if (sawError) report.faceAreaError = sawError;
+      else if (!chosenFace) report.faceAreaError = 'missing binding';
+      else {
+        state.measurePicks = [];
+        state.measureShapes = [measureShapeRecord('face', chosenFace)];
+        updateMeasure();
+        report.faceAreaMm2 = chosen;
+        report.faceAreaLabel = labelText();
+        report.faceAreaFormatted = formatArea(chosen);
+        report.faceVolumeText = volumeText();
+      }
+    }
+    return report;
   }
 
   function measureProbe() {
@@ -11800,9 +12227,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       propsHasVolume: false,
       inchText: '',
       inchVolume: '',
+      angleEdgeRad: null,
+      angleEdgeLabel: '',
+      angleEdgeError: '',
+      angleVolumeText: '',
+      angleEdgeFaceRad: null,
+      angleEdgeFaceLabel: '',
+      angleEdgeFaceError: '',
+      faceAreaMm2: null,
+      faceAreaLabel: '',
+      faceAreaFormatted: '',
+      faceAreaError: '',
+      faceVolumeText: '',
       hiddenAfter: false,
       readoutAfter: false,
       picksAfter: -1,
+      shapesAfter: -1,
       exportBefore: exportBefore,
       exportAfter: false,
       bodiesBefore: bodiesBefore,
@@ -11882,10 +12322,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       result.inchVolume = volEl ? String(volEl.textContent || '').trim() : '';
       state.unit = unitWas;
       refreshUnits();
+      const angleArea = probeMeasureAngleArea();
+      result.angleEdgeRad = angleArea.angleEdgeRad;
+      result.angleEdgeLabel = angleArea.angleEdgeLabel;
+      result.angleEdgeError = angleArea.angleEdgeError;
+      result.angleVolumeText = angleArea.angleVolumeText;
+      result.angleEdgeFaceRad = angleArea.angleEdgeFaceRad;
+      result.angleEdgeFaceLabel = angleArea.angleEdgeFaceLabel;
+      result.angleEdgeFaceError = angleArea.angleEdgeFaceError;
+      result.faceAreaMm2 = angleArea.faceAreaMm2;
+      result.faceAreaLabel = angleArea.faceAreaLabel;
+      result.faceAreaFormatted = angleArea.faceAreaFormatted;
+      result.faceAreaError = angleArea.faceAreaError;
+      result.faceVolumeText = angleArea.faceVolumeText;
       if (btn) btn.click();
       result.hiddenAfter = measureSvg.hidden === true;
       result.readoutAfter = !readout || readout.hidden === true;
       result.picksAfter = state.measurePicks.length;
+      result.shapesAfter = (state.measureShapes || []).length;
       result.exportAfter = state.exportAllowed === true;
       result.bodiesAfter = state.bodies.length;
       result.shelfAfter = !shelf || shelf.hidden === true;
@@ -12363,6 +12817,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           if (state.holeTool && state.selection === 'face' && next.ids.length === 1 && lastPick && lastPick.id === next.ids[0]) {
             rememberHoleFace(next.ids[0], lastPick.point, true);
           }
+          if (state.measure) noteMeasureSelection();
           refreshAnchor();
           applyLook();
         }
@@ -12446,6 +12901,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const primIds = ['primCx', 'primCy', 'primCz', 'boxSx', 'boxSy', 'boxSz', 'cylD', 'cylH', 'discD', 'discT', 'primRx', 'primRy', 'primRz', 'bboxX', 'bboxY', 'bboxZ'];
   for (let pi = 0; pi < primIds.length; pi += 1) {
     document.getElementById(primIds[pi]).addEventListener('change', onPrimitiveCommit);
+  }
+  const sketchCalloutIds = ['sketchL', 'sketchW', 'sketchD'];
+  for (let si = 0; si < sketchCalloutIds.length; si += 1) {
+    const sketchInput = document.getElementById(sketchCalloutIds[si]);
+    if (!sketchInput) continue;
+    sketchInput.addEventListener('input', function () {
+      if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') paintCallouts();
+    });
   }
   const dimPanel = document.getElementById('dimPanel');
   if (dimPanel) {
