@@ -52,7 +52,7 @@ PETG, TPU, and PLA-default tags survive save/load.
 
 Set PETG and TPU with the `#partMaterial` change listener. A body `makeOwned` created stays `PLA`. After save and load, the file part’s `material` and the reloaded body are those strings. `window.__cadcamPartColor` uses `materialTag`: its `tag` is `PETG`, `TPU`, or `PLA` for those bodies.
 
-`partFromBody` still writes `DEFAULT_MATERIAL` (`'default'`) when `body.material` is empty. A part whose material string is `'default'` still loads. The stored string stays `'default'`. `materialTag` / `__cadcamPartColor.tag` still reads PLA. Do not treat a missing `material` key as success; `checkPart` still returns `ERR_READ`.
+`partFromBody` still writes `DEFAULT_MATERIAL` (`'default'`) when `body.material` is empty. A part whose material string is `'default'` still loads. The stored string stays `'default'`. `materialTag` / `__cadcamPartColor.tag` still reads PLA. Do not treat a missing `material` key as success. `checkPart` returns null for that part, and `parseProject` still returns `ERR_READ`.
 
 ### T4 — Sketch→extrude
 One extruded solid round-trips BREP-only. Same shared null-primitive rule as Boolean. The saved part’s `primitive` is null, not `{ kind: 'extrude', parameters }`. After load, `source` is `'brep'` and body `params` is null. Volume and AddOptimal bounds match the pre-save `measureShape` within **0.01**.
@@ -77,7 +77,7 @@ Box and cylinder stay `source: 'parameters'`. Disc stays on that same `rebuildSh
 Add the missing version-2 bad-file case. `research/project-save-load.md` P7 asks for a file with version 2. `parseProject` already returns `ERR_VERSION` when `version !== 1`. Copy a saved document, set `version` to 2, `loadText` it, and use the same unchanged-model check as the other bad files. Clear is not called. Do not drop the existing bad-file cases.
 
 ### T6 — Out
-- No feature rebuild and no parametric replay. Reload does not call `rebuildShape` for Boolean, fillet/chamfer-with-features, or sketch→extrude.
+- No feature rebuild and no parametric replay. `rebuildShape` returns null for Boolean, fillet/chamfer-with-features, and sketch→extrude, so `loadShapes` reads the BREP.
 - View-cube swipe stays next (`research/touch-gestures.md`). Do not implement it here.
 - Do not reopen P1–P6. Origin-plane, Extrude Join/Cut, and touch Booleans + fillet stay closed.
 - No format v2. No `std::stringstream` binding. No kernel, C++, `src/`, `web/bindings.cpp`, or WASM change.
