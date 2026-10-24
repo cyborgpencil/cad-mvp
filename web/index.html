@@ -3735,8 +3735,31 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       });
     }
 
+    function scanHit(mode, accept, cols, rows) {
+      const gxCount = cols || 18;
+      const gyCount = rows || 24;
+      return seek(mode, function () {
+        for (let gy = 0; gy < gyCount; gy += 1) {
+          for (let gx = 0; gx < gxCount; gx += 1) {
+            const local = {
+              x: (rect.width * (gx + 0.5)) / gxCount,
+              y: (rect.height * (gy + 0.5)) / gyCount
+            };
+            if (!inside(local)) continue;
+            const client = toClient(local);
+            if (blocked(client)) continue;
+            const hit = pickElement(client.x, client.y, 'touch');
+            const taken = accept(hit, local, client);
+            if (taken) return taken;
+          }
+        }
+        return null;
+      });
+    }
+
     function triPoint(triIndex) {
-      const meshCad = state.meshCad;
+      const owned = state.bodies.length === 1 && state.bodies[0].mesh ? state.bodies[0].mesh : null;
+      const meshCad = owned && owned.triangles ? owned : state.meshCad;
       const tri = meshCad && meshCad.triangles ? meshCad.triangles[triIndex] : null;
       if (!tri || !meshCad.vertices) return null;
       const a = meshCad.vertices[tri[0]];
@@ -3751,13 +3774,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       for (let i = 0; i < state.bodies.length; i += 1) {
         const local = screenOfCad(bodyCentroid(state.bodies[i]));
         const locals = ring(local, 0).concat(ring(local, 12), ring(local, 24), ring(local, 40), ring(local, 56));
-        const hit = firstHit('item', locals, state.bodies[i].id);
+        const want = state.bodies[i].id;
+        let hit = firstHit('item', locals, want);
+        if (!hit) {
+          hit = scanHit('item', function (id, _local, client) {
+            if (id !== want) return null;
+            return { id: id, x: client.x, y: client.y };
+          });
+        }
         if (hit) bodyHits.push(hit);
       }
     } else if (state.bodies.length === 1) {
       const local = screenOfCad(bodyCentroid(state.bodies[0]));
       const locals = ring(local, 0).concat(ring(local, 12), ring(local, 24), ring(local, 40), ring(local, 56));
-      const hit = firstHit('item', locals, 'item');
+      let hit = firstHit('item', locals, 'item');
+      if (!hit) {
+        hit = scanHit('item', function (id, _local, client) {
+          if (id !== 'item') return null;
+          return { id: id, x: client.x, y: client.y };
+        });
+      }
       if (hit) bodyHits.push(hit);
     }
 
@@ -3769,8 +3805,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const face = topo.faces[f];
         const locals = [];
         const tris = face.tris || [];
-        const limit = Math.min(tris.length, 24);
-        for (let t = 0; t < limit; t += 1) {
+        const step = Math.max(1, Math.floor(tris.length / 40));
+        for (let t = 0; t < tris.length; t += step) {
           const cad = triPoint(tris[t]);
           if (!cad || !inFront(cad)) continue;
           const local = screenOfCad(cad);
@@ -3783,6 +3819,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (hit && !faceHit) faceHit = hit;
         if (faceHit && cylinderHit) break;
       }
+    }
+    if (!cylinderHit && topo && topo.faces) {
+      cylinderHit = scanHit('face', function (id, _local, client) {
+        if (!id) return null;
+        for (let i = 0; i < topo.faces.length; i += 1) {
+          const surface = String(topo.faces[i].surface || '');
+          if (topo.faces[i].id === id && surface.indexOf('Cylinder') >= 0) {
+            return { id: id, x: client.x, y: client.y };
+          }
+        }
+        return null;
+      }, 40, 56);
     }
 
     let edgeHit = null;
