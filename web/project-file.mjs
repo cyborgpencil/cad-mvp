@@ -175,14 +175,47 @@ function placementFromParams(params) {
   };
 }
 
+function featureKindOf(entry) {
+  if (typeof entry === 'string') return entry;
+  if (entry && typeof entry === 'object' && typeof entry.kind === 'string') return entry.kind;
+  return '';
+}
+
+function hasFilletOrChamfer(features) {
+  if (!Array.isArray(features)) return false;
+  for (let i = 0; i < features.length; i += 1) {
+    const kind = featureKindOf(features[i]);
+    if (kind === 'fillet' || kind === 'chamfer') return true;
+  }
+  return false;
+}
+
+function isParametricKind(kind) {
+  return kind === 'box' || kind === 'cylinder' || kind === 'disc';
+}
+
+// Box, cylinder, and disc rebuild from parameters only when no fillet or
+// chamfer was stored. Boolean, sketch extrude, and an edge feature persist
+// primitive null. The live body's params are left as they are.
+function savedPrimitive(body) {
+  const kind = body && body.kind ? String(body.kind) : '';
+  const params = body && body.params ? body.params : null;
+  if (!isParametricKind(kind) || !params || hasFilletOrChamfer(body && body.features)) return null;
+  return { kind: kind, parameters: cloneData(params) };
+}
+
+function parametricPrimitive(part) {
+  const prim = part && part.primitive;
+  if (!prim || !prim.parameters || !isParametricKind(prim.kind)) return null;
+  if (hasFilletOrChamfer(part.features)) return null;
+  return prim;
+}
+
 export function partFromBody(oc, body) {
   const params = body && body.params ? body.params : null;
   const written = writeBrepText(oc, body && body.shape);
   if (!written.ok) return { ok: false, error: written.error, part: null };
-  const kind = body && body.kind ? String(body.kind) : '';
-  const primitive = kind && params
-    ? { kind: kind, parameters: cloneData(params) }
-    : null;
+  const primitive = savedPrimitive(body);
   let features = [];
   if (body && Array.isArray(body.features)) {
     try {
@@ -372,8 +405,9 @@ export function loadShapes(oc, doc, primApi, opsApi) {
   for (let i = 0; i < list.length; i += 1) {
     const part = list[i];
     let shape = null;
-    let kind = part.primitive && part.primitive.kind ? part.primitive.kind : 'brep';
-    let params = part.primitive ? part.primitive.parameters : null;
+    const kept = parametricPrimitive(part);
+    let kind = kept ? kept.kind : 'brep';
+    let params = kept ? kept.parameters : null;
     let source = '';
     const rebuilt = rebuildShape(oc, part, primApi, opsApi);
     if (rebuilt && rebuilt.shape) {
