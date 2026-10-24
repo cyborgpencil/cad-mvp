@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #60 (merged at ec00e2f): P5a Measure - two-point distance, one-edge polyline length, volume via state.volumeMm3 (JS + deploy_smoke; no P5b/P5c).
+- 2026-10-24 PR #61 (merged at 6420f61): web/PROGRESS.md - P3 #58 and P4 #54 on main; roughness 0.6; P5a Pilot building.
 - 2026-10-24 PR #58 (merged at aa36137): P3 flatter Fusion-like default shaders - bodyMat metalness 0, roughness 0.6 (JS-only web/).
 - 2026-10-24 PR #54 (merged at 1578ad0): P4 tool-shelf show/hide - shelves collapsed at load; Tools-sheet toggles; #hudSize only while editing box/cyl/disc.
 - 2026-10-24 PR #56 (merged at 672cb10): prompts/p5-measure-callouts.md + PROGRESS P5 link (measure/callouts impl prep after research #52).
