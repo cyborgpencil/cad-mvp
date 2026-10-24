@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #48 (merged at f856687): UPDATES.md one-liners for #42, #43, #44, and #46.
+- 2026-10-24 PR #45 (merged at 57bd8c7): research/gui/sketch-mvp-p5c.md P5c sketch MVP digest (rect/circle to Blind 10 mm), with research/INDEX.md line.
 - 2026-10-24 PR #46 (merged at 2a9fc31): web/PROGRESS.md notes P2 UI-gap digest is on main via #43; parked prose removed.
 - 2026-10-24 PR #44 (merged at cc81eff): P4 shelf show/hide locks + prompts/p4-tool-shelf-show-hide.md, and P5 measure/callouts decisions in web/PROGRESS.md.
 - 2026-10-24 PR #43 (merged at 4fd4dbe): research/gui/ui-gap-p2.md P2 UI-gap digest vs Fusion/similar, with research/INDEX.md line.
