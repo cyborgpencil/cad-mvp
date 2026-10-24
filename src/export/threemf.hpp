@@ -9,4 +9,5 @@
 MeshSolid weld_mesh(const MeshSolid& mesh);
 
 // One mesh, unit="millimeter", stored ZIP with no compression library.
-bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh);
+// lay_on_bed seats a single body on z=0. Multi-body callers pass false.
+bool write_3mf(const std::filesystem::path& path, const MeshSolid& mesh, bool lay_on_bed = true);

@@ -9329,9 +9329,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return;
         }
         bytes = built.bytes;
+      } else if (state.bodies.length > 1 && typeof Module.export3mfRaw === 'function') {
+        bytes = Module.export3mfRaw();
       } else {
         bytes = Module.export3mf();
       }
+    } else if (state.bodies.length > 1 && typeof Module.exportStlRaw === 'function') {
+      bytes = Module.exportStlRaw();
     } else {
       bytes = Module.exportStl();
     }
