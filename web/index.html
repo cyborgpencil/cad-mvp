@@ -1927,7 +1927,7 @@
     </button>
     <div class="tools panel" data-panel="sketch" hidden>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Line" title="Line"><svg class="ico"><use href="#i-line"></use></svg><span>Line</span></button>
+        <button type="button" class="tool-btn" data-action="sketchLine" data-tool="Line" title="Line. Click points on the sketch plane. Confirm closes at 3 or more."><svg class="ico"><use href="#i-line"></use></svg><span>Line</span></button>
         <button type="button" class="tool-btn" data-action="sketchRect" data-tool="Rectangle" title="Corner rectangle. Length and width in millimetres."><svg class="ico"><use href="#i-rect"></use></svg><span>Rectangle</span></button>
         <button type="button" class="tool-btn" data-action="sketchCircle" data-tool="Circle" title="Center circle. Diameter in millimetres."><svg class="ico"><use href="#i-circle"></use></svg><span>Circle</span></button>
         <button type="button" class="tool-btn" data-tool="Arc" title="Arc"><svg class="ico"><use href="#i-arc"></use></svg><span>Arc</span></button>
@@ -2541,7 +2541,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     body: 'Body1', sketch: 'Sketch1', xz: 'XZ Plane', xy: 'XY Plane', yz: 'YZ Plane'
   };
   const TOOL_CATALOG = [
-    { name: 'Line', tab: 'sketch' },
+    { name: 'Line', tab: 'sketch', action: 'sketchLine' },
     { name: 'Rectangle', tab: 'sketch', action: 'sketchRect' },
     { name: 'Circle', tab: 'sketch', action: 'sketchCircle' },
     { name: 'Arc', tab: 'sketch' },
@@ -2675,6 +2675,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     holeLog: [],
     sketchPlane: null,
     sketchProfile: null,
+    sketchLineVertices: [],
     sketchSheetMode: '',
     sketchExtrudeMode: 'new',
     projectDirty: false,
@@ -9475,6 +9476,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function clearSketchGeometry() {
     if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
     state.sketchProfile = null;
+    state.sketchLineVertices = [];
     state.sketchPlane = null;
     paintSketchStatus();
     paintSketchVisuals();
@@ -9944,6 +9946,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (mode === 'circle') {
       text = state.sketchPlane ? 'Center circle' : needPlane;
       enabled = !!state.sketchPlane;
+    } else if (mode === 'line') {
+      text = state.sketchPlane ? 'Line' : needPlane;
+      const clicks = state.sketchLineVertices ? state.sketchLineVertices.length : 0;
+      enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3;
     } else {
       text = state.sketchProfile && state.sketchProfile.closed ? 'Blind' : 'Finish a closed profile first';
       enabled = !!(state.sketchProfile && state.sketchProfile.closed);
@@ -9981,12 +9987,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return false;
     }
     state.sketchPlane = { faceId: face.id, bodyId: owner ? owner.id : '', frame: frame };
+    state.sketchLineVertices = [];
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
     paintOriginPicker();
     paintSketchStatus();
-    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') openSketchSheet(state.sketchSheetMode);
+    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle' || state.sketchSheetMode === 'line') openSketchSheet(state.sketchSheetMode);
     refreshAnchor();
     applyLook();
     publishGateState();
@@ -10014,6 +10021,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!state.sketchPlane || state.sketchPlane.originPlane !== key) {
       if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
       state.sketchProfile = null;
+      state.sketchLineVertices = [];
     }
     state.sketchPlane = { faceId: '', bodyId: '', originPlane: key, frame: originPlaneFrame(key) };
     state.selectedIds = [];
@@ -10021,7 +10029,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.lastError = '';
     paintOriginPicker();
     paintSketchStatus();
-    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') openSketchSheet(state.sketchSheetMode);
+    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle' || state.sketchSheetMode === 'line') openSketchSheet(state.sketchSheetMode);
     refreshAnchor();
     applyLook();
     publishGateState();
@@ -10175,6 +10183,100 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     });
     closeSketchSheet();
     const note = 'Circle Ø' + diameterMm + ' mm';
+    setHint(note);
+    toast(note);
+    return note;
+  }
+
+  function lineVertexCount() {
+    if (state.sketchLineVertices && state.sketchLineVertices.length) return state.sketchLineVertices.length;
+    const profile = state.sketchProfile;
+    if (profile && profile.kind === 'line' && profile.loop) return profile.loop.length;
+    return 0;
+  }
+
+  function refreshLineConfirm() {
+    if (state.sketchSheetMode !== 'line') return;
+    const confirmBtn = document.getElementById('sketchConfirm');
+    const clicks = state.sketchLineVertices ? state.sketchLineVertices.length : 0;
+    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3;
+    if (confirmBtn) {
+      confirmBtn.disabled = !enabled;
+      confirmBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    }
+  }
+
+  // Click on the sketch plane, in millimetres. The line tool and a plane
+  // must already be set. Returns false otherwise. Does not snap.
+  function placeLineVertex(uMm, vMm) {
+    if (state.activeTool !== 'Line') return false;
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (!frame || typeof frame.point !== 'function') return false;
+    const u = Number(uMm);
+    const v = Number(vMm);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
+    const point = frame.point(u, v);
+    if (!point || point.length < 3) return false;
+    if (!state.sketchLineVertices) state.sketchLineVertices = [];
+    state.sketchLineVertices.push([Number(point[0]), Number(point[1]), Number(point[2])]);
+    refreshLineConfirm();
+    publishGateState();
+    return true;
+  }
+
+  function sketchPlaneHitUv(clientX, clientY) {
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (!frame || !frame.origin || !frame.outward || typeof frame.uvOf !== 'function') return null;
+    if (!viewApi || typeof viewApi.cadToThree !== 'function' || typeof viewApi.threeDeltaToCad !== 'function') return null;
+    const origin = new THREE.Vector3();
+    viewApi.cadToThree(frame.origin[0], frame.origin[1], frame.origin[2], origin);
+    const normal = new THREE.Vector3();
+    viewApi.cadToThree(frame.outward[0], frame.outward[1], frame.outward[2], normal);
+    if (normal.lengthSq() < 1e-12) return null;
+    normal.normalize();
+    const plane = new THREE.Plane();
+    plane.setFromNormalAndCoplanarPoint(normal, origin);
+    pointerNdc(clientX, clientY);
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+    const cad = viewApi.threeDeltaToCad(hit.x, hit.y, hit.z);
+    if (!cad || !Number.isFinite(cad.x) || !Number.isFinite(cad.y) || !Number.isFinite(cad.z)) return null;
+    const uv = frame.uvOf([cad.x, cad.y, cad.z]);
+    if (!uv || !Number.isFinite(uv.u) || !Number.isFinite(uv.v)) return null;
+    return uv;
+  }
+
+  function commitSketchLine() {
+    const plane = state.sketchPlane;
+    const verts = state.sketchLineVertices || [];
+    if (!plane || !plane.frame) {
+      const why = sketchPlanePrompt() || 'Tap a planar face';
+      setHint(why);
+      return why;
+    }
+    if (verts.length < 3) {
+      refreshLineConfirm();
+      return 'Line';
+    }
+    if (!oc || !opsApi || typeof opsApi.makeLineFace !== 'function') {
+      const why = 'FAIL: the line was rejected.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const shape = opsApi.makeLineFace(oc, verts);
+    if (!shape) {
+      const why = 'FAIL: the line was rejected.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    const loop = [];
+    for (let i = 0; i < verts.length; i += 1) loop.push([verts[i][0], verts[i][1], verts[i][2]]);
+    storeSketchProfile('line', shape, loop, { lengthMm: 0, widthMm: 0, diameterMm: 0 });
+    state.sketchLineVertices = [];
+    closeSketchSheet();
+    const note = 'Line';
     setHint(note);
     toast(note);
     return note;
@@ -11244,6 +11346,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         ? 'Finish Sketch. Closed profile kept.'
         : 'Finish Sketch';
       setHint(message);
+    } else if (action === 'sketchLine') {
+      setTab('sketch');
+      state.activeTool = 'Line';
+      openSketchSheet('line');
+      message = state.sketchPlane ? 'Line' : sketchPlanePrompt();
+      setHint(message);
+      updateInspector();
     } else if (action === 'sketchRect') {
       setTab('sketch');
       state.activeTool = 'Rectangle';
@@ -11273,6 +11382,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'confirmSketch') {
       if (state.sketchSheetMode === 'circle') message = commitSketchCircle();
       else if (state.sketchSheetMode === 'extrude') message = commitSketchExtrude();
+      else if (state.sketchSheetMode === 'line') message = commitSketchLine();
       else message = commitSketchRect();
     } else if (action === 'checkShape') {
       message = Module.checkShape();
@@ -12797,6 +12907,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return;
         }
         if (state.tab === 'sketch' && !(ev.shiftKey || ev.ctrlKey || ev.metaKey)) {
+          if (state.activeTool === 'Line' && state.sketchPlane && state.sketchPlane.frame) {
+            const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
+            if (uv) placeLineVertex(uv.u, uv.v);
+            gesture = null;
+            pinch = null;
+            return;
+          }
           const faceId = pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
           if (faceId) {
             setSketchPlane(faceId);
@@ -13191,6 +13308,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   window.__cadcamSketch = {
     topFace: function () { return topSketchFaceId(); },
     tapFace: function (id) { return setSketchPlane(id || topSketchFaceId()); },
+    placeLineVertex: function (uMm, vMm) { return placeLineVertex(uMm, vMm); },
     state: function () {
       const frame = state.sketchPlane && state.sketchPlane.frame;
       const bar = document.getElementById('originPlanes');
@@ -13224,6 +13342,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         highlight: selectionHighlighted(),
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
+        lineVertices: lineVertexCount(),
         extrudeMode: state.sketchExtrudeMode === 'join' || state.sketchExtrudeMode === 'cut' ? state.sketchExtrudeMode : 'new',
         emptyBodies: (function () {
           let n = 0;
