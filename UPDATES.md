@@ -3,8 +3,23 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-23
+- 2026-10-23 PR #38 (merged at 4dcf789): Moves the Pages PR preview banner to the top (dismissible), replaces NEEDS ERIK'S REVIEW / unreviewed C++ with needs team review, drops the review flag for JS-only #31/#34, and logs the owed UPDATES line for #35.
+- 2026-10-23 PR #35 (merged at 2025cbd): adds PR #34 to the Pages previews at /cad-mvp/pr34/ with the needs-review banner, since #34 is stacked on #31/#24 and so carries #20's C++.
+- 2026-10-23 PR #33 (merged at dc1f953): AGENTS.md says a PR gets a Pages preview only once Repo Keeper lists it in .github/preview-prs.txt on main, and it logs the UPDATES lines for #29, #30 and #32.
+- 2026-10-23 PR #32 (merged at 8501f93): adds PR #31 (phone selection) to the Pages previews at /cad-mvp/pr31/ with the needs-review banner, since #31 is stacked on #24, which carries #20's C++.
+- 2026-10-23 PR #30 (merged at e5e603c): adds PR #20 to the Pages previews at /cad-mvp/pr20/ with the needs-review banner, for Erik's phone check.
+- 2026-10-23 PR #29 (merged at 2df266e): AGENTS.md says mobile test links come only from https://cyborgpencil.github.io/cad-mvp/ (no LAN or localhost), and it logs #28's UPDATES line.
+- 2026-10-23 PR #28 (merged at 42ab446): previews refresh only on main pushes, the daily run or a manual run (no PR-branch trigger), and all four carry the needs-review banner because they include #20's C++.
+- 2026-10-23 PR #27 (merged at 1ea5741): Pages now also publishes each listed open PR at /cad-mvp/prN/, each from its own build, with a preview index at /cad-mvp/previews/. The root main build is unchanged. A guard step blocks fixtures, builds/ files and secrets. The PR list lives in .github/preview-prs.txt.
+- 2026-10-23 PR #23 (merged at cb6a942): research/touch-gestures.md, a sourced digest of touch swipe gestures in Onshape, Shapr3D and Nomad (plus MDN pointer and touch-action notes), with its INDEX line. A follow-up PR fixes its dates and describes main as it is.
+
 ## 2026-10-22
 
+- trimesh export check (PR #18, merged at 3649de9): new `tools/check_export.py` with `trimesh==5.1.1` pinned in `tools/requirements.txt`, run as a step in the CI `build` job only when code changed. CI checks the default 20 mm cube (20 mm on each axis, 8000 mm3) within 0.1 mm and 1%; the check against typed sizes stays a manual A3 step on Z13.
+- Acceptance A3 and CI wording (PR #17, merged at 7675b7c): A3 passes when the exported bounding box is within 0.1 mm of the typed sizes and the trimesh volume is within 1% of the app's volume. `AGENTS.md` line 48 now describes the single `build` job with its docs-only skip.
+- Multi-body UI fixes (PR #16, merged at 4117e42): one selected part shows and resizes only its own sizes; one selected part gets the move gizmo and X/Y/Z fields (a plain primitive updates its placement, a Boolean result bakes the move, undo and redo cover both); PETG is `#B9D6F2` and TPU is `#E7C36A`, matching the 3MF colours. No `src/` change.
+- Docs wave 3 (PR #19, merged at 8f6703b): acceptance B3 reads within 1% (relative), the Orca CLI workarounds are noted in the acceptance doc, and the local `PROGRESS.md` is gitignored.
 - CI (PR #15): one `build` job in `ci.yml`; pushes run on main only, PRs always run. A `git diff` step skips the native build when only `*.md`, `research/` or `prompts/` changed; manual runs and first commits always build. Any future trimesh step needs the same code-changed condition.
 - Process speed-ups (PR #14, merged at 2493612): `AGENTS.md` gains a "Process speed-ups" section; `mvp/tooling-priority.md` routes all C++ through Grok Build or Cursor until Erik rules on small direct edits. Repo Keeper alone writes UPDATES.md, one line per PR at merge.
 - Export gate: a mesh with no triangles, or a signed volume at or below 1e-9 mm3, is refused. The sentence is `FAIL: mesh has no triangles.` or `FAIL: mesh has zero volume.` Units still win when they fail. Watertight stays informational. An inside-out shell has negative volume and is blocked with `FAIL: mesh is inside-out (negative volume).` (PR #11, merged at eeccb77). `flipped_box()` reverses one face and still exports. `cadcam.wasm` does not link OCCT.

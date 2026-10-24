@@ -1,4 +1,4 @@
-﻿# Builds output (includes large exports like *.gcode / *.nc)
+# Builds output (includes large exports like *.gcode / *.nc)
 builds/
 # FreeCAD / CAD temp & backups
 *.FCStd1
@@ -54,3 +54,6 @@ tests/fixtures/blink.*
 
 # user project saves
 *.cadmvp
+
+# Local-only progress notes (stay untracked)
+/PROGRESS.md

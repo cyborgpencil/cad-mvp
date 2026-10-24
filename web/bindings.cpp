@@ -48,7 +48,7 @@ std::string read_bytes(const std::filesystem::path& path) {
     return buffer.str();
 }
 
-emscripten::val export_file(bool stl) {
+emscripten::val export_file(bool stl, bool lay_on_bed) {
     const GateReport report = evaluate_export_gate(g_mesh, g_lock);
     // Units plus a non-empty, positive-volume mesh. Watertight stays informational.
     // console.warn, not console.error: smoke tests treat console errors as failures.
@@ -57,7 +57,7 @@ emscripten::val export_file(bool stl) {
         return emscripten::val::null();
     }
     const char* path = stl ? "/cadcam_export.stl" : "/cadcam_export.3mf";
-    const bool wrote = stl ? write_binary_stl(path, g_mesh) : write_3mf(path, g_mesh);
+    const bool wrote = stl ? write_binary_stl(path, g_mesh, lay_on_bed) : write_3mf(path, g_mesh, lay_on_bed);
     if (!wrote) {
         return emscripten::val::null();
     }
@@ -181,11 +181,19 @@ emscripten::val mesh_indices() {
 }
 
 emscripten::val export_stl() {
-    return export_file(true);
+    return export_file(true, true);
+}
+
+emscripten::val export_stl_raw() {
+    return export_file(true, false);
 }
 
 emscripten::val export_3mf() {
-    return export_file(false);
+    return export_file(false, true);
+}
+
+emscripten::val export_3mf_raw() {
+    return export_file(false, false);
 }
 
 EMSCRIPTEN_BINDINGS(cadcam) {
@@ -216,5 +224,7 @@ EMSCRIPTEN_BINDINGS(cadcam) {
     emscripten::function("meshPositions", &mesh_positions);
     emscripten::function("meshIndices", &mesh_indices);
     emscripten::function("exportStl", &export_stl);
+    emscripten::function("exportStlRaw", &export_stl_raw);
     emscripten::function("export3mf", &export_3mf);
+    emscripten::function("export3mfRaw", &export_3mf_raw);
 }

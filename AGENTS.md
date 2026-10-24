@@ -22,7 +22,7 @@ Erik approved pushing. The team set this cadence on 2026-10-21; Repo Keeper owns
 - Before every push: check `git status` for build, SDK, or mesh files; scan for keys, tokens, and local user paths; then do a normal `git push` to `main`.
 - Never: push a failing build or test, force-push, amend or rebase pushed commits, or push while a Grok Build session is still editing the tree.
 - A rejected push, conflict, or login prompt means stop and report in the group.
-- After each push, post the commit links and the changed core files so Erik can review them.
+- After each push, post the commit links and the changed core files in the CAD CAM MVP group.
 
 ## Keep finished work (Erik's rule, 2026-10-21)
 - Keep everything Grok Build has already finished (the Qt app, export, units, tests in dfb46b7, and the rest) unless something actually needs to change.
@@ -53,5 +53,16 @@ The shared skill `pull-files-from-user-pc` covers this method: stage with Shell,
 - Green docs PRs merge right away, with no merge-order queue.
 - Each bot posts one status line per milestone; Repo Keeper posts the single post-merge line. No "waiting" posts.
 - When Z13 is down, docs edits go to a Cursor cloud agent that 3T launches. No new GitHub access.
-- Erik's C++ review commits stay separate.
 - Small direct C++ edits that skip Grok Build: waiting on Erik's answer. Until then, all C++ goes through Grok Build or Cursor.
+## Mobile test links (Erik's rule, 2026-10-23)
+Links for phone testing come only from https://cyborgpencil.github.io/cad-mvp/: main at the root, and open PR builds under `/cad-mvp/prN/` (index at `/cad-mvp/previews/`). Never post LAN or localhost links. Previews deploy as a GitHub Actions Pages artifact (no `gh-pages` branch, no committed `.wasm`), and a guard step blocks fixtures, `builds/`, Blink files and secrets. A PR gets a preview only once Repo Keeper adds it to `.github/preview-prs.txt` on main. Add `review` when the preview still needs the team's review; that shows a short top banner (dismissible, never over the phone bottom bar). Copy is "needs team review" — Erik no longer reviews. Drop `review` for JS-only stacks once C++ parents have merged or no C++ review remains. Banner HTML lives in `.github/workflows/pages.yml`. Previews refresh on main pushes, the daily 3:17 AM MT run, or a manual run; after a PR push that needs a fresh preview, ask Repo Keeper for a manual run.
+
+## Self-serve review and merge (confirmed by Erik to 3T, 2026-10-23 7:21 PM MT; plan team-chosen by the Chief)
+Erik no longer reviews repo pushes, C++ included. The team owns review and merge approval. Only something truly irreversible or outside scope goes to Erik.
+- Reviewers (the author never reviews its own PR):
+  - C++ core (`src/`): Research Digest first, checking OCCT usage against the official docs; Pilot second, with Grok Build in read-only plan mode. Both approve.
+  - JS (`web/`): Research Digest first, Doc Steward second.
+  - Docs: Repo Keeper.
+  - CI and CMake: Doc Steward reviews; Pilot confirms the CTest count.
+- Required before any merge: green `build`, CTest count on the branch's own build, units pass, non-author written approval on the PR, phone preview pass for UI, clean secret scan with no `.wasm` or root `PROGRESS.md`.
+- Merging: only Repo Keeper (or 3T for #20/#26 when Repo Keeper's standing rules block a relayed confirmation), plain merges, no force-push. Stacked children retarget to `main` and re-check after the parent merges.
