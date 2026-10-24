@@ -433,6 +433,33 @@
     font-weight: 650;
   }
   .finish-btn:hover { filter: brightness(1.08); }
+  .origin-planes {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 12px;
+    background: var(--finish);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .origin-planes[hidden] { display: none !important; }
+  .origin-planes button {
+    flex: 1 1 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    border: 1px solid var(--line);
+    font-weight: 650;
+  }
+  .origin-planes button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .workspace {
     flex: 1;
     min-height: 0;
@@ -1848,6 +1875,11 @@
   <div class="finish-bar" id="finishBar" hidden>
     <button type="button" class="finish-btn" data-action="finishSketch" data-tool="Finish Sketch">Finish Sketch</button>
     <span class="muted" id="sketchStatus">Tap a planar face · returns to Model</span>
+  </div>
+  <div class="origin-planes" id="originPlanes" hidden role="group" aria-label="Origin plane">
+    <button type="button" data-action="originPlane" data-plane="xy" data-tool="Top" title="Top · XY" aria-pressed="false">Top</button>
+    <button type="button" data-action="originPlane" data-plane="xz" data-tool="Front" title="Front · XZ" aria-pressed="false">Front</button>
+    <button type="button" data-action="originPlane" data-plane="yz" data-tool="Right" title="Right · YZ" aria-pressed="false">Right</button>
   </div>
 
   <div class="workspace">
@@ -9055,6 +9087,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     handles.visible = gizmoShouldShow();
     updateHighlights();
     paintSketchVisuals();
+    paintOriginPicker();
     paintPrimFields();
     paintPhoneChrome();
     paintEdgeChrome();
@@ -9322,6 +9355,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchPlane = null;
     paintSketchStatus();
     paintSketchVisuals();
+    paintOriginPicker();
   }
 
   function closeSketchSheet() {
@@ -9330,13 +9364,129 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (sheet) sheet.hidden = true;
   }
 
+  function sketchPlanePrompt() {
+    if (state.sketchPlane) return '';
+    if (state.bodies.length === 0) return 'Pick Top, Front, or Right';
+    return 'Tap a planar face';
+  }
+
+  function originPlaneLabel(key) {
+    if (key === 'xz') return 'Front';
+    if (key === 'yz') return 'Right';
+    return 'Top';
+  }
+
+  // Right-hand outward, same axis rule as faceFrameFromTriangles:
+  // u is the first world axis least aligned with outward, kept positive,
+  // and v = outward × u. Top/XY outward is +Z. Front/XZ outward is +Y
+  // (the Front view). Right/YZ outward is +X (the Right view).
+  function originPlaneFrame(name) {
+    const outward = name === 'xz' ? [0, 1, 0] : name === 'yz' ? [1, 0, 0] : [0, 0, 1];
+    const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    let bestI = 0;
+    let bestAbs = 2;
+    for (let i = 0; i < 3; i += 1) {
+      const ad = Math.abs(outward[0] * axes[i][0] + outward[1] * axes[i][1] + outward[2] * axes[i][2]);
+      if (ad < bestAbs - 1e-9) {
+        bestAbs = ad;
+        bestI = i;
+      }
+    }
+    const axis = axes[bestI];
+    const along = outward[0] * axis[0] + outward[1] * axis[1] + outward[2] * axis[2];
+    let ux = axis[0] - outward[0] * along;
+    let uy = axis[1] - outward[1] * along;
+    let uz = axis[2] - outward[2] * along;
+    const ulen = Math.hypot(ux, uy, uz) || 1;
+    ux /= ulen;
+    uy /= ulen;
+    uz /= ulen;
+    if (ux * axis[0] + uy * axis[1] + uz * axis[2] < 0) {
+      ux = -ux;
+      uy = -uy;
+      uz = -uz;
+    }
+    let vx = outward[1] * uz - outward[2] * uy;
+    let vy = outward[2] * ux - outward[0] * uz;
+    let vz = outward[0] * uy - outward[1] * ux;
+    const vlen = Math.hypot(vx, vy, vz) || 1;
+    vx /= vlen;
+    vy /= vlen;
+    vz /= vlen;
+    const u = [ux, uy, uz];
+    const v = [vx, vy, vz];
+    const n = [outward[0], outward[1], outward[2]];
+    const origin = [0, 0, 0];
+    return {
+      origin: origin,
+      u: u,
+      v: v,
+      outward: n,
+      inward: [-n[0], -n[1], -n[2]],
+      uSpan: 0,
+      vSpan: 0,
+      point: function (uMm, vMm) {
+        const su = Number(uMm) || 0;
+        const sv = Number(vMm) || 0;
+        return [
+          origin[0] + u[0] * su + v[0] * sv,
+          origin[1] + u[1] * su + v[1] * sv,
+          origin[2] + u[2] * su + v[2] * sv
+        ];
+      },
+      uvOf: function (p) {
+        const dx = p[0] - origin[0];
+        const dy = p[1] - origin[1];
+        const dz = p[2] - origin[2];
+        return {
+          u: dx * u[0] + dy * u[1] + dz * u[2],
+          v: dx * v[0] + dy * v[1] + dz * v[2]
+        };
+      }
+    };
+  }
+
+  // Display-only 40 mm square, the same size as makePlane. Not a profile size.
+  function originPlanePositions(frame) {
+    const half = 20;
+    const n = frame.outward;
+    const lift = 0.08;
+    const local = [[-half, -half], [half, -half], [half, half], [-half, -half], [half, half], [-half, half]];
+    const arr = new Float32Array(local.length * 3);
+    for (let i = 0; i < local.length; i += 1) {
+      const p = frame.point(local[i][0], local[i][1]);
+      arr[i * 3] = p[0] + n[0] * lift;
+      arr[i * 3 + 1] = p[2] + n[2] * lift;
+      arr[i * 3 + 2] = p[1] + n[1] * lift;
+    }
+    return arr;
+  }
+
+  function paintOriginPicker() {
+    const bar = document.getElementById('originPlanes');
+    if (!bar) return;
+    const show = state.tab === 'sketch' && state.bodies.length === 0;
+    bar.hidden = !show;
+    const buttons = bar.querySelectorAll('[data-action="originPlane"]');
+    const picked = state.sketchPlane && state.sketchPlane.originPlane;
+    for (let i = 0; i < buttons.length; i += 1) {
+      const on = show && picked === buttons[i].getAttribute('data-plane');
+      buttons[i].classList.toggle('is-on', on);
+      buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
   function paintSketchStatus() {
     const note = document.getElementById('sketchStatus');
     if (!note) return;
     if (state.sketchProfile && state.sketchProfile.closed) {
       note.textContent = 'Closed profile kept · returns to Model';
+    } else if (state.sketchPlane && state.sketchPlane.originPlane) {
+      note.textContent = 'Sketch on ' + originPlaneLabel(state.sketchPlane.originPlane) + ' · returns to Model';
     } else if (state.sketchPlane) {
       note.textContent = 'Sketch on face · returns to Model';
+    } else if (state.bodies.length === 0) {
+      note.textContent = 'Pick Top, Front, or Right · returns to Model';
     } else {
       note.textContent = 'Tap a planar face · returns to Model';
     }
@@ -9344,34 +9494,46 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function paintSketchVisuals() {
     const plane = state.sketchPlane;
-    const showPlane = !!(plane && state.selectedIds.length === 0 && state.topology && state.meshCad && viewApi);
-    if (!showPlane || !sketchPlaneMesh) {
-      if (sketchPlaneMesh) sketchPlaneMesh.visible = false;
+    const frame = plane && plane.frame;
+    const originKey = !!(plane && plane.originPlane && !plane.faceId);
+    if (!sketchPlaneMesh) {
+      /* profile line below */
+    } else if (originKey && frame && state.selectedIds.length === 0) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(originPlanePositions(frame), 3));
+      sketchPlaneMesh.geometry.dispose();
+      sketchPlaneMesh.geometry = geo;
+      sketchPlaneMesh.visible = true;
     } else {
-      let face = null;
-      const faces = state.topology.faces || [];
-      for (let i = 0; i < faces.length; i += 1) {
-        if (faces[i].id === plane.faceId) face = faces[i];
-      }
-      if (!face || !face.tris) {
+      const showPlane = !!(plane && !originKey && state.selectedIds.length === 0 && state.topology && state.meshCad && viewApi);
+      if (!showPlane) {
         sketchPlaneMesh.visible = false;
       } else {
-        const arr = viewApi.faceVertexArray(state.meshCad.vertices, state.meshCad.triangles, face.tris);
-        const n = plane.frame && plane.frame.outward ? plane.frame.outward : [0, 0, 1];
-        const shifted = new Float32Array(arr.length);
-        const ox = n[0] * 0.08;
-        const oy = n[2] * 0.08;
-        const oz = n[1] * 0.08;
-        for (let i = 0; i < arr.length; i += 3) {
-          shifted[i] = arr[i] + ox;
-          shifted[i + 1] = arr[i + 1] + oy;
-          shifted[i + 2] = arr[i + 2] + oz;
+        let face = null;
+        const faces = state.topology.faces || [];
+        for (let i = 0; i < faces.length; i += 1) {
+          if (faces[i].id === plane.faceId) face = faces[i];
         }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(shifted, 3));
-        sketchPlaneMesh.geometry.dispose();
-        sketchPlaneMesh.geometry = geo;
-        sketchPlaneMesh.visible = true;
+        if (!face || !face.tris) {
+          sketchPlaneMesh.visible = false;
+        } else {
+          const arr = viewApi.faceVertexArray(state.meshCad.vertices, state.meshCad.triangles, face.tris);
+          const n = plane.frame && plane.frame.outward ? plane.frame.outward : [0, 0, 1];
+          const shifted = new Float32Array(arr.length);
+          const ox = n[0] * 0.08;
+          const oy = n[2] * 0.08;
+          const oz = n[1] * 0.08;
+          for (let i = 0; i < arr.length; i += 3) {
+            shifted[i] = arr[i] + ox;
+            shifted[i + 1] = arr[i + 1] + oy;
+            shifted[i + 2] = arr[i + 2] + oz;
+          }
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(shifted, 3));
+          sketchPlaneMesh.geometry.dispose();
+          sketchPlaneMesh.geometry = geo;
+          sketchPlaneMesh.visible = true;
+        }
       }
     }
     const profile = state.sketchProfile;
@@ -9408,11 +9570,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     let text = 'Rectangle';
     let enabled = false;
+    const needPlane = sketchPlanePrompt() || 'Tap a planar face';
     if (mode === 'rect') {
-      text = state.sketchPlane ? 'Corner rectangle' : 'Tap a planar face';
+      text = state.sketchPlane ? 'Corner rectangle' : needPlane;
       enabled = !!state.sketchPlane;
     } else if (mode === 'circle') {
-      text = state.sketchPlane ? 'Center circle' : 'Tap a planar face';
+      text = state.sketchPlane ? 'Center circle' : needPlane;
       enabled = !!state.sketchPlane;
     } else {
       text = state.sketchProfile && state.sketchProfile.closed ? 'Blind' : 'Finish a closed profile first';
@@ -9453,6 +9616,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
+    paintOriginPicker();
     paintSketchStatus();
     if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') openSketchSheet(state.sketchSheetMode);
     refreshAnchor();
@@ -9474,6 +9638,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       best = faces[i].id;
     }
     return best;
+  }
+
+  function setOriginSketchPlane(which) {
+    if (state.bodies.length !== 0) return false;
+    const key = which === 'xz' || which === 'yz' ? which : 'xy';
+    if (!state.sketchPlane || state.sketchPlane.originPlane !== key) {
+      if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
+      state.sketchProfile = null;
+    }
+    state.sketchPlane = { faceId: '', bodyId: '', originPlane: key, frame: originPlaneFrame(key) };
+    state.selectedIds = [];
+    state.hoverId = null;
+    state.lastError = '';
+    paintOriginPicker();
+    paintSketchStatus();
+    if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle') openSketchSheet(state.sketchSheetMode);
+    refreshAnchor();
+    applyLook();
+    publishGateState();
+    setHint('Sketch plane ' + originPlaneLabel(key));
+    return true;
   }
 
   // Phone miss ring. Diameter is 44 CSS px. A direct ray still hits the face.
@@ -9565,8 +9750,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function commitSketchRect() {
     const plane = state.sketchPlane;
     if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makeRectFace !== 'function') {
-      setHint('Tap a planar face');
-      return 'Tap a planar face';
+      const why = sketchPlanePrompt() || 'Tap a planar face';
+      setHint(why);
+      return why;
     }
     const lengthMm = readField('sketchL');
     const widthMm = readField('sketchW');
@@ -9597,8 +9783,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function commitSketchCircle() {
     const plane = state.sketchPlane;
     if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makeCircleFace !== 'function') {
-      setHint('Tap a planar face');
-      return 'Tap a planar face';
+      const why = sketchPlanePrompt() || 'Tap a planar face';
+      setHint(why);
+      return why;
     }
     const diameterMm = readField('sketchD');
     if (!(diameterMm > 0)) {
@@ -9742,6 +9929,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.getElementById('finishBar').hidden = tab !== 'sketch';
     if (tab !== 'sketch') closeSketchSheet();
     paintSketchStatus();
+    paintOriginPicker();
     if (tab !== 'export' && exportMenu) exportMenu.hidden = true;
     if (!opts.keepTool) state.activeTool = '';
     updateInspector();
@@ -10647,13 +10835,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       bodyMat.color.set(btn.getAttribute('data-color'));
       const swatches = document.querySelectorAll('.swatch');
       for (let i = 0; i < swatches.length; i++) swatches[i].classList.toggle('is-on', swatches[i] === btn);
+    } else if (action === 'originPlane') {
+      const which = btn.getAttribute('data-plane') || 'xy';
+      if (state.bodies.length !== 0 || !setOriginSketchPlane(which)) {
+        message = state.bodies.length === 0 ? 'Pick Top, Front, or Right' : 'Tap a planar face';
+        setHint(message);
+      } else {
+        message = originPlaneLabel(which === 'xz' || which === 'yz' ? which : 'xy');
+      }
     } else if (action === 'newSketch') {
       clearSketchGeometry();
       closeSketchSheet();
       setTab('sketch');
       selectNode('sketch');
       message = 'New Sketch';
-      setHint('Tap a planar face');
+      setHint(sketchPlanePrompt());
     } else if (action === 'finishSketch') {
       closeSketchSheet();
       setTab('model');
@@ -10666,14 +10862,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setTab('sketch');
       state.activeTool = 'Rectangle';
       openSketchSheet('rect');
-      message = state.sketchPlane ? 'Rectangle' : 'Tap a planar face';
+      message = state.sketchPlane ? 'Rectangle' : sketchPlanePrompt();
       setHint(message);
       updateInspector();
     } else if (action === 'sketchCircle') {
       setTab('sketch');
       state.activeTool = 'Circle';
       openSketchSheet('circle');
-      message = state.sketchPlane ? 'Circle' : 'Tap a planar face';
+      message = state.sketchPlane ? 'Circle' : sketchPlanePrompt();
       setHint(message);
       updateInspector();
     } else if (action === 'sketchExtrude') {
@@ -12231,15 +12427,40 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     topFace: function () { return topSketchFaceId(); },
     tapFace: function (id) { return setSketchPlane(id || topSketchFaceId()); },
     state: function () {
+      const frame = state.sketchPlane && state.sketchPlane.frame;
+      const bar = document.getElementById('originPlanes');
+      const body = state.bodies.length === 1 ? state.bodies[0] : null;
+      const verts = body && body.mesh && body.mesh.vertices;
+      let bounds = null;
+      if (body && verts && verts.length) {
+        const min = [Infinity, Infinity, Infinity];
+        const max = [-Infinity, -Infinity, -Infinity];
+        for (let i = 0; i < verts.length; i += 1) {
+          const p = verts[i];
+          for (let k = 0; k < 3; k += 1) {
+            if (p[k] < min[k]) min[k] = p[k];
+            if (p[k] > max[k]) max[k] = p[k];
+          }
+        }
+        bounds = { kind: body.kind || '', min: min, max: max };
+      }
       return {
         tab: state.tab,
         plane: !!state.sketchPlane,
         faceId: state.sketchPlane ? state.sketchPlane.faceId : '',
+        originPlane: state.sketchPlane && state.sketchPlane.originPlane ? state.sketchPlane.originPlane : '',
+        outward: frame && frame.outward ? frame.outward.slice() : null,
+        u: frame && frame.u ? frame.u.slice() : null,
+        v: frame && frame.v ? frame.v.slice() : null,
+        origin: frame && frame.origin ? frame.origin.slice() : null,
+        picker: !!(bar && bar.hidden !== true),
+        projectBlank: state.projectBlank === true,
         selectedIds: state.selectedIds.slice(),
         highlight: selectionHighlighted(),
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
-        bodies: state.bodies.length
+        bodies: state.bodies.length,
+        bounds: bounds
       };
     }
   };
