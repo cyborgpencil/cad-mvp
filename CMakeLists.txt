@@ -156,6 +156,20 @@ else()
     message(STATUS "field_nudge skipped locally: Node was not found.")
 endif()
 
+# Phone pick filter, tap-vs-drag, and Multi. Pure JS, no libcascade.
+if(CADCAM_NODE)
+    add_test(NAME phone_select COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_phone_select.mjs")
+    set_tests_properties(phone_select PROPERTIES
+        TIMEOUT 30
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "phone_select requires Node. CI must not skip this test when Node is missing.")
+else()
+    message(STATUS "phone_select skipped locally: Node was not found.")
+endif()
+
 # Single-body bed pose. tests/test_bed_orient.mjs exits 77 when libcascade
 # is missing and CI is unset. The solid is a synthetic L, not a fixture.
 if(CADCAM_NODE)
@@ -172,6 +186,7 @@ else()
     message(STATUS
         "bed_orient skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
 endif()
+
 
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
@@ -233,10 +248,19 @@ if(CADCAM_PYTHON)
         SKIP_RETURN_CODE 77
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
+    add_test(
+        NAME phone_select_smoke
+        COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/phone_select_smoke.py"
+    )
+    set_tests_properties(phone_select_smoke PROPERTIES
+        TIMEOUT 600
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
 elseif(DEFINED ENV{CI})
-    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, and field_nudge_smoke require Python; CI must not skip them")
+    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, and phone_select_smoke require Python; CI must not skip them")
 else()
-    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, and field_nudge_smoke not added: Python was not found")
+    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, and phone_select_smoke not added: Python was not found")
 endif()
 
 add_library(model
