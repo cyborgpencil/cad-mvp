@@ -5664,6 +5664,8 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     box = _named_part(locked, "Box") or {}
     if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 30.0, 1e-6):
         return [f"multi size lock cylinder {cyl!r}"]
+    if not _near(locked.get("dx"), 30.0) or not _near(locked.get("dy"), 30.0) or not _near(locked.get("dz"), 30.0):
+        return [f"multi size lock bounds {locked.get('dx')!r} {locked.get('dy')!r} {locked.get('dz')!r}"]
     if not _near(box.get("sx"), 20.0, 1e-6) or not _near(box.get("sy"), 20.0, 1e-6) or not _near(box.get("sz"), 20.0, 1e-6):
         return [f"multi size lock box changed {box!r}"]
     undone, undo_err = resize_call(cdp, {"undo": True}, timeout=120)
@@ -5672,12 +5674,16 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     cyl = _named_part(undone, "Cylinder") or {}
     if not _near(cyl.get("radius"), 10.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
         return [f"multi size undo cylinder {cyl!r}"]
+    if not _near(undone.get("dx"), 20.0) or not _near(undone.get("dy"), 20.0) or not _near(undone.get("dz"), 20.0):
+        return [f"multi size undo bounds {undone.get('dx')!r} {undone.get('dy')!r} {undone.get('dz')!r}"]
     redone, redo_err = resize_call(cdp, {"redo": True}, timeout=120)
     if redo_err or not redone or int(redone.get("undoDepth") or 0) != 1 or int(redone.get("redoDepth") or 0) != 0:
         return [f"multi size redo {redo_err or redone}"]
     cyl = _named_part(redone, "Cylinder") or {}
     if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 30.0, 1e-6):
         return [f"multi size redo cylinder {cyl!r}"]
+    if not _near(redone.get("dx"), 30.0) or not _near(redone.get("dy"), 30.0) or not _near(redone.get("dz"), 30.0):
+        return [f"multi size redo bounds {redone.get('dx')!r} {redone.get('dy')!r} {redone.get('dz')!r}"]
     cleared, clear_err = resize_call(cdp, {"undo": True}, timeout=120)
     if clear_err or not cleared or int(cleared.get("undoDepth") or 0) != 0:
         return [f"multi size clear {clear_err or cleared}"]
@@ -5691,6 +5697,8 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     box = _named_part(unlocked, "Box") or {}
     if not _near(cyl.get("radius"), 15.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
         return [f"multi size unlock cylinder {cyl!r}"]
+    if not _near(unlocked.get("dx"), 30.0) or not _near(unlocked.get("dy"), 30.0) or not _near(unlocked.get("dz"), 20.0):
+        return [f"multi size unlock bounds {unlocked.get('dx')!r} {unlocked.get('dy')!r} {unlocked.get('dz')!r}"]
     if not _near(box.get("sx"), 20.0, 1e-6):
         return [f"multi size unlock box {box!r}"]
     restored, restore_err = resize_call(cdp, {"undo": True, "lock": True}, timeout=120)
@@ -5715,6 +5723,8 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     cyl = _named_part(widened, "Cylinder") or {}
     if not _near(box.get("sx"), 30.0, 1e-6) or not _near(box.get("sy"), 30.0, 1e-6) or not _near(box.get("sz"), 30.0, 1e-6):
         return [f"multi size box lock {box!r}"]
+    if not _near(widened.get("dx"), 30.0) or not _near(widened.get("dy"), 30.0) or not _near(widened.get("dz"), 30.0):
+        return [f"multi size box bounds {widened.get('dx')!r} {widened.get('dy')!r} {widened.get('dz')!r}"]
     if not _near(cyl.get("radius"), 10.0, 1e-6) or not _near(cyl.get("height"), 20.0, 1e-6):
         return [f"multi size box touched cylinder {cyl!r}"]
     box_undo, box_undo_err = resize_call(cdp, {"undo": True}, timeout=120)
@@ -5723,12 +5733,16 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     box = _named_part(box_undo, "Box") or {}
     if not _near(box.get("sx"), 20.0, 1e-6) or not _near(box.get("sy"), 20.0, 1e-6) or not _near(box.get("sz"), 20.0, 1e-6):
         return [f"multi size box undo values {box!r}"]
+    if not _near(box_undo.get("dx"), 20.0) or not _near(box_undo.get("dy"), 20.0) or not _near(box_undo.get("dz"), 20.0):
+        return [f"multi size box undo bounds {box_undo.get('dx')!r} {box_undo.get('dy')!r} {box_undo.get('dz')!r}"]
     box_redo, box_redo_err = resize_call(cdp, {"redo": True}, timeout=120)
     if box_redo_err or not box_redo or int(box_redo.get("undoDepth") or 0) != 1:
         return [f"multi size box redo {box_redo_err or box_redo}"]
     box = _named_part(box_redo, "Box") or {}
     if not _near(box.get("sx"), 30.0, 1e-6) or not _near(box.get("sy"), 30.0, 1e-6) or not _near(box.get("sz"), 30.0, 1e-6):
         return [f"multi size box redo values {box!r}"]
+    if not _near(box_redo.get("dx"), 30.0) or not _near(box_redo.get("dy"), 30.0) or not _near(box_redo.get("dz"), 30.0):
+        return [f"multi size box redo bounds {box_redo.get('dx')!r} {box_redo.get('dy')!r} {box_redo.get('dz')!r}"]
 
     added, add_err = eval_expr(
         cdp,
@@ -6278,6 +6292,8 @@ def cylinder_live_volume_problems(cdp: Cdp, origin: str) -> list[str]:
         return [f"cyl volume resize {resize_err}"]
     if resized.get("done") != "RESIZE_DONE":
         return [f"cyl volume result {resized.get('done')!r} {resized.get('error')!r}"]
+    if not _near(resized.get("dx"), 14.0) or not _near(resized.get("dy"), 14.0) or not _near(resized.get("dz"), 22.0):
+        return [f"cyl volume bounds {resized.get('dx')!r} {resized.get('dy')!r} {resized.get('dz')!r}"]
     want = math.pi * 7.0 * 7.0 * 22.0
     live = resized.get("volumeMm3")
     if not _near(live, want, 0.01):
