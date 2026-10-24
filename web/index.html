@@ -620,6 +620,21 @@
     stroke-width: 4px;
     paint-order: stroke;
   }
+  .measure-readout {
+    position: absolute;
+    top: 72px;
+    left: 12px;
+    z-index: 4;
+    max-width: min(240px, calc(100% - 120px));
+    pointer-events: none;
+    display: grid;
+    gap: 2px;
+    color: var(--measure);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  }
   .backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 20; }
   .prop { padding: 0 12px 16px; }
   .prop h3 { margin: 10px 0 2px; font-size: 15px; }
@@ -1360,6 +1375,7 @@
     }
     .vp-bar::-webkit-scrollbar { display: none; }
     .hud { top: 8px; left: 8px; }
+    .measure-readout { top: 60px; left: 8px; }
     .create-menu {
       left: 0;
       right: 0;
@@ -1909,6 +1925,10 @@
         <polygon id="mArrow2" fill="#fff8e8"></polygon>
         <text id="mText" text-anchor="middle"></text>
       </svg>
+      <div id="measureReadout" class="measure-readout" hidden>
+        <div id="measureSpanLabel"></div>
+        <div id="measureVolume"></div>
+      </div>
       <div class="hud">
         <div><b id="hudName">Body1</b></div>
         <div><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel">Iso</span></div>
@@ -2488,6 +2508,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     dimStepFromPointer: false,
     section: false,
     measure: false,
+    measurePicks: [],
     display: 'edges',
     isolated: false,
     node: 'body',
@@ -2908,8 +2929,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       else if (kind === 'vol') el.textContent = formatVolume(mm);
       else el.textContent = formatLength(mm);
     }
-    const measureText = document.getElementById('mText');
-    if (measureText) measureText.textContent = formatLength(20);
+    if (state.measure) updateMeasure();
     document.getElementById('statusUnits').textContent = state.unit;
     const locked = document.getElementById('gateUnitLocked');
     if (locked) locked.textContent = state.exportUnit + ' (locked for export)';
@@ -8588,6 +8608,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     planeXY.visible = vis.xy && extras;
     planeYZ.visible = vis.yz && extras;
     measureSvg.hidden = !state.measure;
+    const measureReadout = document.getElementById('measureReadout');
+    if (measureReadout) measureReadout.hidden = !state.measure;
     handles.visible = gizmoShouldShow();
     updateHighlights();
     paintPrimFields();
@@ -8628,6 +8650,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     updateInspector();
     updateGate();
     paintBooleanChrome();
+    if (state.measure) updateMeasure();
+    else clearMeasureGraphics();
   }
 
   function selectNode(node) {
@@ -9747,6 +9771,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       applyLook();
     } else if (action === 'measure') {
       state.measure = !state.measure;
+      if (!state.measure) clearMeasurePicks();
       message = state.measure ? 'Measure: On' : 'Measure: Off';
       applyLook();
       refreshUnits();
@@ -10055,23 +10080,488 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return into;
   }
 
+  function clearMeasurePicks() {
+    state.measurePicks = [];
+  }
+
+  function clearMeasureGraphics() {
+    showMeasureSpan(false);
+    const text = document.getElementById('mText');
+    if (text) text.textContent = '';
+    const kind = document.getElementById('measureSpanLabel');
+    if (kind) kind.textContent = '';
+    const vol = document.getElementById('measureVolume');
+    if (vol) vol.textContent = '';
+  }
+
+  function showMeasureSpan(on) {
+    const ids = ['mExt1', 'mExt2', 'mLine', 'mArrow1', 'mArrow2', 'mText'];
+    for (let i = 0; i < ids.length; i += 1) {
+      const el = document.getElementById(ids[i]);
+      if (el) el.setAttribute('visibility', on ? 'visible' : 'hidden');
+    }
+  }
+
+  function cadPoint(p) {
+    if (!p || p.length < 3) return null;
+    const x = Number(p[0]);
+    const y = Number(p[1]);
+    const z = Number(p[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    return { x: x, y: y, z: z };
+  }
+
+  function pointDistance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  }
+
+  // Length is the polyline sum of edge.pts. Curved-edge accuracy is TBD.
+  // BRepGProp::LinearProperties is not used.
+  function polylineLengthMm(pts) {
+    let sum = 0;
+    if (!pts) return sum;
+    for (let i = 0; i + 1 < pts.length; i += 1) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      if (!a || !b || a.length < 3 || b.length < 3) continue;
+      sum += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    }
+    return sum;
+  }
+
+  function listVertexRows() {
+    const rows = [];
+    function add(vertices, bodyId) {
+      if (!vertices) return;
+      for (let i = 0; i < vertices.length; i += 1) {
+        const v = vertices[i];
+        if (!v || !v.p || v.p.length < 3) continue;
+        rows.push({ id: v.id, p: v.p, bodyId: bodyId || '' });
+      }
+    }
+    if (state.topology && state.topology.vertices && state.topology.vertices.length) {
+      add(state.topology.vertices, '');
+      return rows;
+    }
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      if (body && body.topology) add(body.topology.vertices, body.id);
+    }
+    return rows;
+  }
+
+  function selectedVertexPoints() {
+    if (state.selection !== 'vertex') return [];
+    const rows = listVertexRows();
+    const out = [];
+    for (let i = 0; i < state.selectedIds.length; i += 1) {
+      const id = state.selectedIds[i];
+      for (let k = 0; k < rows.length; k += 1) {
+        if (rows[k].id === id) {
+          const point = cadPoint(rows[k].p);
+          if (point) out.push(point);
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  function selectedEdgeLengthMm() {
+    if (state.selection !== 'edge' || state.selectedIds.length !== 1) return null;
+    const ends = selectedEdgeEnds();
+    if (!ends) return null;
+    const rows = listEdgeRows();
+    const id = state.selectedIds[0];
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (row.id !== id || !row.pts || row.pts.length < 2) continue;
+      const a = cadPoint(ends.a);
+      const b = cadPoint(ends.b);
+      if (!a || !b) return null;
+      return { mm: polylineLengthMm(row.pts), a: a, b: b, pts: row.pts.length };
+    }
+    return null;
+  }
+
+  function measureSolidPresent() {
+    if (state.sceneCleared === true) return false;
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      if (state.bodies[i] && state.bodies[i].shape) return true;
+    }
+    return false;
+  }
+
+  function activeMeasureSpan() {
+    const edge = selectedEdgeLengthMm();
+    if (edge) return { kind: 'length', mm: edge.mm, a: edge.a, b: edge.b };
+    const picks = state.measurePicks;
+    if (picks && picks.length >= 2) {
+      return { kind: 'distance', mm: pointDistance(picks[0], picks[1]), a: picks[0], b: picks[1] };
+    }
+    if (state.selection === 'vertex' && state.selectedIds.length === 2) {
+      const verts = selectedVertexPoints();
+      if (verts.length === 2) {
+        return { kind: 'distance', mm: pointDistance(verts[0], verts[1]), a: verts[0], b: verts[1] };
+      }
+    }
+    return null;
+  }
+
+  function pushMeasurePick(point) {
+    if (!point) return;
+    const picks = state.measurePicks;
+    if (picks.length === 1 && pointDistance(picks[0], point) < 0.05) return;
+    if (picks.length >= 2) state.measurePicks = [point];
+    else picks.push({ x: point.x, y: point.y, z: point.z });
+  }
+
+  function measurePickLimitPx(pointerType) {
+    const touch = pointerType === 'touch' || pointerType === 'pen';
+    if (selApi && phoneApi && typeof phoneApi.pickTolerancePx === 'function') {
+      return phoneApi.pickTolerancePx('vertex', pointerType, selApi.TOUCH_PICK_TOLERANCE_PX, selApi.PICK_TOLERANCE_PX);
+    }
+    if (selApi) return touch && selApi.TOUCH_PICK_TOLERANCE_PX ? selApi.TOUCH_PICK_TOLERANCE_PX : selApi.PICK_TOLERANCE_PX;
+    return touch ? 20 : 8;
+  }
+
+  function vertexNearScreen(clientX, clientY, pointerType) {
+    const bounds = canvas.getBoundingClientRect();
+    const px = clientX - bounds.left;
+    const py = clientY - bounds.top;
+    const limit = measurePickLimitPx(pointerType);
+    const rows = listVertexRows();
+    let best = null;
+    let bestD = limit;
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (!inFront(row.p)) continue;
+      const s = screenOfCad(row.p);
+      const d = Math.hypot(s.x - px, s.y - py);
+      if (d <= bestD) {
+        bestD = d;
+        best = row;
+      }
+    }
+    return best;
+  }
+
+  function meshHitCad(clientX, clientY) {
+    pointerNdc(clientX, clientY);
+    const hits = raycaster.intersectObject(mesh, false);
+    let hit = hits.length ? hits[0] : null;
+    if (!hit && bodyRoot.children.length) {
+      const bodyHits = raycaster.intersectObjects(bodyRoot.children, true);
+      if (bodyHits.length) hit = bodyHits[0];
+    }
+    if (!hit || !hit.point) return null;
+    return { x: hit.point.x, y: hit.point.z, z: hit.point.y };
+  }
+
+  function noteMeasureTap(clientX, clientY, pointerType) {
+    const vertex = vertexNearScreen(clientX, clientY, pointerType);
+    if (vertex && vertex.p) {
+      const point = cadPoint(vertex.p);
+      if (point) pushMeasurePick(point);
+      return;
+    }
+    const hit = meshHitCad(clientX, clientY);
+    if (hit) pushMeasurePick(hit);
+  }
+
+  function cadToScreen(point) {
+    tmpA.set(point.x, point.z, point.y);
+    return screenPoint(tmpA, { x: 0, y: 0, ok: true });
+  }
+
+  function clientOfCad(point) {
+    const bounds = canvas.getBoundingClientRect();
+    const s = screenOfCad([point.x, point.y, point.z]);
+    return { x: bounds.left + s.x, y: bounds.top + s.y };
+  }
+
+  function placeMeasureReadout() {
+    const readout = document.getElementById('measureReadout');
+    const hud = viewport.querySelector('.hud');
+    if (!readout || !hud) return;
+    const vp = viewport.getBoundingClientRect();
+    const box = hud.getBoundingClientRect();
+    readout.style.top = Math.max(8, box.bottom - vp.top + 8) + 'px';
+    readout.style.left = Math.max(8, box.left - vp.left) + 'px';
+  }
+
+  function paintMeasureSpan(span) {
+    const text = document.getElementById('mText');
+    if (!span) {
+      showMeasureSpan(false);
+      if (text) text.textContent = '';
+      return;
+    }
+    const aArr = [span.a.x, span.a.y, span.a.z];
+    const bArr = [span.b.x, span.b.y, span.b.z];
+    if (!inFront(aArr) || !inFront(bArr)) {
+      showMeasureSpan(false);
+      if (text) text.textContent = '';
+      return;
+    }
+    const s1 = cadToScreen(span.a);
+    const s2 = cadToScreen(span.b);
+    if (!s1.ok || !s2.ok) {
+      showMeasureSpan(false);
+      if (text) text.textContent = '';
+      return;
+    }
+    const dx = s2.x - s1.x;
+    const dy = s2.y - s1.y;
+    const len = Math.hypot(dx, dy);
+    let ox = 0;
+    let oy = -22;
+    if (len > 1) {
+      ox = (-dy / len) * 22;
+      oy = (dx / len) * 22;
+      if (oy > 0) {
+        ox = -ox;
+        oy = -oy;
+      }
+    }
+    const p1 = { x: s1.x + ox, y: s1.y + oy };
+    const p2 = { x: s2.x + ox, y: s2.y + oy };
+    setLine('mExt1', s1, p1);
+    setLine('mExt2', s2, p2);
+    setLine('mLine', p1, p2);
+    if (text) {
+      text.setAttribute('x', String((p1.x + p2.x) / 2));
+      text.setAttribute('y', String((p1.y + p2.y) / 2 - 8));
+      text.textContent = formatLength(span.mm);
+    }
+    showMeasureSpan(true);
+    if (len < 8) {
+      const arrow1 = document.getElementById('mArrow1');
+      const arrow2 = document.getElementById('mArrow2');
+      if (arrow1) arrow1.setAttribute('visibility', 'hidden');
+      if (arrow2) arrow2.setAttribute('visibility', 'hidden');
+    } else {
+      setArrow('mArrow1', p1, p2);
+      setArrow('mArrow2', p2, p1);
+    }
+  }
+
   function updateMeasure() {
     if (measureSvg.hidden) return;
-    const p1 = screenPoint(tmpA.set(-10, 0, 13), { x: 0, y: 0, ok: true });
-    const p2 = screenPoint(tmpB.set(10, 0, 13), { x: 0, y: 0, ok: true });
-    const e1 = screenPoint(new THREE.Vector3(-10, 0, 10), { x: 0, y: 0, ok: true });
-    const e2 = screenPoint(new THREE.Vector3(10, 0, 10), { x: 0, y: 0, ok: true });
-    const show = p1.ok && p2.ok;
-    measureSvg.style.opacity = show ? '1' : '0';
-    setLine('mLine', p1, p2);
-    setLine('mExt1', e1, p1);
-    setLine('mExt2', e2, p2);
-    const text = document.getElementById('mText');
-    text.setAttribute('x', String((p1.x + p2.x) / 2));
-    text.setAttribute('y', String((p1.y + p2.y) / 2 - 8));
-    text.textContent = formatLength(20);
-    setArrow('mArrow1', p1, p2);
-    setArrow('mArrow2', p2, p1);
+    measureSvg.style.opacity = '1';
+    placeMeasureReadout();
+    const span = activeMeasureSpan();
+    paintMeasureSpan(span);
+    const kindEl = document.getElementById('measureSpanLabel');
+    if (kindEl) {
+      if (!span || !Number.isFinite(span.mm)) kindEl.textContent = '';
+      else kindEl.textContent = (span.kind === 'length' ? 'Length ' : 'Distance ') + formatLength(span.mm);
+    }
+    const volEl = document.getElementById('measureVolume');
+    if (volEl) {
+      volEl.textContent = measureSolidPresent() && Number.isFinite(state.volumeMm3)
+        ? 'Volume ' + formatVolume(state.volumeMm3)
+        : '';
+    }
+  }
+
+  function oppositeVertexPoints() {
+    const rows = listVertexRows();
+    let best = null;
+    let bestD = -1;
+    for (let i = 0; i < rows.length; i += 1) {
+      const a = cadPoint(rows[i].p);
+      if (!a) continue;
+      for (let k = i + 1; k < rows.length; k += 1) {
+        const b = cadPoint(rows[k].p);
+        if (!b) continue;
+        const d = pointDistance(a, b);
+        if (d > bestD) {
+          bestD = d;
+          best = { a: a, b: b, aId: rows[i].id, bId: rows[k].id, d: d };
+        }
+      }
+    }
+    return best;
+  }
+
+  function measureProbe() {
+    const unitWas = state.unit;
+    const exportBefore = state.exportAllowed === true;
+    const volumeBefore = state.volumeMm3;
+    const bodiesBefore = state.bodies.length;
+    const shelf = document.getElementById('modifyShelf');
+    const shelfBefore = !shelf || shelf.hidden === true;
+    const result = {
+      buttonW: 0,
+      buttonH: 0,
+      hiddenOff: false,
+      readoutOff: false,
+      hiddenOn: false,
+      readoutOn: false,
+      idleText: '',
+      idleSpanHidden: false,
+      edgeMm: null,
+      edgePts: 0,
+      edgeText: '',
+      edgeLabel: '',
+      edgeFormatted: '',
+      vertexMm: null,
+      vertexText: '',
+      vertexFormatted: '',
+      pickMm: null,
+      pickText: '',
+      pickCount: 0,
+      pickPath: '',
+      volumeMm3: 0,
+      volumeBefore: volumeBefore,
+      volumeText: '',
+      volumeFormatted: '',
+      propsHasVolume: false,
+      inchText: '',
+      inchVolume: '',
+      hiddenAfter: false,
+      readoutAfter: false,
+      picksAfter: -1,
+      exportBefore: exportBefore,
+      exportAfter: false,
+      bodiesBefore: bodiesBefore,
+      bodiesAfter: 0,
+      shelfBefore: shelfBefore,
+      shelfAfter: false
+    };
+    try {
+      const btn = document.querySelector('[data-action="measure"]');
+      const rect = btn ? btn.getBoundingClientRect() : { width: 0, height: 0 };
+      result.buttonW = rect.width;
+      result.buttonH = rect.height;
+      state.selection = 'item';
+      state.selectedIds = state.bodies.length === 1 ? ['item'] : [];
+      clearMeasurePicks();
+      if (state.measure && btn) btn.click();
+      const readout = document.getElementById('measureReadout');
+      result.hiddenOff = measureSvg.hidden === true;
+      result.readoutOff = !readout || readout.hidden === true;
+      if (btn) btn.click();
+      const mText = document.getElementById('mText');
+      result.hiddenOn = measureSvg.hidden === false;
+      result.readoutOn = !!(readout && readout.hidden === false);
+      result.idleText = mText ? String(mText.textContent || '').trim() : '';
+      result.idleSpanHidden = !mText || mText.getAttribute('visibility') === 'hidden';
+      const rows = listEdgeRows();
+      if (rows.length) {
+        state.selection = 'edge';
+        state.selectedIds = [rows[0].id];
+        state.hoverId = null;
+        clearMeasurePicks();
+        applyLook();
+        const edge = selectedEdgeLengthMm();
+        if (edge) {
+          result.edgeMm = edge.mm;
+          result.edgePts = edge.pts;
+          result.edgeFormatted = formatLength(edge.mm);
+        }
+      }
+      result.edgeText = mText ? String(mText.textContent || '').trim() : '';
+      const spanLabel = document.getElementById('measureSpanLabel');
+      result.edgeLabel = spanLabel ? String(spanLabel.textContent || '').trim() : '';
+      clearMeasurePicks();
+      const corners = oppositeVertexPoints();
+      if (corners) {
+        state.selection = 'vertex';
+        state.selectedIds = [corners.aId, corners.bId];
+        state.hoverId = null;
+        applyLook();
+        result.vertexMm = corners.d;
+        result.vertexText = mText ? String(mText.textContent || '').trim() : '';
+        result.vertexFormatted = formatLength(corners.d);
+      }
+      clearMeasurePicks();
+      state.selection = 'item';
+      state.selectedIds = state.bodies.length === 1 ? ['item'] : [];
+      if (corners) {
+        const tapA = clientOfCad(corners.a);
+        const tapB = clientOfCad(corners.b);
+        noteMeasureTap(tapA.x, tapA.y, 'mouse');
+        noteMeasureTap(tapB.x, tapB.y, 'mouse');
+        result.pickPath = 'tap';
+      }
+      applyLook();
+      result.pickCount = state.measurePicks.length;
+      if (state.measurePicks.length === 2) result.pickMm = pointDistance(state.measurePicks[0], state.measurePicks[1]);
+      result.pickText = mText ? String(mText.textContent || '').trim() : '';
+      result.volumeMm3 = state.volumeMm3;
+      result.volumeFormatted = formatVolume(state.volumeMm3);
+      const volEl = document.getElementById('measureVolume');
+      result.volumeText = volEl ? String(volEl.textContent || '').trim() : '';
+      const props = document.getElementById('inspKv');
+      result.propsHasVolume = !!(props && String(props.textContent || '').indexOf(result.volumeFormatted) >= 0);
+      state.unit = 'in';
+      updateMeasure();
+      result.inchText = mText ? String(mText.textContent || '').trim() : '';
+      result.inchVolume = volEl ? String(volEl.textContent || '').trim() : '';
+      state.unit = unitWas;
+      refreshUnits();
+      if (btn) btn.click();
+      result.hiddenAfter = measureSvg.hidden === true;
+      result.readoutAfter = !readout || readout.hidden === true;
+      result.picksAfter = state.measurePicks.length;
+      result.exportAfter = state.exportAllowed === true;
+      result.bodiesAfter = state.bodies.length;
+      result.shelfAfter = !shelf || shelf.hidden === true;
+      return result;
+    } finally {
+      state.unit = unitWas;
+      state.measure = false;
+      clearMeasurePicks();
+      state.selection = 'item';
+      if (state.bodies.length === 1) state.selectedIds = ['item'];
+      applyLook();
+      refreshUnits();
+    }
+  }
+
+  function publishMeasureHook() {
+    window.__cadcamMeasure = {
+      probe: function () { return measureProbe(); },
+      enabled: function () { return state.measure === true; },
+      picks: function () {
+        return state.measurePicks.map(function (p) { return { x: p.x, y: p.y, z: p.z }; });
+      },
+      setEnabled: function (on) {
+        const want = on === true;
+        if (state.measure !== want) {
+          const button = document.querySelector('[data-action="measure"]');
+          if (button) button.click();
+        }
+        return state.measure === true;
+      },
+      clearPicks: function () {
+        clearMeasurePicks();
+        if (state.measure) updateMeasure();
+        return state.measurePicks.length;
+      },
+      addPick: function (p) {
+        const point = Array.isArray(p)
+          ? cadPoint(p)
+          : (p ? cadPoint([p.x, p.y, p.z]) : null);
+        if (!point) return state.measurePicks.length;
+        pushMeasurePick(point);
+        if (state.measure) updateMeasure();
+        return state.measurePicks.length;
+      },
+      selectEdge: function (index) {
+        const rows = listEdgeRows();
+        const at = Math.max(0, Number(index) || 0);
+        const row = rows[at];
+        if (!row) return false;
+        state.selection = 'edge';
+        state.selectedIds = [row.id];
+        state.hoverId = null;
+        applyLook();
+        return true;
+      }
+    };
   }
 
   function setLine(id, a, b) {
@@ -10468,6 +10958,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return;
         }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
+        if (state.measure) noteMeasureTap(ev.clientX, ev.clientY, ev.pointerType);
         const modified = !!(ev.shiftKey || ev.ctrlKey || ev.metaKey);
         const next = (!modified && phoneApi && typeof phoneApi.selectionFromTap === 'function')
           ? phoneApi.selectionFromTap(state.selection, state.selectedIds, hitId, state.phoneMulti === true)
@@ -10938,6 +11429,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     };
   }
   window.__cadcamNavCube = navCubeState;
+  publishMeasureHook();
   renderFrame();
 
   function frame() {
