@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #79 (merged at 23aee4c): research/gui/extrude-join-cut.md + INDEX - Extrude Join/Cut prep (T1-T5 locks).
 - 2026-10-24 PR #77 (merged at 347888e): web - origin-plane picker when document has no body (T1-T5; Top/Front/Right; Blind 10 mm).
 - 2026-10-24 PR #75 (merged at bcecd56): docs - prompts/origin-plane-empty-doc.md (T1-T5 locked).
 - 2026-10-24 PR #73 (merged at 58f502f): web/PROGRESS.md - P5c #70 on main; sketch rect/circle Blind 10 mm.
