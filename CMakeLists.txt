@@ -229,10 +229,19 @@ if(CADCAM_PYTHON)
         SKIP_RETURN_CODE 77
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
+    add_test(
+        NAME phone_select_smoke
+        COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/phone_select_smoke.py"
+    )
+    set_tests_properties(phone_select_smoke PROPERTIES
+        TIMEOUT 600
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
 elseif(DEFINED ENV{CI})
-    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, and field_nudge_smoke require Python; CI must not skip them")
+    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, and phone_select_smoke require Python; CI must not skip them")
 else()
-    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, and field_nudge_smoke not added: Python was not found")
+    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, and phone_select_smoke not added: Python was not found")
 endif()
 
 add_library(model
