@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #47 (merged at cc769e1): clearer V/E/F selection overlays (18/14 px points, 6/4 px edge ribbons) in web/viewport-selection.mjs with phone-select and occt_gate tests.
 - 2026-10-24 PR #48 (merged at f856687): UPDATES.md one-liners for #42, #43, #44, and #46.
 - 2026-10-24 PR #45 (merged at 57bd8c7): research/gui/sketch-mvp-p5c.md P5c sketch MVP digest (rect/circle to Blind 10 mm), with research/INDEX.md line.
 - 2026-10-24 PR #46 (merged at 2a9fc31): web/PROGRESS.md notes P2 UI-gap digest is on main via #43; parked prose removed.
