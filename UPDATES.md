@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #100 (merged at 0c4c220): research - save/load BREP-only round-trip prep (T1-T6).
 - 2026-10-24 PR #98 (merged at 56c2528): web - measure angle + face area, sketch LxW/O callouts (P6 T1-T6).
 - 2026-10-24 PR #96 (merged at f32d35b): docs - prompts/measure-sketch-next.md (P6 T1-T6 GB feed).
 - 2026-10-24 PR #93 (merged at e03da89): PROGRESS scrub - touch Booleans + fillet/chamfer on main (#91 at 73408c4); next measuring/callouts then sketching.
