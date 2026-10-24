@@ -7,6 +7,9 @@ Part 1 visible, one search, coverage thresholds, Home, the nav cube, the
 3-hole plate, and the empty-document origin-plane sketch (Top / Front /
 Right, then Blind 10 mm). Those portrait runs also check the Extrude
 New / Join / Cut chips are at least 44 CSS px and stay off the bottom bar.
+Before that portrait run, the open Modify shelf shows "1 = target, 2 = tool",
+shelf buttons stay at least 44 CSS px, and the open edge sheet stays off the
+view bar and the phone tab bar.
 
 Playwright lives in the gitignored builds/pwvenv. When it cannot be
 imported, exit 77. Exit 1 under CI=1 only when a workflow file installs
@@ -18,6 +21,7 @@ WebKit screenshots of the finished plate:
 """
 from __future__ import annotations
 
+import json
 import os
 import struct
 import sys
@@ -688,6 +692,262 @@ def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
     return ["webkit screenshot: dimension panel did not open"]
 
 
+def _click_selector(cdp: PwCdp, selector: str) -> str:
+    raw, err = deploy_smoke.eval_expr(
+        cdp,
+        "(function(){var b=document.querySelector("
+        + json.dumps(selector)
+        + ");if(!b) return 'missing';b.click();return 'clicked';})()",
+    )
+    if err:
+        return err
+    return str(raw or "")
+
+
+def _json_problems(cdp: PwCdp, expression: str) -> list[str]:
+    data, err = deploy_smoke._json_eval(cdp, expression)
+    if err or not isinstance(data, dict):
+        return [err or "no layout json"]
+    found = data.get("problems")
+    if not isinstance(found, list):
+        return [f"layout {data!r}"]
+    problems = [str(item) for item in found]
+    if data.get("w") not in (None, 390) or data.get("h") not in (None, 844):
+        problems.append(f"viewport {data.get('w')}x{data.get('h')}")
+    return problems
+
+
+SHELF_LAYOUT_EXPR = r"""
+(function(){
+  var problems = [];
+  function shown(el) {
+    if (!el || (el.closest && el.closest('[hidden]'))) return false;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return false;
+    var r = el.getBoundingClientRect();
+    return r.width >= 1 && r.height >= 1;
+  }
+  function boxOf(el) {
+    if (!shown(el)) return null;
+    return el.getBoundingClientRect();
+  }
+  function overlaps(a, b) {
+    if (!a || !b) return false;
+    return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+  }
+  var label = document.getElementById('modifyOrder');
+  var text = label ? String(label.textContent || '') : '';
+  if (text !== '1 = target, 2 = tool') problems.push('sentence ' + JSON.stringify(text));
+  if (!shown(label)) problems.push('sentence hidden');
+  var pe = label ? getComputedStyle(label).pointerEvents : '';
+  if (pe !== 'none') problems.push('sentence pointer-events ' + pe);
+  var tab = boxOf(document.querySelector('.phone-tabbar'));
+  if (!tab) problems.push('missing phone tab bar');
+  if (label && shown(label)) {
+    var r = label.getBoundingClientRect();
+    var hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (hit === label || (hit && label.contains(hit))) problems.push('sentence is a hit target');
+    if (tab && overlaps(r, tab)) problems.push('sentence covers phone tab bar');
+  }
+  var buttons = document.querySelectorAll('#modifyShelf button');
+  if (!buttons.length) problems.push('no shelf buttons');
+  for (var i = 0; i < buttons.length; i++) {
+    var b = buttons[i];
+    var br = b.getBoundingClientRect();
+    var name = (b.textContent || '').replace(/\s+/g, ' ').trim();
+    if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
+      problems.push(name + ' ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
+    }
+    if (tab && overlaps(br, tab)) problems.push(name + ' covers phone tab bar');
+  }
+  var groups = document.querySelectorAll('.group-label');
+  var visible = [];
+  for (var g = 0; g < groups.length; g++) {
+    if (shown(groups[g])) visible.push((groups[g].textContent || '').replace(/\s+/g, ' ').trim());
+  }
+  if (visible.length) problems.push('group labels visible ' + visible.join('|'));
+  return JSON.stringify({problems: problems, w: window.innerWidth, h: window.innerHeight});
+})()
+"""
+
+EDGE_SHEET_EXPR = r"""
+(function(){
+  var problems = [];
+  function shown(el) {
+    if (!el || (el.closest && el.closest('[hidden]'))) return false;
+    var st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return false;
+    var r = el.getBoundingClientRect();
+    return r.width >= 1 && r.height >= 1;
+  }
+  function boxOf(el) {
+    if (!shown(el)) return null;
+    return el.getBoundingClientRect();
+  }
+  function overlaps(a, b) {
+    if (!a || !b) return false;
+    return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+  }
+  var input = document.getElementById('edgeSize');
+  var sheet = document.getElementById('edgeSheet');
+  var span = sheet ? sheet.querySelector('.edge-size span') : null;
+  var label = input ? input.closest('label') : null;
+  if (!input) problems.push('missing edge size');
+  else {
+    if (input.getAttribute('type') !== 'text') problems.push('type ' + input.getAttribute('type'));
+    if (input.getAttribute('inputmode') !== 'decimal') problems.push('inputmode ' + input.getAttribute('inputmode'));
+    if (input.getAttribute('autocomplete') !== 'off') problems.push('autocomplete ' + input.getAttribute('autocomplete'));
+    if (input.getAttribute('spellcheck') !== 'false') problems.push('spellcheck ' + input.getAttribute('spellcheck'));
+    if (input.getAttribute('aria-label') !== 'Edge size mm') problems.push('aria ' + input.getAttribute('aria-label'));
+    if (input.hasAttribute('min') || input.hasAttribute('step')) problems.push('min or step set');
+  }
+  if (!label || label.getAttribute('title') !== 'Fillet radius or chamfer distance in millimetres. Applies on Confirm.') {
+    problems.push('title ' + (label ? label.getAttribute('title') : 'missing'));
+  }
+  if (!span || String(span.textContent || '').trim() !== 'mm') problems.push('suffix ' + (span ? span.textContent : 'missing'));
+  var sizeBox = boxOf(input);
+  var confirm = document.getElementById('edgeConfirm');
+  var confirmBox = boxOf(confirm);
+  if (!sizeBox || sizeBox.width + 0.5 < 44 || sizeBox.height + 0.5 < 44) problems.push('edge size target');
+  if (!confirmBox || confirmBox.width + 0.5 < 44 || confirmBox.height + 0.5 < 44) problems.push('confirm target');
+  var sheetBox = boxOf(sheet);
+  if (!sheetBox) problems.push('edge sheet hidden');
+  var bars = ['.vp-bar', '.phone-tabbar'];
+  for (var i = 0; i < bars.length; i++) {
+    var bar = boxOf(document.querySelector(bars[i]));
+    if (!bar) problems.push('missing ' + bars[i]);
+    else if (sheetBox && overlaps(sheetBox, bar)) problems.push('edge sheet covers ' + bars[i]);
+  }
+  return JSON.stringify({problems: problems, w: window.innerWidth, h: window.innerHeight});
+})()
+"""
+
+ORDER_EXPR = r"""
+(function(){
+  var problems = [];
+  var s = window.__cadcamExportState || {};
+  var label = document.getElementById('modifyOrder');
+  var order = document.getElementById('boolOrder');
+  var badges = [];
+  var nodes = document.querySelectorAll('.bool-badge');
+  for (var i = 0; i < nodes.length; i++) badges.push(nodes[i].textContent);
+  var disabled = [];
+  var ops = ['union', 'cut', 'intersect'];
+  for (var j = 0; j < ops.length; j++) {
+    var b = document.querySelector('#modifyShelf [data-action="boolean"][data-op="' + ops[j] + '"]');
+    if (!b || b.disabled) disabled.push(ops[j]);
+  }
+  if (!label || label.textContent !== '1 = target, 2 = tool') problems.push('sentence changed');
+  var orderText = order ? String(order.textContent || '') : '';
+  if (orderText.indexOf('1 Box 1') < 0 || orderText.indexOf('2 Box 2') < 0) problems.push('boolOrder ' + orderText);
+  if (badges.join(',') !== '1,2') problems.push('badges ' + badges.join(','));
+  if (disabled.length) problems.push('disabled ' + disabled.join(','));
+  if (s.phoneMulti === true) problems.push('multi turned on');
+  if (s.selectionMode !== 'item' || s.selectionCount !== 2) {
+    problems.push('selection ' + s.selectionMode + ' ' + s.selectionCount);
+  }
+  return JSON.stringify({problems: problems});
+})()
+"""
+
+CLOSED_EXPR = r"""
+(function(){
+  var problems = [];
+  var label = document.getElementById('modifyOrder');
+  var shelf = document.getElementById('modifyShelf');
+  var shown = false;
+  if (label && !(label.closest && label.closest('[hidden]'))) {
+    var st = getComputedStyle(label);
+    var r = label.getBoundingClientRect();
+    shown = st.display !== 'none' && st.visibility !== 'hidden' && r.width >= 1 && r.height >= 1;
+  }
+  if (shown) problems.push('sentence visible while shelf closed');
+  if (!shelf || shelf.hidden !== true) problems.push('shelf still open');
+  if ((label ? label.textContent : '') !== '1 = target, 2 = tool') problems.push('sentence text changed');
+  return JSON.stringify({problems: problems});
+})()
+"""
+
+
+def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
+    """390x844 Modify shelf sentence, button size, and edge sheet clearance."""
+    url = origin + "/?pair=overlap"
+    print(f"load modify_touch {url}", flush=True)
+    state, load_problems = deploy_smoke.wait_for_case(cdp, origin, url, deploy_smoke.PAGE_TIMEOUT_S)
+    if load_problems or not isinstance(state, dict):
+        return ["modify touch load", *load_problems[:20]]
+    if int(state.get("bodyCount") or 0) != 2:
+        return [f"modify touch bodyCount {state.get('bodyCount')!r}"]
+    if state.get("phoneMulti") is True:
+        return ["modify touch multi already on"]
+    closed = _json_problems(cdp, CLOSED_EXPR)
+    if closed:
+        return ["modify touch closed", *closed]
+    opened = _click_selector(cdp, "#modifyBtn")
+    if opened != "clicked":
+        return [f"modify touch open {opened}"]
+    cdp.drain(0.3)
+    state = deploy_smoke._export_state(cdp)
+    if state.get("modifyOpen") is not True:
+        return ["modify touch shelf stayed closed"]
+    if state.get("phoneMulti") is True:
+        return ["modify touch open turned multi on"]
+    layout = _json_problems(cdp, SHELF_LAYOUT_EXPR)
+    if layout:
+        return ["modify touch shelf", *layout]
+    for op in ("union", "cut", "intersect"):
+        clicked = _click_selector(cdp, f'#modifyShelf [data-action="boolean"][data-op="{op}"]')
+        if clicked != "clicked":
+            return [f"modify touch {op} click {clicked}"]
+    cdp.drain(0.2)
+    state = deploy_smoke._export_state(cdp)
+    if state.get("phoneMulti") is True:
+        return ["modify touch boolean turned multi on"]
+    if int(state.get("selectionCount") or 0) != 0:
+        return [f"modify touch selection changed {state.get('selectionCount')!r}"]
+    selected, select_err = deploy_smoke.eval_expr(cdp, "window.__cadcamSelectItem()")
+    if select_err or selected is not True:
+        return [f"modify touch select item {select_err or selected!r}"]
+    cdp.drain(0.4)
+    order = _json_problems(cdp, ORDER_EXPR)
+    if order:
+        return ["modify touch order", *order]
+    sentence = _json_problems(cdp, SHELF_LAYOUT_EXPR)
+    if sentence:
+        return ["modify touch two bodies", *sentence]
+    armed = _click_selector(cdp, "#modifyShelf [data-action='armEdge'][data-op='fillet']")
+    if armed != "clicked":
+        return [f"modify touch fillet {armed}"]
+    cdp.drain(0.3)
+    state = deploy_smoke._export_state(cdp)
+    if state.get("edgeArm") != "fillet" or state.get("edgeSize") != "2" or state.get("edgeSheetOpen") is not True:
+        return [
+            f"modify touch fillet arm {state.get('edgeArm')!r} "
+            f"size {state.get('edgeSize')!r} open {state.get('edgeSheetOpen')!r}"
+        ]
+    sheet = _json_problems(cdp, EDGE_SHEET_EXPR)
+    if sheet:
+        return ["modify touch edge sheet", *sheet]
+    chamfer = _click_selector(cdp, "#modifyShelf [data-action='armEdge'][data-op='chamfer']")
+    if chamfer != "clicked":
+        return [f"modify touch chamfer {chamfer}"]
+    cdp.drain(0.2)
+    state = deploy_smoke._export_state(cdp)
+    if state.get("edgeArm") != "chamfer" or state.get("edgeSize") != "0.5":
+        return [f"modify touch chamfer size {state.get('edgeArm')!r} {state.get('edgeSize')!r}"]
+    if state.get("phoneMulti") is True:
+        return ["modify touch chamfer turned multi on"]
+    closed_click = _click_selector(cdp, "#modifyBtn")
+    if closed_click != "clicked":
+        return [f"modify touch close {closed_click}"]
+    cdp.drain(0.2)
+    hidden = _json_problems(cdp, CLOSED_EXPR)
+    if hidden:
+        return ["modify touch close", *hidden]
+    print("modify touch pass", flush=True)
+    return []
+
+
 def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[str]:
     browser = getattr(playwright, engine).launch(headless=True)
     try:
@@ -703,6 +963,9 @@ def run_engine(playwright: Any, engine: str, origin: str, shoot: bool) -> list[s
         page.set_default_timeout(deploy_smoke.PAGE_TIMEOUT_S * 1000)
         cdp = PwCdp(page)
         print(f"phone {engine} iPhone 13", flush=True)
+        touched = modify_touch_problems(cdp, origin)
+        if touched:
+            return [f"{engine} modify touch", *touched[:40]]
         portrait = deploy_smoke.run_portrait(cdp, origin)
         if portrait:
             return [f"{engine} portrait", *portrait[:40]]

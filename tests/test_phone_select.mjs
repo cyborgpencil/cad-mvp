@@ -171,6 +171,8 @@ expect('size null', phone.parseEdgeSize(null), { ok: false, size: NaN });
 expect('size zero', phone.parseEdgeSize('0'), { ok: false, size: 0 });
 expect('size negative', phone.parseEdgeSize('-1'), { ok: false, size: -1 });
 expect('size word', phone.parseEdgeSize('big'), { ok: false, size: NaN });
+expect('size comma', phone.parseEdgeSize('1,5'), { ok: true, size: 1.5 });
+expect('size comma spaced', phone.parseEdgeSize(' 1,25 '), { ok: true, size: 1.25 });
 
 expect('one body id', phone.edgePickId('b1', 'e0', 1), 'e0');
 expect('multi body id', phone.edgePickId('b1', 'e0', 2), 'b1:e0');
@@ -216,6 +218,10 @@ expect('negative size blocks', negativeSize.enabled, false);
 const noEdge = phone.confirmEdgeDecision([], '2', 'b1');
 expect('no edge blocks', noEdge.enabled, false);
 expect('no edge quiet', noEdge.message, '');
+
+const commaEdge = phone.confirmEdgeDecision(['e0'], '1,5', 'b1');
+expect('comma size enables', commaEdge.enabled, true);
+expect('comma size value', commaEdge.size, 1.5);
 
 expect('refillet allowed', phone.repeatEdgeOpAllowed(), true);
 expect('smaller message', phone.SMALLER_SIZE_MESSAGE, 'Try a smaller size.');

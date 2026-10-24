@@ -1339,13 +1339,14 @@ export function applyBooleanSolids(oc, op, shapeA, shapeB) {
   const units = unitsLockGate();
   const triangles = view.mesh && view.mesh.triangles ? view.mesh.triangles.length : 0;
   const empty = !(volume > BOOLEAN_EMPTY_VOLUME_MM3) || solids < 1 || triangles < 1;
-  const pass = !empty && view.gate.pass === true && view.watertight.pass === true && units.pass === true;
+  // Watertight stays on the result for callers. It does not decide accept.
+  // Hole cuts still use checkSolidGate, which still requires watertight.
+  const pass = !empty && view.gate.pass === true && units.pass === true;
   if (!pass) {
     releaseShape(made.shape);
     let error = '';
     if (empty) error = 'FAIL: ' + which.ui + ' result is empty.';
     else if (view.gate.pass !== true) error = view.gate.message || ('FAIL: ' + which.ui + ' failed the OCCT gate.');
-    else if (view.watertight.pass !== true) error = view.watertight.message || ('FAIL: ' + which.ui + ' mesh is not watertight.');
     else error = units.message || 'FAIL: units are not millimetres.';
     if (error.indexOf('kept') === -1) error += ' Both inputs were kept.';
     return {

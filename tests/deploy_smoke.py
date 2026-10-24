@@ -16,7 +16,10 @@ Asserts window.__cadcamExportState.occtReady for:
   ?demo=lbracket        final L-bracket OCCT gate PASS (app defaults)
   ?demo=booleans        box minus cylinder, OCCT gate PASS
   ?demo=booleans&op=    union, cut, and intersect each PASS
-  ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect
+  ?pair=overlap         select two bodies with the 4 key, then Union, Cut, Intersect.
+                        Union undo restores both boxes. ?pair=disjoint Intersect
+                        keeps both and does not push undo. Disjoint Cut follows
+                        the same keep-both rule when the gate rejects it.
   /?fixture=closed_box  plain 4 key selects the whole body when the viewport is focused
   Create Box/Cylinder/Disc is one undo/redo step; digits do not change selection
                         unless the viewport is focused, and inputs ignore hotkeys
@@ -4182,7 +4185,7 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
-def click_boolean(cdp: Cdp, op: str) -> str:
+def click_boolean(cdp: Cdp, op: str, timeout: float = 30) -> str:
     expression = (
         "(function(){"
         f"var b=document.querySelector('[data-action=\"boolean\"][data-op=\"{op}\"]');"
@@ -4195,7 +4198,7 @@ def click_boolean(cdp: Cdp, op: str) -> str:
     result = cdp.call(
         "Runtime.evaluate",
         {"expression": expression, "returnByValue": True},
-        timeout=30,
+        timeout=timeout,
     )
     remote = result.get("result") or {}
     value = remote.get("value")
@@ -4227,6 +4230,224 @@ def wait_boolean(
         elif problems:
             return last, problems
     return last, [f"timed out waiting for boolean {op}", json.dumps(last)]
+
+
+BOOLEAN_MM3_TOL = 1e-3
+
+BOOL_PART_EXPR = r"""
+(function(){
+  var asm = window.__cadcamAssembly ? window.__cadcamAssembly() : null;
+  var s = window.__cadcamExportState || {};
+  var hintEl = document.getElementById('statusHint');
+  var vols = [];
+  var parts = asm && asm.parts ? asm.parts : [];
+  for (var i = 0; i < parts.length; i++) vols.push(parts[i] && parts[i].volumeMm3);
+  return JSON.stringify({
+    body: s.bodyCount,
+    undo: s.undoDepth,
+    op: s.booleanOp || '',
+    err: s.lastError || '',
+    vol: s.volumeMm3,
+    gate: s.occtGate === true,
+    units: s.unitsPass === true,
+    vols: vols,
+    hint: hintEl ? String(hintEl.textContent || '') : ''
+  });
+})()
+"""
+
+
+def _within_mm3(value: Any, want: float) -> bool:
+    try:
+        return abs(float(value) - want) <= BOOLEAN_MM3_TOL
+    except (TypeError, ValueError):
+        return False
+
+
+def _bool_part_snap(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
+    return _json_eval(cdp, BOOL_PART_EXPR)
+
+
+def _pair_volume_problems(snap: dict[str, Any], label: str) -> list[str]:
+    problems: list[str] = []
+    vols = snap.get("vols")
+    if not isinstance(vols, list) or len(vols) != 2:
+        problems.append(f"{label} volumes {vols!r}")
+        return problems
+    for vol in vols:
+        if not _within_mm3(vol, 8000):
+            problems.append(f"{label} box volume {vol!r}")
+    if snap.get("gate") is not True or snap.get("units") is not True:
+        problems.append(f"{label} gate {snap.get('gate')!r} units {snap.get('units')!r}")
+    if int(snap.get("body") or 0) != 2:
+        problems.append(f"{label} bodyCount {snap.get('body')!r}")
+    return problems
+
+
+def _undo_restores_pair(cdp: Cdp, before_depth: int, label: str) -> list[str]:
+    raw, err = eval_expr(cdp, UNDO_KEY_EXPR)
+    parsed, parse_err = _key_state(raw, err)
+    if parse_err or not parsed:
+        return [f"boolean undo {label} {parse_err or raw!r}"]
+    problems: list[str] = []
+    if int(parsed.get("body") or 0) != 2:
+        problems.append(f"boolean undo {label} bodyCount {parsed.get('body')!r}")
+    if int(parsed.get("undo") or 0) != before_depth:
+        problems.append(f"boolean undo {label} depth {parsed.get('undo')!r} want {before_depth}")
+    snap, snap_err = _bool_part_snap(cdp)
+    if snap_err or not snap:
+        problems.append(f"boolean undo {label} parts {snap_err or snap!r}")
+        return problems
+    hint = str(snap.get("hint") or "")
+    if hint != "Undo " + label:
+        problems.append(f"boolean undo {label} hint {hint!r}")
+    problems.extend(_pair_volume_problems(snap, f"boolean undo {label}"))
+    if not _within_mm3(snap.get("vol"), 16000):
+        problems.append(f"boolean undo {label} scene volume {snap.get('vol')!r}")
+    return problems
+
+
+def union_undo_problems(cdp: Cdp, before_depth: int, done: dict[str, Any]) -> list[str]:
+    """Overlap Union is one undo step. Undo restores both 8000 mm3 boxes."""
+    problems: list[str] = []
+    depth = int(done.get("undoDepth") or 0)
+    if depth != before_depth + 1:
+        problems.append(f"boolean_union undo depth {depth} want {before_depth + 1}")
+    if not _within_mm3(done.get("volumeMm3"), 12000):
+        problems.append(f"boolean_union volume {done.get('volumeMm3')!r} want 12000")
+    if problems:
+        return problems
+    return _undo_restores_pair(cdp, before_depth, "Union")
+
+
+def _select_pair(cdp: Cdp, origin: str, label: str) -> tuple[dict[str, Any] | None, list[str]]:
+    press_plain_4(cdp)
+    cdp.drain(0.4)
+    keyed = eval_state(cdp)
+    problems = site_problems(cdp.events, origin, cdp.urls)
+    problems.extend(smoke_notes(keyed))
+    keyed_state = (keyed or {}).get("state") if keyed else None
+    if not isinstance(keyed_state, dict):
+        problems.append(f"{label}: no state after the 4 key")
+        return None, problems
+    if keyed_state.get("selectionMode") != "item" or int(keyed_state.get("selectionCount") or 0) < 2:
+        problems.append(
+            f"{label}: expected two selected bodies after 4, "
+            f"mode {keyed_state.get('selectionMode')!r} count {keyed_state.get('selectionCount')!r}"
+        )
+    order = keyed_state.get("selectionOrder") or []
+    if len(order) < 2:
+        problems.append(f"{label}: selection order {order!r}")
+    return keyed_state, problems
+
+
+def overlap_boolean_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Union, Cut, and Intersect on the overlap pair. Union undo restores both boxes."""
+    for op in ("union", "cut", "intersect"):
+        url = origin + "/?pair=overlap"
+        print(f"load boolean_{op} {url}", flush=True)
+        started = time.time()
+        state, problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+        if problems or not isinstance(state, dict):
+            return [f"boolean_{op} load", *problems[:40]]
+        state, problems = _select_pair(cdp, origin, f"boolean_{op}")
+        if problems or not isinstance(state, dict):
+            return [f"boolean_{op} select", *problems[:40]]
+        before_depth = int(state.get("undoDepth") or 0)
+        clicked = click_boolean(cdp, op, PAGE_TIMEOUT_S)
+        if clicked != "clicked":
+            return [f"boolean_{op}: button {clicked}"]
+        done, problems = wait_boolean(cdp, origin, op, PAGE_TIMEOUT_S)
+        elapsed = time.time() - started
+        if not isinstance(done, dict):
+            problems.append(f"boolean_{op}: no result state")
+        else:
+            print(f"boolean_{op}={json.dumps(done, separators=(',', ':'))}", flush=True)
+            if done.get("occtGate") is not True or done.get("gateOcct") != "PASS":
+                problems.append(f"boolean_{op}: gate {done.get('gateOcct')!r}")
+            if done.get("unitsPass") is not True:
+                problems.append(f"boolean_{op}: units failed")
+            if done.get("exportAllowed") is not True:
+                problems.append(f"boolean_{op}: Export is not enabled")
+            if int(done.get("bodyCount") or 0) != 1:
+                problems.append(f"boolean_{op}: bodyCount {done.get('bodyCount')!r}")
+            if done.get("booleanOp") != op:
+                problems.append(f"boolean_{op}: op {done.get('booleanOp')!r}")
+            if op == "union" and not problems:
+                problems.extend(union_undo_problems(cdp, before_depth, done))
+        if problems:
+            return [f"boolean_{op} ({elapsed:.1f}s)", *problems[:40]]
+        print(f"boolean_{op}: gate PASS, {elapsed:.1f}s", flush=True)
+    return []
+
+
+def _boolean_outcome(cdp: Cdp, timeout: float) -> tuple[dict[str, Any] | None, list[str]]:
+    """Poll until the op records a result or a kept-inputs error. An error is not a failure by itself."""
+    deadline = time.time() + timeout
+    last: dict[str, Any] | None = None
+    while time.time() < deadline:
+        cdp.drain(0.4)
+        snap, err = _bool_part_snap(cdp)
+        if err or not snap:
+            last = None
+            continue
+        last = snap
+        if snap.get("err") or snap.get("op"):
+            return snap, []
+    return last, ["timed out waiting for boolean outcome", json.dumps(last)]
+
+
+def disjoint_boolean_problems(cdp: Cdp, origin: str) -> list[str]:
+    """Disjoint Intersect stays an empty reject. Cut is a success only when OCCT accepts it."""
+    for op in ("intersect", "cut"):
+        label = f"boolean_disjoint_{op}"
+        url = origin + "/?pair=disjoint"
+        print(f"load {label} {url}", flush=True)
+        state, problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+        if problems or not isinstance(state, dict):
+            return [f"{label} load", *problems[:40]]
+        state, problems = _select_pair(cdp, origin, label)
+        if problems or not isinstance(state, dict):
+            return [f"{label} select", *problems[:40]]
+        before_depth = int(state.get("undoDepth") or 0)
+        if int(state.get("bodyCount") or 0) != 2:
+            return [f"{label} bodyCount before {state.get('bodyCount')!r}"]
+        clicked = click_boolean(cdp, op, PAGE_TIMEOUT_S)
+        if clicked != "clicked":
+            return [f"{label}: button {clicked}"]
+        done, problems = _boolean_outcome(cdp, PAGE_TIMEOUT_S)
+        if problems or not isinstance(done, dict):
+            return [f"{label} outcome", *problems[:20]]
+        print(f"{label}={json.dumps(done, separators=(',', ':'))}", flush=True)
+        err = str(done.get("err") or "")
+        if op == "intersect" or err:
+            if op == "intersect" and ("empty" not in err or "kept" not in err):
+                problems.append(f"{label} message {err!r}")
+            elif op == "cut" and "kept" not in err:
+                problems.append(f"{label} message {err!r}")
+            if int(done.get("body") or 0) != 2:
+                problems.append(f"{label} bodyCount {done.get('body')!r}")
+            if int(done.get("undo") or 0) != before_depth:
+                problems.append(f"{label} undo {done.get('undo')!r} want {before_depth}")
+            if done.get("op"):
+                problems.append(f"{label} pushed op {done.get('op')!r}")
+            problems.extend(_pair_volume_problems(done, label))
+        elif done.get("op") == "cut" and int(done.get("body") or 0) == 1:
+            if int(done.get("undo") or 0) != before_depth + 1:
+                problems.append(f"{label} undo {done.get('undo')!r} want {before_depth + 1}")
+            if done.get("gate") is not True or done.get("units") is not True:
+                problems.append(f"{label} gate {done.get('gate')!r} units {done.get('units')!r}")
+            if not problems:
+                problems.extend(_undo_restores_pair(cdp, before_depth, "Cut"))
+        else:
+            problems.append(f"{label} unsettled {done!r}")
+        site = site_problems(cdp.events, origin, cdp.urls)
+        if site:
+            problems.extend(site[:10])
+        if problems:
+            return [label, *problems[:40]]
+        print(f"{label}: pass", flush=True)
+    return []
 
 
 def response_count(events: list[dict[str, Any]], origin: str) -> int:
@@ -6237,62 +6458,9 @@ def run(omit: list[str]) -> int:
                     failures.extend(stamp_found)
                     break
         if not failures:
-            for op in ("union", "cut", "intersect"):
-                url = origin + "/?pair=overlap"
-                print(f"load boolean_{op} {url}", flush=True)
-                started = time.time()
-                state, problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
-                if problems or not isinstance(state, dict):
-                    failures.append(f"boolean_{op} load")
-                    failures.extend(problems[:40])
-                    break
-                press_plain_4(cdp)
-                cdp.drain(0.4)
-                keyed = eval_state(cdp)
-                problems = site_problems(cdp.events, origin, cdp.urls)
-                problems.extend(smoke_notes(keyed))
-                keyed_state = (keyed or {}).get("state") if keyed else None
-                if not isinstance(keyed_state, dict):
-                    problems.append(f"boolean_{op}: no state after the 4 key")
-                else:
-                    state = keyed_state
-                    if state.get("selectionMode") != "item" or int(state.get("selectionCount") or 0) < 2:
-                        problems.append(
-                            f"boolean_{op}: expected two selected bodies after 4, "
-                            f"mode {state.get('selectionMode')!r} count {state.get('selectionCount')!r}"
-                        )
-                    order = state.get("selectionOrder") or []
-                    if len(order) < 2:
-                        problems.append(f"boolean_{op}: selection order {order!r}")
-                if problems:
-                    failures.append(f"boolean_{op} select")
-                    failures.extend(problems[:40])
-                    break
-                clicked = click_boolean(cdp, op)
-                if clicked != "clicked":
-                    failures.append(f"boolean_{op}: button {clicked}")
-                    break
-                done, problems = wait_boolean(cdp, origin, op, PAGE_TIMEOUT_S)
-                elapsed = time.time() - started
-                if not isinstance(done, dict):
-                    problems.append(f"boolean_{op}: no result state")
-                else:
-                    print(f"boolean_{op}={json.dumps(done, separators=(',', ':'))}", flush=True)
-                    if done.get("occtGate") is not True or done.get("gateOcct") != "PASS":
-                        problems.append(f"boolean_{op}: gate {done.get('gateOcct')!r}")
-                    if done.get("unitsPass") is not True:
-                        problems.append(f"boolean_{op}: units failed")
-                    if done.get("exportAllowed") is not True:
-                        problems.append(f"boolean_{op}: Export is not enabled")
-                    if int(done.get("bodyCount") or 0) != 1:
-                        problems.append(f"boolean_{op}: bodyCount {done.get('bodyCount')!r}")
-                    if done.get("booleanOp") != op:
-                        problems.append(f"boolean_{op}: op {done.get('booleanOp')!r}")
-                if problems:
-                    failures.append(f"boolean_{op} ({elapsed:.1f}s)")
-                    failures.extend(problems[:40])
-                    break
-                print(f"boolean_{op}: gate PASS, {elapsed:.1f}s", flush=True)
+            failures.extend(overlap_boolean_problems(cdp, origin))
+        if not failures:
+            failures.extend(disjoint_boolean_problems(cdp, origin))
         if not failures:
             try:
                 set_desktop(cdp)
