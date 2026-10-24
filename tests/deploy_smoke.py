@@ -4863,6 +4863,7 @@ SAVELOAD_EXPR = r"""
       for (var n = 0; n < before.length; n += 1) {
         if (after[n].name !== before[n].name) problems.push('name ' + before[n].name + ' vs ' + after[n].name);
         if (after[n].source !== 'parameters') problems.push('source ' + after[n].name + ' ' + after[n].source);
+        if (!after[n].params || typeof after[n].params !== 'object') problems.push('params ' + after[n].name);
         if (!near(after[n].volumeMm3, before[n].volumeMm3)) problems.push('volume ' + after[n].name + ' ' + after[n].volumeMm3);
         var keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
         for (var k = 0; k < keys.length; k += 1) {
@@ -4915,6 +4916,15 @@ SAVELOAD_EXPR = r"""
     var missingUnits = JSON.parse(saved.text);
     delete missingUnits.units;
     unchanged('missing units', hook.loadText(JSON.stringify(missingUnits), true));
+    var badVersion = JSON.parse(saved.text);
+    badVersion.version = 2;
+    var beforeVersion = clears;
+    var versionResult = hook.loadText(JSON.stringify(badVersion), true);
+    unchanged('version', versionResult);
+    if (!versionResult || versionResult.error !== 'This file version is not supported. The model was not changed.') {
+      problems.push('version error ' + (versionResult && versionResult.error));
+    }
+    if (clears !== beforeVersion) problems.push('version cleared undo');
     var beforeCancel = clears;
     unchanged('cancel', hook.loadText(saved.text, false));
     if (clears !== beforeCancel) problems.push('cancel cleared undo');
@@ -4922,6 +4932,316 @@ SAVELOAD_EXPR = r"""
     if (!clearOk) problems.push('clearUndo final did not reset the undo stack');
     var endState = window.__cadcamExportState || {};
     if (endState.undoDepth !== 0 || endState.redoDepth !== 0) problems.push('undo depth final ' + endState.undoDepth + '/' + endState.redoDepth);
+    var mmBtn = document.querySelector('[data-action="units"][data-unit="mm"]');
+    if (mmBtn) mmBtn.click();
+    function bodyCount() {
+      var st = window.__cadcamSketch && window.__cadcamSketch.state ? window.__cadcamSketch.state() : null;
+      return st ? st.bodies : -1;
+    }
+    function hintText() {
+      var hint = document.getElementById('statusHint');
+      return hint ? String(hint.textContent || '') : '';
+    }
+    function rowNamed(name) {
+      var rows = document.querySelectorAll('#partList .part-row');
+      for (var i = 0; i < rows.length; i++) {
+        var label = rows[i].querySelector('.part-name');
+        if (label && label.textContent === name) return rows[i];
+      }
+      return null;
+    }
+    function clearParts() {
+      var guard = 0;
+      while (guard < 12) {
+        var on = document.querySelector('#partList .part-row.is-on');
+        if (!on) break;
+        on.click();
+        guard += 1;
+      }
+    }
+    function setMaterial(name, value) {
+      clearParts();
+      var row = rowNamed(name);
+      if (!row) { problems.push('material row ' + name); return false; }
+      row.click();
+      var sel = document.getElementById('partMaterial');
+      if (!sel) { problems.push('partMaterial missing'); return false; }
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    function tagOf(name) {
+      var row = rowNamed(name);
+      if (!row || typeof window.__cadcamPartColor !== 'function') return '';
+      var color = window.__cadcamPartColor(row.getAttribute('data-part-id'));
+      return color && color.tag ? color.tag : '';
+    }
+    function storedMaterial(name) {
+      var pub = window.__cadcamExportState || {};
+      var names = pub.projectNames || [];
+      var materials = pub.assemblyMaterials || [];
+      for (var i = 0; i < names.length; i++) if (names[i] === name) return materials[i];
+      return '';
+    }
+    function deleteAll(label) {
+      var guard = 0;
+      while (guard < 6) {
+        var count = bodyCount();
+        if (!count) return true;
+        var item = document.querySelector('[data-action="select"][data-mode="item"]');
+        if (!item) { problems.push(label + ' item missing'); return false; }
+        item.click();
+        var del = document.getElementById('deleteBtn');
+        if (!del) { problems.push(label + ' delete missing'); return false; }
+        del.click();
+        if (bodyCount() >= count) {
+          problems.push(label + ' stuck ' + bodyCount() + ' ' + hintText());
+          return false;
+        }
+        guard += 1;
+      }
+      if (bodyCount()) problems.push(label + ' left ' + bodyCount());
+      return bodyCount() === 0;
+    }
+    function clickCreate(kind) {
+      var menu = document.getElementById('createMenu');
+      if (!menu || menu.hidden) {
+        var openers = document.querySelectorAll('[data-action="createMenu"]');
+        var opener = null;
+        for (var i = 0; i < openers.length; i++) {
+          var st = getComputedStyle(openers[i]);
+          var r = openers[i].getBoundingClientRect();
+          if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
+          opener = openers[i];
+          break;
+        }
+        if (!opener) { problems.push('create opener hidden'); return false; }
+        opener.click();
+      }
+      menu = document.getElementById('createMenu');
+      var button = menu ? menu.querySelector('[data-action="primitive"][data-kind="' + kind + '"]') : null;
+      if (!button) { problems.push('missing create ' + kind); return false; }
+      button.click();
+      return true;
+    }
+    function visibleClick(selector) {
+      var nodes = document.querySelectorAll(selector);
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        if (!el || (el.closest && el.closest('[hidden]'))) continue;
+        var st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') continue;
+        var r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue;
+        el.click();
+        return true;
+      }
+      return false;
+    }
+    function openTools() {
+      if (!visibleClick('[data-action="toolsMenu"]')) { problems.push('tools opener hidden'); return false; }
+      var tools = document.getElementById('toolsSheet');
+      if (!tools || tools.hidden) { problems.push('tools sheet hidden'); return false; }
+      return true;
+    }
+    function sheetBtn(name) {
+      var buttons = document.querySelectorAll('#sheetTools button');
+      for (var i = 0; i < buttons.length; i++) {
+        var span = buttons[i].querySelector('span');
+        if (span && span.textContent === name) return buttons[i];
+      }
+      return null;
+    }
+    function setMm(id, value) {
+      var el = document.getElementById(id);
+      if (!el) { problems.push('missing ' + id); return; }
+      el.value = value;
+    }
+    function boundKeys() { return ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax']; }
+    function roundTrip(label, expectName, expectVolume) {
+      var before = hook.measures();
+      if (!before || before.length !== 1) { problems.push(label + ' count ' + (before && before.length)); return; }
+      if (before[0].name !== expectName) problems.push(label + ' name ' + before[0].name);
+      if (!near(before[0].volumeMm3, expectVolume)) problems.push(label + ' volume ' + before[0].volumeMm3);
+      var savedOp = hook.saveText();
+      if (!savedOp || savedOp.ok !== true) { problems.push(label + ' save ' + (savedOp && savedOp.error)); return; }
+      var opDoc = JSON.parse(savedOp.text);
+      if (opDoc.units !== 'mm' || opDoc.version !== 1) problems.push(label + ' header');
+      if (!opDoc.parts || opDoc.parts.length !== 1) { problems.push(label + ' parts'); return; }
+      if (opDoc.parts[0].primitive !== null) problems.push(label + ' primitive');
+      if (opDoc.parts[0].name !== expectName) problems.push(label + ' part name ' + opDoc.parts[0].name);
+      var loadedOp = hook.loadText(savedOp.text, true);
+      if (!loadedOp || loadedOp.ok !== true) { problems.push(label + ' load ' + (loadedOp && loadedOp.error)); return; }
+      var afterOp = hook.measures();
+      if (!afterOp || afterOp.length !== 1) { problems.push(label + ' reload count'); return; }
+      if (afterOp[0].name !== before[0].name) problems.push(label + ' reload name ' + afterOp[0].name);
+      if (afterOp[0].source !== 'brep') problems.push(label + ' source ' + afterOp[0].source);
+      if (afterOp[0].params !== null) problems.push(label + ' params');
+      if (!near(afterOp[0].volumeMm3, before[0].volumeMm3)) problems.push(label + ' drift ' + afterOp[0].volumeMm3);
+      var keys = boundKeys();
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        if (!afterOp[0].bounds || !before[0].bounds || !near(afterOp[0].bounds[key], before[0].bounds[key])) {
+          problems.push(label + ' bound ' + key);
+        }
+      }
+    }
+    function makeOverlapPair(label) {
+      if (!deleteAll(label + ' clear')) return false;
+      if (!clickCreate('box') || !clickCreate('box')) return false;
+      if (bodyCount() !== 2) { problems.push(label + ' bodies ' + bodyCount()); return false; }
+      return true;
+    }
+    function clickBoolean(op) {
+      var item = document.querySelector('[data-action="select"][data-mode="item"]');
+      if (!item) { problems.push(op + ' item missing'); return false; }
+      item.click();
+      var buttons = document.querySelectorAll('[data-action="boolean"][data-op="' + op + '"]');
+      var picked = null;
+      for (var i = 0; i < buttons.length; i++) if (!buttons[i].disabled) { picked = buttons[i]; break; }
+      if (!picked) {
+        var pub = window.__cadcamExportState || {};
+        problems.push(op + ' disabled sel ' + pub.selectionMode + ' ' + pub.selectionCount);
+        return false;
+      }
+      picked.click();
+      if (bodyCount() !== 1) { problems.push(op + ' result ' + bodyCount() + ' ' + hintText()); return false; }
+      return true;
+    }
+    var matRows = hook.measures() || [];
+    var boxName = '';
+    var cylName = '';
+    for (var mi = 0; mi < matRows.length; mi++) {
+      if (!boxName && matRows[mi].name.indexOf('Box') === 0) boxName = matRows[mi].name;
+      if (!cylName && matRows[mi].name.indexOf('Cylinder') === 0) cylName = matRows[mi].name;
+    }
+    if (!boxName || !cylName) problems.push('material names ' + boxName + ' ' + cylName);
+    else if (setMaterial(boxName, 'PETG') && setMaterial(cylName, 'TPU')) {
+      var namesBeforePla = ((window.__cadcamExportState || {}).projectNames || []).slice();
+      if (!clickCreate('box')) problems.push('pla create');
+      else {
+        var namesAfterPla = (window.__cadcamExportState || {}).projectNames || [];
+        var plaName = '';
+        for (var pi = 0; pi < namesAfterPla.length; pi++) {
+          if (namesBeforePla.indexOf(namesAfterPla[pi]) < 0) plaName = namesAfterPla[pi];
+        }
+        if (!plaName) problems.push('pla name ' + namesAfterPla.join(','));
+        else if (storedMaterial(boxName) !== 'PETG' || storedMaterial(cylName) !== 'TPU' || storedMaterial(plaName) !== 'PLA') {
+          problems.push('material live ' + storedMaterial(boxName) + ' ' + storedMaterial(cylName) + ' ' + storedMaterial(plaName));
+        } else {
+          var matSaved = hook.saveText();
+          if (!matSaved || matSaved.ok !== true) problems.push('material save');
+          else {
+            var matDoc = JSON.parse(matSaved.text);
+            var matByName = {};
+            for (var mp = 0; mp < matDoc.parts.length; mp++) matByName[matDoc.parts[mp].name] = matDoc.parts[mp].material;
+            if (matByName[boxName] !== 'PETG' || matByName[cylName] !== 'TPU' || matByName[plaName] !== 'PLA') {
+              problems.push('material file ' + JSON.stringify(matByName));
+            }
+            hook.setDirty(true);
+            var missingMat = JSON.parse(matSaved.text);
+            delete missingMat.parts[0].material;
+            var missingMatResult = hook.loadText(JSON.stringify(missingMat), true);
+            if (!missingMatResult || missingMatResult.unchanged !== true || missingMatResult.ok !== false) problems.push('missing material result');
+            if (!missingMatResult || missingMatResult.error !== 'This file could not be read. The model was not changed.') {
+              problems.push('missing material error ' + (missingMatResult && missingMatResult.error));
+            }
+            if (hook.dirty() !== true) problems.push('missing material dirty');
+            if (storedMaterial(boxName) !== 'PETG' || storedMaterial(plaName) !== 'PLA') problems.push('missing material changed model');
+            var matLoaded = hook.loadText(matSaved.text, true);
+            if (!matLoaded || matLoaded.ok !== true) problems.push('material load ' + (matLoaded && matLoaded.error));
+            else if (storedMaterial(boxName) !== 'PETG' || storedMaterial(cylName) !== 'TPU' || storedMaterial(plaName) !== 'PLA') {
+              problems.push('material reload ' + storedMaterial(boxName) + ' ' + storedMaterial(cylName) + ' ' + storedMaterial(plaName));
+            } else if (tagOf(boxName) !== 'PETG' || tagOf(cylName) !== 'TPU' || tagOf(plaName) !== 'PLA') {
+              problems.push('material tag ' + tagOf(boxName) + ' ' + tagOf(cylName) + ' ' + tagOf(plaName));
+            } else {
+              var matAfter = hook.measures() || [];
+              for (var mr = 0; mr < matAfter.length; mr++) {
+                if (matAfter[mr].source !== 'parameters' || !matAfter[mr].params) problems.push('material source ' + matAfter[mr].name + ' ' + matAfter[mr].source);
+              }
+              var defaultDoc = JSON.parse(matSaved.text);
+              for (var md = 0; md < defaultDoc.parts.length; md++) {
+                if (defaultDoc.parts[md].name === plaName) defaultDoc.parts[md].material = 'default';
+              }
+              var defaultLoaded = hook.loadText(JSON.stringify(defaultDoc), true);
+              if (!defaultLoaded || defaultLoaded.ok !== true) problems.push('default material load');
+              else if (storedMaterial(plaName) !== 'default' || tagOf(plaName) !== 'PLA') {
+                problems.push('default material ' + storedMaterial(plaName) + ' tag ' + tagOf(plaName));
+              } else if (storedMaterial(boxName) !== 'PETG' || tagOf(boxName) !== 'PETG' || storedMaterial(cylName) !== 'TPU' || tagOf(cylName) !== 'TPU') {
+                problems.push('default siblings ' + storedMaterial(boxName) + ' ' + storedMaterial(cylName));
+              }
+            }
+          }
+        }
+      }
+    }
+    if (makeOverlapPair('union') && clickBoolean('union')) roundTrip('union', 'Union 1', 12000);
+    if (makeOverlapPair('cut') && clickBoolean('cut')) roundTrip('cut', 'Cut 1', 4000);
+    if (!deleteAll('extrude clear')) {
+      /* deleteAll already recorded why the scene was not empty */
+    } else if (!visibleClick('[data-action="createMenu"]')) {
+      problems.push('extrude create hidden');
+    } else {
+      var sketchMenu = document.getElementById('createMenu');
+      var sketchItem = sketchMenu ? sketchMenu.querySelector('[data-action="newSketch"]') : null;
+      if (!sketchItem) problems.push('extrude sketch missing');
+      else {
+        sketchItem.click();
+        var sketchState = window.__cadcamSketch.state();
+        if (!sketchState || sketchState.bodies !== 0 || sketchState.tab !== 'sketch') {
+          problems.push('extrude sketch start ' + (sketchState && sketchState.tab) + ' ' + (sketchState && sketchState.bodies));
+        } else {
+          var topPlane = document.querySelector('#originPlanes [data-plane="xy"]');
+          if (!topPlane) problems.push('extrude top missing');
+          else {
+            topPlane.click();
+            sketchState = window.__cadcamSketch.state();
+            if (!sketchState || sketchState.originPlane !== 'xy') problems.push('extrude plane ' + (sketchState && sketchState.originPlane));
+            else if (openTools()) {
+              var rectBtn = sheetBtn('Rectangle');
+              if (!rectBtn) problems.push('extrude rectangle missing');
+              else {
+                rectBtn.click();
+                setMm('sketchL', '10');
+                setMm('sketchW', '10');
+                var confirmBtn = document.getElementById('sketchConfirm');
+                if (!confirmBtn || confirmBtn.disabled) problems.push('extrude rect confirm ' + hintText());
+                else {
+                  confirmBtn.click();
+                  sketchState = window.__cadcamSketch.state();
+                  if (!sketchState || sketchState.profile !== 'rect' || sketchState.closed !== true) {
+                    problems.push('extrude profile ' + (sketchState && sketchState.profile));
+                  } else {
+                    var finishBtn = document.querySelector('#finishBar [data-action="finishSketch"]');
+                    if (finishBtn) finishBtn.click();
+                    else problems.push('extrude finish missing');
+                    if (openTools()) {
+                      var extBtn = sheetBtn('Extrude (Push/Pull)');
+                      if (!extBtn) problems.push('extrude tool missing');
+                      else {
+                        extBtn.click();
+                        setMm('sketchDepth', '10');
+                        var newMode = document.querySelector('#sketchModeRow [data-mode="new"]');
+                        if (newMode && !newMode.classList.contains('is-on')) newMode.click();
+                        confirmBtn = document.getElementById('sketchConfirm');
+                        if (!confirmBtn || confirmBtn.disabled) problems.push('extrude confirm ' + hintText());
+                        else {
+                          confirmBtn.click();
+                          sketchState = window.__cadcamSketch.state();
+                          if (!sketchState || sketchState.bodies !== 1 || !sketchState.bounds || sketchState.bounds.kind !== 'extrude') {
+                            problems.push('extrude kind ' + (sketchState && sketchState.bounds && sketchState.bounds.kind) + ' bodies ' + (sketchState && sketchState.bodies) + ' ' + hintText());
+                          } else roundTrip('extrude', 'Extrude 1', 1000);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   } catch (err2) {
     problems.push(err2 && err2.message ? err2.message : String(err2));
   }
@@ -5085,7 +5405,7 @@ def run_saveload(cdp: Cdp, origin: str) -> list[str]:
     cover = coverage_problems(cdp, False)
     if cover:
         return [f"saveload {item}" for item in cover]
-    raw, err = eval_expr(cdp, SAVELOAD_EXPR, timeout=180)
+    raw, err = eval_expr(cdp, SAVELOAD_EXPR, timeout=300)
     if err or not isinstance(raw, str):
         return [f"saveload eval {raw or err}"]
     try:
@@ -6046,11 +6366,16 @@ def boolean_unique_names_problems(cdp: Cdp, origin: str) -> list[str]:
         "if(second!=='cut') return JSON.stringify({error:second,names:names()});"
         "var afterSecond=names().slice();"
         "var h=window.__cadcamProject;"
+        "var before=h&&h.measures?h.measures():[];"
         "var saved=h&&h.saveText?h.saveText():null;"
         "if(!saved||saved.ok!==true) return JSON.stringify({error:saved&&saved.error||'save',names:afterSecond});"
+        "var doc=null; try { doc=JSON.parse(saved.text); } catch (e) { doc=null; }"
+        "var prims=[];"
+        "if(doc&&doc.parts){for(var p=0;p<doc.parts.length;p++) prims.push(doc.parts[p].primitive);}"
         "var loaded=h.loadText(saved.text,true);"
         "if(!loaded||loaded.ok!==true) return JSON.stringify({error:loaded&&loaded.error||'load',names:afterSecond});"
-        "return JSON.stringify({first:afterFirst,second:afterSecond,reloaded:(window.__cadcamExportState||{}).projectNames||[]});"
+        "var after=h.measures?h.measures():[];"
+        "return JSON.stringify({first:afterFirst,second:afterSecond,reloaded:(window.__cadcamExportState||{}).projectNames||[],before:before,after:after,prims:prims});"
         "})()",
         timeout=180,
     )
@@ -6069,6 +6394,36 @@ def boolean_unique_names_problems(cdp: Cdp, origin: str) -> list[str]:
         return [f"bool names duplicate {second}"]
     if reloaded != second:
         return [f"bool names reload {reloaded} vs {second}"]
+    before_rows = named.get("before") if isinstance(named.get("before"), list) else []
+    after_rows = named.get("after") if isinstance(named.get("after"), list) else []
+    prims = named.get("prims") if isinstance(named.get("prims"), list) else []
+    if len(before_rows) != len(second) or len(after_rows) != len(second) or len(prims) != len(second):
+        return [f"bool names measures {len(before_rows)} {len(after_rows)} {len(prims)}"]
+    bound_keys = ("xmin", "ymin", "zmin", "xmax", "ymax", "zmax")
+    for index, (before_row, after_row) in enumerate(zip(before_rows, after_rows)):
+        if not isinstance(before_row, dict) or not isinstance(after_row, dict):
+            return [f"bool names row {index}"]
+        if before_row.get("name") != second[index] or after_row.get("name") != second[index]:
+            return [f"bool names measure {before_row.get('name')!r} {after_row.get('name')!r}"]
+        try:
+            same_volume = abs(float(after_row.get("volumeMm3")) - float(before_row.get("volumeMm3"))) <= 0.01
+        except (TypeError, ValueError):
+            same_volume = False
+        if not same_volume:
+            return [f"bool names volume {after_row.get('name')} {after_row.get('volumeMm3')!r} {before_row.get('volumeMm3')!r}"]
+        before_bounds = before_row.get("bounds") if isinstance(before_row.get("bounds"), dict) else {}
+        after_bounds = after_row.get("bounds") if isinstance(after_row.get("bounds"), dict) else {}
+        for key in bound_keys:
+            try:
+                same_bound = abs(float(after_bounds.get(key)) - float(before_bounds.get(key))) <= 0.01
+            except (TypeError, ValueError):
+                same_bound = False
+            if not same_bound:
+                return [f"bool names bound {after_row.get('name')} {key}"]
+        if prims[index] is not None:
+            return [f"bool names primitive {before_row.get('name')!r}"]
+        if after_row.get("source") != "brep" or after_row.get("params") is not None:
+            return [f"bool names brep {after_row.get('name')!r} {after_row.get('source')!r} {after_row.get('params')!r}"]
     print("boolean unique names pass", flush=True)
     return []
 

@@ -1069,6 +1069,133 @@ projectInches.units = 'in';
 expect('project wrong units', projectFile.parseProject(JSON.stringify(projectInches)).error === projectFile.ERR_UNITS);
 delete projectInches.units;
 expect('project missing units', projectFile.parseProject(JSON.stringify(projectInches)).error === projectFile.ERR_UNITS);
+if (projectWritten.ok) {
+  const projectVersion = JSON.parse(projectWritten.text);
+  projectVersion.version = 2;
+  expect('project version 2', projectFile.parseProject(JSON.stringify(projectVersion)).error === projectFile.ERR_VERSION);
+  const projectMissingMaterial = JSON.parse(projectWritten.text);
+  delete projectMissingMaterial.parts[0].material;
+  expect(
+    'project missing material',
+    projectFile.parseProject(JSON.stringify(projectMissingMaterial)).error === projectFile.ERR_READ
+  );
+  const projectDefaultMaterial = JSON.parse(projectWritten.text);
+  projectDefaultMaterial.parts[0].material = 'default';
+  const projectDefaultParsed = projectFile.parseProject(JSON.stringify(projectDefaultMaterial));
+  expect(
+    'project default material',
+    projectDefaultParsed.ok === true && projectDefaultParsed.doc.parts[0].material === 'default'
+  );
+  const extrudeShape = ops.makeBoxSolid(oc, 10, 10, 10, [0, 0, 0]);
+  const extrudeWritten = extrudeShape
+    ? projectFile.documentFromBodies(oc, [{
+      name: 'Extrude 1',
+      kind: 'extrude',
+      params: { depthMm: 10, profile: 'rect', lengthMm: 10, widthMm: 10, units: 'mm' },
+      shape: extrudeShape,
+      material: 'PLA',
+      features: [],
+    }])
+    : { ok: false, error: 'shape' };
+  expect('extrude save', extrudeWritten.ok === true);
+  if (extrudeWritten.ok) {
+    const extrudeDoc = JSON.parse(extrudeWritten.text);
+    expect('extrude primitive null', extrudeDoc.parts.length === 1 && extrudeDoc.parts[0].primitive === null);
+    const extrudeParsed = projectFile.parseProject(extrudeWritten.text);
+    const extrudeLoaded = extrudeParsed.ok
+      ? projectFile.loadShapes(oc, extrudeParsed.doc, { normalizeBox, normalizeCylinder, normalizeDisc }, ops)
+      : { ok: false, parts: [] };
+    expect('extrude load ' + (extrudeLoaded.error || ''), extrudeLoaded.ok === true && extrudeLoaded.parts.length === 1);
+    if (extrudeLoaded.ok) {
+      const extrudePart = extrudeLoaded.parts[0];
+      const extrudeBefore = projectFile.measureShape(oc, extrudeShape);
+      const extrudeAfter = projectFile.measureShape(oc, extrudePart.shape);
+      expect(
+        'extrude source ' + extrudePart.source + ' ' + extrudeAfter.volumeMm3,
+        extrudePart.source === 'brep' && extrudePart.params === null && extrudePart.kind === 'brep'
+          && projectNear(extrudeBefore.volumeMm3, extrudeAfter.volumeMm3)
+          && projectNear(extrudeAfter.volumeMm3, 1000)
+      );
+      releaseProjectShape(extrudePart.shape);
+    }
+  }
+  releaseProjectShape(extrudeShape);
+  const filletShape = ops.makeBoxSolid(oc, 20, 20, 20, [-10, -10, 0]);
+  const filletWritten = filletShape
+    ? projectFile.documentFromBodies(oc, [{
+      name: 'Box',
+      kind: 'box',
+      params: projectBoxParams,
+      shape: filletShape,
+      material: 'PLA',
+      features: [{ kind: 'fillet', faces: [1] }],
+    }])
+    : { ok: false, error: 'shape' };
+  expect(
+    'fillet primitive null',
+    filletWritten.ok === true && JSON.parse(filletWritten.text).parts[0].primitive === null
+  );
+  if (filletWritten.ok) {
+    const filletLoaded = projectFile.loadShapes(
+      oc,
+      projectFile.parseProject(filletWritten.text).doc,
+      { normalizeBox, normalizeCylinder, normalizeDisc },
+      ops
+    );
+    expect(
+      'fillet load ' + (filletLoaded.error || ''),
+      filletLoaded.ok === true && filletLoaded.parts[0]
+        && filletLoaded.parts[0].source === 'brep' && filletLoaded.parts[0].params === null
+    );
+    if (filletLoaded.ok) {
+      expect('fillet volume', projectNear(projectFile.measureShape(oc, filletLoaded.parts[0].shape).volumeMm3, 8000));
+      filletLoaded.parts.forEach(function (part) { releaseProjectShape(part.shape); });
+    }
+  }
+  releaseProjectShape(filletShape);
+  const discParams = normalizeDisc(null);
+  const discHeight = discParams.thickness;
+  const discShape = ops.makeCylinderSolid(oc, discParams.diameter / 2, discHeight, [
+    discParams.cx,
+    discParams.cy,
+    discParams.cz - discHeight / 2,
+  ], [0, 0, 1]);
+  const discWritten = discShape
+    ? projectFile.documentFromBodies(oc, [{
+      name: 'Disc',
+      kind: 'disc',
+      params: discParams,
+      shape: discShape,
+      material: 'PLA',
+      features: [],
+    }])
+    : { ok: false, error: 'shape' };
+  expect(
+    'disc primitive kept',
+    discWritten.ok === true && discWritten.text
+      && JSON.parse(discWritten.text).parts[0].primitive
+      && JSON.parse(discWritten.text).parts[0].primitive.kind === 'disc'
+  );
+  if (discWritten.ok) {
+    const discLoaded = projectFile.loadShapes(
+      oc,
+      projectFile.parseProject(discWritten.text).doc,
+      { normalizeBox, normalizeCylinder, normalizeDisc },
+      ops
+    );
+    expect(
+      'disc source ' + (discLoaded.error || ''),
+      discLoaded.ok === true && discLoaded.parts[0]
+        && discLoaded.parts[0].source === 'parameters' && !!discLoaded.parts[0].params
+    );
+    if (discLoaded.ok) {
+      const discAfter = projectFile.measureShape(oc, discLoaded.parts[0].shape);
+      expect('disc volume', projectNear(discAfter.volumeMm3, projectFile.measureShape(oc, discShape).volumeMm3));
+      discLoaded.parts.forEach(function (part) { releaseProjectShape(part.shape); });
+    }
+  }
+  releaseProjectShape(discShape);
+}
 releaseProjectShape(projectBox);
 releaseProjectShape(projectCyl);
 

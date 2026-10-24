@@ -8902,11 +8902,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (!held.shape) continue;
       const measured = projectApi.measureShape(oc, held.shape);
       if (held.owned) dropShape(held.shape);
+      let params = null;
+      if (body.params) {
+        try { params = JSON.parse(JSON.stringify(body.params)); } catch (_err) { params = body.params; }
+      }
       rows.push({
         name: body.name,
         volumeMm3: measured.volumeMm3,
         bounds: measured.bounds,
-        source: body.source || ''
+        source: body.source || '',
+        params: params
       });
     }
     return rows;
