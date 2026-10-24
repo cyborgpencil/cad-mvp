@@ -4,6 +4,10 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #46 (merged at 2a9fc31): web/PROGRESS.md notes P2 UI-gap digest is on main via #43; parked prose removed.
+- 2026-10-24 PR #44 (merged at cc81eff): P4 shelf show/hide locks + prompts/p4-tool-shelf-show-hide.md, and P5 measure/callouts decisions in web/PROGRESS.md.
+- 2026-10-24 PR #43 (merged at 4fd4dbe): research/gui/ui-gap-p2.md P2 UI-gap digest vs Fusion/similar, with research/INDEX.md line.
+- 2026-10-24 PR #42 (merged at f4d8c16): UPDATES.md one-liners for #40, #21, #22, #24, #31, #41, #34, and #37.
 - 2026-10-24 PR #37 (merged at a688c71): countersink default 90° (ISO 10642) in web/occt-ops.mjs and the hole angle field, occt_gate assert updated, and edge_fillet_smoke registered in CTest.
 - 2026-10-24 PR #34 (merged at 540cc07): phone fillet and chamfer on picked edges, edge_fillet_smoke.py, and related web/phone-select wiring.
 - 2026-10-24 PR #41 (merged at a8d3ac1): AGENTS.md and ORGANIZATION.md log the stuck+backup standing rule (Chief + 3T, 2026-10-24).
