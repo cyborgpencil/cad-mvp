@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #108 (merged at a5f4763): web - click-click sketch line (N≥3 Confirm → MakeFace/extrude; T1-T6).
 - 2026-10-24 PR #104 (merged at 3b485f8): web - BREP-only save/load for boolean, fillet, and extrude (T1-T6).
 - 2026-10-24 PR #102 (merged at dae25ad): docs - prompts/project-save-load-extend.md (save/load BREP-only T1-T6 GB feed).
 - 2026-10-24 PR #100 (merged at 0c4c220): research - save/load BREP-only round-trip prep (T1-T6).
