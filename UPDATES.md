@@ -4,6 +4,9 @@
 Newest entries at the top.
 
 ## 2026-10-23
+- 2026-10-23 PR #32 (merged at 8501f93): adds PR #31 (phone selection) to the Pages previews at /cad-mvp/pr31/ with the needs-review banner, since #31 is stacked on #24, which carries #20's C++.
+- 2026-10-23 PR #30 (merged at e5e603c): adds PR #20 to the Pages previews at /cad-mvp/pr20/ with the needs-review banner, for Erik's phone check.
+- 2026-10-23 PR #29 (merged at 2df266e): AGENTS.md says mobile test links come only from https://cyborgpencil.github.io/cad-mvp/ (no LAN or localhost), and it logs #28's UPDATES line.
 - 2026-10-23 PR #28 (merged at 42ab446): previews refresh only on main pushes, the daily run or a manual run (no PR-branch trigger), and all four carry the needs-review banner because they include #20's C++.
 - 2026-10-23 PR #27 (merged at 1ea5741): Pages now also publishes each listed open PR at /cad-mvp/prN/, each from its own build, with a preview index at /cad-mvp/previews/. The root main build is unchanged. A guard step blocks fixtures, builds/ files and secrets. The PR list lives in .github/preview-prs.txt.
 - 2026-10-23 PR #23 (merged at cb6a942): research/touch-gestures.md, a sourced digest of touch swipe gestures in Onshape, Shapr3D and Nomad (plus MDN pointer and touch-action notes), with its INDEX line. A follow-up PR fixes its dates and describes main as it is.
