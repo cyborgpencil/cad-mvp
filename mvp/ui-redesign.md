@@ -109,7 +109,7 @@ All web-only, in the pointer handler in `web/index.html`; no C++. Sources: [Onsh
 ## Phone selection (team-chosen by 3T and the Chief 2026-10-23; Erik reviews afterward)
 Needed for Erik's phone acceptance test (picked edges for fillet and chamfer, Booleans, and deleting solids and sub-elements). JS only, on `feat/phone-selection`.
 - Tap to select: tapping a body selects it; tapping empty space clears the selection. A drag never selects.
-- Pick modes: a bottom-bar chip switches between Body, Face, Edge and Vertex. No long press, to avoid iOS clashes. Edge mode uses a larger touch tolerance, recorded in `PROGRESS.md` (TBD until set).
+- Pick modes: a bottom-bar chip switches between Body, Face, Edge and Vertex. No long press, to avoid iOS clashes. Edge mode uses a 32 px touch tolerance (the general touch pick is 20 px), team-chosen and recorded in `web/PROGRESS.md`.
 - Multi toggle: adds or removes items from the selection, for Booleans.
 - Delete: removes whatever is selected; undo and redo cover it.
 - Feedback: the selection has a clear highlight, and the panel shows the selected count.
