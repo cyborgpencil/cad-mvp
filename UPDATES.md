@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #83 (merged at 99063c9): Extrude Join/Cut - New/Join/Cut chips, one commitSketchExtrude + fuseShapes/cutShapes (T1-T5; JS + deploy/phone smoke).
 - 2026-10-24 PR #80 (merged at 9fce2a8): docs - prompts/extrude-join-cut.md (T1-T5 Extrude Join/Cut GB feed).
 - 2026-10-24 PR #79 (merged at 23aee4c): research/gui/extrude-join-cut.md + INDEX - Extrude Join/Cut prep (T1-T5 locks).
 - 2026-10-24 PR #77 (merged at 347888e): web - origin-plane picker when document has no body (T1-T5; Top/Front/Right; Blind 10 mm).
