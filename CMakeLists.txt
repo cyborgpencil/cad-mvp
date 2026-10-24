@@ -33,6 +33,7 @@ add_library(export_mesh
     src/export/box.cpp
     src/export/stl.cpp
     src/export/threemf.cpp
+    src/export/bed_orient.cpp
     src/export/export_files.cpp
     src/export/gate.cpp
 )
@@ -126,6 +127,24 @@ elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
 else()
     message(STATUS "view_cube skipped locally: Node was not found.")
 endif()
+
+# Single-body bed pose. tests/test_bed_orient.mjs exits 77 when libcascade
+# is missing and CI is unset. The solid is a synthetic L, not a fixture.
+if(CADCAM_NODE)
+    add_test(NAME bed_orient COMMAND "${CADCAM_NODE}" "${CMAKE_SOURCE_DIR}/tests/test_bed_orient.mjs")
+    set_tests_properties(bed_orient PROPERTIES
+        TIMEOUT 180
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+    message(FATAL_ERROR
+        "bed_orient requires Node. CI must not skip this test when libcascade or Node is missing.")
+else()
+    message(STATUS
+        "bed_orient skipped locally: Node was not found (would be SKIP_RETURN_CODE 77).")
+endif()
+
 
 # Pages file set in headless Edge/Chromium. The script exits 77 only when
 # the browser or libcascade is missing and CI is unset. CI must not skip.
