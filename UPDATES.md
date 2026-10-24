@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-24
+- 2026-10-24 PR #66 (merged at d3faf0f): web/PROGRESS.md - P5b #64 on main; P5c sketch unblocked (Blind 10 mm).
+- 2026-10-24 PR #64 (merged at 7bcb81d): P5b live callouts - edit-scoped LxWxH / OxH (disc OxT) HTML overlays, tappable >=44 px (JS + deploy_smoke; no P5c).
 - 2026-10-24 PR #60 (merged at ec00e2f): P5a Measure - two-point distance, one-edge polyline length, volume via state.volumeMm3 (JS + deploy_smoke; no P5b/P5c).
 - 2026-10-24 PR #61 (merged at 6420f61): web/PROGRESS.md - P3 #58 and P4 #54 on main; roughness 0.6; P5a Pilot building.
 - 2026-10-24 PR #58 (merged at aa36137): P3 flatter Fusion-like default shaders - bodyMat metalness 0, roughness 0.6 (JS-only web/).
