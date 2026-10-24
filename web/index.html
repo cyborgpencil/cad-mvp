@@ -460,6 +460,23 @@
     border-color: var(--active-border);
     color: var(--ink);
   }
+  .extrude-modes[hidden] { display: none !important; }
+  .extrude-modes button {
+    flex: 1 1 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    border: 1px solid var(--line);
+    font-weight: 650;
+  }
+  .extrude-modes button.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+    color: var(--ink);
+  }
   .workspace {
     flex: 1;
     min-height: 0;
@@ -1923,7 +1940,7 @@
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
         <button type="button" class="tool-btn wide" id="createDesktop" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
-        <button type="button" class="tool-btn" data-action="sketchExtrude" data-tool="Extrude (Push/Pull)" title="Extrude. Blind distance, default 10 mm. New body."><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
+        <button type="button" class="tool-btn" data-action="sketchExtrude" data-tool="Extrude (Push/Pull)" title="Extrude. Blind distance, default 10 mm. New, Join, or Cut."><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
         <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
       <div class="group"><div class="group-btns">
@@ -2171,6 +2188,11 @@
       </div>
       <div id="sketchSheet" class="edge-sheet sketch-sheet" hidden>
         <p id="sketchNote" class="edge-note">Rectangle</p>
+        <div class="edge-sheet-row extrude-modes" id="sketchModeRow" hidden role="group" aria-label="Extrude mode">
+          <button type="button" data-action="sketchExtrudeMode" data-mode="new" data-tool="Extrude New" title="New body" aria-pressed="true">New</button>
+          <button type="button" data-action="sketchExtrudeMode" data-mode="join" data-tool="Extrude Join" title="Join the prism into one body" aria-pressed="false">Join</button>
+          <button type="button" data-action="sketchExtrudeMode" data-mode="cut" data-tool="Extrude Cut" title="Cut the prism from one body" aria-pressed="false">Cut</button>
+        </div>
         <div class="edge-sheet-row" id="sketchRectRow">
           <label class="edge-size" title="Length in millimetres"><span>L</span><input id="sketchL" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Length mm"><span>mm</span></label>
           <label class="edge-size" title="Width in millimetres"><span>W</span><input id="sketchW" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Width mm"><span>mm</span></label>
@@ -2577,7 +2599,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     'Trim': { title: 'Trim', sub: 'Sketch tool', kv: [['Mode', 'first hit']] },
     'Offset': { title: 'Offset', sub: 'Sketch tool', kv: [['Distance', 2, 'len']] },
     'Dimension': { title: 'Dimension', sub: 'Sketch tool', kv: [['Value', 20, 'len']] },
-    'Extrude (Push/Pull)': { title: 'Extrude', sub: 'Blind distance. New body.', kv: [['Distance', 10, 'len']] },
+    'Extrude (Push/Pull)': { title: 'Extrude', sub: 'Blind distance. New, Join, or Cut.', kv: [['Distance', 10, 'len']] },
     'Inset': { title: 'Inset', sub: 'Model tool', kv: [['Distance', 2, 'len']] },
     'Fillet': { title: 'Fillet', sub: 'Rounds selected edges', kv: [['Radius', 2, 'len']] },
     'Loop Cut': { title: 'Loop Cut', sub: 'Model tool', kv: [['Cuts', '1']] },
@@ -2639,6 +2661,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     sketchPlane: null,
     sketchProfile: null,
     sketchSheetMode: '',
+    sketchExtrudeMode: 'new',
     projectDirty: false,
     projectError: '',
     projectApplying: false,
@@ -9552,6 +9575,244 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     sketchProfileLine.visible = true;
   }
 
+  // T2: no bodies, or an origin plane (no faceId), opens on New. A face opens on Join.
+  function defaultSketchExtrudeMode() {
+    if (state.bodies.length === 0) return 'new';
+    if (state.sketchPlane && state.sketchPlane.faceId) return 'join';
+    return 'new';
+  }
+
+  function paintExtrudeModes() {
+    const row = document.getElementById('sketchModeRow');
+    if (!row) return;
+    const mode = state.sketchExtrudeMode === 'join' || state.sketchExtrudeMode === 'cut'
+      ? state.sketchExtrudeMode
+      : 'new';
+    const buttons = row.querySelectorAll('[data-action="sketchExtrudeMode"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      const on = buttons[i].getAttribute('data-mode') === mode;
+      buttons[i].classList.toggle('is-on', on);
+      buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  function bodyOwningFace(faceId) {
+    if (!faceId) return null;
+    for (let i = 0; i < state.bodies.length; i += 1) {
+      const body = state.bodies[i];
+      const faces = body.topology && body.topology.faces ? body.topology.faces : [];
+      for (let f = 0; f < faces.length; f += 1) {
+        if (faces[f].id === faceId) return body;
+      }
+    }
+    return null;
+  }
+
+  function itemSelectedBodies() {
+    if (state.selection !== 'item') return [];
+    return orderedBodies();
+  }
+
+  // T1: one Item-selected body, else the face owner, else the newest.
+  // Origin plane (no faceId) does not fall through to the newest body.
+  function resolveExtrudeTarget(mode) {
+    if (mode === 'new') return { ok: true, body: null };
+    if (!state.bodies.length) {
+      return { ok: false, error: 'Join and Cut need a body. The document stayed empty.' };
+    }
+    const plane = state.sketchPlane;
+    const facePath = !!(plane && plane.faceId);
+    const selected = itemSelectedBodies();
+    if (!facePath) {
+      if (selected.length !== 1) {
+        return { ok: false, error: 'Select exactly one body for Join or Cut.' };
+      }
+      return { ok: true, body: selected[0] };
+    }
+    if (selected.length === 1) return { ok: true, body: selected[0] };
+    if (plane && plane.bodyId) {
+      const named = findBody(plane.bodyId);
+      if (named) return { ok: true, body: named };
+    }
+    const owner = plane ? bodyOwningFace(plane.faceId) : null;
+    if (owner) return { ok: true, body: owner };
+    return { ok: true, body: state.bodies[state.bodies.length - 1] };
+  }
+
+  function rejectExtrude(why) {
+    state.lastError = why;
+    setHint(why);
+    toast(why);
+    publishGateState();
+    return why;
+  }
+
+  function worldOperand(body) {
+    if (!body || !body.shape) return { shape: null, owned: false };
+    // Copy first. fuseShapes and cutShapes do not set NonDestructive, and a
+    // failed op must leave the stored body alone. A local solid is placed
+    // into world millimetres. A world solid is copied in place.
+    if (assemblyApi && typeof assemblyApi.placedCopy === 'function') {
+      const placement = body.shapeLocal === true
+        ? (body.placement || { x: 0, y: 0, z: 0 })
+        : { x: 0, y: 0, z: 0 };
+      const placed = assemblyApi.placedCopy(oc, body.shape, placement);
+      if (!placed || placed.ok !== true || !placed.shape) return { shape: null, owned: false };
+      return { shape: placed.shape, owned: true };
+    }
+    return { shape: body.shape, owned: false };
+  }
+
+  function installExtrudeOnBody(body, owned) {
+    if (!body || !owned || !owned.shape || !primApi) return false;
+    const previous = {
+      shape: body.shape,
+      mesh: body.mesh,
+      topology: body.topology,
+      gate: body.gate,
+      watertight: body.watertight,
+      params: body.params,
+      kind: body.kind,
+      shapeLocal: body.shapeLocal === true,
+      placement: body.placement
+        ? { x: Number(body.placement.x) || 0, y: Number(body.placement.y) || 0, z: Number(body.placement.z) || 0 }
+        : { x: 0, y: 0, z: 0 },
+      features: body.features
+    };
+    body.shape = owned.shape;
+    body.mesh = owned.mesh;
+    body.topology = owned.topology;
+    body.gate = owned.gate;
+    body.watertight = owned.watertight;
+    body.params = owned.params;
+    body.kind = 'extrude';
+    body.shapeLocal = false;
+    body.placement = { x: 0, y: 0, z: 0 };
+    body.features = [];
+    const flat = primApi.flattenMesh(combineBodyMeshes(state.bodies));
+    if (!flat.indices.length || typeof Module.replaceMesh !== 'function' || !Module.replaceMesh(flat.positions, flat.indices, body.name || 'extrude')) {
+      body.shape = previous.shape;
+      body.mesh = previous.mesh;
+      body.topology = previous.topology;
+      body.gate = previous.gate;
+      body.watertight = previous.watertight;
+      body.params = previous.params;
+      body.kind = previous.kind;
+      body.shapeLocal = previous.shapeLocal;
+      body.placement = previous.placement;
+      body.features = previous.features;
+      dropShape(owned.shape);
+      state.lastError = 'FAIL: the extrude mesh was rejected. The prior body was kept.';
+      setHint(state.lastError);
+      toast(state.lastError);
+      publishGateState();
+      return false;
+    }
+    dropShape(previous.shape);
+    state.primitive = null;
+    state.topology = state.bodies.length === 1 ? body.topology : null;
+    state.topologySource = 'occt';
+    state.shapeGate = sceneGate();
+    state.lastError = '';
+    state.sceneCleared = false;
+    state.projectBlank = false;
+    if (!state.projectApplying) state.projectDirty = true;
+    syncFromKernel();
+    mountBodyMeshes();
+    refreshAnchor();
+    clearSketchGeometry();
+    applyLook();
+    publishProjectHook();
+    return true;
+  }
+
+  // Join fuses the prism into the target. Cut subtracts it. An empty cut is rejected.
+  function finishBooleanExtrude(mode, target, prism, depth, profile) {
+    if (!opsApi || typeof opsApi.fuseShapes !== 'function' || typeof opsApi.cutShapes !== 'function') {
+      dropShape(prism);
+      return rejectExtrude('FAIL: Boolean ops are not loaded. The profile was kept.');
+    }
+    const world = worldOperand(target);
+    if (!world.shape) {
+      dropShape(prism);
+      return rejectExtrude('FAIL: ' + (mode === 'cut' ? 'Cut' : 'Join') + ' could not read the body. The prior body was kept.');
+    }
+    const made = mode === 'cut'
+      ? opsApi.cutShapes(oc, world.shape, prism)
+      : opsApi.fuseShapes(oc, world.shape, prism);
+    if (world.owned) dropShape(world.shape);
+    if (!made || made.ok !== true || !made.shape) {
+      if (made && made.shape) dropShape(made.shape);
+      dropShape(prism);
+      const raw = (made && made.error) || ('FAIL: ' + (mode === 'cut' ? 'Cut' : 'Join') + ' failed.');
+      return rejectExtrude(raw.indexOf('kept') === -1 ? raw + ' The prior body was kept.' : raw);
+    }
+    let volume = 0;
+    let measured = false;
+    if (typeof opsApi.solidVolumeMm3 === 'function') {
+      try {
+        volume = opsApi.solidVolumeMm3(oc, made.shape);
+        measured = Number.isFinite(volume);
+      } catch (_err) {
+        measured = false;
+      }
+    }
+    const emptyLimit = opsApi.BOOLEAN_EMPTY_VOLUME_MM3 > 0 ? opsApi.BOOLEAN_EMPTY_VOLUME_MM3 : 1e-4;
+    if (!measured || !(volume > emptyLimit)) {
+      dropShape(made.shape);
+      dropShape(prism);
+      if (mode === 'cut') return rejectExtrude('Cut removed the whole body');
+      return rejectExtrude('FAIL: Join result is empty. The prior body was kept.');
+    }
+    let view = null;
+    try {
+      view = primApi.inspectSolid(oc, made.shape);
+    } catch (err) {
+      dropShape(made.shape);
+      dropShape(prism);
+      return rejectExtrude('FAIL: extrude gate threw ' + (err && err.message ? err.message : String(err)) + ' The prior body was kept.');
+    }
+    if (!view || !view.gate || view.gate.pass !== true || view.units !== 'mm' || !view.mesh) {
+      dropShape(made.shape);
+      dropShape(prism);
+      const why = (view && view.gate && view.gate.message) || 'FAIL: OCCT validity or millimetre units rejected the extrude. The prior body was kept.';
+      return rejectExtrude(why);
+    }
+    const owned = {
+      shape: made.shape,
+      mesh: view.mesh,
+      topology: view.topology,
+      gate: view.gate,
+      watertight: view.watertight,
+      params: {
+        depthMm: depth,
+        profile: profile.kind,
+        lengthMm: profile.lengthMm,
+        widthMm: profile.widthMm,
+        diameterMm: profile.diameterMm,
+        mode: mode,
+        units: 'mm'
+      }
+    };
+    const ok = installExtrudeOnBody(target, owned);
+    dropShape(prism);
+    if (!ok) return state.lastError || 'FAIL: the prior body was kept.';
+    state.selection = 'item';
+    state.selectedIds = state.bodies.length === 1 ? ['item'] : [target.id];
+    state.hoverId = null;
+    state.assemblyIds = [target.id];
+    state.booleanOp = '';
+    state.lastError = '';
+    closeSketchSheet();
+    paintPrimFields();
+    const label = mode === 'cut' ? 'Cut' : 'Join';
+    const note = 'Extrude ' + depth + ' mm. ' + label + '. OCCT valid, mm.';
+    setHint(note);
+    toast(note);
+    publishGateState();
+    return note;
+  }
+
   function openSketchSheet(mode) {
     state.sketchSheetMode = mode;
     const sheet = document.getElementById('sketchSheet');
@@ -9563,10 +9824,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (rectRow) rectRow.hidden = mode !== 'rect';
     if (circRow) circRow.hidden = mode !== 'circle';
     if (depthRow) depthRow.hidden = mode !== 'extrude';
+    const modeRow = document.getElementById('sketchModeRow');
+    if (modeRow) modeRow.hidden = mode !== 'extrude';
     if (mode === 'extrude') {
       const depth = document.getElementById('sketchDepth');
       const fallback = opsApi && opsApi.SKETCH_BLIND_DEPTH_MM ? opsApi.SKETCH_BLIND_DEPTH_MM : 10;
       if (depth && !String(depth.value).trim()) depth.value = String(fallback);
+      // T2: empty doc and origin planes open on New. A face opens on Join.
+      state.sketchExtrudeMode = defaultSketchExtrudeMode();
+      paintExtrudeModes();
     }
     let text = 'Rectangle';
     let enabled = false;
@@ -9603,8 +9869,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (faces[i].id === faceId) face = faces[i];
     }
     if (!face) return false;
-    const body = state.bodies.length === 1 ? state.bodies[0] : null;
-    const centre = body ? bodyCentroid(body) : [0, 0, 0];
+    const owner = bodyOwningFace(face.id) || (state.bodies.length === 1 ? state.bodies[0] : null);
+    const centre = owner ? bodyCentroid(owner) : [0, 0, 0];
     const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
     if (!frame) {
       const why = 'That face is not planar.';
@@ -9612,7 +9878,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(why);
       return false;
     }
-    state.sketchPlane = { faceId: face.id, bodyId: body ? body.id : '', frame: frame };
+    state.sketchPlane = { faceId: face.id, bodyId: owner ? owner.id : '', frame: frame };
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
@@ -9834,16 +10100,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(why);
       return why;
     }
+    const mode = state.sketchExtrudeMode === 'join' || state.sketchExtrudeMode === 'cut'
+      ? state.sketchExtrudeMode
+      : 'new';
+    let target = null;
+    if (mode !== 'new') {
+      const resolved = resolveExtrudeTarget(mode);
+      if (!resolved.ok) return rejectExtrude(resolved.error);
+      target = resolved.body;
+    }
     const n = plane.frame.outward;
     const shape = opsApi.makePrismSolid(oc, profile.shape, n[0] * depth, n[1] * depth, n[2] * depth);
-    if (!shape) {
-      const why = 'FAIL: extrude was rejected. The profile was kept.';
-      state.lastError = why;
-      setHint(why);
-      toast(why);
-      publishGateState();
-      return why;
-    }
+    if (!shape) return rejectExtrude('FAIL: extrude was rejected. The profile was kept.');
+    if (mode !== 'new') return finishBooleanExtrude(mode, target, shape, depth, profile);
     let view = null;
     try {
       view = primApi.inspectSolid(oc, shape);
@@ -10680,7 +10949,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const label = 'Create ' + primitiveLabel(kind);
       const selectMode = state.selection === 'item' ? 'item' : state.selection;
       runUndoable(label, function () {
-        if (state.bodies.length >= 1) return addAnotherBody(kind) === true;
+        // A finished profile stays so Join or Cut can use the body added next.
+        if (state.bodies.length >= 1 || (state.sketchProfile && state.sketchProfile.closed)) {
+          return addAnotherBody(kind) === true;
+        }
         return createPrimitive(kind, null, selectMode, false) === true;
       });
       message = primitiveLabel(kind);
@@ -10851,6 +11123,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       message = 'New Sketch';
       setHint(sketchPlanePrompt());
     } else if (action === 'finishSketch') {
+      state.sketchExtrudeMode = defaultSketchExtrudeMode();
       closeSketchSheet();
       setTab('model');
       selectNode('body');
@@ -10878,6 +11151,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       message = state.sketchProfile && state.sketchProfile.closed ? 'Extrude' : 'Finish a closed profile first';
       setHint(message);
       updateInspector();
+    } else if (action === 'sketchExtrudeMode') {
+      const picked = btn.getAttribute('data-mode');
+      state.sketchExtrudeMode = picked === 'join' || picked === 'cut' ? picked : 'new';
+      paintExtrudeModes();
+      message = state.sketchExtrudeMode === 'join' ? 'Join' : state.sketchExtrudeMode === 'cut' ? 'Cut' : 'New';
+      setHint(message);
     } else if (action === 'confirmSketch') {
       if (state.sketchSheetMode === 'circle') message = commitSketchCircle();
       else if (state.sketchSheetMode === 'extrude') message = commitSketchExtrude();
@@ -12459,6 +12738,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         highlight: selectionHighlighted(),
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
+        extrudeMode: state.sketchExtrudeMode === 'join' || state.sketchExtrudeMode === 'cut' ? state.sketchExtrudeMode : 'new',
+        emptyBodies: (function () {
+          let n = 0;
+          for (let i = 0; i < state.bodies.length; i += 1) {
+            if (!state.bodies[i] || !state.bodies[i].shape) n += 1;
+          }
+          return n;
+        })(),
         bodies: state.bodies.length,
         bounds: bounds
       };
