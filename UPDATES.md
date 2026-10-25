@@ -3,6 +3,9 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-25
+- 2026-10-25 PR #114 (merged at 00ff1ea): Antigravity trial — VERTEX_TOUCH_TOLERANCE_PX 32 (Select/#1; tool only, no token/cost).
+
 ## 2026-10-24
 - 2026-10-24 PR #112 (merged at 6fbed73): test - AddOptimal mm bounds ±0.01 smoke (typed-resize keep-path; T1-T6 tests-only).
 - 2026-10-24 PR #110 (merged at 1274466): docs - typed-resize + move-gizmo GB prompt (T1-T6).
