@@ -155,7 +155,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         }"""
     )
     hook = page.evaluate("() => window.__cadcamPhoneSelect")
-    if not isinstance(hook, dict) or hook.get("edgePx") != 32 or hook.get("touchPx") != 20:
+    if not isinstance(hook, dict) or hook.get("edgePx") != 32 or hook.get("vertexPx") != 32 or hook.get("touchPx") != 20:
         return [f"{kind} hook {hook!r}"]
     if hook.get("chipMin") != 44 or hook.get("filters") != ["body", "face", "edge", "vertex"]:
         return [f"{kind} hook filters {hook!r}"]
@@ -244,19 +244,19 @@ def run_case(page: Any, kind: str) -> list[str]:
         if not aim or not aim.get("id"):
             problems.append(f"{kind} {name} aim missing {aim!r}")
             continue
-        if name == "edge":
+        if name in ("edge", "vertex"):
             gap = aim.get("gap")
             touch_px = found.get("touchPx")
-            edge_px = found.get("edgePx")
+            edge_px = found.get("edgePx" if name == "edge" else "vertexPx")
             try:
                 gap_n = float(gap)
                 touch_n = float(touch_px)
                 edge_n = float(edge_px)
             except (TypeError, ValueError):
-                problems.append(f"{kind} edge gap {gap!r} touch {touch_px!r} edge {edge_px!r}")
+                problems.append(f"{kind} {name} gap {gap!r} touch {touch_px!r} limit {edge_px!r}")
                 gap_n = touch_n = edge_n = 0.0
             if not (touch_n < gap_n < edge_n):
-                problems.append(f"{kind} edge gap {gap_n} not between {touch_n} and {edge_n}")
+                problems.append(f"{kind} {name} gap {gap_n} not between {touch_n} and {edge_n}")
         picked = pointer(page, {"x": aim["x"], "y": aim["y"], "pointerId": 54})
         shot(page, kind, step)
         ids = picked.get("selectedIds")
