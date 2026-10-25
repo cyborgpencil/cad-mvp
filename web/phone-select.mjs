@@ -2,7 +2,7 @@
 // The page wires pointer events and the existing highlight path.
 // Tap slop stays in viewport-selection.mjs (TAP_SLOP_PX). Face and body
 // touch picks stay on selection.mjs TOUCH_PICK_TOLERANCE_PX. This file
-// only widens Edge.
+// only widens Edge and Vertex.
 
 export const PICK_FILTERS = ['body', 'face', 'edge', 'vertex'];
 
@@ -13,10 +13,11 @@ export const FILTER_LABELS = {
   vertex: 'Vertex',
 };
 
-// Screen-px radius for an Edge tap. Larger than selection.mjs
+// Screen-px radius for an Edge or Vertex tap. Larger than selection.mjs
 // TOUCH_PICK_TOLERANCE_PX (20). Face and body stay on that radius.
 // Team-chosen, TBD for Erik.
 export const EDGE_TOUCH_TOLERANCE_PX = 32;
+export const VERTEX_TOUCH_TOLERANCE_PX = 32;
 
 // Bottom-bar chip and Multi toggle. WCAG 2.5.5 / Apple HIG.
 export const CHIP_MIN_PX = 44;
@@ -54,7 +55,7 @@ export function nextFilter(filter) {
   return PICK_FILTERS[(index + 1) % PICK_FILTERS.length];
 }
 
-// Edge touch and pen use EDGE_TOUCH_TOLERANCE_PX. Mouse stays on the
+// Edge and Vertex touch and pen use their 32 px radii. Mouse stays on the
 // shared mouse radius. Every other filter uses the caller's touch or
 // mouse radius (selection.mjs).
 export function pickTolerancePx(modeOrFilter, pointerType, touchPx, mousePx) {
@@ -64,6 +65,7 @@ export function pickTolerancePx(modeOrFilter, pointerType, touchPx, mousePx) {
   const baseTouch = Number(touchPx) > 0 ? Number(touchPx) : 20;
   const baseMouse = Number(mousePx) > 0 ? Number(mousePx) : 8;
   if (filter === 'edge' && touch) return EDGE_TOUCH_TOLERANCE_PX;
+  if (filter === 'vertex' && touch) return VERTEX_TOUCH_TOLERANCE_PX;
   return touch ? baseTouch : baseMouse;
 }
 

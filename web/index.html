@@ -4375,6 +4375,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const rect = canvas.getBoundingClientRect();
     const touchPx = selApi && selApi.TOUCH_PICK_TOLERANCE_PX ? selApi.TOUCH_PICK_TOLERANCE_PX : 20;
     const edgePx = phoneApi ? phoneApi.EDGE_TOUCH_TOLERANCE_PX : 32;
+    const vertexPx = phoneApi && phoneApi.VERTEX_TOUCH_TOLERANCE_PX ? phoneApi.VERTEX_TOUCH_TOLERANCE_PX : 32;
+    const vertexGap = (Number(touchPx) + Number(vertexPx)) / 2;
     const gap = (Number(touchPx) + Number(edgePx)) / 2;
 
     function toClient(local) {
@@ -4619,12 +4621,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
 
     let vertexHit = null;
+    let vertexFallback = null;
     if (topo && topo.vertices) {
       for (let i = 0; i < topo.vertices.length && !vertexHit; i += 1) {
         const vertex = topo.vertices[i];
         if (!vertex.p || !inFront(vertex.p)) continue;
         const local = screenOfCad(vertex.p);
-        vertexHit = firstHit('vertex', ring(local, 0).concat(ring(local, 6), ring(local, 12)), vertex.id);
+        const band = firstHit('vertex', ring(local, vertexGap), vertex.id);
+        if (band) {
+          const measured = Math.hypot(band.x - rect.left - local.x, band.y - rect.top - local.y);
+          if (measured > touchPx && measured < vertexPx) {
+            vertexHit = { id: band.id, x: band.x, y: band.y, gap: measured };
+            break;
+          }
+        }
+        const near = firstHit('vertex', ring(local, 0).concat(ring(local, 6), ring(local, 12)), vertex.id);
+        if (near && !vertexFallback) vertexFallback = near;
       }
     }
 
@@ -4647,11 +4659,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       inner: namedEdges.inner,
       tip: namedEdges.tip,
       bodyEdges: bodyEdges,
-      vertex: vertexHit,
+      vertex: vertexHit || vertexFallback,
       empty: emptyHit,
       cylinder: cylinderHit,
       touchPx: touchPx,
-      edgePx: edgePx
+      edgePx: edgePx,
+      vertexPx: vertexPx
     };
   }
 
@@ -13446,6 +13459,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   if (phoneApi) {
     window.__cadcamPhoneSelect = {
       edgePx: phoneApi.EDGE_TOUCH_TOLERANCE_PX,
+      vertexPx: phoneApi.VERTEX_TOUCH_TOLERANCE_PX,
       touchPx: selApi ? selApi.TOUCH_PICK_TOLERANCE_PX : 20,
       slopPx: tapSlopPx(),
       chipMin: phoneApi.CHIP_MIN_PX,

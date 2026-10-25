@@ -37,6 +37,8 @@ expect('filters', phone.PICK_FILTERS, ['body', 'face', 'edge', 'vertex']);
 expect('chip min', phone.CHIP_MIN_PX, 44);
 expect('edge radius', phone.EDGE_TOUCH_TOLERANCE_PX, 32);
 expectOk('edge radius is larger than touch pick', phone.EDGE_TOUCH_TOLERANCE_PX > TOUCH);
+expect('vertex radius', phone.VERTEX_TOUCH_TOLERANCE_PX, 32);
+expectOk('vertex radius is larger than touch pick', phone.VERTEX_TOUCH_TOLERANCE_PX > TOUCH);
 expect('touch pick stays 20', TOUCH, 20);
 expect('mouse pick stays 8', MOUSE, 8);
 expect('tap slop stays 8', SLOP, 8);
@@ -74,7 +76,9 @@ expect('edge mouse stays shared', phone.pickTolerancePx('edge', 'mouse', TOUCH, 
 expect('face touch stays 20', phone.pickTolerancePx('face', 'touch', TOUCH, MOUSE), TOUCH);
 expect('body touch stays 20', phone.pickTolerancePx('body', 'touch', TOUCH, MOUSE), TOUCH);
 expect('item touch stays 20', phone.pickTolerancePx('item', 'touch', TOUCH, MOUSE), TOUCH);
-expect('vertex touch stays 20', phone.pickTolerancePx('vertex', 'touch', TOUCH, MOUSE), TOUCH);
+expect('vertex touch', phone.pickTolerancePx('vertex', 'touch', TOUCH, MOUSE), 32);
+expect('vertex pen', phone.pickTolerancePx('vertex', 'pen', TOUCH, MOUSE), 32);
+expect('vertex mode touch', phone.pickTolerancePx('vertex', 'touch', TOUCH, MOUSE), phone.VERTEX_TOUCH_TOLERANCE_PX);
 expect('vertex mouse', phone.pickTolerancePx('vertex', 'mouse', TOUCH, MOUSE), MOUSE);
 expect('face mouse', phone.pickTolerancePx('face', '', TOUCH, MOUSE), MOUSE);
 
