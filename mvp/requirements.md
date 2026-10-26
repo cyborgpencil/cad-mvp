@@ -107,14 +107,18 @@ Erik hands-off overnight; final tool tests on wake. Stuck/help check every **20 
 - No printer send unless Erik said otherwise.
 
 ### Wake acceptance (Erik final tests when awake)
-Leave smokes and Pages ready for:
-- Sketch (typed mm + callouts; empty Create Sketch path)
-- Boolean
-- Selection (V/E/F; gizmo hidden in those modes)
-- View-cube swipe (adjacent)
-- Exports STL + 3MF (E2E tonight)
+Leave smokes and Pages ready. **Human gate** = Erik runs this on [Pages](https://cyborgpencil.github.io/cad-mvp/) (or live main) after overnight lands. CI smoke + Pages green on main is the overnight bar.
 
-CI smoke + Pages green on main is the overnight bar; Erik's wake retest is the human gate.
+#### Wake smoke checklist
+1. **Empty sketch / boot cube (lock b)** — Delete-all → Create Sketch (no solid) → confirm odies.length===0 and #originPlanes visible; boot cube still present on fresh load (not removed).
+2. **Sketch typed + callouts (lock a / queue 1)** — New Sketch on Top → draw closed profile → typed mm sizes via Properties/#dimPanel → callouts show matching values (no constraint solver expected).
+3. **Boolean** — Two bodies → Union or Cut → result solid; undo restores prior.
+4. **Selection V/E/F (lock d / queue 4)** — Switch vertex / edge / face: whole-body gizmo **hidden** in those modes; body/item mode still shows gizmo.
+5. **View-cube swipe (lock c / queue 3)** — Swipe so the **adjacent** face steps in the swipe direction (not opposite-face flip). Invert L/R only if direction feels wrong.
+6. **Export STL + 3MF (lock e)** — Box or boolean result → Export STL and 3MF → units mm; Export enabled only when C++ Module.gate() passes (Rust dual-run may show #statusRustGate / window.__cadcamRustGate.matchesCpp===true when loaded — informational).
+7. **Phone sanity (if testing phone)** — Basic-shape edit: #calloutLayer hidden; Size still editable on #dimPanel. No printer send.
+
+Pass = all seven feel right; fail notes go to the room (team discuss → Chief/3T call).
 
 ## Success Criteria
 
