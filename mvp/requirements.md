@@ -116,10 +116,24 @@ Leave smokes and Pages ready. **Human gate** = Erik runs this on [Pages](https:/
 3. **Boolean** — Two bodies → Union or Cut → result solid; undo restores prior.
 4. **Selection V/E/F (lock d / queue 4)** — Switch vertex / edge / face: whole-body gizmo **hidden** in those modes; body/item mode still shows gizmo.
 5. **View-cube swipe (lock c / queue 3)** — Swipe so the **adjacent** face steps in the swipe direction (not opposite-face flip). Invert L/R only if direction feels wrong.
-6. **Export STL + 3MF (lock e)** — Box or boolean result → Export STL and 3MF → units mm; Export enabled only when C++ Module.gate() passes (Rust dual-run may show #statusRustGate / window.__cadcamRustGate.matchesCpp===true when loaded — informational).
+6. **Export STL + 3MF (lock e)** — Box or boolean result → Export STL and 3MF → units mm; Export enabled only when C++ Module.gate() passes (Rust dual-run may show #statusRustGate / window.__cadcamRustGate.matchesCpp===true when loaded — informational). Concrete bar: Export acceptance checks (queue item 6) below, including the post–Q5 L-bracket solid when it exists.
 7. **Phone sanity (if testing phone)** — Basic-shape edit: #calloutLayer hidden; Size still editable on #dimPanel. No printer send.
 
 Pass = all seven feel right; fail notes go to the room (team discuss → Chief/3T call).
+
+#### Export acceptance checks (queue item 6)
+
+Concrete bar for wake checklist item 6 / lock **(e)**. Pilot runs it after the Q5 L-bracket rebuild, and the same checks cover an ordinary boot box or boolean export. E2E stays STL + 3MF only; STEP later. Write blocks match `mvp/export.md`.
+
+- **Export enable.** The Export button is enabled only when C++ `Module.gate()` passes (units mm). `#statusRustGate` and `window.__cadcamRustGate.matchesCpp` are informational when the Rust dual-run has loaded. OCCT-after-ops still runs and does not block Export.
+- **Both files.** Export STL and 3MF successfully for (a) the boot box or a boolean result and (b) the post–Q5 L-bracket solid when that solid exists. L-bracket path: sketch → Blind Extrude (New/Join/Cut) + Union/Cut. `mvp/projects/blink-l-bracket.md` is reference only.
+- **Units in the file.** The 3MF model unit is `millimeter`. STL coordinates are millimeters.
+- **Write blocked.** No triangles → `FAIL: mesh has no triangles.` Zero or non-positive volume on the floor (|volume| <= 1e-9 mm3) → `FAIL: mesh has zero volume.` Inside-out (negative volume, volume < -1e-9 mm3) → `FAIL: mesh is inside-out (negative volume).` Each of these blocks the write.
+- **INFO only.** Free-edge count and `is_watertight` are shown as information only. They do not gate Export. `is_watertight` does not decide the offline checker exit code.
+- **Optional offline expect.** When expected size and volume are known, run `tools/check_export.py` and/or `cadcam_check_export` on the STL and 3MF. CI box (20 × 20 × 20 mm, volume 8000 mm3): `--expect-size 20 20 20 --expect-volume 8000` on `builds/export/box.stl` and `builds/export/box.3mf`. L-bracket: skip that numeric expect until dimensions lock. Both tools require `--expect-size` and `--expect-volume`, so do not invoke them on the L-bracket files while size or volume is TBD. Until then the L-bracket bar is a successful STL + 3MF export, units mm, and the C++ gate. Locked physical values only: wall thickness 4 mm, disc thickness 4 mm, corner 90°, units mm. Every other size stays TBD.
+- **No printer.** No printer send for Q5 or this acceptance.
+
+Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate()` passed, and none of the write-block messages on those files. Watertight stays INFO. L-bracket numeric expect stays skipped while sizes are TBD.
 
 ## Success Criteria
 
