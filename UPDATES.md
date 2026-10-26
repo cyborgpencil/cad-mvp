@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #186 (merged at ddce415): feat - Antigravity sketch chrome Create->six ortho + floaters (tip e0fddd8).
 - 2026-10-26 PR #183 (merged at 4ee8d49): docs - park sketch chrome + Create->ortho plane Antigravity brief (tip bb696d0).
 - 2026-10-26 PR #181 (merged at 77696ec): feat - Antigravity view-cube + gizmo + line dims (tip 10d9b9d).
 - 2026-10-26 PR #179 (merged at b2b0455): Antigravity view-cube / gizmo / line-dims brief + requirements freeze TBD (tip ec96baa).
