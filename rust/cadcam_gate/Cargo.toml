@@ -1,0 +1,16 @@
+[package]
+name = "cadcam_gate"
+version = "0.1.0"
+edition = "2021"
+description = "Rust WASM mirror of CAD/CAM MVP units lock and mesh volume export gate (slice #1)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.100"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
