@@ -181,3 +181,11 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.*
   - Separate by tool type. Selection gets its own icon group. Any further tool-type groups are **TBD**.
   - Same behavior as the tools menu: press the icon to show or hide that shelf.
   - **TBD:** icon art, pixel sizes, hotkeys, which existing controls are the selection shelf and which are the show/hide camera shelf, which bar is the top bar (header or the ribbon that holds the Tools menu), phone and desktop placement, and whether any shelf besides those two moves.
+## Success Criteria
+
+- User can go from blank sketch to validated, slicer-ready 3MF in a few minutes.
+- Files open correctly in common slicers (PrusaSlicer, Orca, Bambu Studio, Cura) without scale or manifold errors.
+- MCP commands reliably modify the model and trigger validation.
+
+> [!NOTE]
+> This document covers only the MVP. See /vision/full-project.md for post-MVP goals. Changes here do not affect the vision document.
