@@ -1691,6 +1691,30 @@ SKETCH_PORTRAIT_EXPR = r"""
   }
   st = hook.state();
   if (!st || st.bodies !== 0) problems.push('restore empty ' + (st && st.bodies));
+  var emptySeqBefore = st ? st.bodySeq : null;
+  if (!openCreate()) problems.push('empty sketch create hidden');
+  menu = document.getElementById('createMenu');
+  var emptyNewSketch = menu ? menu.querySelector('[data-action="newSketch"]') : null;
+  if (emptyNewSketch) emptyNewSketch.click();
+  else problems.push('empty newSketch missing');
+  st = hook.state();
+  published = window.__cadcamExportState || {};
+  var emptyOriginBar = document.getElementById('originPlanes');
+  if (!st || st.tab !== 'sketch' || st.bodies !== 0 || st.picker !== true) {
+    problems.push('empty newSketch state ' + JSON.stringify(st));
+  }
+  if (!st || !Array.isArray(st.bodyIds) || st.bodyIds.length !== 0 || st.bodySeq !== emptySeqBefore) {
+    problems.push('empty newSketch bodyIds ' + JSON.stringify(st && st.bodyIds) + ' seq ' + (st && st.bodySeq) + '/' + emptySeqBefore);
+  }
+  if (published.bodyCount !== 0 || (Array.isArray(published.bodyIds) && published.bodyIds.length !== 0) || published.primitiveKind) {
+    problems.push('empty newSketch published ' + published.bodyCount + ' ' + published.primitiveKind);
+  }
+  if (!emptyOriginBar || emptyOriginBar.hidden === true || !boxOf(emptyOriginBar)) {
+    problems.push('empty newSketch originPlanes hidden');
+  }
+  var emptyFinish = document.querySelector('#finishBar [data-action="finishSketch"]');
+  if (emptyFinish) emptyFinish.click();
+  else problems.push('empty finishSketch missing');
   if (!openCreate()) problems.push('restore create hidden');
   menu = document.getElementById('createMenu');
   var restoreBox = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
@@ -1969,19 +1993,42 @@ ORIGIN_PLANE_EXPR = r"""
       problems.push(label + ' left ' + (st && st.bodies) + ' ' + (published.lastError || ''));
       return null;
     }
+    if (!Array.isArray(st.bodyIds) || st.bodyIds.length !== 0) {
+      problems.push(label + ' bodyIds ' + JSON.stringify(st.bodyIds));
+    }
+    if (published.bodyCount !== 0 || (Array.isArray(published.bodyIds) && published.bodyIds.length !== 0)) {
+      problems.push(label + ' published bodyCount ' + published.bodyCount);
+    }
     if (published.projectBlank === true || st.projectBlank === true) problems.push(label + ' projectBlank');
     return st;
   }
   function startSketch() {
+    var stBefore = hook.state();
+    var seqBefore = stBefore ? stBefore.bodySeq : null;
     if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
     var menu = document.getElementById('createMenu');
     var sketchItem = menu ? menu.querySelector('[data-action="newSketch"]') : null;
     if (!sketchItem) { problems.push('Create Sketch missing'); return null; }
     sketchItem.click();
     var st = hook.state();
+    var published = window.__cadcamExportState || {};
+    var originBarNow = document.getElementById('originPlanes');
     if (!st || st.tab !== 'sketch') problems.push('tab ' + (st && st.tab));
-    if (!st || st.bodies !== 0) problems.push('sketch bodies ' + (st && st.bodies));
+    if (!st || st.bodies !== 0 || published.bodyCount !== 0) problems.push('sketch bodies ' + (st && st.bodies) + '/' + published.bodyCount);
     if (!st || st.picker !== true) problems.push('picker off on empty doc');
+    if (!originBarNow || originBarNow.hidden === true || !boxOf(originBarNow)) problems.push('originPlanes hidden on empty newSketch');
+    if (!st || !Array.isArray(st.bodyIds) || st.bodyIds.length !== 0) {
+      problems.push('newSketch spawned bodyIds ' + JSON.stringify(st && st.bodyIds));
+    }
+    if (Array.isArray(published.bodyIds) && published.bodyIds.length !== 0) {
+      problems.push('newSketch published bodyIds ' + JSON.stringify(published.bodyIds));
+    }
+    if (seqBefore !== null && st && st.bodySeq !== seqBefore) {
+      problems.push('newSketch advanced bodySeq ' + seqBefore + ' -> ' + st.bodySeq);
+    }
+    if (published.primitiveKind) {
+      problems.push('newSketch spawned primitive ' + published.primitiveKind);
+    }
     if (st && st.projectBlank === true) problems.push('empty doc required projectBlank');
     return st;
   }
@@ -1994,8 +2041,12 @@ ORIGIN_PLANE_EXPR = r"""
     return JSON.stringify(problems);
   }
   var before = hook.state();
-  if (!before || before.bodies !== 1 || before.picker !== false) {
+  var beforePub = window.__cadcamExportState || {};
+  if (!before || before.bodies !== 1 || before.picker !== false || !Array.isArray(before.bodyIds) || before.bodyIds.length !== 1) {
     problems.push('cube start bodies ' + (before && before.bodies) + ' picker ' + (before && before.picker));
+  }
+  if (beforePub.primitiveKind !== 'box' || !(Math.abs(Number(beforePub.volumeMm3) - 8000) < 0.5)) {
+    problems.push('boot cube ' + beforePub.primitiveKind + ' vol ' + beforePub.volumeMm3);
   }
   if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
   var menu0 = document.getElementById('createMenu');
@@ -2003,8 +2054,17 @@ ORIGIN_PLANE_EXPR = r"""
   if (sketch0) sketch0.click();
   else problems.push('Create Sketch missing');
   var cube = hook.state();
-  if (!cube || cube.tab !== 'sketch' || cube.picker !== false || cube.bodies !== 1) {
+  var originBarCube = document.getElementById('originPlanes');
+  if (!cube || cube.tab !== 'sketch' || cube.picker !== false || cube.bodies !== 1 || (originBarCube && !originBarCube.hidden)) {
     problems.push('cube sketch picker ' + (cube && cube.picker) + ' tab ' + (cube && cube.tab) + ' bodies ' + (cube && cube.bodies));
+  }
+  var cubeFace = typeof hook.topFace === 'function' ? hook.topFace() : null;
+  if (!cubeFace || typeof hook.tapFace !== 'function' || !hook.tapFace(cubeFace)) {
+    problems.push('cube face tap failed ' + cubeFace);
+  }
+  cube = hook.state();
+  if (!cube || !cube.plane || cube.faceId !== cubeFace || cube.originPlane !== '' || cube.picker !== false) {
+    problems.push('cube face plane ' + JSON.stringify(cube));
   }
   var finish0 = document.querySelector('#finishBar [data-action="finishSketch"]');
   if (finish0) finish0.click();

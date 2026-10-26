@@ -4760,6 +4760,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.selection = mode;
     if (mode === 'item' && state.bodies.length > 1) {
       state.selectedIds = state.bodies.map(function (body) { return body.id; });
+    } else if (mode === 'item' && state.bodies.length === 0 && (state.sceneCleared || state.projectBlank)) {
+      state.selectedIds = [];
     } else {
       state.selectedIds = mode === 'item' ? ['item'] : [];
     }
@@ -6368,6 +6370,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.demo = '';
       state.sceneCleared = true;
       state.lastError = '';
+      if (state.sketchPlane && state.sketchPlane.faceId) {
+        state.sketchPlane = null;
+        state.sketchLineVertices = [];
+        state.sketchArcPoints = [];
+      }
       mountBodyMeshes();
       syncFromKernel();
       refreshAnchor();
@@ -6388,7 +6395,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (drop[state.bodies[i].id]) dropShape(state.bodies[i].shape);
     }
     state.bodies = kept;
-    state.selectedIds = [];
+    state.selectedIds = kept.length === 1 && state.selection === 'item' ? ['item'] : [];
+    if (state.sketchPlane && state.sketchPlane.bodyId && drop[state.sketchPlane.bodyId]) {
+      state.sketchPlane = null;
+      state.sketchLineVertices = [];
+      state.sketchArcPoints = [];
+    }
     state.hoverId = null;
     state.sceneCleared = false;
     state.lastError = '';
@@ -9251,6 +9263,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       booleanOp: state.booleanOp || '',
       booleanMessage: state.booleanMessage || '',
       bodyCount: state.bodies.length,
+      bodyIds: state.bodies.map(function (body) { return body.id; }),
+      bodySeq: state.bodySeq,
       assemblyMessage: state.assemblyMessage || '',
       assemblyMaterials: state.bodies.map(function (body) { return body.material || 'PLA'; }),
       selectionOrder: orderedBodies().map(function (body) { return body.id; }),
@@ -10830,7 +10844,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function setTab(tab, opts) {
     opts = opts || {};
+    const wasTab = state.tab;
     state.tab = tab;
+    if (tab === 'sketch' && state.bodies.length === 0) {
+      state.selectedIds = [];
+      state.hoverId = null;
+    } else if (wasTab === 'sketch' && tab === 'model' && state.bodies.length === 1 && state.selection === 'item' && state.selectedIds.length === 0) {
+      state.selectedIds = ['item'];
+    }
     const tabs = document.querySelectorAll('.tab');
     for (let i = 0; i < tabs.length; i++) {
       const on = tabs[i].getAttribute('data-tab') === tab;
@@ -11773,6 +11794,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         message = originPlaneLabel(which === 'xz' || which === 'yz' ? which : 'xy');
       }
     } else if (action === 'newSketch') {
+      if (state.bodies.length === 0) {
+        state.primitive = null;
+        state.selectedIds = [];
+        state.hoverId = null;
+        state.sceneCleared = true;
+        showClearedScene();
+      }
       clearSketchGeometry();
       closeSketchSheet();
       setTab('sketch');
@@ -11909,8 +11937,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (btn.getAttribute('data-tool')) {
         state.activeTool = btn.getAttribute('data-tool');
         if (state.activeTool === 'New Sketch') {
+          if (state.bodies.length === 0) {
+            state.primitive = null;
+            state.selectedIds = [];
+            state.hoverId = null;
+            state.sceneCleared = true;
+            showClearedScene();
+          }
+          clearSketchGeometry();
+          closeSketchSheet();
           setTab('sketch');
           selectNode('sketch');
+          setHint(sketchPlanePrompt());
         }
         updateInspector();
       }
@@ -13830,6 +13868,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return n;
         })(),
         bodies: state.bodies.length,
+        bodyIds: state.bodies.map(function (body) { return body.id; }),
+        bodySeq: state.bodySeq,
         bounds: bounds
       };
     }
