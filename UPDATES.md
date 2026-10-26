@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #141 (merged at a126ee7): fix - hide whole-body gizmo on V/E/F selection (web + deploy_smoke; tip 7b75abb).
 - 2026-10-26 PR #139 (merged at 6504925): docs - Antigravity sketch+dims brief (prompts/antigravity-sketch-dims.md; Chief T3 ii + T4; tip da6cf0d).
 - 2026-10-26 PR #137 (merged at 1d7246b): fix - empty-doc newSketch stays body-free / no spawn box (web + deploy_smoke; tip 500271b).
 - 2026-10-26 PR #135 (merged at bf8e9a9): docs - Antigravity selection V/E/F hide-gizmo brief (prompts/antigravity-selection-gizmo-hide.md; tip a793301).
