@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #177 (merged at eeb2311): feat - Antigravity top-bar shelf icons selection + camera (tip 404304c).
 - 2026-10-26 PR #175 (merged at c624d6e): docs - park Chief Boolean shortlist locks Fuzzy 0.01 / Option C / fillet 2+0.5 (tip de52fa1).
 - 2026-10-26 PR #173 (merged at 65279ec): docs - Antigravity top-bar shelf icons brief (tip 9c19d6e).
 - 2026-10-26 PR #171 (merged at d8988d7): feat - Antigravity truck MVP Acceptance B (tip 34a930d).
