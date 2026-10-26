@@ -174,13 +174,26 @@ Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate
 
 ## Queued after current in-flight (discuss / parked)
 
-End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for this item yet.
+End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT and ~8:46 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after L-bracket agy and remaining in-flight merges clear. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
 
 - **Top-bar shelf icons (selection + show/hide camera)**
   - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
   - Separate by tool type. Selection gets its own icon group. Any further tool-type groups are **TBD**.
   - Same behavior as the tools menu: press the icon to show or hide that shelf.
   - **TBD:** icon art, pixel sizes, hotkeys, which existing controls are the selection shelf and which are the show/hide camera shelf, which bar is the top bar (header or the ribbon that holds the Tools menu), phone and desktop placement, and whether any shelf besides those two moves.
+- **View cube**
+  - More predictable swipe: each swipe up, down, left, or right rotates the view cube and the camera in that direction. The direction is screen-relative and independent of the model orientation.
+  - **Press-and-hold** for a slow continuous view-cube and camera adjust.
+  - **Home** shortcut: center on the selected model when something is selected; otherwise center on **0,0,0**.
+  - **TBD:** pixel thresholds, hold timing, and the Home key binding.
+- **Gizmo fix**
+  - The gizmo centers on the selection (one selection, or a multi-component / multi-object selection).
+  - Tap empty space hides the gizmo or moves it off.
+  - With multi-select off: tap vertex 1, then vertex 2, and the gizmo moves from vertex 1 to vertex 2.
+  - **TBD:** any tap or pixel threshold not stated here.
+- **Dimensions**
+  - Show a dimension on **each line**, with that line's length, as in other CAD apps.
+  - **TBD:** which dimension style.
 ## Success Criteria
 
 - User can go from blank sketch to validated, slicer-ready 3MF in a few minutes.
