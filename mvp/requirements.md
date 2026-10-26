@@ -65,6 +65,7 @@ flowchart LR
 - Browser path: Emscripten/WASM possible; watch binary size, boolean performance, and memory limits.
 - Desktop fallback recommended for heavy operations.
 - Hybrid: B-Rep for engineering features + mesh for organic shapes.
+- **Rust WASM slice #1 (dual-run shadow)**: `rust/cadcam_gate` (`wasm32-unknown-unknown`, loaded via `web/rust-gate.mjs`) mirrors the millimeter units lock (`to_display`, `to_millimeters`, `export_units_pass`) and signed mesh volume (`mesh_volume_mm3`, `evaluate_rust_gate`) alongside C++ `Module.gate()`, publishing `#statusRustGate` and `window.__cadcamRustGate` (`matchesCpp`). C++ `Module.gate()` remains authoritative for Export button enablement; no OCCT / `libcascade` in Rust; watertight remains dropped as an Export gate. TBD: whether Rust replaces C++ `Module.gate()` is deferred until Erik decides.
 
 ## Phone UI (main, team-locked)
 

@@ -80,6 +80,15 @@ jobs:
           test -f web/cadcam.js && test -f web/cadcam.wasm
       - name: Fetch libcascade
         run: python3 web/fetch-libcascade.py
+      - name: Build Rust units/volume gate WASM
+        run: |
+          if [ -f web/build-rust-gate.py ]; then
+            if ! command -v cargo >/dev/null 2>&1; then
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --target wasm32-unknown-unknown
+            fi
+            export PATH="$HOME/.cargo/bin:$PATH"
+            python3 web/build-rust-gate.py
+          fi
       - name: Assemble preview (the PR's own site list)
         env:
           PR: ${{ matrix.pr }}
@@ -138,6 +147,17 @@ jobs:
           python3 web/fetch-libcascade.py
           test -f web/dist/opencascade_single.wasm
           test -f web/occt-gate.mjs
+      - name: Build Rust units/volume gate WASM
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --target wasm32-unknown-unknown
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo test --manifest-path rust/cadcam_gate/Cargo.toml
+          python3 web/build-rust-gate.py
+          test -f web/dist/cadcam_rust_gate.js
+          test -f web/dist/cadcam_rust_gate_bg.wasm
+          test -f web/rust-gate.mjs
       - name: Assemble site
         # web/assemble_site.py is the only file list. tests/deploy_smoke.py calls it too.
         run: python3 web/assemble_site.py _site

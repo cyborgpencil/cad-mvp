@@ -50,6 +50,16 @@ python web\fetch-libcascade.py
 
 Source: `https://registry.npmjs.org/libcascade/-/libcascade-3.1.0.tgz` (OCCT V8_0_1, Emscripten 6.0.5). The OCCT check is `web/occt-gate.mjs`: `BRepCheck_Analyzer.IsValid()` after operations. A failed operation becomes a clean error and reverts; the check does not block Export. Free-edge (watertight) counting is no longer a requirement.
 
+## Rust units + volume gate mirror (slice #1)
+
+`rust/cadcam_gate` compiles to `wasm32-unknown-unknown` and is loaded as a third WASM (`web/rust-gate.mjs` + staged `web/dist/cadcam_rust_gate.js` and `web/dist/cadcam_rust_gate_bg.wasm`). It runs in dual-run shadow mode alongside C++ `Module.gate()`; C++ stays authoritative for Export enablement and there is no OCCT dependency in the Rust crate.
+
+```bat
+python web\build-rust-gate.py
+```
+
+`web/build-rust-gate.py` builds the release `wasm32-unknown-unknown` crate (adding the target via `rustup` when present), caches the matching `wasm-bindgen` CLI under gitignored `builds/wasm-bindgen/`, and stages the glue and `.wasm` into gitignored `web/dist/`. Do not commit `rust/cadcam_gate/target/` or `web/dist/`.
+
 ## Serve
 
 Static files only. No custom headers and no app server.
