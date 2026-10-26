@@ -7276,11 +7276,11 @@ def _asm_part(doc: dict[str, Any] | None, name: str) -> dict[str, Any]:
 
 
 def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
-    """Several bodies: the selected part shows the move gizmo and editable X/Y/Z.
+    """Several bodies: body/item selection shows the move gizmo (SC4 multi OK).
 
-    Repro before the fix: with more than one body, the gizmo stayed hidden and
-    the position fields were disabled, with no message. A plain primitive must
-    update its placement. A Boolean result may bake the translation.
+    Park SC4: gizmo centers on single or multi body/item. Then pick one part
+    and drag; a plain primitive must update its placement. A Boolean result
+    may bake the translation.
     """
     try:
         set_desktop(cdp)
@@ -7293,13 +7293,16 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
         return ["multi move load", *load_problems[:20]]
     if loaded.get("demo") != "assembly" or int(loaded.get("bodyCount") or 0) != 2:
         return [f"multi move scene {loaded.get('demo')!r} bodies {loaded.get('bodyCount')!r}"]
-    if loaded.get("gizmoVisible") is not False or loaded.get("posDisabled") is not True:
+    # SC4 / park: gizmo centers on multi body/item selection (not hidden).
+    if loaded.get("gizmoVisible") is not True or loaded.get("posDisabled") is not False:
         return [f"multi move both selected gizmo {loaded.get('gizmoVisible')!r} disabled {loaded.get('posDisabled')!r}"]
     both, both_err = _json_eval(cdp, MOVE_POS_EXPR)
     if both_err or not both:
         return [f"multi move both fields {both_err}"]
-    if both.get("disabled") is not True or "Select one part" not in str(both.get("title") or ""):
-        return [f"multi move both title {both}"]
+    if both.get("disabled") is not False or both.get("gizmo") is not True:
+        return [f"multi move both fields state {both}"]
+    if "Select one part" in str(both.get("title") or ""):
+        return [f"multi move both blocked {both.get('title')!r}"]
 
     cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
     if cyl_err or not cyl_id:
