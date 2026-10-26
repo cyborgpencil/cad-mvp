@@ -2913,10 +2913,13 @@ def _set_sheet(cdp: Cdp, want_open: bool) -> list[str]:
 def _wait_snap(
     cdp: Cdp,
     axis: tuple[float, float, float],
-    distance: float,
+    distance: float | None,
     label: str,
+    *,
+    check_snap_timing: bool = True,
 ) -> list[str]:
-    deadline = time.time() + 1.2
+    # Home uses goView/animateSpherical (320 ms, may refit radius) — not cube face snap (250 ms).
+    deadline = time.time() + (1.6 if not check_snap_timing else 1.2)
     last: dict[str, Any] | None = None
     while time.time() < deadline:
         cdp.drain(0.03)
@@ -2935,13 +2938,24 @@ def _wait_snap(
             return [f"{label} direction {direction!r}"]
         angle = _angle_deg(direction, axis)
         try:
-            dist = abs(float(nav.get("distance")) - distance)
+            dist_ok = True
+            if distance is not None:
+                dist_ok = abs(float(nav.get("distance")) - distance) <= 0.05
             elapsed = float(nav.get("lastSnapMs") or 0)
             budget = float(nav.get("lastSnapBudget") or 0)
         except (TypeError, ValueError):
             return [f"{label} distance {nav.get('distance')!r}"]
+        if not check_snap_timing:
+            if angle <= 1.0 and dist_ok:
+                print(
+                    f"nav {label}: {angle:.3f} deg, distance {float(nav.get('distance')):.2f}",
+                    flush=True,
+                )
+                return []
+            time.sleep(0.02)
+            continue
         # The ease is 250 ms. Headless frames can land later; that lateness is not a longer ease.
-        if angle <= 1.0 and dist <= 0.05 and 0 < budget <= 250.0 and elapsed < 500.0:
+        if angle <= 1.0 and dist_ok and 0 < budget <= 250.0 and elapsed < 500.0:
             print(
                 f"nav {label}: {angle:.3f} deg, ease {budget:.0f} ms, frame {elapsed:.0f} ms, "
                 f"distance {float(nav.get('distance')):.2f}",
@@ -3159,7 +3173,14 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
     doubled = _double_tap_zone(cdp, home_zone)
     if doubled:
         return doubled
-    snapped = _wait_snap(cdp, (float(home[0]), float(home[1]), float(home[2])), distance, "home")
+    # Double-tap Home: goView/animateSpherical refits selection (SC3); not cube snap timing/distance.
+    snapped = _wait_snap(
+        cdp,
+        (float(home[0]), float(home[1]), float(home[2])),
+        None,
+        "home",
+        check_snap_timing=False,
+    )
     if snapped:
         return snapped
     time.sleep(0.4)
@@ -3172,6 +3193,7 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
         return ["drag zone missing"]
     x = float(drag_zone["x"])
     y = float(drag_zone["y"])
+    # On-cube: past tap slop (8) but under swipe (24) must not commit a face snap (SC1).
     dragged, drag_err = eval_expr(
         cdp,
         "(function(){"
@@ -3182,8 +3204,8 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
         "pointerId:7, pointerType:'touch', button:0, buttons:buttons, isPrimary:true}));"
         "}"
         f"fire('pointerdown', {x}, {y}, 1);"
-        f"fire('pointermove', {x + 36}, {y + 18}, 1);"
-        f"fire('pointerup', {x + 36}, {y + 18}, 0);"
+        f"fire('pointermove', {x + 16}, {y}, 1);"
+        f"fire('pointerup', {x + 16}, {y}, 0);"
         "return 'dragged';"
         "})()",
     )
@@ -3582,7 +3604,8 @@ def home_target_ready(aim: dict[str, Any], selected: bool) -> bool:
     target = aim.get("target")
     if not isinstance(target, list) or len(target) != 3:
         return False
-    if any(abs(float(v)) > 1e-6 for v in target):
+    # SC: Home centers selected model else 0,0,0. Only require origin when cleared.
+    if not selected and any(abs(float(v)) > 1e-6 for v in target):
         return False
     count = int(aim.get("selectionCount") or 0)
     sel_ok = count > 0 if selected else count == 0
@@ -7253,11 +7276,11 @@ def _asm_part(doc: dict[str, Any] | None, name: str) -> dict[str, Any]:
 
 
 def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
-    """Several bodies: the selected part shows the move gizmo and editable X/Y/Z.
+    """Several bodies: body/item selection shows the move gizmo (SC4 multi OK).
 
-    Repro before the fix: with more than one body, the gizmo stayed hidden and
-    the position fields were disabled, with no message. A plain primitive must
-    update its placement. A Boolean result may bake the translation.
+    Park SC4: gizmo centers on single or multi body/item. Then pick one part
+    and drag; a plain primitive must update its placement. A Boolean result
+    may bake the translation.
     """
     try:
         set_desktop(cdp)
@@ -7270,13 +7293,16 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
         return ["multi move load", *load_problems[:20]]
     if loaded.get("demo") != "assembly" or int(loaded.get("bodyCount") or 0) != 2:
         return [f"multi move scene {loaded.get('demo')!r} bodies {loaded.get('bodyCount')!r}"]
-    if loaded.get("gizmoVisible") is not False or loaded.get("posDisabled") is not True:
+    # SC4 / park: gizmo centers on multi body/item selection (not hidden).
+    if loaded.get("gizmoVisible") is not True or loaded.get("posDisabled") is not False:
         return [f"multi move both selected gizmo {loaded.get('gizmoVisible')!r} disabled {loaded.get('posDisabled')!r}"]
     both, both_err = _json_eval(cdp, MOVE_POS_EXPR)
     if both_err or not both:
         return [f"multi move both fields {both_err}"]
-    if both.get("disabled") is not True or "Select one part" not in str(both.get("title") or ""):
-        return [f"multi move both title {both}"]
+    if both.get("disabled") is not False or both.get("gizmo") is not True:
+        return [f"multi move both fields state {both}"]
+    if "Select one part" in str(both.get("title") or ""):
+        return [f"multi move both blocked {both.get('title')!r}"]
 
     cyl_id, cyl_err = _part_row_id(cdp, "Cylinder")
     if cyl_err or not cyl_id:
