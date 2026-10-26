@@ -185,7 +185,7 @@ Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate
 
 ## Queued after current in-flight (discuss / parked)
 
-End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, and ~10:27 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after remaining in-flight coding clears. L-bracket `agy` has already cleared via merged #165. Leave Pilot uninterrupted for any remaining coding. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
+End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, ~10:27 AM MT, and ~4:40 PM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after remaining in-flight coding clears. L-bracket `agy` has already cleared via merged #165. Leave Pilot uninterrupted for any remaining coding. Sketch chrome minimize and the Create → ortho plane sketch flow are **next after #181**. X-ray and panel chrome stay later in the queue. Antigravity brief for those two sketch items: `prompts/antigravity-sketch-chrome-flow.md`. No Antigravity prompt yet for X-ray, panel labels, or always-visible chrome. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
 
 - **Top-bar shelf icons (selection + show/hide camera)**
   - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
@@ -219,6 +219,18 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, and
   - Everything else must not stay on-screen permanently; use show/hide like other shelves.
   - **Status: discuss / parked.** Implement only after the current coding queue clears. No Antigravity prompt yet.
   - **TBD:** which existing UI regions map to “very top / tools menu bar / very bottom”, which other panels currently stay permanent and must become shelves, and any exceptions Erik did not state.
+- **Sketch chrome minimize (active sketch)**
+  - **Problem:** Arc+polygon hard to test — Arc dialog + floating toolbars eat the viewport.
+  - While a sketch process is active, **minimize / hide non-sketch chrome** — only sketching tools stay visible. Erik referred to the blue-circled sketch tool strip in his phone screenshot; do not invent which control ids that strip maps to. Hide the other floating shelves that crowd the view.
+  - **Status: discuss / parked → next coding after #181.**
+  - **TBD:** which existing shelves/panels count as non-sketch chrome vs the sketch tool strip; phone vs desktop placement; whether always-visible chrome from the prior park (very top / tools menu bar / very bottom) stays visible during sketch; Arc dialog placement beyond “don’t eat the viewport”.
+- **Sketch Create → ortho plane → sketch tools flow**
+  - Press Create.
+  - Pick any of the **six** orthographic views/planes: Front, Back, Top, Bottom, Left, Right.
+  - Once a plane/view is chosen, hide that view-selection menu and show **only** sketch-create tools.
+  - Keep **Finish Sketch**.
+  - **Status: discuss / parked → next coding after #181.**
+  - **TBD:** Create vs New Sketch naming if the UI differs; whether this replaces the current face-tap sketch plane path or is additive; control ids; layout of the six-plane picker.
 
 ## Success Criteria
 
