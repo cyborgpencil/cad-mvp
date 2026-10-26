@@ -3193,6 +3193,7 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
         return ["drag zone missing"]
     x = float(drag_zone["x"])
     y = float(drag_zone["y"])
+    # On-cube: past tap slop (8) but under swipe (24) must not commit a face snap (SC1).
     dragged, drag_err = eval_expr(
         cdp,
         "(function(){"
@@ -3203,8 +3204,8 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
         "pointerId:7, pointerType:'touch', button:0, buttons:buttons, isPrimary:true}));"
         "}"
         f"fire('pointerdown', {x}, {y}, 1);"
-        f"fire('pointermove', {x + 36}, {y + 18}, 1);"
-        f"fire('pointerup', {x + 36}, {y + 18}, 0);"
+        f"fire('pointermove', {x + 16}, {y}, 1);"
+        f"fire('pointerup', {x + 16}, {y}, 0);"
         "return 'dragged';"
         "})()",
     )
