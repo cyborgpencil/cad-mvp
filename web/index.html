@@ -3667,7 +3667,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function openCalloutEntry(dimId) {
     if (!dimId) return;
     const sketch = isSketchDimId(dimId) && sketchCalloutActive(dimId);
-    if (!sketch && !editingBasicShape()) return;
+    if (!sketch && (!editingBasicShape() || isPhoneCube())) return;
     const field = document.getElementById(dimId);
     const form = document.getElementById('calloutEntryForm');
     const entry = document.getElementById('calloutEntry');
@@ -3791,6 +3791,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const layer = document.getElementById('calloutLayer');
     if (!layer) return;
     const sketchSpecs = sketchCalloutSpecs();
+    if (isPhoneCube() && editingBasicShape() && !sketchSpecs) {
+      for (let i = 0; i < 3; i += 1) {
+        const row = document.getElementById('calloutRow' + i);
+        if (row) row.hidden = true;
+      }
+      layer.hidden = true;
+      hideCalloutEntry();
+      return;
+    }
     const specs = sketchSpecs || (editingBasicShape() ? calloutSpecs() : []);
     let shown = 0;
     for (let i = 0; i < 3; i += 1) {
@@ -3905,6 +3914,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const vpCy = vp.top + vp.height / 2;
     const coversVpCenter = !!(lr && vpCx >= lr.left - 0.5 && vpCx <= lr.right + 0.5
       && vpCy >= lr.top - 0.5 && vpCy <= lr.bottom + 0.5);
+    const dimPanel = document.getElementById('dimPanel');
+    const groupMap = { box: 'primBox', cylinder: 'primCyl', disc: 'primDisc' };
+    const groupId = prim && prim.kind ? groupMap[prim.kind] : '';
+    const groupEl = groupId ? document.getElementById(groupId) : null;
+    const sizeSpecs = editingBasicShape() ? calloutSpecs() : [];
+    const sizeFields = [];
+    for (let i = 0; i < sizeSpecs.length; i += 1) {
+      const spec = sizeSpecs[i];
+      const field = spec && spec.dim ? document.getElementById(spec.dim) : null;
+      const mm = field ? Number(field.getAttribute('data-mm')) : NaN;
+      sizeFields.push({
+        tag: spec.tag,
+        dim: spec.dim,
+        present: !!field,
+        editable: !!(field && !field.disabled && !field.readOnly),
+        groupHidden: !groupEl || groupEl.hidden === true,
+        value: field ? String(field.value || '').trim() : '',
+        formatted: Number.isFinite(mm) ? formatLength(mm) : '',
+        mm: Number.isFinite(mm) ? mm : null
+      });
+    }
     let coversBodyCenter = false;
     if (lr && prim && prim.params) {
       const sc = screenOfCad([
@@ -3929,7 +3959,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       phone: phone,
       dockedUnderHud: dockedUnderHud,
       coversVpCenter: coversVpCenter,
-      coversBodyCenter: coversBodyCenter
+      coversBodyCenter: coversBodyCenter,
+      dimPanelHidden: !dimPanel || dimPanel.hidden === true,
+      sizeFields: sizeFields
     };
   }
 
@@ -7852,7 +7884,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     layoutDimSheet();
     placeCreateMenu();
     syncClosedPanels();
-    placeCallouts();
+    paintCallouts();
   }
 
   function placeViewCube() {
