@@ -2,7 +2,7 @@
 
 **Status**: Confirmed  
 **Date**: 2026-10-20  
-**Scope**: Single-part 2D/3D design â†’ STL/3MF for any slicer. Browser-portable target (WASM). C++ kernel preferred.
+**Scope**: Single-part 2D/3D design → STL/3MF for any slicer. Browser-portable target (WASM). C++ kernel preferred.
 
 ## Overview
 
@@ -13,7 +13,7 @@ Tool for creating precise or freeform 3D parts from 2D sketches or direct modeli
 
 ## Goals
 
-- 2D sketch (constraints) â†’ 3D solid or mesh (extrude, revolve, boolean, fillet, freeform).
+- 2D sketch (constraints) → 3D solid or mesh (extrude, revolve, boolean, fillet, freeform).
 - Parametric history + direct edits.
 - High-quality tessellation to STL and 3MF.
 - MCP AI for natural-language design and validation ops.
@@ -52,12 +52,12 @@ flowchart LR
 ```
 
 > [!TIP]
-> Default tessellation to â€œslicer-safeâ€ (consistent normals, no holes). Allow user override for higher resolution.
+> Default tessellation to “slicer-safe” (consistent normals, no holes). Allow user override for higher resolution.
 
 ## AI / MCP
 
 - Built-in MCP server exposing: create sketch, extrude, fillet, boolean, heal, measure, validate, export.
-- Agent can execute â€œadd 2 mm fillet, check printability, and export 3MFâ€.
+- Agent can execute “add 2 mm fillet, check printability, and export 3MF”.
 
 ## Technical Notes
 
@@ -70,7 +70,6 @@ flowchart LR
 
 - **Callout hide (accepted 2026-10-26, Erik retest)**: On phone, while editing a basic shape (box / cylinder / disc, no sketch specs), `#calloutLayer` stays hidden. Size stays editable on `#dimPanel` / Properties (`boxSx`/`boxSy`/`boxSz`, cyl/disc Size). Shipped PR #123 merge `907402c` (tip `202a737`).
 - **`#dimPanel` keep-lock (Chief, 2026-10-26 ~1:09 AM MT)**: Keep the dim body (Size / Centre / Rot / axis / bbox / hole). No full remove until those fields migrate into Properties and phone typed resize is confirmed. Later safe cut only: drop gizmo row / thin selection bar. No `#dimPanel` remove code until then.
-
 
 ## Overnight queue + wake acceptance (team-locked 2026-10-26 ~3:07 AM MT)
 
