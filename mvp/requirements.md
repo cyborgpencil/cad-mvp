@@ -100,6 +100,31 @@ Chief Q5, after overnight (1)–(4). No invented sizes; every missing dimension 
 - **Dims TBD** (do not invent): leg A/B length×width; fit/clearance to frame casing; leg screw hole size, countersink, and spacing; Blink boss diameter/height; disc diameter and placement; disc screw count/size/pattern; Blink model; fillet/chamfer defaults; casing profile; screw gauge; printed hole oversize; material/printer.
 - **Locked** (restated from `mvp/projects/blink-l-bracket.md` only): wall thickness **4 mm**, disc thickness **4 mm**, corner **90°**, units **mm**. Everything else TBD.
 
+#### Toy truck feature list (discuss/spec; Digest 2026-10-26 ~8:14 AM MT; Chief locks same day)
+
+Parked under this Q5 discuss note. The L-bracket stays the primary rebuild. Locked L-bracket values above are unchanged. The truck stays discuss/spec. Queue it after the Q5 L-bracket. **Rebuild the truck only after L-bracket acceptance.** Units **mm**. Prefer **sketch → Blind Extrude + Union/Cut**. Intersect is not required. **No printer** send for Q5.
+
+Acceptance B sizes stay the discuss baseline only. Every size below is a **sourced team-chosen baseline** from Acceptance B (sourced, not invented). They are not Q5 locks. Prefer the **11-part** assembly (PLA hubs + TPU tires).
+
+- **Chassis/body** — MVP — plate 80×30×6 mm; two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up. **Sourced team-chosen baseline** (Acceptance B; PLA).
+- **Cab** — MVP — 30×30×25 mm box on the chassis front; Union into the chassis → 11 parts after combine. **Sourced team-chosen baseline** (Acceptance B; PLA).
+- **Bed/cargo box** — discuss — dimensions **TBD**. Do not invent.
+- **Axles ×2** — MVP — Ø4×44 mm (PLA). **Sourced team-chosen baseline** (Acceptance B).
+- **Wheel hubs ×4** — MVP — Ø16×8 mm with Ø4.2 bore (PLA). **Sourced team-chosen baseline** (Acceptance B). Bore via Cut.
+- **Tires ×4** — MVP for Acceptance B materials — ring OD 24 / ID 15.6 / width 8 (TPU; 0.2 stretch on the hub). **Sourced team-chosen baseline** (Acceptance B).
+- **Spokes** — discuss — dimensions **TBD**. Do not invent.
+- **Tread** — discuss — dimensions **TBD**. Do not invent.
+- **Interior** — discuss — dimensions **TBD**. Do not invent.
+- **Doors** — discuss — dimensions **TBD**. Do not invent.
+- **Boolean cuts** — axle holes, hub bore, and tire ID via Cut; body joins via Union. Prefer the **11-part** assembly (PLA hubs + TPU tires).
+- **Multi-plate Orca (PLA + TPU 95A)** — Acceptance B check, later relative to this Q5 discuss. **No printer** send.
+
+**Rebuild path** (only after L-bracket acceptance): sketch → Blind Extrude → Union/Cut → units + OCCT validity; export STL/3MF in mm when the export gate passes. Prefer the **11-part** assembly (PLA hubs + TPU tires).
+
+**Fillet/chamfer defaults:** non-blocking. No values until sourced. Do not invent.
+
+**Sources:** `mvp/acceptance-a-b.md` (truck parts, team-chosen 07:10 MT; 11 parts after the cab combine, Chief and 3T 07:15 MT); `web/PROGRESS.md` (07:10 and 07:15 notes); `research/assemblies.md` and `prompts/assemblies.md` (flat parts list, Combine, per-part 3MF, mm); `prompts/mobile-5-booleans.md` (Union/Cut; Intersect may stay in the UI; L-bracket sketch path); Q5 locks in this section (PR #150, merge `a38d89d`). Chief locks in this subsection (2026-10-26): Acceptance B sizes stay the discuss baseline only; prefer the 11-part assembly (PLA hubs + TPU tires); fillet/chamfer non-blocking; truck rebuild only after L-bracket acceptance. Chief refine same day: bed, spokes, tread, interior, and doors stay on the discuss list with dimensions TBD.
+
 ### After Rust #1 tip — Antigravity order
 1. (2) Empty-sketch / no-solid Create Sketch never spawns box.
 2. (4) Selection V/E/F: hide whole-body gizmo.
@@ -128,11 +153,12 @@ Leave smokes and Pages ready. **Human gate** = Erik runs this on [Pages](https:/
 3. **Boolean** — Two bodies → Union or Cut → result solid; undo restores prior.
 4. **Selection V/E/F (lock d / queue 4)** — Switch vertex / edge / face: whole-body gizmo **hidden** in those modes; body/item mode still shows gizmo.
 5. **View-cube swipe (lock c / queue 3)** — Swipe so the **adjacent** face steps in the swipe direction (not opposite-face flip). Invert L/R only if direction feels wrong.
-6. **Export STL + 3MF (lock e)** — Box or boolean result → Export STL and 3MF → units mm; Export enabled only when C++ Module.gate() passes (Rust dual-run may show #statusRustGate / window.__cadcamRustGate.matchesCpp===true when loaded — informational).
+6. **Export STL + 3MF (lock e)** — Box or boolean result → Export STL and 3MF → units mm; Export enabled only when C++ Module.gate() passes (Rust dual-run may show #statusRustGate / window.__cadcamRustGate.matchesCpp===true when loaded — informational). Concrete bar: Export acceptance checks (queue item 6) below, including the post–Q5 L-bracket solid when it exists.
 7. **Phone sanity (if testing phone)** — Basic-shape edit: #calloutLayer hidden; Size still editable on #dimPanel. No printer send.
 
 Pass = all seven feel right; fail notes go to the room (team discuss → Chief/3T call).
 
+<<<<<<< HEAD
 ## Queued after current in-flight (discuss / parked)
 
 End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for this item yet.
@@ -142,6 +168,21 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.*
   - Separate by tool type. Selection gets its own icon group. Any further tool-type groups are **TBD**.
   - Same behavior as the tools menu: press the icon to show or hide that shelf.
   - **TBD:** icon art, pixel sizes, hotkeys, which existing controls are the selection shelf and which are the show/hide camera shelf, which bar is the top bar (header or the ribbon that holds the Tools menu), phone and desktop placement, and whether any shelf besides those two moves.
+=======
+#### Export acceptance checks (queue item 6)
+
+Concrete bar for wake checklist item 6 / lock **(e)**. Pilot runs it after the Q5 L-bracket rebuild, and the same checks cover an ordinary boot box or boolean export. E2E stays STL + 3MF only; STEP later. Write blocks match `mvp/export.md`.
+
+- **Export enable.** The Export button is enabled only when C++ `Module.gate()` passes (units mm). `#statusRustGate` and `window.__cadcamRustGate.matchesCpp` are informational when the Rust dual-run has loaded. OCCT-after-ops still runs and does not block Export.
+- **Both files.** Export STL and 3MF successfully for (a) the boot box or a boolean result and (b) the post–Q5 L-bracket solid when that solid exists. L-bracket path: sketch → Blind Extrude (New/Join/Cut) + Union/Cut. `mvp/projects/blink-l-bracket.md` is reference only.
+- **Units in the file.** The 3MF model unit is `millimeter`. STL coordinates are millimeters.
+- **Write blocked.** No triangles → `FAIL: mesh has no triangles.` Zero or non-positive volume on the floor (|volume| <= 1e-9 mm3) → `FAIL: mesh has zero volume.` Inside-out (negative volume, volume < -1e-9 mm3) → `FAIL: mesh is inside-out (negative volume).` Each of these blocks the write.
+- **INFO only.** Free-edge count and `is_watertight` are shown as information only. They do not gate Export. `is_watertight` does not decide the offline checker exit code.
+- **Optional offline expect.** When expected size and volume are known, run `tools/check_export.py` and/or `cadcam_check_export` on the STL and 3MF. CI box (20 × 20 × 20 mm, volume 8000 mm3): `--expect-size 20 20 20 --expect-volume 8000` on `builds/export/box.stl` and `builds/export/box.3mf`. L-bracket: skip that numeric expect until dimensions lock. Both tools require `--expect-size` and `--expect-volume`, so do not invoke them on the L-bracket files while size or volume is TBD. Until then the L-bracket bar is a successful STL + 3MF export, units mm, and the C++ gate. Locked physical values only: wall thickness 4 mm, disc thickness 4 mm, corner 90°, units mm. Every other size stays TBD.
+- **No printer.** No printer send for Q5 or this acceptance.
+
+Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate()` passed, and none of the write-block messages on those files. Watertight stays INFO. L-bracket numeric expect stays skipped while sizes are TBD.
+>>>>>>> origin/main
 
 ## Success Criteria
 
