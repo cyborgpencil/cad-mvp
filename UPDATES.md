@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #130 (merged at 7ab9645): docs - overnight locks (a)-(f) + post-#1 order (2)->(4)->(3)->(1) in mvp/requirements.md (tip 1afd862).
+- 2026-10-26 PR #128 (merged at f74e02a): docs - overnight queue + wake acceptance in mvp/requirements.md (tip aa7b8ad).
 - 2026-10-26 PR #126 (merged at 2e57032): docs - Antigravity Rust WASM units+volume gate brief (prompts/antigravity-rust-units-gate.md; tip 1491bbf).
 - 2026-10-26 PR #125 (merged at a18e191): docs - phone callout hide + dimPanel keep-lock in mvp/requirements.md (tip cd57a07).
 - 2026-10-26 PR #123 (merged at 907402c): Antigravity phone hide calloutLayer for basic shapes (Size stays on dimPanel; tip 202a737).
