@@ -2913,10 +2913,13 @@ def _set_sheet(cdp: Cdp, want_open: bool) -> list[str]:
 def _wait_snap(
     cdp: Cdp,
     axis: tuple[float, float, float],
-    distance: float,
+    distance: float | None,
     label: str,
+    *,
+    check_snap_timing: bool = True,
 ) -> list[str]:
-    deadline = time.time() + 1.2
+    # Home uses goView/animateSpherical (320 ms, may refit radius) — not cube face snap (250 ms).
+    deadline = time.time() + (1.6 if not check_snap_timing else 1.2)
     last: dict[str, Any] | None = None
     while time.time() < deadline:
         cdp.drain(0.03)
@@ -2935,13 +2938,24 @@ def _wait_snap(
             return [f"{label} direction {direction!r}"]
         angle = _angle_deg(direction, axis)
         try:
-            dist = abs(float(nav.get("distance")) - distance)
+            dist_ok = True
+            if distance is not None:
+                dist_ok = abs(float(nav.get("distance")) - distance) <= 0.05
             elapsed = float(nav.get("lastSnapMs") or 0)
             budget = float(nav.get("lastSnapBudget") or 0)
         except (TypeError, ValueError):
             return [f"{label} distance {nav.get('distance')!r}"]
+        if not check_snap_timing:
+            if angle <= 1.0 and dist_ok:
+                print(
+                    f"nav {label}: {angle:.3f} deg, distance {float(nav.get('distance')):.2f}",
+                    flush=True,
+                )
+                return []
+            time.sleep(0.02)
+            continue
         # The ease is 250 ms. Headless frames can land later; that lateness is not a longer ease.
-        if angle <= 1.0 and dist <= 0.05 and 0 < budget <= 250.0 and elapsed < 500.0:
+        if angle <= 1.0 and dist_ok and 0 < budget <= 250.0 and elapsed < 500.0:
             print(
                 f"nav {label}: {angle:.3f} deg, ease {budget:.0f} ms, frame {elapsed:.0f} ms, "
                 f"distance {float(nav.get('distance')):.2f}",
@@ -3159,7 +3173,14 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
     doubled = _double_tap_zone(cdp, home_zone)
     if doubled:
         return doubled
-    snapped = _wait_snap(cdp, (float(home[0]), float(home[1]), float(home[2])), distance, "home")
+    # Double-tap Home: goView/animateSpherical refits selection (SC3); not cube snap timing/distance.
+    snapped = _wait_snap(
+        cdp,
+        (float(home[0]), float(home[1]), float(home[2])),
+        None,
+        "home",
+        check_snap_timing=False,
+    )
     if snapped:
         return snapped
     time.sleep(0.4)
