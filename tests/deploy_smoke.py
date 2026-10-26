@@ -177,6 +177,8 @@ def libcascade_gaps() -> list[str]:
         ROOT / "web" / "dist" / "init.single.js",
         ROOT / "web" / "dist" / "opencascade_single.js",
         ROOT / "web" / "dist" / "opencascade_single.wasm",
+        ROOT / "web" / "dist" / "cadcam_rust_gate.js",
+        ROOT / "web" / "dist" / "cadcam_rust_gate_bg.wasm",
     ]
     missing = [str(path.relative_to(ROOT)) for path in needed if not path.is_file()]
     if not missing:
@@ -508,6 +510,11 @@ CASES = (
         "expect": "occtReady and gate FAIL, units pass, Export enabled",
     },
     {
+        "name": "flipped_box",
+        "query": "/?fixture=flipped_box&tab=export",
+        "expect": "occtReady, inside-out negative volume blocked by C++ and Rust",
+    },
+    {
         "name": "box_face",
         "query": "/?primitive=box&select=face",
         "expect": "occtReady, face selected",
@@ -601,6 +608,140 @@ def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[
             problems.append(f"{name}: lastError {state.get('lastError')!r}")
         if state.get("booleanOp") != expected_op:
             problems.append(f"{name}: booleanOp {state.get('booleanOp')!r}, want {expected_op!r}")
+    elif name == "flipped_box":
+        if state.get("fixture") != "flipped_box":
+            problems.append(f"{name}: fixture {state.get('fixture')!r}")
+        if state.get("exportAllowed") is not False or state.get("exportDisabled") is not True:
+            problems.append(f"{name}: inside-out mesh did not block Export ({state.get('exportAllowed')!r})")
+        inside_out_msg = "FAIL: mesh is inside-out (negative volume)."
+        if state.get("blockReason") != inside_out_msg:
+            problems.append(f"{name}: C++ blockReason {state.get('blockReason')!r}")
+    rust = state.get("rustGate") if isinstance(state.get("rustGate"), dict) else {}
+    if name in ("closed_box", "open_box"):
+        if (
+            rust.get("ready") is not True
+            or rust.get("exportAllowed") is not True
+            or rust.get("unitsPass") is not True
+            or rust.get("meshPass") is not True
+            or rust.get("matchesCpp") is not True
+            or str(rust.get("blockReason") or "") != ""
+            or not str(rust.get("statusText") or "").startswith("RustGate: PASS")
+        ):
+            problems.append(f"{name}: rustGate {rust!r}")
+        try:
+            rust_vol = float(rust.get("volumeMm3"))
+            cpp_vol = float(state.get("cppVolumeMm3"))
+        except (TypeError, ValueError):
+            rust_vol = float("nan")
+            cpp_vol = float("nan")
+        if not math.isfinite(rust_vol) or not math.isfinite(cpp_vol) or abs(rust_vol - cpp_vol) > 1e-9:
+            problems.append(f"{name}: volume mismatch rust={rust.get('volumeMm3')!r} cpp={state.get('cppVolumeMm3')!r}")
+        if name == "closed_box" and abs(rust_vol - 1.0) > 1e-9:
+            problems.append(f"{name}: expected 1.0 mm3 volume, got {rust_vol!r}")
+    elif name == "flipped_box":
+        inside_out_msg = "FAIL: mesh is inside-out (negative volume)."
+        if (
+            rust.get("ready") is not True
+            or rust.get("exportAllowed") is not False
+            or rust.get("unitsPass") is not True
+            or rust.get("meshPass") is not False
+            or rust.get("matchesCpp") is not True
+            or rust.get("blockReason") != inside_out_msg
+            or not str(rust.get("statusText") or "").startswith("RustGate: FAIL")
+        ):
+            problems.append(f"{name}: rustGate {rust!r}")
+        try:
+            rust_vol = float(rust.get("volumeMm3"))
+            cpp_vol = float(state.get("cppVolumeMm3"))
+        except (TypeError, ValueError):
+            rust_vol = float("nan")
+            cpp_vol = float("nan")
+        if not math.isfinite(rust_vol) or not math.isfinite(cpp_vol) or abs(rust_vol - cpp_vol) > 1e-9 or abs(rust_vol + 1.0) > 1e-9:
+            problems.append(f"{name}: inside-out volume rust={rust.get('volumeMm3')!r} cpp={state.get('cppVolumeMm3')!r}")
+    return problems
+
+
+def rust_gate_probe_problems(cdp: Cdp, case_name: str) -> list[str]:
+    expr = (
+        "(function(){"
+        "var rg=window.__cadcamRustGate||null;"
+        "var st=window.__cadcamExportState||null;"
+        "var dom=document.getElementById('statusRustGate');"
+        "var badge=document.getElementById('gateRust');"
+        "var empty=rg&&typeof rg.eval==='function'?rg.eval({vertices:[],triangles:[]}):null;"
+        "var unitsBad=rg&&typeof rg.eval==='function'?rg.eval({vertices:[],triangles:[],storage:'inch'}):null;"
+        "var d254=rg&&typeof rg.toDisplay==='function'?rg.toDisplay(25.4,true):null;"
+        "var m254=rg&&typeof rg.toMillimeters==='function'?rg.toMillimeters(1.0,true):null;"
+        "var rt1=rg&&typeof rg.toDisplay==='function'&&typeof rg.toMillimeters==='function'?rg.toMillimeters(rg.toDisplay(1.0,true),true):null;"
+        "return JSON.stringify({"
+        "rg:rg?{ready:rg.ready,exportAllowed:rg.exportAllowed,blockReason:rg.blockReason,volumeMm3:rg.volumeMm3,unitsPass:rg.unitsPass,meshPass:rg.meshPass,matchesCpp:rg.matchesCpp}:null,"
+        "domText:dom?String(dom.textContent||''):'',"
+        "badgeText:badge?String(badge.textContent||''):'',"
+        "empty:empty,"
+        "unitsBad:unitsBad,"
+        "d254:d254,m254:m254,rt1:rt1,"
+        "liveAllowedAfter:st?st.exportAllowed:null"
+        "});"
+        "})()"
+    )
+    raw, err = eval_expr(cdp, expr)
+    if err or not isinstance(raw, str) or not raw.startswith("{"):
+        return [f"{case_name}: rust_gate_probe {raw or err}"]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"{case_name}: rust_gate_probe json {raw}"]
+    problems: list[str] = []
+    rg = data.get("rg") if isinstance(data.get("rg"), dict) else {}
+    dom_text = str(data.get("domText") or "")
+    badge_text = str(data.get("badgeText") or "")
+    if case_name == "closed_box":
+        if (
+            rg.get("ready") is not True
+            or rg.get("exportAllowed") is not True
+            or rg.get("matchesCpp") is not True
+            or badge_text != "PASS"
+            or not dom_text.startswith("RustGate: PASS")
+            or data.get("liveAllowedAfter") is not True
+        ):
+            problems.append(f"{case_name}: window.__cadcamRustGate/DOM {data!r}")
+    elif case_name == "flipped_box":
+        inside_out = "FAIL: mesh is inside-out (negative volume)."
+        if (
+            rg.get("ready") is not True
+            or rg.get("exportAllowed") is not False
+            or rg.get("blockReason") != inside_out
+            or rg.get("matchesCpp") is not True
+            or badge_text != "FAIL"
+            or not dom_text.startswith("RustGate: FAIL")
+            or inside_out not in dom_text
+            or data.get("liveAllowedAfter") is not False
+        ):
+            problems.append(f"{case_name}: window.__cadcamRustGate/DOM {data!r}")
+    empty = data.get("empty") if isinstance(data.get("empty"), dict) else {}
+    if (
+        empty.get("exportAllowed") is not False
+        or empty.get("unitsPass") is not True
+        or empty.get("meshPass") is not False
+        or empty.get("blockReason") != "FAIL: mesh has no triangles."
+        or empty.get("matchesCpp") is not True
+    ):
+        problems.append(f"{case_name}: empty eval {empty!r}")
+    units_bad = data.get("unitsBad") if isinstance(data.get("unitsBad"), dict) else {}
+    if (
+        units_bad.get("exportAllowed") is not False
+        or units_bad.get("unitsPass") is not False
+        or units_bad.get("blockReason") != "FAIL: export unit is not millimeter."
+    ):
+        problems.append(f"{case_name}: unitsBad eval {units_bad!r}")
+    if data.get("d254") != 1.0 or data.get("m254") != 25.4:
+        problems.append(f"{case_name}: unit conversion 25.4 -> {data.get('d254')!r}, 1.0 -> {data.get('m254')!r}")
+    try:
+        rt1 = float(data.get("rt1"))
+    except (TypeError, ValueError):
+        rt1 = float("nan")
+    if not math.isfinite(rt1) or abs(rt1 - 1.0) > 2.3e-16:
+        problems.append(f"{case_name}: 1 mm round-trip {data.get('rt1')!r}")
     return problems
 
 
@@ -7250,6 +7391,8 @@ def run(omit: list[str]) -> int:
                     failures.extend(problems[:40])
                     break
             case_problems = check_case(case["name"], state, str(case.get("op") or ""))
+            if case["name"] in ("closed_box", "flipped_box") and not case_problems:
+                case_problems.extend(rust_gate_probe_problems(cdp, case["name"]))
             shown = json.dumps(state, separators=(",", ":"))
             print(f"{case['name']}={shown}", flush=True)
             print(

@@ -23,6 +23,8 @@ DIST_FILES = (
     "dist/init.single.js",
     "dist/opencascade_single.js",
     "dist/opencascade_single.wasm",
+    "dist/cadcam_rust_gate.js",
+    "dist/cadcam_rust_gate_bg.wasm",
 )
 
 # Names that must be in the tree. A new import has to land in this tuple
@@ -43,9 +45,12 @@ REQUIRED = (
     "three-finger.mjs",
     "field-nudge.mjs",
     "phone-select.mjs",
+    "rust-gate.mjs",
     "dist/init.single.js",
     "dist/opencascade_single.js",
     "dist/opencascade_single.wasm",
+    "dist/cadcam_rust_gate.js",
+    "dist/cadcam_rust_gate_bg.wasm",
     ".nojekyll",
 )
 
@@ -129,7 +134,7 @@ def stamp_static_imports(source: str, stamp: str) -> str:
         return match.group(1) + _with_version(match.group(2), stamp) + match.group(3)
 
     return re.sub(
-        r"""(\bfrom\s+["'])(\./[^"']+\.mjs)(["'])""",
+        r"""(\bfrom\s+["'])(\./[^"']+\.(?:mjs|js))(["'])""",
         repl,
         source,
     )
@@ -204,7 +209,7 @@ def assemble(dest: Path, omit: list[str] | None = None) -> list[str]:
         stamp = build_stamp()
         page = dest / "index.html"
         page.write_text(stamp_page(page.read_text(encoding="utf-8"), stamp), encoding="utf-8")
-        for rel in ("occt-primitives.mjs", "occt-ops.mjs", "project-file.mjs", "assemblies.mjs"):
+        for rel in ("occt-primitives.mjs", "occt-ops.mjs", "project-file.mjs", "assemblies.mjs", "rust-gate.mjs"):
             if rel not in copied:
                 continue
             module = dest / rel

@@ -50,6 +50,7 @@ qrc_*.cpp
 node_modules/
 *.wasm
 web/dist/
+rust/**/target/
 tests/fixtures/blink.*
 
 # user project saves
