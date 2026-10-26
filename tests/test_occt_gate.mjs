@@ -40,6 +40,8 @@ const { buildBox, buildCylinder, buildDisc, PLACEHOLDER_BOX_MM, PLACEHOLDER_CYLI
 const ops = await import(opsUrl);
 const projectUrl = pathToFileURL(path.join(root, 'web', 'project-file.mjs')).href;
 const projectFile = await import(projectUrl);
+const assembliesUrl = pathToFileURL(path.join(root, 'web', 'assemblies.mjs')).href;
+const assemblies = await import(assembliesUrl);
 const { normalizeBox, normalizeCylinder, normalizeDisc } = await import(primUrl);
 const blinkPath = path.join(root, 'tests', 'fixtures', 'blink.mjs');
 const blinkUrl = pathToFileURL(blinkPath).href;
@@ -1380,6 +1382,189 @@ if (sketchCube) sketchCube.delete();
   const q5Stl = q5FinalView ? ops.binaryStlBytes(q5FinalView.mesh) : new Uint8Array(0);
   expect('q5 stl export bytes', q5Stl.byteLength > 84);
   if (q5Solid) q5Solid.delete();
+}
+
+// Q5 11-part toy-truck MVP (sketch -> Blind Extrude (New/Join/Cut) -> Union/Cut, mm, no printer).
+// Sourced Acceptance B baselines:
+// 1. Chassis/body (PLA): 80x30 mm, Blind Extrude 6 mm; two Ø4.4 holes across 30 mm width, 10 mm in from each end, 3 mm up, via Cut.
+// 2. Cab (PLA): 30x30 mm on chassis top at front, Blind Extrude 25 mm, Union into chassis.
+// 3. Axles x2 (PLA): Ø4 circle, Blind Extrude 44 mm (New).
+// 4. Wheel hubs x4 (PLA): Ø16 circle, Blind Extrude 8 mm, bore Ø4.2 via Cut.
+// 5. Tires x4 (TPU): ring OD 24 / ID 15.6 / width 8, ID via Cut (0.2 stretch on hub).
+{
+  const truckParts = [];
+  function checkTruckOp(label, shape, wantVol, tol) {
+    const view = shape ? inspectSolid(oc, shape) : null;
+    const vol = shape ? ops.solidVolumeMm3(oc, shape) : 0;
+    const ok = !!(view && view.units === 'mm' && view.gate && view.gate.pass === true)
+      && (wantVol == null || Math.abs(vol - wantVol) <= (tol || 1.0));
+    expect('truck ' + label + ' occt & mm', ok);
+    return view;
+  }
+
+  // 1. Chassis plate 80x30x6 mm + two Ø4.4 through-holes across 30 mm width at X=10,70 and Z=3 via Cut.
+  const chassisRect = ops.makeRectFace(oc, [0, 0, 0], [1, 0, 0], [0, 1, 0], 80, 30);
+  expect('truck chassis sketch rect 80x30', !!chassisRect);
+  let bodyShape = chassisRect ? ops.makePrismSolid(oc, chassisRect, 0, 0, 6) : null;
+  if (chassisRect) chassisRect.delete();
+  const plateVol = 80 * 30 * 6;
+  checkTruckOp('chassis extrude 6mm', bodyShape, plateVol, 0.5);
+
+  const holeRadius = 4.4 / 2;
+  const oneHoleVol = Math.PI * holeRadius * holeRadius * 30;
+  const holeXs = [10, 70];
+  for (let hi = 0; hi < holeXs.length; hi += 1) {
+    const hFace = ops.makeCircleFace(oc, [holeXs[hi], 0, 3], [0, 1, 0], 4.4);
+    const hPrism = hFace ? ops.makePrismSolid(oc, hFace, 0, 30, 0) : null;
+    if (hFace) hFace.delete();
+    checkTruckOp('chassis hole ' + (hi + 1) + ' prism', hPrism, oneHoleVol, 0.5);
+    const hCut = ops.applyBooleanSolids(oc, 'cut', bodyShape, hPrism);
+    if (hPrism) hPrism.delete();
+    if (bodyShape) bodyShape.delete();
+    bodyShape = hCut && hCut.ok ? hCut.shape : null;
+    checkTruckOp('chassis hole ' + (hi + 1) + ' cut', bodyShape, plateVol - (hi + 1) * oneHoleVol, 1.5);
+  }
+
+  // 2. Cab 30x30 mm on chassis top (Z=6) at front (X: 0..30, Y: 0..30), Blind Extrude 25 mm, Union into chassis.
+  const cabRect = ops.makeRectFace(oc, [0, 0, 6], [1, 0, 0], [0, 1, 0], 30, 30);
+  expect('truck cab sketch rect 30x30', !!cabRect);
+  const cabPrism = cabRect ? ops.makePrismSolid(oc, cabRect, 0, 0, 25) : null;
+  if (cabRect) cabRect.delete();
+  const cabVol = 30 * 30 * 25;
+  checkTruckOp('cab extrude 25mm', cabPrism, cabVol, 0.5);
+  const cabUnion = ops.applyBooleanSolids(oc, 'union', bodyShape, cabPrism);
+  if (cabPrism) cabPrism.delete();
+  if (bodyShape) bodyShape.delete();
+  bodyShape = cabUnion && cabUnion.ok ? cabUnion.shape : null;
+  const bodyView = checkTruckOp('cab union into chassis', bodyShape, plateVol - 2 * oneHoleVol + cabVol, 2.0);
+  truckParts.push({
+    id: 'b1',
+    name: 'Chassis Body',
+    material: 'PLA',
+    shape: bodyShape,
+    mesh: bodyView ? bodyView.mesh : { vertices: [], triangles: [] },
+    shapeLocal: false,
+    placement: { x: 0, y: 0, z: 0 },
+  });
+
+  // 3. Axles x2 (PLA): Ø4 circle, Blind Extrude 44 mm (New) at the sourced hole centres.
+  const axleVol = Math.PI * 2 * 2 * 44;
+  for (let ai = 0; ai < 2; ai += 1) {
+    const aFace = ops.makeCircleFace(oc, [holeXs[ai], 0, 3], [0, 1, 0], 4);
+    const aSolid = aFace ? ops.makePrismSolid(oc, aFace, 0, 44, 0) : null;
+    if (aFace) aFace.delete();
+    const aView = checkTruckOp('axle ' + (ai + 1) + ' extrude 44mm', aSolid, axleVol, 1.0);
+    truckParts.push({
+      id: 'b' + (truckParts.length + 1),
+      name: 'Axle ' + (ai + 1),
+      material: 'PLA',
+      shape: aSolid,
+      mesh: aView ? aView.mesh : { vertices: [], triangles: [] },
+      shapeLocal: false,
+      placement: { x: 0, y: 0, z: 0 },
+    });
+  }
+
+  // 4. Wheel hubs x4 (PLA): Ø16 circle, Blind Extrude 8 mm, bore Ø4.2 via Cut.
+  const hubOuterVol = Math.PI * 8 * 8 * 8;
+  const hubBoreVol = Math.PI * 2.1 * 2.1 * 8;
+  const hubFinalVol = hubOuterVol - hubBoreVol;
+  for (let wi = 0; wi < 4; wi += 1) {
+    const cx = 15 + wi * 20;
+    const cy = 50;
+    const wFace = ops.makeCircleFace(oc, [cx, cy, 0], [0, 0, 1], 16);
+    let wSolid = wFace ? ops.makePrismSolid(oc, wFace, 0, 0, 8) : null;
+    if (wFace) wFace.delete();
+    checkTruckOp('hub ' + (wi + 1) + ' extrude 8mm', wSolid, hubOuterVol, 1.5);
+    const bFace = ops.makeCircleFace(oc, [cx, cy, 0], [0, 0, 1], 4.2);
+    const bSolid = bFace ? ops.makePrismSolid(oc, bFace, 0, 0, 8) : null;
+    if (bFace) bFace.delete();
+    checkTruckOp('hub ' + (wi + 1) + ' bore prism', bSolid, hubBoreVol, 0.5);
+    const bCut = ops.applyBooleanSolids(oc, 'cut', wSolid, bSolid);
+    if (bSolid) bSolid.delete();
+    if (wSolid) wSolid.delete();
+    wSolid = bCut && bCut.ok ? bCut.shape : null;
+    const wView = checkTruckOp('hub ' + (wi + 1) + ' bore cut', wSolid, hubFinalVol, 1.5);
+    truckParts.push({
+      id: 'b' + (truckParts.length + 1),
+      name: 'Wheel Hub ' + (wi + 1),
+      material: 'PLA',
+      shape: wSolid,
+      mesh: wView ? wView.mesh : { vertices: [], triangles: [] },
+      shapeLocal: false,
+      placement: { x: 0, y: 0, z: 0 },
+    });
+  }
+
+  // 5. Tires x4 (TPU): ring OD 24 / ID 15.6 / width 8, ID via Cut (0.2 stretch on Ø16 hub).
+  const tireOuterVol = Math.PI * 12 * 12 * 8;
+  const tireIdVol = Math.PI * 7.8 * 7.8 * 8;
+  const tireFinalVol = tireOuterVol - tireIdVol;
+  for (let ti = 0; ti < 4; ti += 1) {
+    const cx = 15 + ti * 30;
+    const cy = 80;
+    const tFace = ops.makeCircleFace(oc, [cx, cy, 0], [0, 0, 1], 24);
+    let tSolid = tFace ? ops.makePrismSolid(oc, tFace, 0, 0, 8) : null;
+    if (tFace) tFace.delete();
+    checkTruckOp('tire ' + (ti + 1) + ' extrude 8mm', tSolid, tireOuterVol, 2.0);
+    const idFace = ops.makeCircleFace(oc, [cx, cy, 0], [0, 0, 1], 15.6);
+    const idSolid = idFace ? ops.makePrismSolid(oc, idFace, 0, 0, 8) : null;
+    if (idFace) idFace.delete();
+    checkTruckOp('tire ' + (ti + 1) + ' id prism', idSolid, tireIdVol, 1.5);
+    const idCut = ops.applyBooleanSolids(oc, 'cut', tSolid, idSolid);
+    if (idSolid) idSolid.delete();
+    if (tSolid) tSolid.delete();
+    tSolid = idCut && idCut.ok ? idCut.shape : null;
+    const tView = checkTruckOp('tire ' + (ti + 1) + ' id cut', tSolid, tireFinalVol, 2.0);
+    truckParts.push({
+      id: 'b' + (truckParts.length + 1),
+      name: 'Tire ' + (ti + 1),
+      material: 'TPU',
+      shape: tSolid,
+      mesh: tView ? tView.mesh : { vertices: [], triangles: [] },
+      shapeLocal: false,
+      placement: { x: 0, y: 0, z: 0 },
+    });
+  }
+
+  expect('truck 11 parts total', truckParts.length === 11);
+  const plaCount = truckParts.filter((p) => p.material === 'PLA').length;
+  const tpuCount = truckParts.filter((p) => p.material === 'TPU').length;
+  expect('truck 7 PLA + 4 TPU parts', plaCount === 7 && tpuCount === 4);
+
+  // Do not Combine a hub with a tire (mixed materials; sourced in mvp/acceptance-a-b.md).
+  const mixedCombine = assemblies.combineParts(oc, [truckParts[3], truckParts[7]]);
+  expect(
+    'truck mixed hub+tire combine refused',
+    !!(mixedCombine && mixedCombine.ok === false && mixedCombine.shape === null && mixedCombine.error === assemblies.ERR_MIXED)
+  );
+
+  // Export STL and 11-part 3MF in mm.
+  const allVerts = [];
+  const allTris = [];
+  for (let pi = 0; pi < truckParts.length; pi += 1) {
+    const m = truckParts[pi].mesh;
+    const base = allVerts.length;
+    for (let v = 0; v < m.vertices.length; v += 1) allVerts.push(m.vertices[v]);
+    for (let t = 0; t < m.triangles.length; t += 1) {
+      const tri = m.triangles[t];
+      allTris.push([tri[0] + base, tri[1] + base, tri[2] + base]);
+    }
+  }
+  const truckStl = ops.binaryStlBytes({ vertices: allVerts, triangles: allTris });
+  expect('truck stl export bytes', truckStl.byteLength > 84);
+  const truck3mf = assemblies.exportAssembly3mf(oc, truckParts);
+  expect(
+    'truck 3mf export 11 parts in mm',
+    !!(truck3mf && truck3mf.ok === true && truck3mf.bytes && truck3mf.bytes.byteLength > 200)
+      && truck3mf.xml.includes('unit="millimeter"')
+      && (truck3mf.xml.match(/<item /g) || []).length === 11
+  );
+
+  for (let pi = 0; pi < truckParts.length; pi += 1) {
+    if (truckParts[pi].shape) truckParts[pi].shape.delete();
+  }
+  console.log('TRUCK_MVP_DONE');
 }
 
 if (failures !== 0) {
