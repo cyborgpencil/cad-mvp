@@ -128,6 +128,18 @@ jobs:
           python3 web/fetch-libcascade.py
           test -f web/dist/opencascade_single.wasm
           test -f web/occt-gate.mjs
+      - name: Build Rust units/volume gate WASM
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --target wasm32-unknown-unknown
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo test --manifest-path rust/cadcam_gate/Cargo.toml
+          python3 web/build-rust-gate.py
+          test -f web/dist/cadcam_rust_gate.js
+          test -f web/dist/cadcam_rust_gate_bg.wasm
+          test -f web/rust-gate.mjs
       - name: Assemble site
         if: steps.changes.outputs.code == 'true'
         # web/assemble_site.py is the only file list. tests/deploy_smoke.py calls it too.

@@ -8716,6 +8716,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       btn.title = state.exportAllowed ? 'Export STL or 3MF' : (blocked || 'Export blocked until units pass.');
     }
     if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
+    publishGateState();
   }
 
   function clearedReport() {
@@ -8759,13 +8760,43 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (state.sceneCleared) report = clearedReport();
     state.watertight = !!report.watertightPass;
     state.unitsPass = !!report.unitsPass;
-    state.meshPass = report.meshPass !== false;
-    state.cppExportAllowed = !!report.exportAllowed;
-    state.cppBlockReason = report.blockReason || '';
+    const hasMeshPass = typeof report.meshPass === 'boolean';
+    const rawVol = Number(report.volumeMm3) || 0;
+    let derivedMeshPass = hasMeshPass ? report.meshPass : true;
+    let derivedMeshMsg = report.meshMessage || '';
+    if (!hasMeshPass) {
+      const idxLen = (!state.sceneCleared && typeof Module.meshIndices === 'function')
+        ? Module.meshIndices().length
+        : 0;
+      if (idxLen < 3) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh has no triangles.';
+      } else if (rawVol < -1e-9) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh is inside-out (negative volume).';
+      } else if (rawVol <= 1e-9) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh has zero volume.';
+      } else {
+        derivedMeshPass = true;
+        derivedMeshMsg = 'PASS: mesh has volume.';
+      }
+    }
+    const derivedUnitsMsg = report.unitsMessage || (state.unitsPass
+      ? 'PASS: export unit is millimeter.'
+      : 'FAIL: export unit is not millimeter.');
+    const derivedReason = hasMeshPass
+      ? (report.blockReason || '')
+      : (state.sceneCleared
+        ? 'Nothing to export.'
+        : (!state.unitsPass ? derivedUnitsMsg : (!derivedMeshPass ? derivedMeshMsg : '')));
+    state.meshPass = derivedMeshPass;
+    state.cppExportAllowed = hasMeshPass ? !!report.exportAllowed : (!state.sceneCleared && state.unitsPass && derivedMeshPass);
+    state.cppBlockReason = derivedReason;
     state.cppVolumeMm3 = Number(report.volumeMm3) || 0;
     state.exportAllowed = false;
     state.exportUnit = report.exportUnit || 'millimeter';
-    state.failReason = report.blockReason || '';
+    state.failReason = derivedReason;
     state.volumeMm3 = Number(report.volumeMm3) || 0;
     state.widthMm = Number(report.widthMm) || 0;
     state.depthMm = Number(report.depthMm) || 0;
@@ -8773,7 +8804,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.unit = report.displayUnit === 'in' ? 'in' : 'mm';
     state.watertightMessage = report.watertightMessage || '';
     state.unitsMessage = report.unitsMessage || '';
-    state.meshMessage = report.meshMessage || '';
+    state.meshMessage = derivedMeshMsg;
     const volNodes = document.querySelectorAll('#statusVol, #gateVol');
     for (let i = 0; i < volNodes.length; i++) {
       volNodes[i].setAttribute('data-mm', String(state.volumeMm3));
