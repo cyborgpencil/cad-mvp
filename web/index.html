@@ -473,23 +473,25 @@
   .origin-planes {
     display: flex;
     flex: none;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     min-width: 0;
-    padding: 4px 12px;
+    padding: 4px 8px;
     background: var(--finish);
     border-bottom: 1px solid var(--line-strong);
   }
   .origin-planes[hidden] { display: none !important; }
   .origin-planes button {
-    flex: 1 1 44px;
+    flex: 1 1 54px;
     min-width: 44px;
     min-height: 44px;
     height: 44px;
-    padding: 0 12px;
+    padding: 0 6px;
     border-radius: 8px;
     background: var(--tab-bg);
     border: 1px solid var(--line);
+    font-size: 12px;
     font-weight: 650;
   }
   .origin-planes button.is-on {
@@ -1657,6 +1659,20 @@
     }
     /* The scrolling strip runs past the screen. The Tools sheet has the same actions. */
     .toolbox .tools:not(.export-tools) { display: none; }
+    html[data-sketch-plane] .toolbox .tools[data-panel="sketch"]:not([hidden]) {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 4px 2px;
+      gap: 2px;
+    }
+    html[data-sketch-plane] .toolbox .tools[data-panel="sketch"] .group {
+      padding: 0;
+      border: 0;
+    }
+    html[data-sketch-plane] .toolbox .tools[data-panel="sketch"] .group-btns {
+      gap: 2px;
+    }
     .gizmo-switch { flex-wrap: wrap; min-width: 0; max-width: 100%; }
     .gizmo-switch button { flex: 1 1 72px; }
     .dim-panel {
@@ -1758,6 +1774,44 @@
       overflow: hidden;
     }
     #viewport { flex: 1 1 auto; min-height: 96px; }
+  }
+  html[data-sketch-active] #dimPanel,
+  html[data-sketch-active] #selectionShelf,
+  html[data-sketch-active] #cameraShelf,
+  html[data-sketch-active] #edgeSheet,
+  html[data-sketch-active] #pickChooser,
+  html[data-sketch-active] .hud,
+  html[data-sketch-active] .vp-bar[aria-label="View"],
+  html[data-sketch-active] .topbar-shelves .selection-shelf-group,
+  html[data-sketch-active] .topbar-shelves #cameraShelfBtn,
+  html[data-sketch-active] #toolsSheet .sheet-shelves,
+  html[data-sketch-active] [data-panel="sketch"] .tool-btn:not([data-action]),
+  html[data-sketch-active] [data-panel="sketch"] .group:nth-child(n+3) {
+    display: none !important;
+  }
+  html[data-sketch-active]:not([data-sketch-plane]) [data-panel="sketch"] {
+    display: none !important;
+  }
+  html[data-sketch-active] #sketchSheet {
+    bottom: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+  html[data-sketch-active] #sketchSheet .edge-note {
+    min-height: 44px;
+    font-size: 13px;
+    padding-right: 2px;
+  }
+  html[data-sketch-active] #sketchSheet .edge-sheet-row:not([hidden]) {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 4px;
+  }
+  html[data-sketch-active] #sketchSheet .edge-sheet-row:last-child {
+    flex: 0 0 auto;
   }
   .assembly-panel { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
   .part-list { display: flex; flex-direction: column; gap: 4px; }
@@ -1969,8 +2023,11 @@
     <span class="muted" id="sketchStatus">Tap a planar face · returns to Model</span>
   </div>
   <div class="origin-planes" id="originPlanes" hidden role="group" aria-label="Origin plane">
-    <button type="button" data-action="originPlane" data-plane="xy" data-tool="Top" title="Top · XY" aria-pressed="false">Top</button>
     <button type="button" data-action="originPlane" data-plane="xz" data-tool="Front" title="Front · XZ" aria-pressed="false">Front</button>
+    <button type="button" data-action="originPlane" data-plane="back" data-tool="Back" title="Back · -XZ" aria-pressed="false">Back</button>
+    <button type="button" data-action="originPlane" data-plane="xy" data-tool="Top" title="Top · XY" aria-pressed="false">Top</button>
+    <button type="button" data-action="originPlane" data-plane="bottom" data-tool="Bottom" title="Bottom · -XY" aria-pressed="false">Bottom</button>
+    <button type="button" data-action="originPlane" data-plane="left" data-tool="Left" title="Left · -YZ" aria-pressed="false">Left</button>
     <button type="button" data-action="originPlane" data-plane="yz" data-tool="Right" title="Right · YZ" aria-pressed="false">Right</button>
   </div>
 
@@ -3601,7 +3658,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const centres = document.getElementById('primCentres');
     const rotate = document.getElementById('primRotate');
     const bboxHost = document.getElementById('primBbox');
-    host.hidden = !prim && !bbox && !state.holeTool && !selected;
+    host.hidden = state.tab === 'sketch' || (!prim && !bbox && !state.holeTool && !selected);
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     disc.hidden = !prim || prim.kind !== 'disc';
@@ -9966,6 +10023,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!menu) return;
     const willOpen = menu.hidden === true;
     closePopups();
+    if (state.tab === 'sketch') {
+      clearSketchGeometry();
+      closeSketchSheet();
+    }
     if (!willOpen) return;
     setModifyOpen(false, true);
     state.dimSheetOpen = false;
@@ -10113,24 +10174,55 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     paintCallouts();
   }
 
-  function sketchPlanePrompt() {
-    if (state.sketchPlane) return '';
-    if (state.bodies.length === 0) return 'Pick Top, Front, or Right';
-    return 'Tap a planar face';
+  function normalizeOriginPlaneKey(which) {
+    const k = String(which || '').toLowerCase();
+    if (k === 'xz' || k === 'front') return 'xz';
+    if (k === 'back' || k === '-xz') return 'back';
+    if (k === 'xy' || k === 'top') return 'xy';
+    if (k === 'bottom' || k === '-xy') return 'bottom';
+    if (k === 'left' || k === '-yz') return 'left';
+    if (k === 'yz' || k === 'right') return 'yz';
+    return 'xy';
   }
 
   function originPlaneLabel(key) {
-    if (key === 'xz') return 'Front';
-    if (key === 'yz') return 'Right';
+    const k = normalizeOriginPlaneKey(key);
+    if (k === 'xz') return 'Front';
+    if (k === 'back') return 'Back';
+    if (k === 'bottom') return 'Bottom';
+    if (k === 'left') return 'Left';
+    if (k === 'yz') return 'Right';
     return 'Top';
+  }
+
+  function originPlaneViewName(key) {
+    const k = normalizeOriginPlaneKey(key);
+    if (k === 'xz') return 'front';
+    if (k === 'back') return 'back';
+    if (k === 'bottom') return 'bottom';
+    if (k === 'left') return 'left';
+    if (k === 'yz') return 'right';
+    return 'top';
+  }
+
+  function sketchPlanePrompt() {
+    if (state.sketchPlane) return '';
+    if (state.bodies.length === 0) return 'Pick Front, Back, Top, Bottom, Left, or Right';
+    return 'Pick an ortho plane or tap a planar face';
   }
 
   // Right-hand outward, same axis rule as faceFrameFromTriangles:
   // u is the first world axis least aligned with outward, kept positive,
-  // and v = outward × u. Top/XY outward is +Z. Front/XZ outward is +Y
-  // (the Front view). Right/YZ outward is +X (the Right view).
+  // and v = outward × u. Top/XY outward is +Z. Bottom outward is -Z.
+  // Front/XZ outward is +Y. Back outward is -Y. Right/YZ outward is +X. Left outward is -X.
   function originPlaneFrame(name) {
-    const outward = name === 'xz' ? [0, 1, 0] : name === 'yz' ? [1, 0, 0] : [0, 0, 1];
+    const k = normalizeOriginPlaneKey(name);
+    const outward = k === 'xz' ? [0, 1, 0]
+      : k === 'back' ? [0, -1, 0]
+      : k === 'yz' ? [1, 0, 0]
+      : k === 'left' ? [-1, 0, 0]
+      : k === 'bottom' ? [0, 0, -1]
+      : [0, 0, 1];
     const axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
     let bestI = 0;
     let bestAbs = 2;
@@ -10213,13 +10305,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function paintOriginPicker() {
     const bar = document.getElementById('originPlanes');
+    const sketchActive = state.tab === 'sketch';
+    const hasPlane = !!(sketchActive && state.sketchPlane);
+    document.documentElement.toggleAttribute('data-sketch-active', sketchActive);
+    document.documentElement.toggleAttribute('data-sketch-plane', hasPlane);
+    const sketchPanel = document.querySelector('[data-panel="sketch"]');
+    if (sketchPanel) sketchPanel.hidden = !hasPlane;
     if (!bar) return;
-    const show = state.tab === 'sketch' && state.bodies.length === 0;
+    const show = sketchActive && !state.sketchPlane;
     bar.hidden = !show;
     const buttons = bar.querySelectorAll('[data-action="originPlane"]');
     const picked = state.sketchPlane && state.sketchPlane.originPlane;
     for (let i = 0; i < buttons.length; i += 1) {
-      const on = show && picked === buttons[i].getAttribute('data-plane');
+      const on = picked === buttons[i].getAttribute('data-plane');
       buttons[i].classList.toggle('is-on', on);
       buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
     }
@@ -10235,9 +10333,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (state.sketchPlane) {
       note.textContent = 'Sketch on face · returns to Model';
     } else if (state.bodies.length === 0) {
-      note.textContent = 'Pick Top, Front, or Right · returns to Model';
+      note.textContent = 'Pick Front, Back, Top, Bottom, Left, or Right · returns to Model';
     } else {
-      note.textContent = 'Tap a planar face · returns to Model';
+      note.textContent = 'Pick an ortho plane or tap a planar face · returns to Model';
     }
   }
 
@@ -10768,8 +10866,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function setOriginSketchPlane(which) {
-    if (state.bodies.length !== 0) return false;
-    const key = which === 'xz' || which === 'yz' ? which : 'xy';
+    const key = normalizeOriginPlaneKey(which);
     if (!state.sketchPlane || state.sketchPlane.originPlane !== key) {
       if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
       state.sketchProfile = null;
@@ -10781,6 +10878,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
+    goView(originPlaneViewName(key));
     paintOriginPicker();
     paintSketchStatus();
     if (state.sketchSheetMode === 'rect' || state.sketchSheetMode === 'circle' || state.sketchSheetMode === 'line' || state.sketchSheetMode === 'arc' || state.sketchSheetMode === 'polygon') openSketchSheet(state.sketchSheetMode);
@@ -11475,6 +11573,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     opts = opts || {};
     const wasTab = state.tab;
     state.tab = tab;
+    if (tab === 'sketch') {
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
+      state.dimSheetOpen = false;
+      state.propSheetOpen = false;
+      const chooser = document.getElementById('pickChooser');
+      if (chooser) chooser.hidden = true;
+    }
     if (tab === 'sketch' && state.bodies.length === 0) {
       state.selectedIds = [];
       state.hoverId = null;
@@ -11489,10 +11595,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const panels = document.querySelectorAll('[data-panel]');
     for (let i = 0; i < panels.length; i++) {
-      panels[i].hidden = panels[i].getAttribute('data-panel') !== tab;
+      const panelTab = panels[i].getAttribute('data-panel');
+      panels[i].hidden = panelTab === 'sketch' ? !(tab === 'sketch' && state.sketchPlane) : panelTab !== tab;
     }
     document.getElementById('finishBar').hidden = tab !== 'sketch';
     if (tab !== 'sketch') closeSketchSheet();
+    paintPrimFields();
     paintSketchStatus();
     paintOriginPicker();
     if (tab !== 'export' && exportMenu) exportMenu.hidden = true;
@@ -11545,7 +11653,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function fillSheet(query) {
     const q = (query || '').trim();
     let items = filterTools(q);
-    if (!q) {
+    if (state.tab === 'sketch') {
+      items = items.filter(function (t) {
+        return t.tab === 'sketch' && !!t.action;
+      });
+    } else if (!q) {
       items = TOOL_CATALOG.filter(function (t) {
         return !t.tab || t.tab === state.tab;
       });
@@ -12444,11 +12556,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       for (let i = 0; i < swatches.length; i++) swatches[i].classList.toggle('is-on', swatches[i] === btn);
     } else if (action === 'originPlane') {
       const which = btn.getAttribute('data-plane') || 'xy';
-      if (state.bodies.length !== 0 || !setOriginSketchPlane(which)) {
-        message = state.bodies.length === 0 ? 'Pick Top, Front, or Right' : 'Tap a planar face';
+      if (!setOriginSketchPlane(which)) {
+        message = sketchPlanePrompt();
         setHint(message);
       } else {
-        message = originPlaneLabel(which === 'xz' || which === 'yz' ? which : 'xy');
+        message = originPlaneLabel(which);
       }
     } else if (action === 'newSketch') {
       if (state.bodies.length === 0) {

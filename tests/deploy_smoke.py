@@ -1359,7 +1359,11 @@ SKETCH_PORTRAIT_EXPR = r"""
     for (var i = 0; i < bars.length; i++) {
       var bar = document.querySelector(bars[i]);
       var barBox = boxOf(bar);
-      if (!barBox) { problems.push(label + ' missing ' + bars[i]); continue; }
+      if (!barBox) {
+        if (bars[i] === '.vp-bar' && document.documentElement.hasAttribute('data-sketch-active')) continue;
+        problems.push(label + ' missing ' + bars[i]);
+        continue;
+      }
       if (overlaps(sheetBox, barBox)) problems.push(label + ' covers ' + bars[i]);
     }
   }
@@ -1418,9 +1422,9 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (sketchItem) sketchItem.click();
   var st = hook.state();
   if (!st || st.tab !== 'sketch') problems.push('tab after Sketch ' + (st && st.tab));
-  if (!st || st.picker !== false) problems.push('origin picker forced');
+  if (!st || st.picker !== true) problems.push('origin picker hidden before plane');
   var originBar = document.getElementById('originPlanes');
-  if (!originBar || originBar.hidden !== true) problems.push('origin picker bar');
+  if (!originBar || originBar.hidden !== false) problems.push('origin picker bar hidden before plane');
   need(document.querySelector('#finishBar [data-action="finishSketch"]'), 'Finish Sketch');
   scrollOk('sketch shell');
   if (!visibleClick('[data-action="toolsMenu"]')) problems.push('tools opener hidden');
@@ -1806,6 +1810,8 @@ ORIGIN_PLANE_EXPR = r"""
     return true;
   }
   function coverChips(label) {
+    var barEl = document.getElementById('originPlanes');
+    if (barEl && barEl.hidden) return;
     var chips = document.querySelectorAll('#originPlanes [data-action="originPlane"]');
     var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
     for (var c = 0; c < chips.length; c++) {
@@ -1818,12 +1824,18 @@ ORIGIN_PLANE_EXPR = r"""
       for (var i = 0; i < bars.length; i++) {
         var bar = document.querySelector(bars[i]);
         var barBox = boxOf(bar);
-        if (!barBox) { problems.push(label + ' missing ' + bars[i]); continue; }
+        if (!barBox) {
+          if (bars[i] === '.vp-bar' && document.documentElement.hasAttribute('data-sketch-active')) continue;
+          problems.push(label + ' missing ' + bars[i]);
+          continue;
+        }
         if (overlaps(r, barBox)) problems.push(label + ' ' + text + ' covers ' + bars[i]);
       }
     }
   }
   function pickPlane(plane, label, outward, u, v) {
+    var barEl = document.getElementById('originPlanes');
+    if (barEl && barEl.hidden) startSketch();
     var chip = document.querySelector('#originPlanes [data-plane="' + plane + '"]');
     if (!chip) { problems.push('missing ' + label); return; }
     chip.click();
@@ -1839,7 +1851,7 @@ ORIGIN_PLANE_EXPR = r"""
     if (!near(st.v, v, 1e-6)) problems.push(label + ' v ' + JSON.stringify(st.v));
     if (!near(cross(st.u, st.v), st.outward, 1e-6)) problems.push(label + ' right-hand');
     if (!chip.classList.contains('is-on')) problems.push(label + ' not selected');
-    if (st.picker !== true) problems.push(label + ' picker hidden');
+    if (st.picker !== false) problems.push(label + ' picker stayed visible');
     if (st.bodies !== 0) problems.push(label + ' bodies ' + st.bodies);
   }
   function setMm(id, value) {
@@ -2059,7 +2071,7 @@ ORIGIN_PLANE_EXPR = r"""
   else problems.push('Create Sketch missing');
   var cube = hook.state();
   var originBarCube = document.getElementById('originPlanes');
-  if (!cube || cube.tab !== 'sketch' || cube.picker !== false || cube.bodies !== 1 || (originBarCube && !originBarCube.hidden)) {
+  if (!cube || cube.tab !== 'sketch' || cube.picker !== true || cube.bodies !== 1 || !originBarCube || originBarCube.hidden) {
     problems.push('cube sketch picker ' + (cube && cube.picker) + ' tab ' + (cube && cube.tab) + ' bodies ' + (cube && cube.bodies));
   }
   var cubeFace = typeof hook.topFace === 'function' ? hook.topFace() : null;
@@ -2080,17 +2092,20 @@ ORIGIN_PLANE_EXPR = r"""
   var originBar = document.getElementById('originPlanes');
   if (!originBar || originBar.hidden === true) problems.push('origin picker hidden');
   var chips = originBar ? originBar.querySelectorAll('[data-action="originPlane"]') : [];
-  if (chips.length !== 3) problems.push('chip count ' + chips.length);
+  if (chips.length !== 6) problems.push('chip count ' + chips.length);
   var labels = [];
   for (var i = 0; i < chips.length; i++) {
     labels.push(((chips[i].textContent || '').replace(/\s+/g, '') ) + ':' + chips[i].getAttribute('data-plane'));
   }
-  if (labels.join(',') !== 'Top:xy,Front:xz,Right:yz') problems.push('chips ' + labels.join(','));
+  if (labels.join(',') !== 'Front:xz,Back:back,Top:xy,Bottom:bottom,Left:left,Right:yz') problems.push('chips ' + labels.join(','));
   coverChips('planes');
   if (document.documentElement.scrollWidth > window.innerWidth + 0.5) {
     problems.push('chip scrollWidth ' + document.documentElement.scrollWidth);
   }
   pickPlane('xz', 'Front', [0, 1, 0], [1, 0, 0], [0, 0, -1]);
+  pickPlane('back', 'Back', [0, -1, 0], [1, 0, 0], [0, 0, 1]);
+  pickPlane('bottom', 'Bottom', [0, 0, -1], [1, 0, 0], [0, -1, 0]);
+  pickPlane('left', 'Left', [-1, 0, 0], [0, 1, 0], [0, 0, -1]);
   pickPlane('yz', 'Right', [1, 0, 0], [0, 1, 0], [0, 0, 1]);
   pickPlane('xy', 'Top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
   if (openTools()) {
@@ -2279,16 +2294,7 @@ ORIGIN_PLANE_EXPR = r"""
   else if (trimRibbon.getAttribute('data-action')) problems.push('Trim data-action ' + trimRibbon.getAttribute('data-action'));
   if (openTools()) {
     var trimBtn = sheetBtn('Trim');
-    if (!trimBtn) problems.push('Trim sheet missing');
-    else {
-      if (trimBtn.getAttribute('data-action')) problems.push('Trim sheet action ' + trimBtn.getAttribute('data-action'));
-      trimBtn.click();
-    }
-    var trimSheet = document.getElementById('sketchSheet');
-    var trimSt = hook.state();
-    if (!trimSheet || trimSheet.hidden !== true) problems.push('Trim opened sheet');
-    if (!trimSt || trimSt.profile) problems.push('Trim profile ' + (trimSt && trimSt.profile));
-    if (!openTools()) problems.push('line tools hidden');
+    if (trimBtn) problems.push('Trim sheet visible during sketch');
     var lineTool = sheetBtn('Line');
     need(lineTool, 'Line');
     if (!lineTool) problems.push('Line missing');
@@ -2530,8 +2536,7 @@ ORIGIN_PLANE_EXPR = r"""
   else if (offsetRibbon.getAttribute('data-action')) problems.push('Offset data-action ' + offsetRibbon.getAttribute('data-action'));
   if (openTools()) {
     var offsetBtn = sheetBtn('Offset');
-    if (!offsetBtn) problems.push('Offset sheet missing');
-    else if (offsetBtn.getAttribute('data-action')) problems.push('Offset sheet action ' + offsetBtn.getAttribute('data-action'));
+    if (offsetBtn) problems.push('Offset sheet visible during sketch');
     var polyTool = sheetBtn('Polygon');
     need(polyTool, 'Polygon');
     if (!polyTool) problems.push('Polygon missing');
