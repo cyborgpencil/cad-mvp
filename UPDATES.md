@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #163 (merged at c5ec1a3): docs - park x-ray select-through (tip e69494d).
 - 2026-10-26 PR #160 (merged at 4c1a7c2): docs - park view cube, gizmo, and line dimensions (tip a2a7593).
 - 2026-10-26 PR #157 (merged at b0a5808): docs - park top-bar shelf icons (selection + show/hide camera; tip 4397534).
 - 2026-10-26 PR #156 (merged at 47d2312): docs - park Q5 toy-truck discuss list (tip 7194c14).
