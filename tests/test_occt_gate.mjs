@@ -1262,6 +1262,126 @@ if (sketchPrism) sketchPrism.delete();
 if (sketchCyl) sketchCyl.delete();
 if (sketchCube) sketchCube.delete();
 
+// Q5 L-bracket rebuild (sketch -> Blind Extrude -> Union/Cut, mm, no printer).
+// Locked: wall 4 mm, disc 4 mm, corner 90 deg, units mm, 3 CSK/leg, off-centre disc.
+// All other sizes below are TBD test-only values (non-Blink).
+{
+  const q5WallMm = 4;
+  const q5DiscThicknessMm = 4;
+  const q5LegAMm = 44; // TBD (non-Blink)
+  const q5LegBMm = 36; // TBD (non-Blink)
+  const q5LegWMm = 28; // TBD (non-Blink)
+  const q5DiscDiaMm = 12; // TBD (non-Blink)
+  const q5HoleDiaMm = 4; // TBD (non-Blink)
+  const q5CsDiaMm = 7; // TBD (non-Blink)
+  const q5CsAngDeg = 90; // TBD (non-Blink)
+  const q5Loop = [
+    [0, 0, 0],
+    [q5LegAMm, 0, 0],
+    [q5LegAMm, q5WallMm, 0],
+    [q5WallMm, q5WallMm, 0],
+    [q5WallMm, q5LegBMm, 0],
+    [0, q5LegBMm, 0],
+  ];
+  const q5Face = ops.makeLineFace(oc, q5Loop);
+  expect('q5 L-profile face on XY', !!q5Face);
+  const q5Flat4 = q5Face ? ops.makePrismSolid(oc, q5Face, 0, 0, q5WallMm) : null;
+  const q5Flat4View = q5Flat4 ? inspectSolid(oc, q5Flat4) : null;
+  const q5Area = q5LegAMm * q5WallMm + (q5LegBMm - q5WallMm) * q5WallMm;
+  expect(
+    'q5 4mm blind extrude occt & mm',
+    !!(q5Flat4View && q5Flat4View.units === 'mm' && q5Flat4View.gate && q5Flat4View.gate.pass === true)
+      && Math.abs(ops.solidVolumeMm3(oc, q5Flat4) - q5Area * q5WallMm) <= 0.1
+  );
+  if (q5Flat4) q5Flat4.delete();
+
+  let q5Solid = q5Face ? ops.makePrismSolid(oc, q5Face, 0, 0, q5LegWMm) : null;
+  if (q5Face) q5Face.delete();
+  const q5BaseView = q5Solid ? inspectSolid(oc, q5Solid) : null;
+  const q5BaseVol = q5Solid ? ops.solidVolumeMm3(oc, q5Solid) : 0;
+  expect(
+    'q5 L-bracket base extrude occt & mm',
+    !!(q5BaseView && q5BaseView.units === 'mm' && q5BaseView.gate && q5BaseView.gate.pass === true)
+      && Math.abs(q5BaseVol - q5Area * q5LegWMm) <= 0.2
+  );
+
+  // Off-centre disc on Leg A outer face (Y = 0, outward [0, -1, 0]; face centre is [22, 0, 14]).
+  const q5DiscCenter = [34, 0, 8];
+  const q5DiscFace = ops.makeCircleFace(oc, q5DiscCenter, [0, -1, 0], q5DiscDiaMm);
+  const q5DiscSolid = q5DiscFace ? ops.makePrismSolid(oc, q5DiscFace, 0, -q5DiscThicknessMm, 0) : null;
+  if (q5DiscFace) q5DiscFace.delete();
+  const q5DiscView = q5DiscSolid ? inspectSolid(oc, q5DiscSolid) : null;
+  expect(
+    'q5 off-centre 4mm disc extrude occt & mm',
+    !!(q5DiscView && q5DiscView.units === 'mm' && q5DiscView.gate && q5DiscView.gate.pass === true)
+  );
+  const q5Union = ops.applyBooleanSolids(oc, 'union', q5Solid, q5DiscSolid);
+  if (q5DiscSolid) q5DiscSolid.delete();
+  if (q5Solid) q5Solid.delete();
+  q5Solid = q5Union && q5Union.ok ? q5Union.shape : null;
+  const q5WantUnionVol = q5BaseVol + Math.PI * (q5DiscDiaMm / 2) * (q5DiscDiaMm / 2) * q5DiscThicknessMm;
+  expect(
+    'q5 disc union occt & mm',
+    !!(q5Union && q5Union.ok && q5Union.units === 'mm' && q5Union.gate && q5Union.gate.pass === true)
+      && Math.abs(q5Union.volumeMm3 - q5WantUnionVol) <= 1.0
+  );
+
+  function findPlanarFaceIndex(shape, wantOutward) {
+    const view = inspectSolid(oc, shape);
+    const verts = view.mesh.vertices;
+    const tris = view.mesh.triangles;
+    let bestIdx = 0;
+    let bestArea = -1;
+    for (let fi = 0; fi < view.topology.faces.length; fi += 1) {
+      const f = view.topology.faces[fi];
+      const frame = faceFrameFromTriangles(verts, tris, f.tris, [10, 10, 14]);
+      if (!frame || !frame.outward) continue;
+      const dot = frame.outward[0] * wantOutward[0] + frame.outward[1] * wantOutward[1] + frame.outward[2] * wantOutward[2];
+      const area = (frame.uSpan || 0) * (frame.vSpan || 0);
+      if (dot > 0.99 && area > bestArea) {
+        bestArea = area;
+        bestIdx = f.occtIndex || (fi + 1);
+      }
+    }
+    return bestIdx;
+  }
+
+  // 3 CSK holes on Leg A (Y = 0, inward [0, +1, 0]) + 3 CSK holes on Leg B (X = 0, inward [+1, 0, 0]).
+  const q5Holes = [
+    { leg: 'A', point: [12, 0, 20], normal: [0, 1, 0], outward: [0, -1, 0] },
+    { leg: 'A', point: [22, 0, 20], normal: [0, 1, 0], outward: [0, -1, 0] },
+    { leg: 'A', point: [34, 0, 21], normal: [0, 1, 0], outward: [0, -1, 0] },
+    { leg: 'B', point: [0, 12, 14], normal: [1, 0, 0], outward: [-1, 0, 0] },
+    { leg: 'B', point: [0, 20, 14], normal: [1, 0, 0], outward: [-1, 0, 0] },
+    { leg: 'B', point: [0, 28, 14], normal: [1, 0, 0], outward: [-1, 0, 0] },
+  ];
+  for (let hi = 0; hi < q5Holes.length; hi += 1) {
+    const h = q5Holes[hi];
+    const cut = ops.cutHole(oc, q5Solid, {
+      face: h.point,
+      dir: h.normal,
+      diameterMm: q5HoleDiaMm,
+      countersink: true,
+      countersinkDiameterMm: q5CsDiaMm,
+      countersinkAngleDeg: q5CsAngDeg,
+      depthMode: 'through',
+      depthMm: q5WallMm,
+    });
+    if (q5Solid) q5Solid.delete();
+    q5Solid = cut && cut.ok ? cut.shape : null;
+    const afterView = q5Solid ? inspectSolid(oc, q5Solid) : null;
+    expect(
+      'q5 csk hole ' + (hi + 1) + ' leg ' + h.leg + ' cut occt & mm ' + (cut ? cut.error : ''),
+      !!(cut && cut.ok && cut.volumeAfter < cut.volumeBefore && Math.abs(cut.depthMm - q5WallMm) <= 0.2)
+        && !!(afterView && afterView.units === 'mm' && afterView.gate && afterView.gate.pass === true)
+    );
+  }
+  const q5FinalView = q5Solid ? inspectSolid(oc, q5Solid) : null;
+  const q5Stl = q5FinalView ? ops.binaryStlBytes(q5FinalView.mesh) : new Uint8Array(0);
+  expect('q5 stl export bytes', q5Stl.byteLength > 84);
+  if (q5Solid) q5Solid.delete();
+}
+
 if (failures !== 0) {
   console.error(failures + ' failed');
   console.error('closed', closed);
