@@ -1,4 +1,4 @@
-﻿# Project Updates Log
+# Project Updates Log
 
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
