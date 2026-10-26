@@ -581,6 +581,10 @@ def check_case(name: str, state: dict[str, Any], expected_op: str = "") -> list[
                 f"{name}: expected one selected face, got mode {state.get('selectionMode')!r} "
                 f"count {state.get('selectionCount')!r}"
             )
+        if state.get("gizmoVisible") is not False:
+            problems.append(
+                f"{name}: expected gizmoVisible false on face selection, got {state.get('gizmoVisible')!r}"
+            )
         if state.get("occtGate") is not True or state.get("gateOcct") != "PASS":
             problems.append(f"{name}: gate is not PASS ({state.get('gateOcct')!r})")
     elif name == "lbracket":
@@ -7164,22 +7168,76 @@ def digit_hotkey_guard_problems(cdp: Cdp, origin: str) -> list[str]:
         "if(vp.focus) vp.focus();"
         "document.dispatchEvent(new KeyboardEvent('keydown',{key:'1',code:'Digit1',bubbles:true,cancelable:true}));"
         "var s=window.__cadcamExportState||{};"
-        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,"
+        "return JSON.stringify({mode:s.selectionMode,count:s.selectionCount,gizmo:s.gizmoVisible,"
         "active:document.activeElement?document.activeElement.id:''});"
         "})()"
     )
     if intended_err or not intended or intended.get("error"):
         return [f"digit viewport {intended_err or intended}"]
-    if intended.get("mode") != "vertex" or intended.get("active") != "viewport":
+    if intended.get("mode") != "vertex" or intended.get("active") != "viewport" or intended.get("gizmo") is not False:
         return [f"digit viewport intended {intended}"]
     press_plain_4(cdp)
     cdp.drain(0.3)
     restored = _export_state(cdp)
-    if restored.get("selectionMode") != "item" or int(restored.get("selectionCount") or 0) < 1:
+    if (
+        restored.get("selectionMode") != "item"
+        or int(restored.get("selectionCount") or 0) < 1
+        or restored.get("gizmoVisible") is not True
+    ):
         return [
             "digit viewport 4 "
-            f"{restored.get('selectionMode')!r} {restored.get('selectionCount')!r}"
+            f"{restored.get('selectionMode')!r} {restored.get('selectionCount')!r} gizmo={restored.get('gizmoVisible')!r}"
         ]
+    vef_check, vef_err = keyed(
+        "(function(){"
+        "var aims=window.__cadcamPhoneSelect&&window.__cadcamPhoneSelect.aims?window.__cadcamPhoneSelect.aims():null;"
+        "if(!aims) return JSON.stringify({error:'missing aims'});"
+        "var canvas=document.getElementById('canvas');"
+        "function tap(pt){"
+        "  canvas.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,pointerId:61,pointerType:'touch',isPrimary:true,button:0,buttons:1,clientX:pt.x,clientY:pt.y}));"
+        "  canvas.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,cancelable:true,pointerId:61,pointerType:'touch',isPrimary:true,button:0,buttons:0,clientX:pt.x,clientY:pt.y}));"
+        "}"
+        "var out={};"
+        "var modes=['vertex','edge','face'];"
+        "for(var i=0;i<modes.length;i++){"
+        "  var m=modes[i];"
+        "  var btn=document.querySelector('[data-action=\"select\"][data-mode=\"'+m+'\"]');"
+        "  if(!btn) return JSON.stringify({error:'missing '+m});"
+        "  btn.click();"
+        "  var s0=window.__cadcamExportState||{};"
+        "  var aim=aims[m];"
+        "  if(!aim||!aim.id) return JSON.stringify({error:'missing aim '+m});"
+        "  tap(aim);"
+        "  var s1=window.__cadcamExportState||{};"
+        "  out[m]={mode0:s0.selectionMode,count0:s0.selectionCount,gizmo0:s0.gizmoVisible,mode1:s1.selectionMode,count1:s1.selectionCount,gizmo1:s1.gizmoVisible};"
+        "}"
+        "var itemBtn=document.querySelector('[data-action=\"select\"][data-mode=\"item\"]');"
+        "if(itemBtn) itemBtn.click();"
+        "var sf=window.__cadcamExportState||{};"
+        "out.item={mode:sf.selectionMode,count:sf.selectionCount,gizmo:sf.gizmoVisible};"
+        "return JSON.stringify(out);"
+        "})()"
+    )
+    if vef_err or not vef_check or vef_check.get("error"):
+        return [f"vef gizmo hide {vef_err or vef_check}"]
+    for mode_name in ("vertex", "edge", "face"):
+        step = vef_check.get(mode_name) if isinstance(vef_check.get(mode_name), dict) else {}
+        if (
+            step.get("mode0") != mode_name
+            or int(step.get("count0") or 0) != 0
+            or step.get("gizmo0") is not False
+            or step.get("mode1") != mode_name
+            or int(step.get("count1") or 0) != 1
+            or step.get("gizmo1") is not False
+        ):
+            return [f"vef gizmo hide {mode_name} {step}"]
+    item_step = vef_check.get("item") if isinstance(vef_check.get("item"), dict) else {}
+    if (
+        item_step.get("mode") != "item"
+        or int(item_step.get("count") or 0) != 1
+        or item_step.get("gizmo") is not True
+    ):
+        return [f"vef gizmo restore item {item_step}"]
     print("digit hotkey guard pass", flush=True)
     return []
 

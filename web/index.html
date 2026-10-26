@@ -3160,6 +3160,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function gizmoShouldShow() {
     if (state.holeTool) return false;
+    if (state.selection === 'vertex' || state.selection === 'edge' || state.selection === 'face') return false;
     if (state.bodies.length > 1) {
       if ((state.gizmoMode || 'move') !== 'move') return false;
       return !!activeEditBody();
@@ -3168,7 +3169,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (state.selection === 'item' && state.selectedIds.length > 0) return true;
     if (state.bodies.length === 1 && !state.primitive) return false;
     if (state.selection === 'item') return false;
-    return true;
+    return false;
   }
 
   function positionEditable() {
@@ -3360,6 +3361,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (n) state.anchor = { x: sx / n, y: sy / n, z: sz / n };
     }
     writePosFields();
+    placeHandles();
   }
 
   function primitiveLabel(kind) {
