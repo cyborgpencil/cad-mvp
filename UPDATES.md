@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #169 (merged at 150b7ad): docs - Antigravity truck MVP brief (tip 2014a97).
 - 2026-10-26 PR #167 (merged at 7b56e1a): docs - park panel labels + always-visible chrome (tip 9fe9260).
 - 2026-10-26 PR #165 (merged at 8248749): feat - Antigravity L-bracket rebuild OCCT gate + portrait smoke (tip d0ec3d5).
 - 2026-10-26 PR #163 (merged at c5ec1a3): docs - park x-ray select-through (tip e69494d).
