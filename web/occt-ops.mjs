@@ -1193,6 +1193,97 @@ export function makeLineFace(oc, points) {
   }
 }
 
+// Closed 3-point circular arc (start -> through -> end) plus straight chord
+// (end -> start). Returns a face the caller owns, or null if colinear/invalid.
+export function makeArcFace(oc, points) {
+  if (!oc || !points || points.length !== 3) return null;
+  if (typeof oc.GC_MakeArcOfCircle !== 'function'
+    || typeof oc.BRepBuilderAPI_MakeEdge !== 'function'
+    || typeof oc.BRepBuilderAPI_MakeWire !== 'function'
+    || typeof oc.BRepBuilderAPI_MakeFace !== 'function') {
+    return null;
+  }
+  const trash = [];
+  let owned = null;
+  try {
+    const coords = [];
+    for (let i = 0; i < 3; i += 1) {
+      const p = points[i];
+      if (!p || p.length < 3) return null;
+      const x = Number(p[0]);
+      const y = Number(p[1]);
+      const z = Number(p[2]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+      coords.push([x, y, z]);
+    }
+    const d12 = Math.hypot(coords[1][0] - coords[0][0], coords[1][1] - coords[0][1], coords[1][2] - coords[0][2]);
+    const d23 = Math.hypot(coords[2][0] - coords[1][0], coords[2][1] - coords[1][1], coords[2][2] - coords[1][2]);
+    const d31 = Math.hypot(coords[0][0] - coords[2][0], coords[0][1] - coords[2][1], coords[0][2] - coords[2][2]);
+    if (!(d12 > 1e-6) || !(d23 > 1e-6) || !(d31 > 1e-6)) return null;
+    const p1 = track(trash, new oc.gp_Pnt(coords[0][0], coords[0][1], coords[0][2]));
+    const p2 = track(trash, new oc.gp_Pnt(coords[1][0], coords[1][1], coords[1][2]));
+    const p3 = track(trash, new oc.gp_Pnt(coords[2][0], coords[2][1], coords[2][2]));
+    const arcMaker = track(trash, new oc.GC_MakeArcOfCircle(p1, p2, p3));
+    if (!arcMaker || typeof arcMaker.IsDone !== 'function' || arcMaker.IsDone() !== true || typeof arcMaker.Value !== 'function') {
+      return null;
+    }
+    const arcCurve = track(trash, arcMaker.Value());
+    const arcEdgeMaker = track(trash, new oc.BRepBuilderAPI_MakeEdge(arcCurve));
+    try {
+      arcEdgeMaker.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (arcEdgeMaker.IsDone() !== true) return null;
+    const arcEdge = track(trash, arcEdgeMaker.Edge());
+    const chordEdgeMaker = track(trash, new oc.BRepBuilderAPI_MakeEdge(p3, p1));
+    try {
+      chordEdgeMaker.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (chordEdgeMaker.IsDone() !== true) return null;
+    const chordEdge = track(trash, chordEdgeMaker.Edge());
+    const wireMaker = track(trash, new oc.BRepBuilderAPI_MakeWire(arcEdge, chordEdge));
+    try {
+      wireMaker.Build();
+    } catch (_err) {
+      return null;
+    }
+    if (wireMaker.IsDone() !== true) return null;
+    const wire = track(trash, wireMaker.Wire());
+    const faceMaker = track(trash, new oc.BRepBuilderAPI_MakeFace(wire, true));
+    owned = ownedFace(oc, faceMaker, trash);
+    if (!owned) return null;
+    const keep = owned;
+    owned = null;
+    return keep;
+  } catch (_err) {
+    releaseShape(owned);
+    return null;
+  } finally {
+    dispose(trash);
+  }
+}
+
+// Closed regular N-gon centered on center. diameterMm is the circumscribed
+// diameter (vertices at diameterMm / 2). axisU and axisV are in-plane axes.
+// Returns a face the caller owns, or null.
+export function makePolygonFace(oc, center, axisU, axisV, sides, diameterMm) {
+  const n = Number(sides);
+  if (!oc || !center || !Number.isInteger(n) || n < 3 || !(diameterMm > 0)) return null;
+  const u = unit3(axisU);
+  const v = unit3(axisV);
+  if (!u || !v) return null;
+  const radius = diameterMm / 2;
+  const points = [];
+  for (let i = 0; i < n; i += 1) {
+    const ang = (2 * Math.PI * i) / n;
+    points.push(pointAt(center, u, v, radius * Math.cos(ang), radius * Math.sin(ang)));
+  }
+  return makeLineFace(oc, points);
+}
+
 // Closed center circle. diameterMm is the full diameter. normal is the
 // plane normal. Returns a face the caller owns, or null.
 export function makeCircleFace(oc, center, normal, diameterMm) {
