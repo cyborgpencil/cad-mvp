@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-26
 - 2026-10-26 PR #155 (merged at 3593cb1): docs - Antigravity L-bracket rebuild brief (prompts/antigravity-l-bracket-rebuild.md; tip 02485f1).
+- 2026-10-26 PR #154 (merged at e455dbe): docs - export acceptance checks queue item 6 (tip de442a3).
 - 2026-10-26 PR #150 (merged at a38d89d): docs - lock Q5 discuss (L-bracket primary, truck TBD; tip fcd16db).
 - 2026-10-26 PR #151 (merged at 8ecaaa5): feat - Rust CLI port of tools/check_export.py (CI dual-run; tip 5882a35).
 - 2026-10-26 PR #148 (merged at 8f2259f): docs - Antigravity Rust #2 check_export CLI brief (prompts/antigravity-rust-check-export.md; tip 9f0b856).
