@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #156 (merged at 47d2312): docs - park Q5 toy-truck discuss list (tip 7194c14).
 - 2026-10-26 PR #155 (merged at 3593cb1): docs - Antigravity L-bracket rebuild brief (prompts/antigravity-l-bracket-rebuild.md; tip 02485f1).
 - 2026-10-26 PR #154 (merged at e455dbe): docs - export acceptance checks queue item 6 (tip de442a3).
 - 2026-10-26 PR #150 (merged at a38d89d): docs - lock Q5 discuss (L-bracket primary, truck TBD; tip fcd16db).
