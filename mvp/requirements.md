@@ -172,6 +172,24 @@ Concrete bar for wake checklist item 6 / lock **(e)**. Pilot runs it after the Q
 
 Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate()` passed, and none of the write-block messages on those files. Watertight stays INFO. L-bracket numeric expect stays skipped while sizes are TBD.
 
+## Queued after current in-flight (discuss / parked)
+
+End of queue (Erik via 3T, 2026-10-26 ~8:46 AM MT; Chief lock). **Status: discuss / parked.** No start until L-bracket `agy` and in-flight merges clear (#158 UPDATES, then #156 / #157 and any remaining docs). #156 is already on main (`47d2312`); the rest of that gate still stands. Leave the in-flight L-bracket work uninterrupted. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
+
+- **View cube**
+  - More predictable swipe: each swipe up, down, left, or right rotates the view cube and the camera in that direction. The direction is screen-relative and independent of the model orientation.
+  - **Press-and-hold** for a slow continuous view-cube and camera adjust.
+  - **Home** shortcut: center on the selected model when something is selected; otherwise center on **0,0,0**.
+  - **TBD:** pixel thresholds, hold timing, and the Home key binding.
+- **Gizmo fix**
+  - The gizmo centers on the selection (one selection, or a multi-component / multi-object selection).
+  - Tap empty space hides the gizmo or moves it off.
+  - With multi-select off: tap vertex 1, then vertex 2, and the gizmo moves from vertex 1 to vertex 2.
+  - **TBD:** any tap or pixel threshold not stated here.
+- **Dimensions**
+  - Show a dimension on **each line**, with that line's length, as in other CAD apps.
+  - **TBD:** which dimension style.
+
 ## Success Criteria
 
 - User can go from blank sketch to validated, slicer-ready 3MF in a few minutes.
