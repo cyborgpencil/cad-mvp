@@ -71,33 +71,47 @@ flowchart LR
 - **Callout hide (accepted 2026-10-26, Erik retest)**: On phone, while editing a basic shape (box / cylinder / disc, no sketch specs), `#calloutLayer` stays hidden. Size stays editable on `#dimPanel` / Properties (`boxSx`/`boxSy`/`boxSz`, cyl/disc Size). Shipped PR #123 merge `907402c` (tip `202a737`).
 - **`#dimPanel` keep-lock (Chief, 2026-10-26 ~1:09 AM MT)**: Keep the dim body (Size / Centre / Rot / axis / bbox / hole). No full remove until those fields migrate into Properties and phone typed resize is confirmed. Later safe cut only: drop gizmo row / thin selection bar. No `#dimPanel` remove code until then.
 
-## Overnight queue + wake acceptance (team-locked 2026-10-26 ~3:07 AM MT)
+## Overnight queue + wake acceptance (team-locked 2026-10-26 ~3:07–3:13 AM MT)
 
-Erik hands-off overnight; final tool tests on wake. Stuck/help check every **20 minutes**. Coding stays **Antigravity-only on Z13**. Do not ping Erik overnight unless irreversible.
+Erik hands-off overnight; final tool tests on wake. Stuck/help check every **20 minutes**. Coding stays **Antigravity-only on Z13**. Open questions: team discuss → 3T / Chief final call (no wait on Erik). Ping Erik only for irreversible or out-of-scope.
 
 ### Finish current first
-1. **Rust #1** — Antigravity units + volume Export-gate mirror (`prompts/antigravity-rust-units-gate.md`, main base `2e57032` / tip after #127 `16500e8`): dual-run vs `Module.gate()`, C++ authoritative, no OCCT. Cascade: tip-match → merge → UPDATES (Repo Keeper) → Pages.
+1. **Rust #1** — Antigravity units + volume Export-gate mirror (`prompts/antigravity-rust-units-gate.md`): dual-run vs `Module.gate()`, C++ authoritative, no OCCT. Cascade: tip-match → merge → UPDATES (Repo Keeper) → Pages.
 
-### Then overnight (order; do not park)
-1. Fully implement sketches + dimensioning and visualization so precise geometry/sketches work.
-2. Bug: Create Sketch with **no solid** for the plane must **not** spawn a box — find/fix.
-3. View cube: flip based on **swipe direction**.
-4. Selection switching: vertex/edge/face must not leave the whole-body gizmo; switching must work.
-5. Print models — **discuss first** what sketch+Boolean already do; then decide fixes/impl to rebuild prior models **from scratch** maximizing sketch+Boolean. Bracket = same features. Toy truck = define bed, wheel spokes, tire tread, interior, **separate door parts**. Then OrcaSlicer plates for Bambu X1C (**no printer send** unless Erik said otherwise).
-6. E2E: design → export STL / 3MF / STEP (+ whatever else already supported). Account for visuals/callouts; keep tools/panels from blocking the subject as little as possible. Pack any extra features needed to finish the above.
+### Overnight locks (Chief/3T final, 2026-10-26)
+- **(a)** Precise sketch = typed mm + callouts; **no** constraint solver.
+- **(b)** **Keep boot cube**; Create Sketch empty path must never spawn a box (smoke: delete-all → New Sketch → `bodies.length===0` + `#originPlanes`).
+- **(c)** View cube = **adjacent** face step; map swipe so direction matches “flip with swipe” (invert L/R if needed). Not opposite-face.
+- **(d)** **Hide gizmo** in vertex/edge/face; keep for body/item.
+- **(e)** E2E tonight = **STL + 3MF** only; STEP later.
+- **(f)** Truck/bracket rebuild discuss after overnight (1)–(4) land.
 
-### Holds (unchanged unless a queue item reopens them)
-- Phone T2 (move-gizmo) still held unless queue (4) requires it.
+### After Rust #1 tip — Antigravity order
+1. (2) Empty-sketch / no-solid Create Sketch never spawns box.
+2. (4) Selection V/E/F: hide whole-body gizmo.
+3. (3) View-cube swipe direction (adjacent).
+4. (1) Sketch + dimensioning/visualization (typed + callouts; no solver).
+
+### Rust conversion (continues; parallel when Independent)
+- After #1: keep **dual-run shadow**, C++ boss, until smokes stay green.
+- Next Independent: **#2** Rust CLI port of `tools/check_export.py` (CI-first).
+- Then **#4** `.cadmvp` schema validate only if schema stays frozen.
+- Skip #3 (watertight reopen), #5/#6 (OCCT/truck / AGPL bindings) for now.
+- Parallelize Independent Rust with overnight UI slices when not blocked.
+
+### Holds
+- Phone T2 (move-gizmo) still held unless (4) requires related work.
 - Watertight stays dropped as Export gate; units + OCCT-after-ops rules stay.
-- `#dimPanel` keep-lock above still applies.
+- `#dimPanel` keep-lock still applies.
+- No printer send unless Erik said otherwise.
 
 ### Wake acceptance (Erik final tests when awake)
 Leave smokes and Pages ready for:
-- Sketch (precise geometry / dimensioning path from queue item 1)
+- Sketch (typed mm + callouts; empty Create Sketch path)
 - Boolean
-- Selection (vertex/edge/face switching, queue item 4)
-- View-cube swipe flip (queue item 3)
-- Exports (STL / 3MF / STEP + existing formats; E2E queue item 6)
+- Selection (V/E/F; gizmo hidden in those modes)
+- View-cube swipe (adjacent)
+- Exports STL + 3MF (E2E tonight)
 
 CI smoke + Pages green on main is the overnight bar; Erik's wake retest is the human gate.
 
