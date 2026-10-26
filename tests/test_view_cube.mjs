@@ -53,6 +53,16 @@ expect('right ring returns to front', ring, 'front');
 expect('top down then down is bottom', cube.nextCubeFace(cube.nextCubeFace('top', 'down'), 'down'), 'bottom');
 expect('bottom up then up is top', cube.nextCubeFace(cube.nextCubeFace('bottom', 'up'), 'up'), 'top');
 
+for (const face of Object.keys(TABLE)) {
+  expect(face + ' not adjacent to self', cube.isAdjacentCubeFace(face, face), false);
+  expect(face + ' not adjacent to opposite', cube.isAdjacentCubeFace(face, cube.OPPOSITE_FACE[face]), false);
+  for (const dir of DIRS) {
+    const step = cube.nextCubeFace(face, dir);
+    expect(face + ' + ' + dir + ' is adjacent', cube.isAdjacentCubeFace(face, step), true);
+  }
+}
+expect('Front + swipe-left -> Right (ring +1)', cube.nextCubeFace('front', cube.swipeDirection(-40, 0, 120)), 'right');
+
 expect('tap 0 px', cube.swipeDirection(0, 0, 100), null);
 expect('tap 23 px right', cube.swipeDirection(23, 0, 100), null);
 expect('tap 23 px up', cube.swipeDirection(0, -23, 100), null);

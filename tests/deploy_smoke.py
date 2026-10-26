@@ -3087,6 +3087,50 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
     if fresh_problems or not isinstance(fresh, dict):
         return ["corner zone", *(fresh_problems or ["missing"])]
     corner = nav_zone(fresh, "trf", "corner")
+    front_zone = nav_zone(fresh, "front", "face")
+    if not isinstance(front_zone, dict):
+        return ["front swipe zone missing"]
+    tapped_front = _tap_zone(cdp, front_zone)
+    if tapped_front:
+        return tapped_front
+    snapped_front = _wait_snap(cdp, (0.0, 0.0, 1.0), distance, "front-before-swipe")
+    if snapped_front:
+        return snapped_front
+    swiped_left, swipe_err = eval_expr(
+        cdp,
+        "(function(){"
+        "var el=document.getElementById('viewCube');"
+        "if(!el) return 'missing';"
+        "var r=el.getBoundingClientRect();"
+        "var cx=r.left+r.width/2, cy=r.top+r.height/2;"
+        "function fire(type, x, y, buttons){"
+        "el.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, clientX:x, clientY:y,"
+        "pointerId:11, pointerType:'touch', button:0, buttons:buttons, isPrimary:true, width:24, height:24}));"
+        "}"
+        "fire('pointerdown', cx, cy, 1);"
+        "fire('pointermove', cx-20, cy, 1);"
+        "fire('pointermove', cx-40, cy, 1);"
+        "fire('pointerup', cx-40, cy, 0);"
+        "return 'swiped';"
+        "})()",
+    )
+    if swipe_err or swiped_left != "swiped":
+        return [f"swipe left {swiped_left or swipe_err}"]
+    snapped_right = _wait_snap(cdp, (1.0, 0.0, 0.0), distance, "swipe-left-right")
+    if snapped_right:
+        return snapped_right
+    swiped_nav, swiped_problems = read_nav(cdp)
+    if swiped_problems or not isinstance(swiped_nav, dict):
+        return ["swipe left read", *(swiped_problems or ["missing"])]
+    if swiped_nav.get("face") != "right" or swiped_nav.get("snapFace") != "right":
+        return [
+            f"swipe left face {swiped_nav.get('face')!r} snapFace {swiped_nav.get('snapFace')!r} want 'right'"
+        ]
+    time.sleep(0.4)
+    fresh, fresh_problems = read_nav(cdp)
+    if fresh_problems or not isinstance(fresh, dict):
+        return ["corner zone after swipe", *(fresh_problems or ["missing"])]
+    corner = nav_zone(fresh, "trf", "corner")
     if corner is None:
         zones = fresh.get("zones") if isinstance(fresh.get("zones"), list) else []
         corner = next((z for z in zones if isinstance(z, dict) and z.get("kind") == "corner"), None)

@@ -12375,7 +12375,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     return {
       phone: isPhoneCube(),
-      animating: !!cubeSnap,
+      animating: !!(cubeSnap || tween),
       snapMs: CUBE_SNAP_MS,
       lastSnapMs: lastSnapMs,
       lastSnapBudget: lastSnapBudget,
@@ -13624,7 +13624,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           if (swipeDir) {
             const face = cubeFaceName || nearestCubeFace();
             const next = cubeApi.nextCubeFace(face, swipeDir);
-            if (next) {
+            if (next && (!cubeApi.isAdjacentCubeFace || cubeApi.isAdjacentCubeFace(face, next))) {
               snapToDirection(faceDirection(next), cap(next), next);
               didSwipe = true;
             }
