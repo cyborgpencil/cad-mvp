@@ -4,6 +4,10 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #135 (merged at bf8e9a9): docs - Antigravity selection V/E/F hide-gizmo brief (prompts/antigravity-selection-gizmo-hide.md; tip a793301).
+- 2026-10-26 PR #132 (merged at 1a7510c): docs - Erik wake smoke checklist (7 steps) in mvp/requirements.md (tip 3be061f).
+- 2026-10-26 PR #133 (merged at 3c18df5): docs - Antigravity empty-sketch no-spawn-box brief (prompts/antigravity-empty-sketch.md; tip 47721cc).
+- 2026-10-26 PR #131 (merged at e65ef50): feat - Rust WASM units+volume Export-gate dual-run shadow (C++ Module.gate() authoritative; tip 55d45d2).
 - 2026-10-26 PR #130 (merged at 7ab9645): docs - overnight locks (a)-(f) + post-#1 order (2)->(4)->(3)->(1) in mvp/requirements.md (tip 1afd862).
 - 2026-10-26 PR #128 (merged at f74e02a): docs - overnight queue + wake acceptance in mvp/requirements.md (tip aa7b8ad).
 - 2026-10-26 PR #126 (merged at 2e57032): docs - Antigravity Rust WASM units+volume gate brief (prompts/antigravity-rust-units-gate.md; tip 1491bbf).
