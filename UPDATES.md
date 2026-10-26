@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-25
+- 2026-10-25 PR #116 (merged at f9c368a): Antigravity basic-sketch brief — Arc + Polygon draw-only (prompts/antigravity-basic-sketch.md; no GB/Cursor).
 - 2026-10-25 PR #114 (merged at 00ff1ea): Antigravity trial — VERTEX_TOUCH_TOLERANCE_PX 32 (Select/#1; tool only, no token/cost).
 
 ## 2026-10-24
