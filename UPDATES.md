@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #137 (merged at 1d7246b): fix - empty-doc newSketch stays body-free / no spawn box (web + deploy_smoke; tip 500271b).
 - 2026-10-26 PR #135 (merged at bf8e9a9): docs - Antigravity selection V/E/F hide-gizmo brief (prompts/antigravity-selection-gizmo-hide.md; tip a793301).
 - 2026-10-26 PR #132 (merged at 1a7510c): docs - Erik wake smoke checklist (7 steps) in mvp/requirements.md (tip 3be061f).
 - 2026-10-26 PR #133 (merged at 3c18df5): docs - Antigravity empty-sketch no-spawn-box brief (prompts/antigravity-empty-sketch.md; tip 47721cc).
