@@ -95,35 +95,45 @@ Chief Q5, after overnight (1)–(4). No invented sizes; every missing dimension 
 - **Primary rebuild** = phone L-bracket acceptance: 3 countersunk holes per leg + off-centre disc, via **sketch → Blind Extrude (New/Join/Cut) + Union/Cut**. Prefer the sketch path over primitives-only (`prompts/mobile-5-booleans.md`).
 - `mvp/projects/blink-l-bracket.md` is **reference only**. Do not bake Blink layout or dimensions into the app or scene.
 - **Truck** = discuss/spec only until sizes exist. **No invent**; flag **TBD**. Rebuild after L-bracket acceptance, or when Erik supplies sizes.
-- **Union/Cut enough** for this rebuild. Intersect is not required (Intersect may remain in the UI).
+- **Union/Cut enough** for this rebuild. Intersect is not required (Intersect may remain in the UI). Extrude Intersect stays out of the Join/Cut MVP slice (Chief lock 2026-10-26, **team-chosen**).
 - **No printer** send for Q5.
-- **Dims TBD** (do not invent): leg A/B length×width; fit/clearance to frame casing; leg screw hole size, countersink, and spacing; Blink boss diameter/height; disc diameter and placement; disc screw count/size/pattern; Blink model; fillet/chamfer defaults; casing profile; screw gauge; printed hole oversize; material/printer.
-- **Locked** (restated from `mvp/projects/blink-l-bracket.md` only): wall thickness **4 mm**, disc thickness **4 mm**, corner **90°**, units **mm**. Everything else TBD.
+- **Dims Erik TBD** (do not invent): leg A/B length×width; fit/clearance to frame casing; leg screw hole size, countersink, and spacing; Blink boss diameter/height; disc diameter and placement; disc screw count/size/pattern; Blink model; casing profile; screw gauge; printed hole oversize; material/printer. Fillet/chamfer defaults are the Chief lock below (**2 mm / 0.5 mm**), not part of this list.
+- **Locked** (restated from `mvp/projects/blink-l-bracket.md` only): wall thickness **4 mm**, disc thickness **4 mm**, corner **90°**, units **mm**. Rebuild scope also includes **3 CSK/leg** and the off-centre disc. Every L-bracket dimension beyond wall/disc 4 mm, 90°, 3 CSK/leg, and the off-centre disc stays **Erik TBD**.
 
 #### Toy truck feature list (discuss/spec; Digest 2026-10-26 ~8:14 AM MT; Chief locks same day)
 
-Parked under this Q5 discuss note. The L-bracket stays the primary rebuild. Locked L-bracket values above are unchanged. The truck stays discuss/spec. Queue it after the Q5 L-bracket. **Rebuild the truck only after L-bracket acceptance.** Units **mm**. Prefer **sketch → Blind Extrude + Union/Cut**. Intersect is not required. **No printer** send for Q5.
+Parked under this Q5 discuss note. The L-bracket stays the primary rebuild. Locked L-bracket values above are unchanged. The truck stays discuss/spec. Queue it after the Q5 L-bracket. **Rebuild the truck only after L-bracket acceptance.** Units **mm**. Prefer **sketch → Blind Extrude + Union/Cut**. Extrude Intersect stays out of the Join/Cut MVP slice. Intersect is not required. **No printer** send for Q5.
 
 Acceptance B sizes stay the discuss baseline only. Every size below is a **sourced team-chosen baseline** from Acceptance B (sourced, not invented). They are not Q5 locks. Prefer the **11-part** assembly (PLA hubs + TPU tires).
 
 - **Chassis/body** — MVP — plate 80×30×6 mm; two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up. **Sourced team-chosen baseline** (Acceptance B; PLA).
 - **Cab** — MVP — 30×30×25 mm box on the chassis front; Union into the chassis → 11 parts after combine. **Sourced team-chosen baseline** (Acceptance B; PLA).
-- **Bed/cargo box** — discuss — dimensions **TBD**. Do not invent.
+- **Bed/cargo box** — discuss — dimensions **Erik TBD**. Do not invent.
 - **Axles ×2** — MVP — Ø4×44 mm (PLA). **Sourced team-chosen baseline** (Acceptance B).
 - **Wheel hubs ×4** — MVP — Ø16×8 mm with Ø4.2 bore (PLA). **Sourced team-chosen baseline** (Acceptance B). Bore via Cut.
 - **Tires ×4** — MVP for Acceptance B materials — ring OD 24 / ID 15.6 / width 8 (TPU; 0.2 stretch on the hub). **Sourced team-chosen baseline** (Acceptance B).
-- **Spokes** — discuss — dimensions **TBD**. Do not invent.
-- **Tread** — discuss — dimensions **TBD**. Do not invent.
-- **Interior** — discuss — dimensions **TBD**. Do not invent.
-- **Doors** — discuss — dimensions **TBD**. Do not invent.
+- **Spokes** — discuss — dimensions **Erik TBD**. Do not invent.
+- **Tread** — discuss — dimensions **Erik TBD**. Do not invent.
+- **Interior** — discuss — dimensions **Erik TBD**. Do not invent.
+- **Doors** — discuss — dimensions **Erik TBD**. Do not invent.
 - **Boolean cuts** — axle holes, hub bore, and tire ID via Cut; body joins via Union. Prefer the **11-part** assembly (PLA hubs + TPU tires).
 - **Multi-plate Orca (PLA + TPU 95A)** — Acceptance B check, later relative to this Q5 discuss. **No printer** send.
 
 **Rebuild path** (only after L-bracket acceptance): sketch → Blind Extrude → Union/Cut → units + OCCT validity; export STL/3MF in mm when the export gate passes. Prefer the **11-part** assembly (PLA hubs + TPU tires).
 
-**Fillet/chamfer defaults:** non-blocking. No values until sourced. Do not invent.
+**Fillet/chamfer defaults:** **2 mm / 0.5 mm** (Chief lock 2026-10-26 ~1:02 PM MT; **team-chosen**; Chief: already in code). This replaces "non-blocking / no values until sourced" for these defaults only. Other TBD dimensions stay TBD.
 
-**Sources:** `mvp/acceptance-a-b.md` (truck parts, team-chosen 07:10 MT; 11 parts after the cab combine, Chief and 3T 07:15 MT); `web/PROGRESS.md` (07:10 and 07:15 notes); `research/assemblies.md` and `prompts/assemblies.md` (flat parts list, Combine, per-part 3MF, mm); `prompts/mobile-5-booleans.md` (Union/Cut; Intersect may stay in the UI; L-bracket sketch path); Q5 locks in this section (PR #150, merge `a38d89d`). Chief locks in this subsection (2026-10-26): Acceptance B sizes stay the discuss baseline only; prefer the 11-part assembly (PLA hubs + TPU tires); fillet/chamfer non-blocking; truck rebuild only after L-bracket acceptance. Chief refine same day: bed, spokes, tread, interior, and doors stay on the discuss list with dimensions TBD.
+#### Chief lock (2026-10-26 ~1:02 PM MT)
+
+Chief lock via Digest sketch→Boolean shortlist. Do not invent. (1) and (2) are **Erik TBD**. (3), (4), and (5) are **team-chosen**.
+
+1. L-bracket dimensions beyond wall/disc **4 mm**, corner **90°**, **3 CSK/leg**, and the off-centre disc stay **Erik TBD**. Do not invent.
+2. Truck discuss parts (bed/cargo box, spokes, tread, interior, doors) stay **Erik TBD**. Do not invent. Acceptance B sourced baselines in the list above are unchanged.
+3. OCCT `SetFuzzyValue` for near-coincident Booleans = **0.01 mm** (Chief lock; OCCT example 1e-5 scaled for our mm). **Team-chosen.**
+4. Drag preview = **Option C**: ghost transform while drag; exact OCCT Boolean on release. Extrude Intersect stays out of the Join/Cut MVP slice. **Team-chosen.**
+5. Fillet/chamfer defaults = **2 mm / 0.5 mm** (Chief: already in code). **Team-chosen.** Supersedes "fillet/chamfer non-blocking / no values until sourced" for these defaults only.
+
+**Sources:** `mvp/acceptance-a-b.md` (truck parts, team-chosen 07:10 MT; 11 parts after the cab combine, Chief and 3T 07:15 MT); `web/PROGRESS.md` (07:10 and 07:15 notes); `research/assemblies.md` and `prompts/assemblies.md` (flat parts list, Combine, per-part 3MF, mm); `prompts/mobile-5-booleans.md` (Union/Cut; Intersect may stay in the UI; L-bracket sketch path); Q5 locks in this section (PR #150, merge `a38d89d`). Chief locks in this subsection (2026-10-26): Acceptance B sizes stay the discuss baseline only; prefer the 11-part assembly (PLA hubs + TPU tires); fillet/chamfer defaults **2 mm / 0.5 mm** (team-chosen, already in code); truck rebuild only after L-bracket acceptance. Chief refine same day: bed, spokes, tread, interior, and doors stay on the discuss list with dimensions **Erik TBD**. Chief lock ~1:02 PM MT via Digest shortlist: Fuzzy **0.01 mm**, drag preview **Option C**, Extrude Intersect out of Join/Cut MVP.
 
 ### After Rust #1 tip — Antigravity order
 1. (2) Empty-sketch / no-solid Create Sketch never spawns box.
