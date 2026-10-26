@@ -216,14 +216,17 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, ~10
   - **TBD:** exact label text per panel, which surfaces count as panels, and phone vs desktop label placement.
 - **Always-visible chrome (permanent panels)**
   - The only panels that stay visible 100% of the time are: the **very top** (tree + filename), the **tools menu bar**, and the **very bottom** (Modify / Create etc.).
+  - Sketch-active exception: see **Sketch chrome minimize (active sketch)** below. While a sketch is active, hide the top tree/filename and the bottom Modify/Create; only the sketch tool strip and **Finish Sketch** stay visible. This idle set still applies when not sketching.
   - Everything else must not stay on-screen permanently; use show/hide like other shelves.
   - **Status: discuss / parked.** Implement only after the current coding queue clears. No Antigravity prompt yet.
   - **TBD:** which existing UI regions map to “very top / tools menu bar / very bottom”, which other panels currently stay permanent and must become shelves, and any exceptions Erik did not state.
 - **Sketch chrome minimize (active sketch)**
   - **Problem:** Arc+polygon hard to test — Arc dialog + floating toolbars eat the viewport.
-  - While a sketch process is active, **minimize / hide non-sketch chrome** — only sketching tools stay visible. Erik referred to the blue-circled sketch tool strip in his phone screenshot; do not invent which control ids that strip maps to. Hide the other floating shelves that crowd the view.
+  - While a sketch is active, hide non-sketch floating shelves that crowd the view, **and** the bottom Modify/Create, **and** the top tree/filename. Only the sketch tool strip + **Finish Sketch** stay visible for the duration. Erik referred to the blue-circled sketch tool strip in his phone screenshot; do not invent which control ids that strip maps to.
+  - When not sketching, the idle always-on park still applies: very top (tree + filename), tools menu, and very bottom (Modify / Create).
+  - **Chief lock** (CAD CAM MVP room, after the first commit on this park): replaces the prior TBD on whether always-visible chrome stays visible during sketch.
   - **Status: discuss / parked → next coding after #181.**
-  - **TBD:** which existing shelves/panels count as non-sketch chrome vs the sketch tool strip; phone vs desktop placement; whether always-visible chrome from the prior park (very top / tools menu bar / very bottom) stays visible during sketch; Arc dialog placement beyond “don’t eat the viewport”.
+  - **TBD:** which existing shelves/panels count as non-sketch chrome vs the sketch tool strip; phone vs desktop placement; Arc/polygon dialog crowding (collapse vs minimal sheet) — flag only, beyond “don’t eat the viewport”. No sizes, hex, control ids, or layout.
 - **Sketch Create → ortho plane → sketch tools flow**
   - Press Create.
   - Pick any of the **six** orthographic views/planes: Front, Back, Top, Bottom, Left, Right.
