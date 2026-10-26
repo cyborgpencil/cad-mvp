@@ -1178,6 +1178,22 @@ SKETCH_PORTRAIT_EXPR = r"""
       need(row.plus, label + ' ' + expected[i].tag + ' plus');
     }
     var layerBox = boxOf(document.getElementById('calloutLayer'));
+    var vpBox = boxOf(document.getElementById('viewport'));
+    var hudBox = boxOf(document.querySelector('.hud'));
+    var homeBox = boxOf(document.getElementById('vcHome'));
+    if (layerBox && vpBox) {
+      var expectTop = vpBox.top + 8;
+      if (hudBox) expectTop = Math.max(expectTop, hudBox.bottom + 8);
+      if (homeBox) expectTop = Math.max(expectTop, homeBox.bottom + 8);
+      if (Math.abs((layerBox.left - vpBox.left) - 8) > 2 || Math.abs(layerBox.top - Math.round(expectTop)) > 2) {
+        problems.push(label + ' not docked under hud');
+      }
+      var vpCx = vpBox.left + vpBox.width / 2;
+      var vpCy = vpBox.top + vpBox.height / 2;
+      if (vpCx >= layerBox.left - 0.5 && vpCx <= layerBox.right + 0.5 && vpCy >= layerBox.top - 0.5 && vpCy <= layerBox.bottom + 0.5) {
+        problems.push(label + ' centered over viewport');
+      }
+    }
     if (overlaps(layerBox, boxOf(document.getElementById('vcHome')))) problems.push(label + ' covers home');
     if (overlaps(layerBox, boxOf(document.getElementById('exportBtn')))) problems.push(label + ' covers export');
     if (overlaps(layerBox, boxOf(document.getElementById('statusUnits')))) problems.push(label + ' covers units');
@@ -3867,6 +3883,11 @@ def callout_problems(
     for name, key in (("Home", "coversHome"), ("Export", "coversExport"), ("units", "coversUnits")):
         if data.get(key) is True:
             problems.append(f"callouts cover {name}")
+    if data.get("phone") is True:
+        if data.get("dockedUnderHud") is not True:
+            problems.append("phone callouts not docked under HUD/left")
+        if data.get("coversVpCenter") is True or data.get("coversBodyCenter") is True:
+            problems.append("phone callouts centered over body")
     rows = data.get("rows")
     expect = CALLOUT_FIELDS.get(kind)
     if not isinstance(rows, list) or expect is None:

@@ -3752,6 +3752,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     let belowTop = gap;
     if (hud) belowTop = Math.max(belowTop, hud.y + hud.h + gap);
     if (home) belowTop = Math.max(belowTop, home.y + home.h + gap);
+    if (isPhoneCube()) {
+      layer.style.left = Math.round(gap) + 'px';
+      layer.style.top = Math.round(belowTop) + 'px';
+      return;
+    }
     const candidates = [{ x: gap, y: belowTop }];
     if (cube) candidates.push({ x: gap, y: cube.y + cube.h + gap });
     if (panel) {
@@ -3886,6 +3891,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       && lr.left >= -1 && lr.top >= -1
       && lr.right <= window.innerWidth + 1 && lr.bottom <= window.innerHeight + 1
     );
+    const hudBox = clientBox(viewport.querySelector('.hud'));
+    const homeBox = clientBox(document.getElementById('vcHome'));
+    let expectTop = vp.top + 8;
+    if (hudBox) expectTop = Math.max(expectTop, hudBox.bottom + 8);
+    if (homeBox) expectTop = Math.max(expectTop, homeBox.bottom + 8);
+    const phone = isPhoneCube();
+    const dockedUnderHud = !lr || (
+      Math.abs((lr.left - vp.left) - 8) <= 2
+      && Math.abs(lr.top - Math.round(expectTop)) <= 2
+    );
+    const vpCx = vp.left + vp.width / 2;
+    const vpCy = vp.top + vp.height / 2;
+    const coversVpCenter = !!(lr && vpCx >= lr.left - 0.5 && vpCx <= lr.right + 0.5
+      && vpCy >= lr.top - 0.5 && vpCy <= lr.bottom + 0.5);
+    let coversBodyCenter = false;
+    if (lr && prim && prim.params) {
+      const sc = screenOfCad([
+        Number(prim.params.cx) || 0,
+        Number(prim.params.cy) || 0,
+        Number(prim.params.cz) || 0
+      ]);
+      const bx = vp.left + sc.x;
+      const by = vp.top + sc.y;
+      coversBodyCenter = bx >= lr.left - 0.5 && bx <= lr.right + 0.5
+        && by >= lr.top - 0.5 && by <= lr.bottom + 0.5;
+    }
     return {
       editing: editingBasicShape(),
       hidden: hidden,
@@ -3894,7 +3925,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       coversHome: covers('vcHome'),
       coversExport: covers('exportBtn'),
       coversUnits: covers('statusUnits'),
-      inside: inside
+      inside: inside,
+      phone: phone,
+      dockedUnderHud: dockedUnderHud,
+      coversVpCenter: coversVpCenter,
+      coversBodyCenter: coversBodyCenter
     };
   }
 
