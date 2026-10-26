@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #181 (merged at 77696ec): feat - Antigravity view-cube + gizmo + line dims (tip 10d9b9d).
 - 2026-10-26 PR #179 (merged at b2b0455): Antigravity view-cube / gizmo / line-dims brief + requirements freeze TBD (tip ec96baa).
 - 2026-10-26 PR #177 (merged at eeb2311): feat - Antigravity top-bar shelf icons selection + camera (tip 404304c).
 - 2026-10-26 PR #175 (merged at c624d6e): docs - park Chief Boolean shortlist locks Fuzzy 0.01 / Option C / fillet 2+0.5 (tip de52fa1).
