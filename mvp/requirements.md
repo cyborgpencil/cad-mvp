@@ -174,7 +174,7 @@ Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate
 
 ## Queued after current in-flight (discuss / parked)
 
-End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT and ~8:46 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after L-bracket gy and remaining in-flight merges clear. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
+End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT and ~8:46 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after L-bracket agy and remaining in-flight merges clear. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
 
 - **Top-bar shelf icons (selection + show/hide camera)**
   - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
