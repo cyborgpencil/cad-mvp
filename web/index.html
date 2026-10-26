@@ -234,7 +234,42 @@
   }
   .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; align-items: stretch; }
   .ribbon > .tools { flex: 1; min-width: 0; }
-  .tools-menu-btn { align-self: center; margin: 4px 4px 4px 8px; }
+  .topbar-shelves {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    flex: none;
+  }
+  .tools-menu-btn { align-self: center; margin: 0; }
+  .topbar-shelves .selection-shelf-group,
+  .toolbox .topbar-shelves .selection-shelf-group {
+    width: auto;
+    border-bottom: 0;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    padding: 0 4px;
+    align-items: center;
+    justify-content: center;
+  }
+  .topbar-shelves .group-btns,
+  .toolbox .topbar-shelves .group-btns {
+    flex-direction: row;
+    width: auto;
+    align-items: center;
+  }
+  .topbar-shelves .tool-btn,
+  .toolbox .topbar-shelves .tool-btn {
+    width: auto;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex-direction: row;
+    justify-content: center;
+    padding: 0 6px;
+    gap: 4px;
+  }
   .tools {
     display: flex;
     align-items: stretch;
@@ -639,6 +674,7 @@
     touch-action: manipulation;
   }
   .vp-bar::-webkit-scrollbar { display: none; }
+  .topbar-shelf { bottom: 74px; z-index: 10; }
   .vp-cluster {
     display: flex;
     gap: 2px;
@@ -1499,6 +1535,7 @@
       scrollbar-width: none;
     }
     .vp-bar::-webkit-scrollbar { display: none; }
+    .topbar-shelf { bottom: 72px; }
     .hud { top: 8px; left: 8px; }
     .measure-readout { top: 60px; left: 8px; }
     .create-menu {
@@ -1569,7 +1606,9 @@
     .toolbox .group { width: auto; border-bottom: 0; align-items: center; }
     .toolbox .group-btns { flex-direction: row; width: auto; align-items: flex-end; }
     .toolbox .tool-btn,
-    .toolbox .tool-btn.wide {
+    .toolbox .tool-btn.wide,
+    .topbar-shelves .tool-btn,
+    .toolbox .topbar-shelves .tool-btn {
       width: 44px;
       height: 44px;
       min-height: 44px;
@@ -1922,9 +1961,21 @@
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (Alt+4)">Export</button>
       </nav>
       <div class="ribbon">
-    <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
-      <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
-    </button>
+    <div class="topbar-shelves">
+      <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
+        <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
+      </button>
+      <div class="group selection-shelf-group" role="group" aria-label="Selection">
+        <div class="group-btns">
+          <button type="button" class="tool-btn" id="selectionShelfBtn" data-action="selectionShelf" data-tool="Selection" title="Selection" aria-label="Selection" aria-controls="selectionShelf" aria-expanded="false">
+            <svg class="ico"><use href="#i-body"></use></svg><span>Select</span>
+          </button>
+        </div>
+      </div>
+      <button type="button" class="tool-btn" id="cameraShelfBtn" data-action="cameraShelf" data-tool="Show/hide camera" title="Show/hide camera" aria-label="Show/hide camera" aria-controls="cameraShelf" aria-expanded="false">
+        <svg class="ico"><use href="#i-eye"></use></svg><span>Camera</span>
+      </button>
+    </div>
     <div class="tools panel" data-panel="sketch" hidden>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" data-action="sketchLine" data-tool="Line" title="Line. Click points on the sketch plane. Confirm closes at 3 or more."><svg class="ico"><use href="#i-line"></use></svg><span>Line</span></button>
@@ -2169,12 +2220,6 @@
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
-        <div class="vp-cluster" role="group" aria-label="Select">
-          <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex (1)"><svg class="ico"><use href="#i-vertex"></use></svg></button>
-          <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
-          <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
-          <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (4)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
-        </div>
         <div class="vp-cluster" role="group" aria-label="Analyze">
           <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
           <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
@@ -2185,6 +2230,16 @@
           <button type="button" data-action="display" data-mode="wire" data-tool="Display: Wireframe" title="Wireframe"><svg class="ico"><use href="#i-wire"></use></svg></button>
           <button type="button" data-action="display" data-mode="xray" data-tool="Display: X-Ray" title="X-Ray"><svg class="ico"><use href="#i-xray"></use></svg></button>
         </div>
+      </div>
+      <div id="selectionShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Selection" data-hscroll hidden>
+        <div class="vp-cluster" role="group" aria-label="Select">
+          <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex (1)"><svg class="ico"><use href="#i-vertex"></use></svg></button>
+          <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
+          <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
+          <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (4)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
+        </div>
+      </div>
+      <div id="cameraShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Show/hide camera" data-hscroll hidden>
         <div class="vp-cluster" role="group" aria-label="Navigate">
           <button type="button" data-action="hint" data-hint="Orbit: one finger or left drag" data-tool="Orbit" title="Orbit"><svg class="ico"><use href="#i-orbit"></use></svg></button>
           <button type="button" data-action="hint" data-hint="Pan: right-drag, middle-drag, or two fingers" data-tool="Pan" title="Pan"><svg class="ico"><use href="#i-pan"></use></svg></button>
@@ -2752,6 +2807,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const searchInput = document.getElementById('searchInput');
   const searchList = document.getElementById('searchList');
   const toolsSheet = document.getElementById('toolsSheet');
+  const selectionShelf = document.getElementById('selectionShelf');
+  const cameraShelf = document.getElementById('cameraShelf');
   const sheetTools = document.getElementById('sheetTools');
 
   const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
@@ -9336,6 +9393,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       exactVolume: state.exactVolume === true,
       logText: window.__cadcamLogText || '',
       modifyOpen: !!(shelf && shelf.hidden !== true),
+      selectionShelfOpen: !!(selectionShelf && selectionShelf.hidden !== true),
+      cameraShelfOpen: !!(cameraShelf && cameraShelf.hidden !== true),
+      toolsOpen: !!(toolsSheet && toolsSheet.hidden !== true),
       selectionMode: state.selection,
       selectionCount: state.selectedIds.length,
       selectedIds: state.selectedIds.slice(),
@@ -9753,7 +9813,31 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const buttons = document.querySelectorAll('[data-action="toolsMenu"]');
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', open === true);
     }
+    publishGateState();
+  }
+
+  function setSelectionShelfOpen(open) {
+    if (!selectionShelf) return;
+    selectionShelf.hidden = open !== true;
+    const buttons = document.querySelectorAll('[data-action="selectionShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', open === true);
+    }
+    publishGateState();
+  }
+
+  function setCameraShelfOpen(open) {
+    if (!cameraShelf) return;
+    cameraShelf.hidden = open !== true;
+    const buttons = document.querySelectorAll('[data-action="cameraShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', open === true);
+    }
+    publishGateState();
   }
 
   function closePopups() {
@@ -9828,6 +9912,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
     closeCreateMenu();
+    setSelectionShelfOpen(false);
+    setCameraShelfOpen(false);
     setToolsOpen(true);
     fillSheet('');
     const firstShelf = document.querySelector('#toolsSheet .sheet-shelves button');
@@ -11826,7 +11912,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter') {
       closePopups();
     }
     if (action === 'tab') {
@@ -11846,8 +11932,31 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toggleSearch();
       message = 'Tool search';
     } else if (action === 'toolsMenu') {
-      openToolsMenu();
-      message = 'Tools menu';
+      if (toolsSheet && !toolsSheet.hidden) {
+        setToolsOpen(false);
+        message = 'Close tools menu';
+      } else {
+        openToolsMenu();
+        message = 'Tools menu';
+      }
+    } else if (action === 'selectionShelf') {
+      const willOpen = !selectionShelf || selectionShelf.hidden === true;
+      closePopups();
+      if (willOpen) {
+        setCameraShelfOpen(false);
+        setModifyOpen(false, true);
+      }
+      setSelectionShelfOpen(willOpen);
+      message = willOpen ? 'Selection' : 'Hide selection';
+    } else if (action === 'cameraShelf') {
+      const willOpen = !cameraShelf || cameraShelf.hidden === true;
+      closePopups();
+      if (willOpen) {
+        setSelectionShelfOpen(false);
+        setModifyOpen(false, true);
+      }
+      setCameraShelfOpen(willOpen);
+      message = willOpen ? 'Show/hide camera' : 'Hide camera';
     } else if (action === 'createMenu') {
       toggleCreateMenu(btn);
       message = 'Create';
@@ -14085,6 +14194,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       const searchWasOpen = !searchDlg.hidden;
       setModifyOpen(false, true);
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
       state.dimSheetOpen = false;
       state.propSheetOpen = false;
       if (editingBasicShape()) state.hudSizeCollapsed = true;
