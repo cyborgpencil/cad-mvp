@@ -66,6 +66,11 @@ flowchart LR
 - Desktop fallback recommended for heavy operations.
 - Hybrid: B-Rep for engineering features + mesh for organic shapes.
 
+## Phone UI (main, team-locked)
+
+- **Callout hide (accepted 2026-10-26, Erik retest)**: On phone, while editing a basic shape (box / cylinder / disc, no sketch specs), `#calloutLayer` stays hidden. Size stays editable on `#dimPanel` / Properties (`boxSx`/`boxSy`/`boxSz`, cyl/disc Size). Shipped PR #123 merge `907402c` (tip `202a737`).
+- **`#dimPanel` keep-lock (Chief, 2026-10-26 ~1:09 AM MT)**: Keep the dim body (Size / Centre / Rot / axis / bbox / hole). No full remove until those fields migrate into Properties and phone typed resize is confirmed. Later safe cut only: drop gizmo row / thin selection bar. No `#dimPanel` remove code until then.
+
 ## Success Criteria
 
 - User can go from blank sketch to validated, slicer-ready 3MF in a few minutes.
