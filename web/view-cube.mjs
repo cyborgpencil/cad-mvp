@@ -12,6 +12,22 @@ export const SWIPE_MS = 400;
 
 export const FACE_RING = ['front', 'right', 'back', 'left'];
 
+export const OPPOSITE_FACE = {
+  front: 'back',
+  back: 'front',
+  right: 'left',
+  left: 'right',
+  top: 'bottom',
+  bottom: 'top'
+};
+
+export function isAdjacentCubeFace(fromFace, toFace) {
+  const f = String(fromFace || '').trim().toLowerCase();
+  const t = String(toFace || '').trim().toLowerCase();
+  if (!OPPOSITE_FACE[f] || !OPPOSITE_FACE[t]) return false;
+  return t !== f && t !== OPPOSITE_FACE[f];
+}
+
 const DIRS = { left: true, right: true, up: true, down: true };
 
 export function swipeDirection(dx, dy, dt) {
@@ -27,8 +43,8 @@ export function swipeDirection(dx, dy, dt) {
 }
 
 export function nextCubeFace(face, dir) {
-  const f = String(face || '').toLowerCase();
-  const d = String(dir || '').toLowerCase();
+  const f = String(face || '').trim().toLowerCase();
+  const d = String(dir || '').trim().toLowerCase();
   if (!DIRS[d]) return null;
   if (f === 'top') {
     if (d === 'up') return 'back';

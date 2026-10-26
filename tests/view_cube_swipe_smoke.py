@@ -325,6 +325,9 @@ def run_phone_swipes(page: Any, kind: str) -> list[str]:
             up = {"x": cube["x"] + dx, "y": cube["y"] + dy}
             pointer_drag(page, cube, up, slow=slow)
             problems.extend(face_problems(page, axis, face, label, tag))
+            if name == "up" and not slow:
+                pointer_drag(page, cube, {"x": cube["x"], "y": cube["y"] + SWIPE_PX}, slow=False)
+                problems.extend(face_problems(page, FRONT, "front", "Front", f"{tag} top-down-adjacent"))
     go_front(page)
     cancel_reset = wait_face(page, FRONT, f"{kind} cancel front")
     problems.extend(cancel_reset)
@@ -463,6 +466,8 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} snap frame {elapsed:.0f} ms")
     if str(after.get("viewLabel") or "") != "Right":
         problems.append(f"{kind} viewLabel {after.get('viewLabel')!r}")
+    if nav.get("face") != "right" or nav.get("snapFace") != "right":
+        problems.append(f"{kind} swipe left face {nav.get('face')!r} snapFace {nav.get('snapFace')!r}")
     if kind == "touch":
         problems.extend(run_phone_swipes(page, kind))
     problems.extend(run_tap_swipe_tap(page, kind))
