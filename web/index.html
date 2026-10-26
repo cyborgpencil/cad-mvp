@@ -1830,6 +1830,28 @@
     z-index: 0;
   }
   #combineBtn:disabled { opacity: 0.38; }
+
+  .line-dim-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .line-dim {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(18, 22, 30, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--measure);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  }
 </style>
 </head>
 <body>
@@ -2218,6 +2240,7 @@
         </div>
       </form>
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
+      <div id="lineDimLayer" class="line-dim-layer" aria-hidden="true" hidden></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
         <div class="vp-cluster" role="group" aria-label="Analyze">
@@ -3224,9 +3247,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function gizmoShouldShow() {
     if (state.holeTool) return false;
     if (state.selection === 'vertex' || state.selection === 'edge' || state.selection === 'face') return false;
+    if (state.sceneCleared || state.projectBlank) return false;
     if (state.bodies.length > 1) {
       if ((state.gizmoMode || 'move') !== 'move') return false;
-      return !!activeEditBody();
+      return state.selection === 'item' && orderedBodies().length > 0;
     }
     if (state.preview) return true;
     if (state.selection === 'item' && state.selectedIds.length > 0) return true;
@@ -3237,7 +3261,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function positionEditable() {
     if (state.holeTool) return false;
-    if (state.bodies.length > 1) return !!activeEditBody();
+    if (state.bodies.length > 1) return state.selection === 'item' && orderedBodies().length > 0;
     return gizmoShouldShow();
   }
 
@@ -3368,8 +3392,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function refreshAnchor() {
     if (state.bodies.length > 1) {
-      const body = activeEditBody();
-      if (body) state.anchor = anchorOf(body);
+      const picked = state.selection === 'item' ? orderedBodies() : [];
+      if (picked.length === 1) {
+        state.anchor = anchorOf(picked[0]);
+      } else if (picked.length > 1) {
+        let sx = 0;
+        let sy = 0;
+        let sz = 0;
+        for (let i = 0; i < picked.length; i += 1) {
+          const a = anchorOf(picked[i]);
+          sx += a.x;
+          sy += a.y;
+          sz += a.z;
+        }
+        state.anchor = { x: sx / picked.length, y: sy / picked.length, z: sz / picked.length };
+      }
       writePosFields();
       placeHandles();
       return;
@@ -5448,6 +5485,80 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     host.innerHTML = html;
   }
 
+  function lineSegmentsForDimensions() {
+    const segs = [];
+    const verts = state.sketchLineVertices;
+    if (verts && verts.length >= 2) {
+      for (let i = 0; i + 1 < verts.length; i += 1) {
+        const a = verts[i];
+        const b = verts[i + 1];
+        if (!a || !b) continue;
+        const mm = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        if (!(mm > 1e-6)) continue;
+        segs.push({
+          index: i,
+          a: [a[0], a[1], a[2]],
+          b: [b[0], b[1], b[2]],
+          mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2],
+          mm: mm,
+          text: formatLength(mm)
+        });
+      }
+      return segs;
+    }
+    const profile = state.sketchProfile;
+    if (profile && profile.kind === 'line' && Array.isArray(profile.loop) && profile.loop.length >= 2) {
+      const loop = profile.loop;
+      const count = loop.length >= 3 ? loop.length : 1;
+      for (let i = 0; i < count; i += 1) {
+        const a = loop[i];
+        const b = loop[(i + 1) % loop.length];
+        if (!a || !b) continue;
+        const mm = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        if (!(mm > 1e-6)) continue;
+        segs.push({
+          index: i,
+          a: [a[0], a[1], a[2]],
+          b: [b[0], b[1], b[2]],
+          mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2],
+          mm: mm,
+          text: formatLength(mm)
+        });
+      }
+    }
+    return segs;
+  }
+
+  function paintLineDimensions() {
+    const host = document.getElementById('lineDimLayer');
+    if (!host) return;
+    const segs = lineSegmentsForDimensions();
+    if (!segs.length) {
+      host.hidden = true;
+      if (host.firstChild) host.replaceChildren();
+      return;
+    }
+    host.hidden = false;
+    while (host.children.length > segs.length) {
+      host.removeChild(host.lastChild);
+    }
+    while (host.children.length < segs.length) {
+      const badge = document.createElement('span');
+      badge.className = 'line-dim';
+      host.appendChild(badge);
+    }
+    for (let i = 0; i < segs.length; i += 1) {
+      const seg = segs[i];
+      const at = screenOfCad(seg.mid);
+      const badge = host.children[i];
+      badge.setAttribute('data-line-index', String(seg.index));
+      badge.setAttribute('data-mm', String(seg.mm));
+      badge.textContent = seg.text;
+      badge.style.left = at.x.toFixed(1) + 'px';
+      badge.style.top = at.y.toFixed(1) + 'px';
+    }
+  }
+
   function paintBooleanChrome() {
     const selected = orderedBodies();
     const two = state.selection === 'item' && selected.length === 2;
@@ -6868,13 +6979,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function translateBody(dx, dy, dz) {
     if (!dx && !dy && !dz) return false;
     if (state.bodies.length > 1) {
-      const body = activeEditBody();
-      if (!body || !body.shape) {
+      const picked = state.selection === 'item' ? orderedBodies() : [];
+      if (!picked.length) {
         setHint('Select one part to move it.');
         writePosFields();
         return false;
       }
-      return moveOwnedShape(dx, dy, dz, body);
+      if (picked.length === 1) {
+        if (!picked[0].shape) {
+          setHint('Select one part to move it.');
+          writePosFields();
+          return false;
+        }
+        return moveOwnedShape(dx, dy, dz, picked[0]);
+      }
+      for (let i = 0; i < picked.length; i += 1) {
+        if (!picked[i].shape || !moveOwnedShape(dx, dy, dz, picked[i])) return false;
+      }
+      return true;
     }
     if (state.bodies.length === 1 && state.bodies[0].shape) {
       return moveOwnedShape(dx, dy, dz);
@@ -7223,14 +7345,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function previewOwnedShift(cad) {
     if (state.bodies.length < 2) return;
-    const body = activeEditBody();
-    const id = body ? body.id : '';
+    const picked = state.selection === 'item' ? orderedBodies() : [];
+    const ids = {};
+    for (let i = 0; i < picked.length; i += 1) ids[picked[i].id] = true;
     const x = cad ? cad.x : 0;
     const y = cad ? cad.z : 0;
     const z = cad ? cad.y : 0;
     for (let i = 0; i < bodyRoot.children.length; i += 1) {
       const child = bodyRoot.children[i];
-      if (id && child.userData.bodyId === id) child.position.set(x, y, z);
+      if (ids[child.userData.bodyId]) child.position.set(x, y, z);
       else child.position.set(0, 0, 0);
     }
   }
@@ -8150,8 +8273,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function nearestCubeFace() {
     const off = camera.position.clone().sub(target).normalize();
     const items = [
-      ['right', off.x], ['left', -off.x], ['top', off.y],
-      ['bottom', -off.y], ['front', off.z], ['back', -off.z]
+      ['front', off.z], ['right', off.x], ['back', -off.z],
+      ['left', -off.x], ['top', off.y], ['bottom', -off.y]
     ];
     items.sort(function (a, b) { return b[1] - a[1]; });
     return items[0][0];
@@ -8255,6 +8378,54 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     tween = requestAnimationFrame(step);
   }
 
+  function homeTargetAndRadius() {
+    const hasSelection = state.selectedIds.length > 0 && !state.sceneCleared && !state.projectBlank && state.bodies.length > 0;
+    if (!hasSelection) {
+      return { center: new THREE.Vector3(0, 0, 0), radius: originFitRadius() };
+    }
+    let bodies = [];
+    if (state.bodies.length > 1) {
+      bodies = orderedBodies();
+      if (!bodies.length) {
+        for (let i = 0; i < state.selectedIds.length; i += 1) {
+          const prefix = String(state.selectedIds[i]).split(':')[0];
+          const b = findBody(prefix);
+          if (b && bodies.indexOf(b) < 0) bodies.push(b);
+        }
+      }
+      if (!bodies.length) bodies = state.bodies.slice();
+    } else if (state.bodies.length === 1) {
+      bodies = [state.bodies[0]];
+    }
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let b = 0; b < bodies.length; b += 1) {
+      const verts = bodies[b] && bodies[b].mesh && bodies[b].mesh.vertices ? bodies[b].mesh.vertices : [];
+      for (let i = 0; i < verts.length; i += 1) {
+        const p = verts[i];
+        const tx = p[0];
+        const ty = p[2];
+        const tz = p[1];
+        if (tx < minX) minX = tx;
+        if (ty < minY) minY = ty;
+        if (tz < minZ) minZ = tz;
+        if (tx > maxX) maxX = tx;
+        if (ty > maxY) maxY = ty;
+        if (tz > maxZ) maxZ = tz;
+      }
+    }
+    if (!Number.isFinite(minX)) {
+      const fallback = new THREE.Vector3();
+      viewApi.cadToThree(state.anchor.x, state.anchor.y, state.anchor.z, fallback);
+      return { center: fallback, radius: fitRadius };
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const r = Math.max(Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2, 0.5);
+    return { center: new THREE.Vector3(cx, cy, cz), radius: r };
+  }
+
   function goView(name) {
     if (name === 'fit') {
       animateSpherical(spherical.theta, spherical.phi, fitDistance(), true);
@@ -8268,7 +8439,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const view = VIEWS[name] || VIEWS.home;
     if (name === 'home') {
-      animateSpherical(view.theta, view.phi, fitDistance(originFitRadius()), new THREE.Vector3(0, 0, 0));
+      const aim = homeTargetAndRadius();
+      animateSpherical(view.theta, view.phi, fitDistance(aim.radius), aim.center);
       setHint('Home view');
       return;
     }
@@ -10117,14 +10289,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
     }
     const profile = state.sketchProfile;
+    const activeLineVerts = state.sketchLineVertices && state.sketchLineVertices.length >= 2 ? state.sketchLineVertices : null;
     if (!sketchProfileLine) return;
-    if (!profile || !profile.loop || profile.loop.length < 3) {
+    const drawLoop = (profile && profile.loop && profile.loop.length >= 3)
+      ? profile.loop
+      : activeLineVerts;
+    if (!drawLoop || drawLoop.length < 2) {
       sketchProfileLine.visible = false;
       return;
     }
     const pts = [];
-    for (let i = 0; i < profile.loop.length; i += 1) {
-      const p = profile.loop[i];
+    for (let i = 0; i < drawLoop.length; i += 1) {
+      const p = drawLoop[i];
       pts.push(new THREE.Vector3(p[0], p[2] + 0.12, p[1]));
     }
     sketchProfileLine.geometry.dispose();
@@ -10873,6 +11049,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchLineVertices.push([Number(point[0]), Number(point[1]), Number(point[2])]);
     if (state.sketchLineVertices.length >= 2) syncSketchLineField();
     refreshLineConfirm();
+    paintSketchVisuals();
+    paintLineDimensions();
     paintCallouts();
     publishGateState();
     return true;
@@ -13568,6 +13746,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     noteFrameSample();
     document.getElementById('viewLabel').textContent = viewCaption();
     paintOrderBadges();
+    paintLineDimensions();
   }
 
   function noteFrameSample() {
@@ -13864,7 +14043,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const travel = Math.hypot(ev.clientX - g.sx, ev.clientY - g.sy);
         const pastSlop = g.moved || travel >= tapSlopPx();
         let didSwipe = false;
-        if (ev.type !== 'pointercancel' && g.fromCubeEl && cubeApi && typeof cubeApi.swipeDirection === 'function') {
+        if (ev.type !== 'pointercancel' && (g.fromCubeEl || g.type === 'cube') && cubeApi && typeof cubeApi.swipeDirection === 'function') {
           const swipeDir = cubeApi.swipeDirection(
             ev.clientX - g.sx,
             ev.clientY - g.sy,
@@ -13881,15 +14060,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         }
         // A committed swipe is not the second tap of a double-tap. Drop the
         // earlier timestamp so a following tap inside 320 ms does not go Home.
-        if (didSwipe) cubeTapMs = 0;
+        if (didSwipe || g.holding) cubeTapMs = 0;
         // A drag past the tap slop must not pick at the release point.
         // On the phone cube that point sits on a side zone.
-        if (!didSwipe && ev.type !== 'pointercancel' && !pastSlop) {
+        if (!didSwipe && !g.holding && ev.type !== 'pointercancel' && !pastSlop) {
           const now = performance.now();
           const doubleTap = cubeTapMs > 0 && (now - cubeTapMs) <= CUBE_DOUBLE_MS;
           if (doubleTap) {
             cubeTapMs = 0;
-            snapToDirection(faceDirection('home'), 'Home');
+            goView('home');
+            toast('View: Home');
           } else if (cubeSnap) {
             /* A tap during the snap is ignored unless it is the double-tap home. */
           } else {
@@ -14465,6 +14645,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         lineLengthMm: state.sketchProfile && state.sketchProfile.kind === 'line'
           ? (state.sketchProfile.lengthMm || 0)
           : (lastLineSegmentLengthMm() || readField('sketchLineL') || 0),
+        lineDimensions: lineSegmentsForDimensions(),
         arcPoints: arcPointCount(),
         arcRadiusMm: state.sketchProfile && state.sketchProfile.kind === 'arc'
           ? (state.sketchProfile.radiusMm || 0)
@@ -14618,9 +14799,35 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       commitCalloutEntry();
     });
   }
+  function stepCubeHold(now) {
+    if (!gesture || gesture.type !== 'cube' || gesture.moved || ptrs.size !== 1) return;
+    const holdDelay = (viewApi && viewApi.LONG_PRESS_MS) || CUBE_SNAP_MS;
+    if (now - (gesture.t0 || 0) < holdDelay) return;
+    gesture.holding = true;
+    cancelTween();
+    cubeFaceName = '';
+    const bounds = canvas.getBoundingClientRect();
+    const visible = cubeRect();
+    const cx = bounds.left + visible.x + visible.s / 2;
+    const cy = bounds.top + visible.y + visible.s / 2;
+    const ox = gesture.sx - cx;
+    const oy = gesture.sy - cy;
+    const dist = Math.hypot(ox, oy);
+    const step = 0.012;
+    if (dist >= 4) {
+      spherical.theta -= (ox / dist) * step;
+      spherical.phi -= (oy / dist) * step;
+    } else {
+      spherical.theta += step;
+    }
+    updateCamera();
+    paintCallouts();
+  }
+
   renderFrame();
 
-  function frame() {
+  function frame(now) {
+    stepCubeHold(typeof now === 'number' ? now : performance.now());
     if (state.measure) updateMeasure();
     renderFrame();
     requestAnimationFrame(frame);
