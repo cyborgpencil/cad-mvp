@@ -158,17 +158,6 @@ Leave smokes and Pages ready. **Human gate** = Erik runs this on [Pages](https:/
 
 Pass = all seven feel right; fail notes go to the room (team discuss → Chief/3T call).
 
-<<<<<<< HEAD
-## Queued after current in-flight (discuss / parked)
-
-End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for this item yet.
-
-- **Top-bar shelf icons (selection + show/hide camera)**
-  - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
-  - Separate by tool type. Selection gets its own icon group. Any further tool-type groups are **TBD**.
-  - Same behavior as the tools menu: press the icon to show or hide that shelf.
-  - **TBD:** icon art, pixel sizes, hotkeys, which existing controls are the selection shelf and which are the show/hide camera shelf, which bar is the top bar (header or the ribbon that holds the Tools menu), phone and desktop placement, and whether any shelf besides those two moves.
-=======
 #### Export acceptance checks (queue item 6)
 
 Concrete bar for wake checklist item 6 / lock **(e)**. Pilot runs it after the Q5 L-bracket rebuild, and the same checks cover an ordinary boot box or boolean export. E2E stays STL + 3MF only; STEP later. Write blocks match `mvp/export.md`.
@@ -182,13 +171,13 @@ Concrete bar for wake checklist item 6 / lock **(e)**. Pilot runs it after the Q
 - **No printer.** No printer send for Q5 or this acceptance.
 
 Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate()` passed, and none of the write-block messages on those files. Watertight stays INFO. L-bracket numeric expect stays skipped while sizes are TBD.
->>>>>>> origin/main
 
-## Success Criteria
+## Queued after current in-flight (discuss / parked)
 
-- User can go from blank sketch to validated, slicer-ready 3MF in a few minutes.
-- Files open correctly in common slicers (PrusaSlicer, Orca, Bambu Studio, Cura) without scale or manifold errors.
-- MCP commands reliably modify the model and trigger validation.
+End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for this item yet.
 
-> [!NOTE]
-> This document covers only the MVP. See `/vision/full-project.md` for post-MVP goals. Changes here do not affect the vision document.
+- **Top-bar shelf icons (selection + show/hide camera)**
+  - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
+  - Separate by tool type. Selection gets its own icon group. Any further tool-type groups are **TBD**.
+  - Same behavior as the tools menu: press the icon to show or hide that shelf.
+  - **TBD:** icon art, pixel sizes, hotkeys, which existing controls are the selection shelf and which are the show/hide camera shelf, which bar is the top bar (header or the ribbon that holds the Tools menu), phone and desktop placement, and whether any shelf besides those two moves.
