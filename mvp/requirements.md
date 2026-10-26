@@ -174,7 +174,7 @@ Pass = STL and 3MF written for each solid under test, units mm, C++ `Module.gate
 
 ## Queued after current in-flight (discuss / parked)
 
-End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, and ~9:44 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after L-bracket agy and remaining in-flight merges clear. Leave Pilot's in-flight L-bracket work uninterrupted. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
+End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, and ~10:27 AM MT; Chief lock). **Status: discuss / parked.** Start only after the L-bracket Antigravity brief and tipped docs #155, #154, and #156 have cleared, and after remaining in-flight coding clears. L-bracket `agy` has already cleared via merged #165. Leave Pilot uninterrupted for any remaining coding. No Antigravity prompt for these items yet. Overnight locks (c) and (d), the Q5 discuss locks, and the export acceptance checks stay as written above. Unspecified details stay **TBD**.
 
 - **Top-bar shelf icons (selection + show/hide camera)**
   - Move the **selection** sliding toolbar and the **show/hide camera** sliding toolbar into **icons on the top bar, to the right of the tools menu**.
@@ -199,6 +199,15 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, and ~9:44 AM MT;
   - When X-ray is **off**, pick must hit the **frontmost surface only** — no click-through to objects behind.
   - **Status: discuss / parked.** Implement only after L-bracket `agy` and the rest of the current coding queue clear. No Antigravity prompt yet.
   - **TBD:** what the app’s X-ray control is named/where it lives, any pick-tolerance or depth-buffer details not stated by Erik.
+- **Panel labels**
+  - Every panel must be labeled.
+  - **Status: discuss / parked.** Implement only after the current coding queue clears. No Antigravity prompt yet.
+  - **TBD:** exact label text per panel, which surfaces count as panels, and phone vs desktop label placement.
+- **Always-visible chrome (permanent panels)**
+  - The only panels that stay visible 100% of the time are: the **very top** (tree + filename), the **tools menu bar**, and the **very bottom** (Modify / Create etc.).
+  - Everything else must not stay on-screen permanently; use show/hide like other shelves.
+  - **Status: discuss / parked.** Implement only after the current coding queue clears. No Antigravity prompt yet.
+  - **TBD:** which existing UI regions map to “very top / tools menu bar / very bottom”, which other panels currently stay permanent and must become shelves, and any exceptions Erik did not state.
 
 ## Success Criteria
 
