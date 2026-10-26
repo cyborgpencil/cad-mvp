@@ -100,6 +100,31 @@ Chief Q5, after overnight (1)–(4). No invented sizes; every missing dimension 
 - **Dims TBD** (do not invent): leg A/B length×width; fit/clearance to frame casing; leg screw hole size, countersink, and spacing; Blink boss diameter/height; disc diameter and placement; disc screw count/size/pattern; Blink model; fillet/chamfer defaults; casing profile; screw gauge; printed hole oversize; material/printer.
 - **Locked** (restated from `mvp/projects/blink-l-bracket.md` only): wall thickness **4 mm**, disc thickness **4 mm**, corner **90°**, units **mm**. Everything else TBD.
 
+#### Toy truck feature list (discuss/spec; Digest 2026-10-26 ~8:14 AM MT; Chief locks same day)
+
+Parked under this Q5 discuss note. The L-bracket stays the primary rebuild. Locked L-bracket values above are unchanged. The truck stays discuss/spec. Queue it after the Q5 L-bracket. **Rebuild the truck only after L-bracket acceptance.** Units **mm**. Prefer **sketch → Blind Extrude + Union/Cut**. Intersect is not required. **No printer** send for Q5.
+
+Acceptance B sizes stay the discuss baseline. Every size below is a **sourced team-chosen baseline** from Acceptance B (sourced, not invented). They are not Q5 locks. Keep the **11-part** assembly (PLA hubs + TPU tires). Single-body is closed for this note.
+
+- **Chassis/body** — MVP — plate 80×30×6 mm; two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up. **Sourced team-chosen baseline** (Acceptance B; PLA).
+- **Cab** — MVP — 30×30×25 mm box on the chassis front; Union into the chassis → 11 parts after combine. **Sourced team-chosen baseline** (Acceptance B; PLA).
+- **Bed/cargo box** — later / **out of MVP**. Not in Acceptance B.
+- **Axles ×2** — MVP — Ø4×44 mm (PLA). **Sourced team-chosen baseline** (Acceptance B).
+- **Wheel hubs ×4** — MVP — Ø16×8 mm with Ø4.2 bore (PLA). **Sourced team-chosen baseline** (Acceptance B). Bore via Cut.
+- **Tires ×4** — MVP for Acceptance B materials — ring OD 24 / ID 15.6 / width 8 (TPU; 0.2 stretch on the hub). **Sourced team-chosen baseline** (Acceptance B).
+- **Spokes** — discuss — dimensions **TBD**. Do not invent.
+- **Tread** — discuss — dimensions **TBD**. Do not invent.
+- **Interior** — discuss — dimensions **TBD**. Do not invent.
+- **Doors** — discuss — dimensions **TBD**. Do not invent.
+- **Boolean cuts** — axle holes, hub bore, and tire ID via Cut; body joins via Union. Assembly stays **11-part** (PLA hubs + TPU tires).
+- **Multi-plate Orca (PLA + TPU 95A)** — Acceptance B check, later relative to this Q5 discuss. **No printer** send.
+
+**Rebuild path** (only after L-bracket acceptance): sketch → Blind Extrude → Union/Cut → units + OCCT validity; export STL/3MF in mm when the export gate passes. Keep the **11-part** assembly.
+
+**Fillet/chamfer defaults:** non-blocking. No values until sourced. Do not invent.
+
+**Sources:** `mvp/acceptance-a-b.md` (truck parts, team-chosen 07:10 MT; 11 parts after the cab combine, Chief and 3T 07:15 MT); `web/PROGRESS.md` (07:10 and 07:15 notes); `research/assemblies.md` and `prompts/assemblies.md` (flat parts list, Combine, per-part 3MF, mm); `prompts/mobile-5-booleans.md` (Union/Cut; Intersect may stay in the UI; L-bracket sketch path); Q5 locks in this section (PR #150, merge `a38d89d`). Chief locks in this subsection (2026-10-26): Acceptance B sizes stay the discuss baseline; bed later / out of MVP; 11-part assembly; fillet/chamfer non-blocking; truck rebuild only after L-bracket acceptance; spokes, tread, interior, and doors stay discuss with dimensions TBD.
+
 ### After Rust #1 tip — Antigravity order
 1. (2) Empty-sketch / no-solid Create Sketch never spawns box.
 2. (4) Selection V/E/F: hide whole-body gizmo.
