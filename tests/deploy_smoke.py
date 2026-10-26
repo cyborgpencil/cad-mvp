@@ -25,15 +25,15 @@ Asserts window.__cadcamExportState.occtReady for:
                         unless the viewport is focused, and inputs ignore hotkeys
   portrait 390x844      Create menu (Box, Cylinder, Disc, Hole, Sketch; no primitive
                         buttons left outside it), then box, cylinder, and disc;
-                        live callouts while that shape is the active edit (box L×W×H,
-                        cylinder Ø×H, disc Ø×T) match formatLength of the sheet fields,
-                        update after the sheet edit, hide when the body is deleted,
-                        and keep 44px hit targets off Home, Export, and units;
+                        #calloutLayer stays hidden on phone while editing a basic shape
+                        (box, cylinder, disc) while Properties Size fields (boxSx/boxSy/boxSz,
+                        cylD/cylH, discD/discT) stay present and editable and update after
+                        the sheet edit; desktop callouts stay visible and off Home/Export/units;
                         uncovered viewport >= 70% with the dimension panel collapsed
                         and >= 50% with it open; the panel stays shut until a tap;
                         build stamp is visible and matches the script ?v= param;
                         bottom sheet does not cover Home; move, rotate, and resize
-                        a box with taps and typed values; a callout plus writes boxSx;
+                        a box with taps and typed values;
                         no page-level horizontal scroll; visible buttons and the status
                         line stay inside the width; the sheet and toolbar do not scroll
                         sideways unless marked data-hscroll; Part 1 is fully visible,
@@ -3742,6 +3742,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     problems = _json_problems(raw, err, "wrapup desktop")
     if problems:
         return problems
+    desk_callouts = callout_problems(cdp, "box", {"boxSx": 20.0, "boxSy": 20.0, "boxSz": 20.0})
+    if desk_callouts:
+        return ["wrapup desktop callouts", *desk_callouts]
     escaped, esc_err = eval_expr(
         cdp,
         "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));"
@@ -3868,29 +3871,60 @@ def callout_problems(
     kind: str,
     expect_mm: dict[str, float] | None = None,
 ) -> list[str]:
-    """Visible L×W×H or Ø×H/Ø×T callouts match the sheet fields."""
+    """Phone hides basic-shape #calloutLayer and keeps Size fields editable; desktop shows callouts."""
     data, problems = _callout_probe(cdp)
     if problems or not isinstance(data, dict):
         return problems
-    if data.get("hidden") is not False:
-        problems.append(f"callouts hidden during {kind} edit")
     if data.get("editing") is not True:
         problems.append(f"callouts editing flag {data.get('editing')!r}")
     if data.get("kind") != kind:
         problems.append(f"callouts kind {data.get('kind')!r}")
-    if data.get("inside") is not True:
-        problems.append("callouts outside the viewport")
     for name, key in (("Home", "coversHome"), ("Export", "coversExport"), ("units", "coversUnits")):
         if data.get(key) is True:
             problems.append(f"callouts cover {name}")
+    expect = CALLOUT_FIELDS.get(kind)
+    if expect is None:
+        problems.append(f"callout kind {kind!r}")
+        return problems
+    if data.get("dimPanelHidden") is True:
+        problems.append(f"dimPanel hidden during {kind} edit")
+    size_fields = data.get("sizeFields")
+    if not isinstance(size_fields, list) or len(size_fields) != len(expect):
+        problems.append(f"size fields {size_fields!r}")
+        return problems
+    for index, (tag, dim) in enumerate(expect):
+        field = size_fields[index] if index < len(size_fields) and isinstance(size_fields[index], dict) else {}
+        if field.get("tag") != tag:
+            problems.append(f"size field tag {field.get('tag')!r} != {tag}")
+        if field.get("dim") != dim:
+            problems.append(f"size field dim {field.get('dim')!r} != {dim}")
+        if field.get("present") is not True or field.get("editable") is not True:
+            problems.append(f"size field {dim} not editable {field!r}")
+        if field.get("groupHidden") is True:
+            problems.append(f"size field {dim} group hidden")
+        if not str(field.get("value") or "").strip():
+            problems.append(f"size field {dim} value {field.get('value')!r}")
+        if expect_mm and dim in expect_mm:
+            try:
+                mm = float(field.get("mm"))
+            except (TypeError, ValueError):
+                mm = float("nan")
+            if abs(mm - float(expect_mm[dim])) > 0.02:
+                problems.append(f"size field {dim} mm {field.get('mm')!r}")
+    rows = data.get("rows")
     if data.get("phone") is True:
-        if data.get("dockedUnderHud") is not True:
-            problems.append("phone callouts not docked under HUD/left")
+        if data.get("hidden") is not True:
+            problems.append(f"phone callouts visible during {kind} edit")
+        if isinstance(rows, list) and rows:
+            problems.append(f"phone callout rows {len(rows)}")
         if data.get("coversVpCenter") is True or data.get("coversBodyCenter") is True:
             problems.append("phone callouts centered over body")
-    rows = data.get("rows")
-    expect = CALLOUT_FIELDS.get(kind)
-    if not isinstance(rows, list) or expect is None:
+        return problems
+    if data.get("hidden") is not False:
+        problems.append(f"callouts hidden during {kind} edit")
+    if data.get("inside") is not True:
+        problems.append("callouts outside the viewport")
+    if not isinstance(rows, list):
         problems.append(f"callout rows {rows!r}")
         return problems
     if len(rows) != len(expect):
@@ -4221,31 +4255,16 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         if stepped.get("snap") is not True:
             problems.append(f"portrait box snap {stepped.get('snap')!r}")
             return problems
-        callout_step = tap_selector(
-            cdp,
-            '#calloutLayer button[data-dim="boxSx"][data-delta="1"]',
-            "callout length plus",
-        )
-        if callout_step:
-            problems.extend(callout_step)
-            return problems
-        callout_done, callout_wait = wait_portrait(
-            cdp, origin, "box", {"cx": 6.0, "rz": 15.0, "sy": 22.0, "sx": 31.0}, PAGE_TIMEOUT_S
-        )
-        if callout_wait or not isinstance(callout_done, dict):
-            problems.append("portrait callout step")
-            problems.extend(callout_wait[:20])
-            return problems
         stepped_callouts = callout_problems(
-            cdp, "box", {"boxSx": 31.0, "boxSy": 22.0, "boxSz": 30.0}
+            cdp, "box", {"boxSx": 30.0, "boxSy": 22.0, "boxSz": 30.0}
         )
         if stepped_callouts:
-            problems.append("portrait callout step text")
+            problems.append("portrait callout check")
             problems.extend(stepped_callouts)
             return problems
         print(
             "portrait_box transforms: move cx 5 stepper 6, rotate z 15, resize sy 22, "
-            "callout sx 31, snap on, gate PASS",
+            "callouts hidden, snap on, gate PASS",
             flush=True,
         )
     return problems
