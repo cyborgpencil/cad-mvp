@@ -1346,7 +1346,7 @@ SKETCH_PORTRAIT_EXPR = r"""
   function noSketchDims(label) {
     var rows = calloutRows();
     for (var i = 0; i < rows.length; i++) {
-      if (rows[i].dim === 'sketchL' || rows[i].dim === 'sketchW' || rows[i].dim === 'sketchD') {
+      if (rows[i].dim === 'sketchL' || rows[i].dim === 'sketchW' || rows[i].dim === 'sketchD' || rows[i].dim === 'sketchPolyD' || rows[i].dim === 'sketchPolySides' || rows[i].dim === 'sketchLineL' || rows[i].dim === 'sketchArcR') {
         problems.push(label + ' sketch callout ' + rows[i].dim);
       }
     }
@@ -2297,13 +2297,25 @@ ORIGIN_PLANE_EXPR = r"""
     if (!lineNote || lineNote.textContent !== 'Line') problems.push('line note ' + (lineNote && lineNote.textContent));
     var lineRect = document.getElementById('sketchRectRow');
     var lineCirc = document.getElementById('sketchCircRow');
+    var lineRow = document.getElementById('sketchLineRow');
     var lineDepth = document.getElementById('sketchDepthRow');
     if (!lineRect || lineRect.hidden !== true) problems.push('line shows length');
     if (!lineCirc || lineCirc.hidden !== true) problems.push('line shows diameter');
+    if (!lineRow || lineRow.hidden !== false) problems.push('line row hidden');
     if (!lineDepth || lineDepth.hidden !== true) problems.push('line shows depth');
     if (boxOf(document.getElementById('sketchL'))) problems.push('line shows sketchL');
     if (boxOf(document.getElementById('sketchW'))) problems.push('line shows sketchW');
     if (boxOf(document.getElementById('sketchD'))) problems.push('line shows sketchD');
+    var lineLEl = document.getElementById('sketchLineL');
+    need(lineLEl, 'Line length');
+    if (!lineLEl || lineLEl.getAttribute('inputmode') !== 'decimal') problems.push('line length inputmode');
+    var lineCallout0 = document.getElementById('calloutValue0');
+    if (!lineCallout0 || !boxOf(lineCallout0) || lineCallout0.getAttribute('data-dim') !== 'sketchLineL') {
+      problems.push('line callout missing');
+    }
+    need(document.getElementById('calloutMinus0'), 'Line callout minus');
+    need(lineCallout0, 'Line callout value');
+    need(document.getElementById('calloutPlus0'), 'Line callout plus');
     var lineSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!lineSheetBox) problems.push('line sheet hidden');
     var lineKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
@@ -2319,6 +2331,9 @@ ORIGIN_PLANE_EXPR = r"""
       if (hook.placeLineVertex(0, 0) !== true) problems.push('line vertex 1');
       if (hook.placeLineVertex(10, 0) !== true) problems.push('line vertex 2');
     }
+    if (!lineCallout0 || String(lineCallout0.textContent || '').trim() !== '10 mm') {
+      problems.push('line callout at 2 ' + (lineCallout0 && lineCallout0.textContent));
+    }
     var two = hook.state();
     if (!two || two.lineVertices !== 2) problems.push('lineVertices 2 ' + (two && two.lineVertices));
     if (!two || two.closed !== false) problems.push('line closed at 2');
@@ -2329,11 +2344,15 @@ ORIGIN_PLANE_EXPR = r"""
       problems.push('line confirm enabled at 2');
     }
     if (typeof hook.placeLineVertex === 'function' && hook.placeLineVertex(0, 10) !== true) problems.push('line vertex 3');
+    if (!lineCallout0 || String(lineCallout0.textContent || '').trim() !== '14.142 mm') {
+      problems.push('line callout at 3 ' + (lineCallout0 && lineCallout0.textContent));
+    }
     var three = hook.state();
     if (!three || three.lineVertices !== 3 || three.closed !== false) {
       problems.push('line before confirm n ' + (three && three.lineVertices) + ' closed ' + (three && three.closed));
     }
     confirmSketch('line');
+    if (boxOf(document.getElementById('calloutRow0'))) problems.push('line callout stayed after confirm');
     var drawnLine = hook.state();
     if (!drawnLine || drawnLine.profile !== 'line' || drawnLine.closed !== true || drawnLine.lineVertices !== 3) {
       problems.push('line profile ' + (drawnLine && drawnLine.profile) + ' closed ' + (drawnLine && drawnLine.closed) + ' n ' + (drawnLine && drawnLine.lineVertices));
@@ -2345,6 +2364,36 @@ ORIGIN_PLANE_EXPR = r"""
       for (var axis = 0; axis < 3; axis++) {
         if (Math.abs(min[axis]) > 0.05) problems.push('line min ' + axis + ' ' + min[axis]);
         if (Math.abs(max[axis] - 10) > 0.05) problems.push('line max ' + axis + ' ' + max[axis]);
+      }
+    });
+  }
+  if (!ensureEmpty('line typed clear')) return JSON.stringify(problems);
+  if (!startSketch()) return JSON.stringify(problems);
+  pickPlane('xy', 'Line typed top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+  if (openTools()) {
+    var lineTypedTool = sheetBtn('Line');
+    if (!lineTypedTool) problems.push('Line typed missing');
+    else lineTypedTool.click();
+    hook.placeLineVertex(0, 0);
+    hook.placeLineVertex(10, 0);
+    hook.placeLineVertex(10, 5);
+    var lineTypedEl = document.getElementById('sketchLineL');
+    if (!lineTypedEl || String(lineTypedEl.value).trim() !== '5') {
+      problems.push('line typed initial ' + (lineTypedEl && lineTypedEl.value));
+    }
+    if (lineTypedEl) {
+      lineTypedEl.value = '10';
+      lineTypedEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    var lineTypedVal0 = document.getElementById('calloutValue0');
+    if (!lineTypedVal0 || String(lineTypedVal0.textContent || '').trim() !== '10 mm') {
+      problems.push('line typed callout ' + (lineTypedVal0 && lineTypedVal0.textContent));
+    }
+    confirmSketch('line typed');
+    extrude('line typed');
+    assertSolid('line typed', 500, function (bounds) {
+      if (Math.abs(bounds.max[0] - 10) > 0.05 || Math.abs(bounds.max[1] - 10) > 0.05) {
+        problems.push('line typed bounds ' + JSON.stringify(bounds));
       }
     });
   }
@@ -2364,14 +2413,26 @@ ORIGIN_PLANE_EXPR = r"""
     var arcRect = document.getElementById('sketchRectRow');
     var arcCirc = document.getElementById('sketchCircRow');
     var arcPoly = document.getElementById('sketchPolyRow');
+    var arcRow = document.getElementById('sketchArcRow');
     var arcDepth = document.getElementById('sketchDepthRow');
     if (!arcRect || arcRect.hidden !== true) problems.push('arc shows length');
     if (!arcCirc || arcCirc.hidden !== true) problems.push('arc shows diameter');
     if (!arcPoly || arcPoly.hidden !== true) problems.push('arc shows polygon');
+    if (!arcRow || arcRow.hidden !== false) problems.push('arc row hidden');
     if (!arcDepth || arcDepth.hidden !== true) problems.push('arc shows depth');
     if (boxOf(document.getElementById('sketchL'))) problems.push('arc shows sketchL');
     if (boxOf(document.getElementById('sketchW'))) problems.push('arc shows sketchW');
     if (boxOf(document.getElementById('sketchD'))) problems.push('arc shows sketchD');
+    var arcREl = document.getElementById('sketchArcR');
+    need(arcREl, 'Arc radius');
+    if (!arcREl || arcREl.getAttribute('inputmode') !== 'decimal') problems.push('arc radius inputmode');
+    var arcCallout0 = document.getElementById('calloutValue0');
+    if (!arcCallout0 || !boxOf(arcCallout0) || arcCallout0.getAttribute('data-dim') !== 'sketchArcR') {
+      problems.push('arc callout missing');
+    }
+    need(document.getElementById('calloutMinus0'), 'Arc callout minus');
+    need(arcCallout0, 'Arc callout value');
+    need(document.getElementById('calloutPlus0'), 'Arc callout plus');
     var arcSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!arcSheetBox) problems.push('arc sheet hidden');
     var arcKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
@@ -2402,11 +2463,15 @@ ORIGIN_PLANE_EXPR = r"""
       if (hook.placeArcPoint(10, 5) !== true) problems.push('arc point 2');
       if (hook.placeArcPoint(10, 0) !== true) problems.push('arc point 3');
     }
+    if (!arcCallout0 || String(arcCallout0.textContent || '').trim() !== '5.590 mm') {
+      problems.push('arc callout at 3 ' + (arcCallout0 && arcCallout0.textContent));
+    }
     var arcThree = hook.state();
     if (!arcThree || arcThree.arcPoints !== 3 || arcThree.closed !== false) {
       problems.push('arc before confirm n ' + (arcThree && arcThree.arcPoints) + ' closed ' + (arcThree && arcThree.closed));
     }
     confirmSketch('arc');
+    if (boxOf(document.getElementById('calloutRow0'))) problems.push('arc callout stayed after confirm');
     var drawnArc = hook.state();
     if (!drawnArc || drawnArc.profile !== 'arc' || drawnArc.closed !== true || drawnArc.arcPoints !== 3) {
       problems.push('arc profile ' + (drawnArc && drawnArc.profile) + ' closed ' + (drawnArc && drawnArc.closed) + ' n ' + (drawnArc && drawnArc.arcPoints));
@@ -2420,13 +2485,53 @@ ORIGIN_PLANE_EXPR = r"""
       if (Math.abs(max[2] - 10) > 0.05) problems.push('arc max z ' + max[2]);
     });
   }
+  if (!ensureEmpty('arc typed clear')) return JSON.stringify(problems);
+  if (!startSketch()) return JSON.stringify(problems);
+  pickPlane('xy', 'Arc typed top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+  if (openTools()) {
+    var arcTypedTool = sheetBtn('Arc');
+    if (!arcTypedTool) problems.push('Arc typed missing');
+    else arcTypedTool.click();
+    hook.placeArcPoint(0, 0);
+    hook.placeArcPoint(5, 5);
+    hook.placeArcPoint(10, 0);
+    var arcTypedEl = document.getElementById('sketchArcR');
+    if (!arcTypedEl || String(arcTypedEl.value).trim() !== '5') {
+      problems.push('arc typed initial ' + (arcTypedEl && arcTypedEl.value));
+    }
+    if (arcTypedEl) {
+      arcTypedEl.value = '10';
+      arcTypedEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    var arcTypedVal0 = document.getElementById('calloutValue0');
+    if (!arcTypedVal0 || String(arcTypedVal0.textContent || '').trim() !== '10 mm') {
+      problems.push('arc typed callout ' + (arcTypedVal0 && arcTypedVal0.textContent));
+    }
+    confirmSketch('arc typed');
+    extrude('arc typed');
+    var semiExpectedVol = 0.5 * Math.PI * 100 * 10;
+    assertSolid('arc typed', semiExpectedVol, function (bounds) {
+      if (Math.abs(bounds.min[2]) > 0.05 || Math.abs(bounds.max[2] - 10) > 0.05) {
+        problems.push('arc typed z ' + JSON.stringify(bounds));
+      }
+    });
+  }
   if (!ensureEmpty('polygon clear')) return JSON.stringify(problems);
   if (!startSketch()) return JSON.stringify(problems);
   pickPlane('xy', 'Polygon top', [0, 0, 1], [1, 0, 0], [0, 1, 0]);
   var polyRibbon = document.querySelector('.tool-btn[data-tool="Polygon"]');
   if (!polyRibbon) problems.push('Polygon button missing');
   else if (polyRibbon.getAttribute('data-action') !== 'sketchPolygon') problems.push('Polygon data-action ' + polyRibbon.getAttribute('data-action'));
+  var dimRibbon = document.querySelector('.tool-btn[data-tool="Dimension"]');
+  if (!dimRibbon) problems.push('Dimension button missing');
+  else if (dimRibbon.getAttribute('data-action') !== 'sketchDimension') problems.push('Dimension data-action ' + dimRibbon.getAttribute('data-action'));
+  var offsetRibbon = document.querySelector('.tool-btn[data-tool="Offset"]');
+  if (!offsetRibbon) problems.push('Offset button missing');
+  else if (offsetRibbon.getAttribute('data-action')) problems.push('Offset data-action ' + offsetRibbon.getAttribute('data-action'));
   if (openTools()) {
+    var offsetBtn = sheetBtn('Offset');
+    if (!offsetBtn) problems.push('Offset sheet missing');
+    else if (offsetBtn.getAttribute('data-action')) problems.push('Offset sheet action ' + offsetBtn.getAttribute('data-action'));
     var polyTool = sheetBtn('Polygon');
     need(polyTool, 'Polygon');
     if (!polyTool) problems.push('Polygon missing');
@@ -2451,12 +2556,38 @@ ORIGIN_PLANE_EXPR = r"""
     if (!polyDEl || String(polyDEl.value).trim() !== '10' || polyDEl.getAttribute('inputmode') !== 'decimal') {
       problems.push('polygon diameter default ' + (polyDEl && polyDEl.value));
     }
+    var polyCallout0 = document.getElementById('calloutValue0');
+    var polyCallout1 = document.getElementById('calloutValue1');
+    if (!polyCallout0 || !boxOf(polyCallout0) || polyCallout0.getAttribute('data-dim') !== 'sketchPolyD' || String(polyCallout0.textContent || '').trim() !== '10 mm') {
+      problems.push('polygon callout 0 ' + (polyCallout0 && polyCallout0.textContent));
+    }
+    if (!polyCallout1 || !boxOf(polyCallout1) || polyCallout1.getAttribute('data-dim') !== 'sketchPolySides' || String(polyCallout1.textContent || '').trim() !== '6') {
+      problems.push('polygon callout 1 ' + (polyCallout1 && polyCallout1.textContent));
+    }
+    need(document.getElementById('calloutMinus0'), 'Polygon D minus');
+    need(polyCallout0, 'Polygon D value');
+    need(document.getElementById('calloutPlus0'), 'Polygon D plus');
+    need(document.getElementById('calloutMinus1'), 'Polygon N minus');
+    need(polyCallout1, 'Polygon N value');
+    need(document.getElementById('calloutPlus1'), 'Polygon N plus');
     var polySheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!polySheetBox) problems.push('polygon sheet hidden');
     var polyKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
     for (var pk = 0; pk < polyKeep.length; pk++) {
       var polyKeepBox = boxOf(document.querySelector(polyKeep[pk]));
       if (polyKeepBox && overlaps(polySheetBox, polyKeepBox)) problems.push('polygon covers ' + polyKeep[pk]);
+    }
+    if (openTools()) {
+      var dimTool = sheetBtn('Dimension');
+      need(dimTool, 'Dimension');
+      if (!dimTool) {
+        problems.push('Dimension sheet missing');
+      } else {
+        dimTool.click();
+        if (!boxOf(document.getElementById('sketchSheet')) || !boxOf(polyCallout0)) {
+          problems.push('Dimension hid sheet or callout');
+        }
+      }
     }
     var polyConfirm = document.getElementById('sketchConfirm');
     need(polyConfirm, 'Polygon confirm');
@@ -2486,6 +2617,9 @@ ORIGIN_PLANE_EXPR = r"""
       polyDEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
     confirmSketch('polygon');
+    if (boxOf(document.getElementById('calloutRow0')) || boxOf(document.getElementById('calloutRow1'))) {
+      problems.push('polygon callout stayed after confirm');
+    }
     var drawnPoly = hook.state();
     if (!drawnPoly || drawnPoly.profile !== 'polygon' || drawnPoly.closed !== true || drawnPoly.polygonSides !== 6) {
       problems.push('polygon profile ' + (drawnPoly && drawnPoly.profile) + ' closed ' + (drawnPoly && drawnPoly.closed) + ' sides ' + (drawnPoly && drawnPoly.polygonSides));
