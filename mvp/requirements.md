@@ -86,7 +86,19 @@ Erik hands-off overnight; final tool tests on wake. Stuck/help check every **20 
 - **(c)** View cube = **adjacent** face step; map swipe so direction matches “flip with swipe” (invert L/R if needed). Not opposite-face.
 - **(d)** **Hide gizmo** in vertex/edge/face; keep for body/item.
 - **(e)** E2E tonight = **STL + 3MF** only; STEP later.
-- **(f)** Truck/bracket rebuild discuss after overnight (1)–(4) land.
+- **(f)** Q5 discuss locked 2026-10-26 ~7:37 AM MT (below). Truck still TBD.
+
+### Q5 discuss (team-locked 2026-10-26 ~7:37 AM MT)
+
+Chief Q5, after overnight (1)–(4). No invented sizes; every missing dimension is **TBD**.
+
+- **Primary rebuild** = phone L-bracket acceptance: 3 countersunk holes per leg + off-centre disc, via **sketch → Blind Extrude (New/Join/Cut) + Union/Cut**. Prefer the sketch path over primitives-only (`prompts/mobile-5-booleans.md`).
+- `mvp/projects/blink-l-bracket.md` is **reference only**. Do not bake Blink layout or dimensions into the app or scene.
+- **Truck** = discuss/spec only until sizes exist. **No invent**; flag **TBD**. Rebuild after L-bracket acceptance, or when Erik supplies sizes.
+- **Union/Cut enough** for this rebuild. Intersect is not required (Intersect may remain in the UI).
+- **No printer** send for Q5.
+- **Dims TBD** (do not invent): leg A/B length×width; fit/clearance to frame casing; leg screw hole size, countersink, and spacing; Blink boss diameter/height; disc diameter and placement; disc screw count/size/pattern; Blink model; fillet/chamfer defaults; casing profile; screw gauge; printed hole oversize; material/printer.
+- **Locked** (restated from `mvp/projects/blink-l-bracket.md` only): wall thickness **4 mm**, disc thickness **4 mm**, corner **90°**, units **mm**. Everything else TBD.
 
 ### After Rust #1 tip — Antigravity order
 1. (2) Empty-sketch / no-solid Create Sketch never spawns box.
