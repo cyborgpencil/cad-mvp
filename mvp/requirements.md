@@ -145,6 +145,7 @@ Chief lock via Digest sketch→Boolean shortlist. Do not invent. (1) and (2) are
 - After #1: keep **dual-run shadow**, C++ boss, until smokes stay green.
 - Next Independent: **#2** Rust CLI port of `tools/check_export.py` (CI-first).
 - Then **#4** `.cadmvp` schema validate only if schema stays frozen.
+- **`.cadmvp` freeze status: TBD (no freeze stamp).** There is no frozen schema file/stamp on main. **Rust #4 stays HOLD** until the team freezes `.cadmvp` and a brief exists.
 - Skip #3 (watertight reopen), #5/#6 (OCCT/truck / AGPL bindings) for now.
 - Parallelize Independent Rust with overnight UI slices when not blocked.
 
