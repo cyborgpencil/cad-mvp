@@ -1992,8 +1992,10 @@
           <div class="gate-rows">
             <span>Units</span><span class="badge" id="gateUnits">…</span>
             <span>Export unit</span><span id="gateUnitLocked">millimeter (locked for export)</span>
+            <span>RustGate</span><span class="badge" id="gateRust">…</span>
           </div>
           <p class="gate-reason" id="gateReason">Checking units.</p>
+          <p class="gate-reason" id="statusRustGate">RustGate: loading…</p>
         </div>
         <div class="gate-actions">
           <div class="export-wrap">
@@ -2482,9 +2484,16 @@ async function boot() {
       console.error('phone-select failed', err);
       return null;
     });
+    const rustGatePromise = import('./rust-gate.mjs').then(async function (mod) {
+      await mod.initRustGate();
+      return mod;
+    }).catch(function (err) {
+      console.error('rust-gate failed', err);
+      return null;
+    });
     const Module = await window.createCadcam();
-    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise, nudgePromise, phonePromise]);
-    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10], occtLoaded[11], occtLoaded[12]);
+    const occtLoaded = await Promise.all([occtPromise, gatePromise, primPromise, selPromise, viewPromise, opsPromise, projectPromise, undoPromise, assemblyPromise, cubePromise, fingerPromise, nudgePromise, phonePromise, rustGatePromise]);
+    main(Module, occtLoaded[0], occtLoaded[1], occtLoaded[2], occtLoaded[3], occtLoaded[4], occtLoaded[5], occtLoaded[6], occtLoaded[7], occtLoaded[8], occtLoaded[9], occtLoaded[10], occtLoaded[11], occtLoaded[12], occtLoaded[13]);
   } catch (err) {
     window.__cadcamBootNote = err && err.message ? err.message : String(err);
     showError(window.__cadcamBootNote);
@@ -2492,7 +2501,7 @@ async function boot() {
 }
 boot();
 
-function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi, nudgeApi, phoneApi) {
+function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi, undoApi, assemblyApi, cubeApi, fingerApi, nudgeApi, phoneApi, rustGateApi) {
   const MM_PER_IN = 25.4;
   const VIEWS = {
     front: { theta: 0, phi: Math.PI / 2 },
@@ -2700,6 +2709,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     node: 'body',
     watertight: false,
     unitsPass: false,
+    meshPass: true,
+    cppExportAllowed: false,
+    cppBlockReason: '',
+    cppVolumeMm3: 0,
     occtGate: false,
     occtReady: false,
     occtMessage: '',
@@ -2715,6 +2728,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     freeEdges: null,
     exactVolume: false,
     unitsMessage: '',
+    meshMessage: '',
+    rustGate: null,
     failReason: 'Loading checks',
     activeTool: '',
     searchIndex: 0
@@ -8461,17 +8476,134 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function userStatus() {
     if (state.sceneCleared) return 'Nothing to export.';
     if (state.unitsPass !== true) return state.unitsMessage || state.failReason || 'Export blocked until units pass.';
+    if (state.meshPass === false) return state.meshMessage || state.failReason || 'Export blocked until mesh passes.';
     return state.unit === 'in' ? 'Units: inch' : 'Units: mm';
   }
 
   function recomputeExport() {
-    state.exportAllowed = state.sceneCleared !== true && state.unitsPass === true;
+    state.exportAllowed = state.sceneCleared !== true && state.unitsPass === true && state.meshPass !== false;
   }
 
   function exportBlockText() {
     if (state.sceneCleared) return 'Nothing to export.';
     if (state.unitsPass !== true) return state.unitsMessage || state.failReason || 'Export blocked until units pass.';
+    if (state.meshPass === false) return state.meshMessage || state.failReason || 'Export blocked until mesh passes.';
     return '';
+  }
+
+  function loadWebFixture(name) {
+    if (name === 'flipped_box' || name === 'inside_out') {
+      if (!Module.loadFixture('closed_box')) return false;
+      const pos = Module.meshPositions();
+      const idx = Module.meshIndices();
+      const flipped = new Uint32Array(idx.length);
+      for (let i = 0; i + 2 < idx.length; i += 3) {
+        flipped[i] = idx[i];
+        flipped[i + 1] = idx[i + 2];
+        flipped[i + 2] = idx[i + 1];
+      }
+      return !!Module.replaceMesh(pos, flipped, name);
+    }
+    return !!Module.loadFixture(name);
+  }
+
+  function evaluateRustShadow() {
+    const expUnit = state.exportUnit || 'millimeter';
+    const cleared = state.sceneCleared === true;
+    const cppAllowed = cleared ? false : (state.cppExportAllowed === true);
+    const cppReason = cleared ? 'FAIL: mesh has no triangles.' : (state.cppBlockReason || '');
+    const cppVol = cleared ? 0 : (Number(state.cppVolumeMm3) || 0);
+    let result;
+    if (rustGateApi && typeof rustGateApi.evalRustGateMesh === 'function') {
+      const pos = cleared ? new Float64Array(0) : Module.meshPositions();
+      const idx = cleared ? new Uint32Array(0) : Module.meshIndices();
+      result = rustGateApi.evalRustGateMesh(
+        { positions: pos, indices: idx, storage: expUnit, threemf: expUnit, stl: expUnit },
+        { exportAllowed: cppAllowed, blockReason: cppReason }
+      );
+    } else {
+      result = {
+        ready: false,
+        units_pass: false,
+        mesh_pass: false,
+        export_allowed: false,
+        block_reason: 'Rust gate WASM not initialized.',
+        units_message: '',
+        mesh_message: '',
+        volume_mm3: 0,
+        unitsPass: false,
+        meshPass: false,
+        exportAllowed: false,
+        blockReason: 'Rust gate WASM not initialized.',
+        unitsMessage: '',
+        meshMessage: '',
+        volumeMm3: 0,
+        matchesCpp: false,
+        statusText: 'RustGate: PENDING'
+      };
+    }
+    state.rustGate = result;
+    setBadge('gateRust', result.exportAllowed);
+    const rustEl = document.getElementById('statusRustGate');
+    if (rustEl) {
+      rustEl.textContent = result.statusText;
+      rustEl.classList.toggle('ok', !!result.exportAllowed);
+    }
+    window.__cadcamRustGate = {
+      ready: result.ready === true,
+      units_pass: result.unitsPass === true,
+      mesh_pass: result.meshPass === true,
+      export_allowed: result.exportAllowed === true,
+      block_reason: result.blockReason || '',
+      units_message: result.unitsMessage || '',
+      mesh_message: result.meshMessage || '',
+      volume_mm3: result.volumeMm3,
+      unitsPass: result.unitsPass === true,
+      meshPass: result.meshPass === true,
+      exportAllowed: result.exportAllowed === true,
+      blockReason: result.blockReason || '',
+      unitsMessage: result.unitsMessage || '',
+      meshMessage: result.meshMessage || '',
+      volumeMm3: result.volumeMm3,
+      matchesCpp: result.matchesCpp === true,
+      statusText: result.statusText || '',
+      cppExportAllowed: cppAllowed,
+      cppBlockReason: cppReason,
+      cppVolumeMm3: cppVol,
+      toDisplay: function (mm, isInch) {
+        return rustGateApi && typeof rustGateApi.to_display === 'function'
+          ? rustGateApi.to_display(Number(mm) || 0, !!isInch)
+          : 0;
+      },
+      toMillimeters: function (displayed, isInch) {
+        return rustGateApi && typeof rustGateApi.to_millimeters === 'function'
+          ? rustGateApi.to_millimeters(Number(displayed) || 0, !!isInch)
+          : 0;
+      },
+      exportUnitsPass: function (storage, threemf, stl) {
+        return rustGateApi && typeof rustGateApi.export_units_pass === 'function'
+          ? rustGateApi.export_units_pass(String(storage || ''), String(threemf || ''), String(stl || ''))
+          : false;
+      },
+      meshVolumeMm3: function (vertices, triangles) {
+        if (!rustGateApi || typeof rustGateApi.mesh_volume_mm3 !== 'function') return 0;
+        return rustGateApi.mesh_volume_mm3(
+          rustGateApi.flattenVertices(vertices),
+          rustGateApi.flattenTriangles(triangles)
+        );
+      },
+      eval: function (meshLike, cppLike) {
+        if (!rustGateApi || typeof rustGateApi.evalRustGateMesh !== 'function') return null;
+        const spec = meshLike || { vertices: [], triangles: [] };
+        const hasTris = (Array.isArray(spec.triangles) && spec.triangles.length > 0)
+          || (spec.indices && spec.indices.length >= 3)
+          || (spec.triangles_ijk && spec.triangles_ijk.length >= 3);
+        const fallbackCpp = cppLike || (!hasTris
+          ? { exportAllowed: false, blockReason: 'FAIL: mesh has no triangles.' }
+          : null);
+        return rustGateApi.evalRustGateMesh(spec, fallbackCpp);
+      }
+    };
   }
 
   function exactMeasures() {
@@ -8563,6 +8695,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     recomputeExport();
     applyExactVolume();
     setBadge('gateUnits', state.unitsPass);
+    evaluateRustShadow();
     logCadChecks();
     publishGateState();
     const blocked = exportBlockText();
@@ -8583,12 +8716,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       btn.title = state.exportAllowed ? 'Export STL or 3MF' : (blocked || 'Export blocked until units pass.');
     }
     if (!state.exportAllowed && exportMenu) exportMenu.hidden = true;
+    publishGateState();
   }
 
   function clearedReport() {
     return {
       watertightPass: false,
       unitsPass: false,
+      meshPass: false,
+      exportAllowed: false,
       exportUnit: 'millimeter',
       blockReason: 'Nothing to export.',
       volumeMm3: 0,
@@ -8597,7 +8733,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       heightMm: 0,
       displayUnit: state.unit === 'in' ? 'in' : 'mm',
       watertightMessage: 'FAIL: mesh has no triangles.',
-      unitsMessage: ''
+      unitsMessage: '',
+      meshMessage: 'FAIL: mesh has no triangles.'
     };
   }
 
@@ -8623,9 +8760,43 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (state.sceneCleared) report = clearedReport();
     state.watertight = !!report.watertightPass;
     state.unitsPass = !!report.unitsPass;
+    const hasMeshPass = typeof report.meshPass === 'boolean';
+    const rawVol = Number(report.volumeMm3) || 0;
+    let derivedMeshPass = hasMeshPass ? report.meshPass : true;
+    let derivedMeshMsg = report.meshMessage || '';
+    if (!hasMeshPass) {
+      const idxLen = (!state.sceneCleared && typeof Module.meshIndices === 'function')
+        ? Module.meshIndices().length
+        : 0;
+      if (idxLen < 3) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh has no triangles.';
+      } else if (rawVol < -1e-9) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh is inside-out (negative volume).';
+      } else if (rawVol <= 1e-9) {
+        derivedMeshPass = false;
+        derivedMeshMsg = 'FAIL: mesh has zero volume.';
+      } else {
+        derivedMeshPass = true;
+        derivedMeshMsg = 'PASS: mesh has volume.';
+      }
+    }
+    const derivedUnitsMsg = report.unitsMessage || (state.unitsPass
+      ? 'PASS: export unit is millimeter.'
+      : 'FAIL: export unit is not millimeter.');
+    const derivedReason = hasMeshPass
+      ? (report.blockReason || '')
+      : (state.sceneCleared
+        ? 'Nothing to export.'
+        : (!state.unitsPass ? derivedUnitsMsg : (!derivedMeshPass ? derivedMeshMsg : '')));
+    state.meshPass = derivedMeshPass;
+    state.cppExportAllowed = hasMeshPass ? !!report.exportAllowed : (!state.sceneCleared && state.unitsPass && derivedMeshPass);
+    state.cppBlockReason = derivedReason;
+    state.cppVolumeMm3 = Number(report.volumeMm3) || 0;
     state.exportAllowed = false;
     state.exportUnit = report.exportUnit || 'millimeter';
-    state.failReason = report.blockReason || '';
+    state.failReason = derivedReason;
     state.volumeMm3 = Number(report.volumeMm3) || 0;
     state.widthMm = Number(report.widthMm) || 0;
     state.depthMm = Number(report.depthMm) || 0;
@@ -8633,6 +8804,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.unit = report.displayUnit === 'in' ? 'in' : 'mm';
     state.watertightMessage = report.watertightMessage || '';
     state.unitsMessage = report.unitsMessage || '';
+    state.meshMessage = derivedMeshMsg;
     const volNodes = document.querySelectorAll('#statusVol, #gateVol');
     for (let i = 0; i < volNodes.length; i++) {
       volNodes[i].setAttribute('data-mm', String(state.volumeMm3));
@@ -9051,11 +9223,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       occtMessage: state.occtMessage || '',
       watertight: state.watertight === true,
       unitsPass: state.unitsPass === true,
+      meshPass: state.meshPass === true,
+      meshMessage: state.meshMessage || '',
+      blockReason: state.failReason || '',
       exportAllowed: state.exportAllowed === true,
       bannerHidden: true,
       exportDisabled: !!(btn && btn.disabled),
       gateOcct: gateLabel,
       volumeMm3: state.volumeMm3,
+      cppVolumeMm3: state.cppVolumeMm3,
+      rustGate: state.rustGate || null,
       bboxMm: state.bboxMm,
       exactVolume: state.exactVolume === true,
       logText: window.__cadcamLogText || '',
@@ -11320,7 +11497,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.booleanOp = '';
       state.booleanMessage = '';
       state.demo = '';
-      if (!Module.loadFixture(name)) {
+      if (!loadWebFixture(name)) {
         message = 'Unknown fixture';
         setHint(message);
       } else {
@@ -13670,7 +13847,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const demoName = params.get('demo');
   const pairName = params.get('pair');
   let loadedQuery = false;
-  if (wanted && Module.loadFixture(wanted)) {
+  if (wanted && loadWebFixture(wanted)) {
     loadedQuery = true;
     state.sceneCleared = false;
     syncFromKernel();
