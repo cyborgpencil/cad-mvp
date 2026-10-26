@@ -3,6 +3,9 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-26
+- 2026-10-26 PR #123 (merged at 907402c): Antigravity phone hide calloutLayer for basic shapes (Size stays on dimPanel; tip 202a737).
+
 ## 2026-10-25
 - 2026-10-25 PR #121 (merged at 3137ab5): Antigravity phone calloutLayer dock under HUD (skip mid-viewport grid; tip 23e8d32).
 - 2026-10-25 PR #118 (merged at 9f069a1): Antigravity Arc + Polygon draw-only — makeArcFace/makePolygonFace (JS + smokes; no GB/Cursor).
