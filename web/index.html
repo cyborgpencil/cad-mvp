@@ -6925,6 +6925,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (!bodyHits.length) return null;
       return bodyHits[0].object.userData.bodyId || null;
     }
+    if (state.bodies.length > 1 && mode === 'face') {
+      const bodyHits = raycaster.intersectObjects(bodyRoot.children, false);
+      if (!bodyHits.length) return null;
+      const bHit = bodyHits[0];
+      const bId = bHit.object && bHit.object.userData ? bHit.object.userData.bodyId : '';
+      const bObj = bId ? findBody(bId) : null;
+      if (!bObj || !bObj.topology || !bObj.topology.triFace || bHit.faceIndex == null) return null;
+      const fId = bObj.topology.triFace[bHit.faceIndex] || null;
+      return fId ? (bObj.id + ':' + fId) : null;
+    }
     const meshHits = raycaster.intersectObject(mesh, false);
     const hit = meshHits.length ? meshHits[0] : null;
     if (mode === 'item') return hit ? 'item' : null;
@@ -9986,19 +9996,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       sketchPlaneMesh.geometry = geo;
       sketchPlaneMesh.visible = true;
     } else {
-      const showPlane = !!(plane && !originKey && state.selectedIds.length === 0 && state.topology && state.meshCad && viewApi);
+      const ownerBody = plane && plane.bodyId ? findBody(plane.bodyId) : null;
+      const planeTopo = state.topology || (ownerBody && ownerBody.topology ? ownerBody.topology : null);
+      const planeMesh = state.topology && state.meshCad ? state.meshCad : (ownerBody && ownerBody.mesh ? ownerBody.mesh : null);
+      const showPlane = !!(plane && !originKey && state.selectedIds.length === 0 && planeTopo && planeMesh && viewApi);
       if (!showPlane) {
         sketchPlaneMesh.visible = false;
       } else {
         let face = null;
-        const faces = state.topology.faces || [];
+        const faces = planeTopo.faces || [];
         for (let i = 0; i < faces.length; i += 1) {
           if (faces[i].id === plane.faceId) face = faces[i];
         }
         if (!face || !face.tris) {
           sketchPlaneMesh.visible = false;
         } else {
-          const arr = viewApi.faceVertexArray(state.meshCad.vertices, state.meshCad.triangles, face.tris);
+          const arr = viewApi.faceVertexArray(planeMesh.vertices, planeMesh.triangles, face.tris);
           const n = plane.frame && plane.frame.outward ? plane.frame.outward : [0, 0, 1];
           const shifted = new Float32Array(arr.length);
           const ox = n[0] * 0.08;
@@ -10195,9 +10208,35 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       dropShape(prism);
       return rejectExtrude('FAIL: ' + (mode === 'cut' ? 'Cut' : 'Join') + ' could not read the body. The prior body was kept.');
     }
+    let activePrism = prism;
+    let inwardPrism = null;
+    const plane = state.sketchPlane;
+    if (
+      mode === 'cut' &&
+      plane &&
+      plane.faceId &&
+      !plane.originPlane &&
+      plane.frame &&
+      Array.isArray(plane.frame.inward) &&
+      assemblyApi &&
+      typeof assemblyApi.placedCopy === 'function' &&
+      (!plane.bodyId || !target || plane.bodyId === target.id)
+    ) {
+      const inw = plane.frame.inward;
+      const shifted = assemblyApi.placedCopy(oc, prism, {
+        x: (Number(inw[0]) || 0) * depth,
+        y: (Number(inw[1]) || 0) * depth,
+        z: (Number(inw[2]) || 0) * depth
+      });
+      if (shifted && shifted.ok === true && shifted.shape) {
+        inwardPrism = shifted.shape;
+        activePrism = inwardPrism;
+      }
+    }
     const made = mode === 'cut'
-      ? opsApi.cutShapes(oc, world.shape, prism)
-      : opsApi.fuseShapes(oc, world.shape, prism);
+      ? opsApi.cutShapes(oc, world.shape, activePrism)
+      : opsApi.fuseShapes(oc, world.shape, activePrism);
+    if (inwardPrism) dropShape(inwardPrism);
     if (world.owned) dropShape(world.shape);
     if (!made || made.ok !== true || !made.shape) {
       if (made && made.shape) dropShape(made.shape);
@@ -10356,20 +10395,62 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     paintCallouts();
   }
 
+  function resolveSketchFace(rawId) {
+    if (!rawId) return null;
+    const raw = String(rawId);
+    const colon = raw.indexOf(':');
+    if (colon > 0) {
+      const bodyId = raw.slice(0, colon);
+      const localId = raw.slice(colon + 1);
+      const body = findBody(bodyId);
+      const faces = body && body.topology && Array.isArray(body.topology.faces) ? body.topology.faces : [];
+      for (let i = 0; i < faces.length; i += 1) {
+        if (faces[i].id === localId) {
+          return { owner: body, mesh: body.mesh, topo: body.topology, face: faces[i] };
+        }
+      }
+      return null;
+    }
+    if (state.topology && state.meshCad && Array.isArray(state.topology.faces)) {
+      const faces = state.topology.faces;
+      for (let i = 0; i < faces.length; i += 1) {
+        if (faces[i].id === raw) {
+          const owner = bodyOwningFace(raw) || (state.bodies.length === 1 ? state.bodies[0] : null);
+          return { owner: owner, mesh: state.meshCad, topo: state.topology, face: faces[i] };
+        }
+      }
+    }
+    const candidates = [];
+    const sel = orderedBodies();
+    for (let i = 0; i < sel.length; i += 1) candidates.push(sel[i]);
+    for (let i = state.bodies.length - 1; i >= 0; i -= 1) {
+      if (candidates.indexOf(state.bodies[i]) < 0) candidates.push(state.bodies[i]);
+    }
+    for (let c = 0; c < candidates.length; c += 1) {
+      const body = candidates[c];
+      const faces = body && body.topology && Array.isArray(body.topology.faces) ? body.topology.faces : [];
+      for (let i = 0; i < faces.length; i += 1) {
+        if (faces[i].id === raw) {
+          return { owner: body, mesh: body.mesh, topo: body.topology, face: faces[i] };
+        }
+      }
+    }
+    return null;
+  }
+
   function setSketchPlane(faceId) {
-    const meshCad = state.meshCad;
-    const topo = state.topology;
-    if (!meshCad || !topo || !viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') {
+    if (!viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') {
       setHint('Tap a planar face');
       return false;
     }
-    let face = null;
-    const faces = topo.faces || [];
-    for (let i = 0; i < faces.length; i += 1) {
-      if (faces[i].id === faceId) face = faces[i];
+    const resolved = resolveSketchFace(faceId);
+    if (!resolved || !resolved.mesh || !resolved.face) {
+      if (!state.meshCad || !state.topology) setHint('Tap a planar face');
+      return false;
     }
-    if (!face) return false;
-    const owner = bodyOwningFace(face.id) || (state.bodies.length === 1 ? state.bodies[0] : null);
+    const face = resolved.face;
+    const owner = resolved.owner;
+    const meshCad = resolved.mesh;
     const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
     const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
     if (!frame) {
@@ -10397,14 +10478,29 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function topSketchFaceId() {
-    const faces = state.topology && state.topology.faces ? state.topology.faces : [];
+    if (state.topology && Array.isArray(state.topology.faces)) {
+      const faces = state.topology.faces;
+      let best = '';
+      let bestZ = -Infinity;
+      for (let i = 0; i < faces.length; i += 1) {
+        const c = faces[i].centroid;
+        if (!c || !(c[2] > bestZ)) continue;
+        bestZ = c[2];
+        best = faces[i].id;
+      }
+      return best;
+    }
     let best = '';
     let bestZ = -Infinity;
-    for (let i = 0; i < faces.length; i += 1) {
-      const c = faces[i].centroid;
-      if (!c || !(c[2] > bestZ)) continue;
-      bestZ = c[2];
-      best = faces[i].id;
+    for (let b = 0; b < state.bodies.length; b += 1) {
+      const body = state.bodies[b];
+      const faces = body && body.topology && Array.isArray(body.topology.faces) ? body.topology.faces : [];
+      for (let i = 0; i < faces.length; i += 1) {
+        const c = faces[i].centroid;
+        if (!c || !(c[2] > bestZ)) continue;
+        bestZ = c[2];
+        best = body.id + ':' + faces[i].id;
+      }
     }
     return best;
   }
@@ -11645,7 +11741,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const value = partMaterial.value;
       if (value !== 'PLA' && value !== 'PETG' && value !== 'TPU') return;
       const selected = selectedAssemblyBodies();
-      const targets = selected.length ? selected : [];
+      const targets = selected.length ? selected : orderedBodies();
       for (let i = 0; i < targets.length; i += 1) targets[i].material = value;
       state.assemblyMessage = '';
       if (!state.projectApplying) state.projectDirty = true;
@@ -14161,30 +14257,59 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishGateState();
       return ok;
     },
-    faces: function () {
+    faces: function (bodyId) {
       const out = [];
-      const meshCad = state.meshCad;
-      const topo = state.topology;
-      if (!meshCad || !topo || !Array.isArray(topo.faces) || !viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') return out;
-      const owner = state.bodies.length === 1 ? state.bodies[0] : null;
-      const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
-      for (let i = 0; i < topo.faces.length; i += 1) {
-        const face = topo.faces[i];
-        const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
-        if (!frame) continue;
-        out.push({
-          id: face.id,
-          occtIndex: face.occtIndex || 0,
-          surface: face.surface || '',
-          centroid: face.centroid ? face.centroid.slice() : null,
-          outward: frame.outward ? frame.outward.slice() : null,
-          inward: frame.inward ? frame.inward.slice() : null,
-          origin: frame.origin ? frame.origin.slice() : null,
-          u: frame.u ? frame.u.slice() : null,
-          v: frame.v ? frame.v.slice() : null,
-          uSpan: frame.uSpan,
-          vSpan: frame.vSpan
-        });
+      if (!viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') return out;
+      if (!bodyId && state.bodies.length <= 1 && state.meshCad && state.topology && Array.isArray(state.topology.faces)) {
+        const owner = state.bodies.length === 1 ? state.bodies[0] : null;
+        const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
+        for (let i = 0; i < state.topology.faces.length; i += 1) {
+          const face = state.topology.faces[i];
+          const frame = viewApi.faceFrameFromTriangles(state.meshCad.vertices, state.meshCad.triangles, face.tris, centre);
+          if (!frame) continue;
+          out.push({
+            id: face.id,
+            faceId: face.id,
+            bodyId: owner ? owner.id : '',
+            occtIndex: face.occtIndex || 0,
+            surface: face.surface || '',
+            centroid: face.centroid ? face.centroid.slice() : null,
+            outward: frame.outward ? frame.outward.slice() : null,
+            inward: frame.inward ? frame.inward.slice() : null,
+            origin: frame.origin ? frame.origin.slice() : null,
+            u: frame.u ? frame.u.slice() : null,
+            v: frame.v ? frame.v.slice() : null,
+            uSpan: frame.uSpan,
+            vSpan: frame.vSpan
+          });
+        }
+        return out;
+      }
+      const list = bodyId ? [findBody(bodyId)] : state.bodies;
+      for (let b = 0; b < list.length; b += 1) {
+        const body = list[b];
+        if (!body || !body.mesh || !body.topology || !Array.isArray(body.topology.faces)) continue;
+        const centre = bodyBoundsCenter(body);
+        for (let i = 0; i < body.topology.faces.length; i += 1) {
+          const face = body.topology.faces[i];
+          const frame = viewApi.faceFrameFromTriangles(body.mesh.vertices, body.mesh.triangles, face.tris, centre);
+          if (!frame) continue;
+          out.push({
+            id: state.bodies.length > 1 ? (body.id + ':' + face.id) : face.id,
+            faceId: face.id,
+            bodyId: body.id,
+            occtIndex: face.occtIndex || 0,
+            surface: face.surface || '',
+            centroid: face.centroid ? face.centroid.slice() : null,
+            outward: frame.outward ? frame.outward.slice() : null,
+            inward: frame.inward ? frame.inward.slice() : null,
+            origin: frame.origin ? frame.origin.slice() : null,
+            u: frame.u ? frame.u.slice() : null,
+            v: frame.v ? frame.v.slice() : null,
+            uSpan: frame.uSpan,
+            vSpan: frame.vSpan
+          });
+        }
       }
       return out;
     },
@@ -14213,6 +14338,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         tab: state.tab,
         plane: !!state.sketchPlane,
         faceId: state.sketchPlane ? state.sketchPlane.faceId : '',
+        bodyId: state.sketchPlane && state.sketchPlane.bodyId ? state.sketchPlane.bodyId : '',
         originPlane: state.sketchPlane && state.sketchPlane.originPlane ? state.sketchPlane.originPlane : '',
         outward: frame && frame.outward ? frame.outward.slice() : null,
         u: frame && frame.u ? frame.u.slice() : null,
@@ -14243,6 +14369,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         })(),
         bodies: state.bodies.length,
         bodyIds: state.bodies.map(function (body) { return body.id; }),
+        parts: state.bodies.map(function (body) {
+          return {
+            id: body.id,
+            name: body.name || '',
+            kind: body.kind || '',
+            material: assemblyApi ? assemblyApi.materialTag(body) : (body.material || 'PLA')
+          };
+        }),
         bodySeq: state.bodySeq,
         bounds: bounds
       };

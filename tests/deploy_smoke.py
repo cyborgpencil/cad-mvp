@@ -5046,10 +5046,13 @@ def _q5_sketch_l_profile_and_extrude(
     return state, []
 
 
-def _q5_find_planar_face(cdp: Cdp, want_outward: tuple[float, float, float]) -> tuple[str, list[str]]:
+def _q5_find_planar_face(
+    cdp: Cdp, want_outward: tuple[float, float, float], body_id: str | None = None
+) -> tuple[str, list[str]]:
+    arg = json.dumps(body_id) if body_id else ""
     raw, err = eval_expr(
         cdp,
-        "JSON.stringify(window.__cadcamSketch && typeof window.__cadcamSketch.faces==='function' ? window.__cadcamSketch.faces() : [])",
+        f"JSON.stringify(window.__cadcamSketch && typeof window.__cadcamSketch.faces==='function' ? window.__cadcamSketch.faces({arg}) : [])",
     )
     if err or not isinstance(raw, str) or not raw.startswith("["):
         return "", [f"q5 faces {raw or err}"]
@@ -5326,6 +5329,406 @@ def run_portrait_q5_lbracket(cdp: Cdp, origin: str) -> list[str]:
         f"6 CSK holes Cut (3/leg), volume {after_holes.get('volumeMm3'):.3f} mm3, STL+3MF exported, units mm",
         flush=True,
     )
+    return []
+
+
+def run_portrait_q5_truck(cdp: Cdp, origin: str) -> list[str]:
+    """390x844 Q5 11-part toy-truck MVP: sketch -> Blind Extrude (New/Join/Cut) -> Union/Cut -> STL/3MF."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"truck portrait emulation failed: {exc}"]
+    url = origin + "/"
+    print(f"load portrait_q5_truck {url}", flush=True)
+    _loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["truck load", *load_problems[:20]]
+
+    problems = _delete_default_body(cdp, origin)
+    if problems:
+        return ["truck clear default body", *problems]
+
+    def check_op(label: str, want_bodies: int) -> tuple[dict[str, Any] | None, list[str]]:
+        st, wait_probs = wait_hole_state(
+            cdp,
+            origin,
+            lambda s, n=want_bodies: (
+                int(s.get("bodyCount") or 0) == n
+                and s.get("occtGate") is True
+                and s.get("gateOcct") == "PASS"
+                and s.get("unitsPass") is True
+                and not s.get("lastError")
+            ),
+            PAGE_TIMEOUT_S,
+            f"truck {label}",
+        )
+        if wait_probs or not isinstance(st, dict):
+            return None, [f"truck {label}", *wait_probs[:12]]
+        units_txt, u_err = eval_expr(
+            cdp,
+            "(function(){var u=document.getElementById('statusUnits');return u?u.textContent.trim():'';})()",
+        )
+        if u_err or units_txt != "mm":
+            return None, [f"truck {label} units {units_txt or u_err!r}"]
+        return st, []
+
+    def sketch_circle_and_extrude(
+        label: str,
+        face_id: str,
+        diameter_mm: float,
+        depth_mm: float,
+        mode: str,
+        want_bodies: int,
+        uv_center: tuple[float, float] | None = None,
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        probs = tap_point(cdp, create_point_expr('[data-action="newSketch"]'), f"truck {label} newSketch")
+        if probs:
+            return None, [f"truck {label} newSketch", *probs]
+        tapped, tap_err = eval_expr(
+            cdp,
+            f"Boolean(window.__cadcamSketch && window.__cadcamSketch.tapFace({json.dumps(face_id)}))",
+        )
+        if tap_err or tapped is not True:
+            return None, [f"truck {label} tapFace({face_id}) {tapped or tap_err}"]
+        probs = tap_point(cdp, _q5_tools_point_expr("Circle"), f"truck {label} Circle")
+        if probs:
+            return None, [f"truck {label} Circle", *probs]
+        if uv_center is not None:
+            placed, place_err = eval_expr(
+                cdp,
+                f"Boolean(window.__cadcamSketch && window.__cadcamSketch.placeCircleCenter({uv_center[0]}, {uv_center[1]}))",
+            )
+            if place_err or placed is not True:
+                return None, [f"truck {label} placeCircleCenter {placed or place_err}"]
+        edited, edit_err = eval_expr(cdp, edit_expr("sketchD", num_text(diameter_mm)))
+        if edit_err or edited != "edited":
+            return None, [f"truck {label} sketchD {edited or edit_err}"]
+        probs = tap_selector(cdp, "#sketchConfirm", f"truck {label} circle confirm")
+        if probs:
+            return None, [f"truck {label} circle confirm", *probs]
+        probs = tap_selector(cdp, '#finishBar [data-action="finishSketch"]', f"truck {label} finishSketch")
+        if probs:
+            return None, [f"truck {label} finishSketch", *probs]
+        probs = tap_point(cdp, _q5_tools_point_expr("Extrude (Push/Pull)"), f"truck {label} Extrude")
+        if probs:
+            return None, [f"truck {label} Extrude", *probs]
+        edited, edit_err = eval_expr(cdp, edit_expr("sketchDepth", num_text(depth_mm)))
+        if edit_err or edited != "edited":
+            return None, [f"truck {label} sketchDepth {edited or edit_err}"]
+        probs = tap_selector(
+            cdp, f'[data-action="sketchExtrudeMode"][data-mode="{mode}"]', f"truck {label} mode {mode}"
+        )
+        if probs:
+            return None, [f"truck {label} mode {mode}", *probs]
+        probs = tap_selector(cdp, "#sketchConfirm", f"truck {label} extrude confirm")
+        if probs:
+            return None, [f"truck {label} extrude confirm", *probs]
+        return check_op(label, want_bodies)
+
+    # 1. Chassis/body (PLA): sketch 80x30 mm on Top XY, Blind Extrude 6 mm.
+    problems = tap_point(cdp, create_point_expr('[data-action="newSketch"]'), "truck chassis newSketch")
+    if problems:
+        return ["truck chassis newSketch", *problems]
+    problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', "truck chassis pick xy")
+    if problems:
+        return ["truck chassis pick xy", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Rectangle"), "truck chassis Rectangle")
+    if problems:
+        return ["truck chassis Rectangle", *problems]
+    for field, val in (("sketchL", 80.0), ("sketchW", 30.0)):
+        edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(val)))
+        if edit_err or edited != "edited":
+            return [f"truck chassis {field} {edited or edit_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "truck chassis rect confirm")
+    if problems:
+        return ["truck chassis rect confirm", *problems]
+    problems = tap_selector(cdp, '#finishBar [data-action="finishSketch"]', "truck chassis finishSketch")
+    if problems:
+        return ["truck chassis finishSketch", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Extrude (Push/Pull)"), "truck chassis Extrude")
+    if problems:
+        return ["truck chassis Extrude", *problems]
+    edited, edit_err = eval_expr(cdp, edit_expr("sketchDepth", num_text(6.0)))
+    if edit_err or edited != "edited":
+        return [f"truck chassis sketchDepth {edited or edit_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "truck chassis extrude confirm")
+    if problems:
+        return ["truck chassis extrude confirm", *problems]
+    chassis_state, problems = check_op("chassis 80x30x6", 1)
+    if problems or not isinstance(chassis_state, dict):
+        return problems
+    if not _near(chassis_state.get("volumeMm3"), 80.0 * 30.0 * 6.0, 1.0):
+        return [f"truck chassis volume {chassis_state.get('volumeMm3')!r}"]
+
+    # Two Ø4.4 through-holes across the 30 mm width, 10 mm in from each end, 3 mm up, via Cut.
+    xz_face, problems = _q5_find_planar_face(cdp, (0.0, -1.0, 0.0))
+    if problems:
+        return ["truck chassis xz face", *problems]
+    for hole_idx, u_mm in enumerate((10.0, 70.0), start=1):
+        _st, problems = sketch_circle_and_extrude(
+            f"chassis hole {hole_idx}", xz_face, 4.4, 30.0, "cut", 1, uv_center=(u_mm, 3.0)
+        )
+        if problems:
+            return problems
+        xz_face, problems = _q5_find_planar_face(cdp, (0.0, -1.0, 0.0))
+        if problems:
+            return [f"truck chassis xz face after hole {hole_idx}", *problems]
+
+    # 2. Cab (PLA): sketch 30x30 mm on chassis top at front, Blind Extrude 25 mm, Union into chassis.
+    top_face, problems = _q5_find_planar_face(cdp, (0.0, 0.0, 1.0))
+    if problems:
+        return ["truck chassis top face", *problems]
+    problems = tap_point(cdp, create_point_expr('[data-action="newSketch"]'), "truck cab newSketch")
+    if problems:
+        return ["truck cab newSketch", *problems]
+    tapped_top, tap_err = eval_expr(
+        cdp,
+        f"Boolean(window.__cadcamSketch && window.__cadcamSketch.tapFace({json.dumps(top_face)}))",
+    )
+    if tap_err or tapped_top is not True:
+        return [f"truck cab tapFace {tapped_top or tap_err}"]
+    problems = tap_point(cdp, _q5_tools_point_expr("Rectangle"), "truck cab Rectangle")
+    if problems:
+        return ["truck cab Rectangle", *problems]
+    for field, val in (("sketchL", 30.0), ("sketchW", 30.0)):
+        edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(val)))
+        if edit_err or edited != "edited":
+            return [f"truck cab {field} {edited or edit_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "truck cab rect confirm")
+    if problems:
+        return ["truck cab rect confirm", *problems]
+    problems = tap_selector(cdp, '#finishBar [data-action="finishSketch"]', "truck cab finishSketch")
+    if problems:
+        return ["truck cab finishSketch", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Extrude (Push/Pull)"), "truck cab Extrude")
+    if problems:
+        return ["truck cab Extrude", *problems]
+    edited, edit_err = eval_expr(cdp, edit_expr("sketchDepth", num_text(25.0)))
+    if edit_err or edited != "edited":
+        return [f"truck cab sketchDepth {edited or edit_err}"]
+    problems = tap_selector(
+        cdp, '[data-action="sketchExtrudeMode"][data-mode="new"]', "truck cab mode new"
+    )
+    if problems:
+        return ["truck cab mode new", *problems]
+    problems = tap_selector(cdp, "#sketchConfirm", "truck cab extrude confirm")
+    if problems:
+        return ["truck cab extrude confirm", *problems]
+    _cab_new, problems = check_op("cab extrude 25mm", 2)
+    if problems:
+        return problems
+    unioned_click, u_click_err = eval_expr(
+        cdp,
+        "(function(){"
+        "var item=document.querySelector('[data-action=\"select\"][data-mode=\"item\"]');"
+        "if(item) item.click();"
+        "var buttons=document.querySelectorAll('[data-action=\"boolean\"][data-op=\"union\"]');"
+        "var picked=null;"
+        "for(var i=0;i<buttons.length;i++){if(!buttons[i].disabled){picked=buttons[i];break;}}"
+        "if(!picked) return 'disabled';"
+        "picked.click();"
+        "return 'clicked';"
+        "})()",
+    )
+    if u_click_err or unioned_click != "clicked":
+        return [f"truck cab union click {unioned_click or u_click_err}"]
+    _unioned_bool, union_probs = wait_boolean(cdp, origin, "union", PAGE_TIMEOUT_S)
+    if union_probs:
+        return ["truck cab union wait", *union_probs[:12]]
+    body_state, problems = check_op("cab union into chassis", 1)
+    if problems or not isinstance(body_state, dict):
+        return problems
+    want_body_vol = 80.0 * 30.0 * 6.0 - 2.0 * (math.pi * 2.2 * 2.2 * 30.0) + 30.0 * 30.0 * 25.0
+    if not _near(body_state.get("volumeMm3"), want_body_vol, 2.5):
+        return [f"truck body volume {body_state.get('volumeMm3')!r} want {want_body_vol:.3f}"]
+    chassis_id = str((body_state.get("bodyIds") or ["b1"])[0])
+    horiz_face, problems = _q5_find_planar_face(cdp, (0.0, 0.0, 1.0), body_id=chassis_id)
+    if problems:
+        return ["truck chassis horiz face", *problems]
+
+    # 3. Axles x2 (PLA): sketch a Ø4 circle, Blind Extrude 44 mm (New).
+    for axle_idx, u_mm in enumerate((10.0, 40.0), start=1):
+        _ax_st, problems = sketch_circle_and_extrude(
+            f"axle {axle_idx}",
+            horiz_face,
+            4.0,
+            44.0,
+            "new",
+            1 + axle_idx,
+            uv_center=(u_mm, 15.0),
+        )
+        if problems:
+            return problems
+
+    # 4. Wheel hubs x4 (PLA): sketch a Ø16 circle, Blind Extrude 8 mm. Bore Ø4.2 via Cut.
+    for hub_idx in range(1, 5):
+        want_count = 3 + hub_idx
+        u_mm = float(hub_idx * 22)
+        v_mm = 50.0
+        hub_st, problems = sketch_circle_and_extrude(
+            f"hub {hub_idx} outer",
+            horiz_face,
+            16.0,
+            8.0,
+            "new",
+            want_count,
+            uv_center=(u_mm, v_mm),
+        )
+        if problems or not isinstance(hub_st, dict):
+            return problems
+        hub_ids = hub_st.get("bodyIds") or []
+        if not isinstance(hub_ids, list) or len(hub_ids) != want_count:
+            return [f"truck hub {hub_idx} bodyIds {hub_ids!r}"]
+        hub_id = str(hub_ids[-1])
+        hub_top, problems = _q5_find_planar_face(cdp, (0.0, 0.0, 1.0), body_id=hub_id)
+        if problems:
+            return [f"truck hub {hub_idx} top face", *problems]
+        _bore_st, problems = sketch_circle_and_extrude(
+            f"hub {hub_idx} bore",
+            hub_top,
+            4.2,
+            8.0,
+            "cut",
+            want_count,
+        )
+        if problems:
+            return problems
+
+    # 5. Tires x4 (TPU): ring OD 24 / ID 15.6 / width 8. ID via Cut. 0.2 stretch on the hub.
+    for tire_idx in range(1, 5):
+        want_count = 7 + tire_idx
+        u_mm = float(tire_idx * 30)
+        v_mm = 85.0
+        tire_st, problems = sketch_circle_and_extrude(
+            f"tire {tire_idx} outer",
+            horiz_face,
+            24.0,
+            8.0,
+            "new",
+            want_count,
+            uv_center=(u_mm, v_mm),
+        )
+        if problems or not isinstance(tire_st, dict):
+            return problems
+        tire_ids = tire_st.get("bodyIds") or []
+        if not isinstance(tire_ids, list) or len(tire_ids) != want_count:
+            return [f"truck tire {tire_idx} bodyIds {tire_ids!r}"]
+        tire_id = str(tire_ids[-1])
+        tire_top, problems = _q5_find_planar_face(cdp, (0.0, 0.0, 1.0), body_id=tire_id)
+        if problems:
+            return [f"truck tire {tire_idx} top face", *problems]
+        _id_st, problems = sketch_circle_and_extrude(
+            f"tire {tire_idx} id",
+            tire_top,
+            15.6,
+            8.0,
+            "cut",
+            want_count,
+        )
+        if problems:
+            return problems
+        tagged, tag_err = eval_expr(
+            cdp,
+            "(function(){"
+            "while(document.querySelector('#partList .part-row.is-on')){"
+            "document.querySelector('#partList .part-row.is-on').click();"
+            "}"
+            f"var row=document.querySelector('#partList [data-part-id={json.dumps(tire_id)}]');"
+            "if(!row) return 'missing row';"
+            "row.click();"
+            "var m=document.getElementById('partMaterial');"
+            "if(!m) return 'missing select';"
+            "m.value='TPU';"
+            "m.dispatchEvent(new Event('change',{bubbles:true}));"
+            f"var fresh=document.querySelector('#partList [data-part-id={json.dumps(tire_id)}]');"
+            "return fresh&&fresh.querySelector('.part-mat')?fresh.querySelector('.part-mat').textContent.trim():'';"
+            "})()",
+        )
+        if tag_err or tagged != "TPU":
+            return [f"truck tire {tire_idx} TPU tag {tagged or tag_err!r}"]
+
+    # Verify 11 parts (1 body + 2 axles + 4 hubs + 4 tires; 7 PLA + 4 TPU) and mixed-material Combine refusal.
+    parts_raw, parts_err = eval_expr(
+        cdp,
+        "JSON.stringify(window.__cadcamSketch && window.__cadcamSketch.state ? window.__cadcamSketch.state().parts : [])",
+    )
+    if parts_err or not isinstance(parts_raw, str) or not parts_raw.startswith("["):
+        return [f"truck parts state {parts_raw or parts_err!r}"]
+    parts = json.loads(parts_raw)
+    if len(parts) != 11:
+        return [f"truck part count {len(parts)} != 11: {parts!r}"]
+    pla_parts = [p for p in parts if isinstance(p, dict) and p.get("material") == "PLA"]
+    tpu_parts = [p for p in parts if isinstance(p, dict) and p.get("material") == "TPU"]
+    if len(pla_parts) != 7 or len(tpu_parts) != 4:
+        return [f"truck materials PLA={len(pla_parts)} TPU={len(tpu_parts)} parts={parts!r}"]
+
+    # Do not Combine a hub with a tire (mixed materials; sourced in mvp/acceptance-a-b.md).
+    hub_part_id = str(parts[3].get("id") or "")
+    tire_part_id = str(parts[7].get("id") or "")
+    mixed_note, mixed_err = eval_expr(
+        cdp,
+        "(function(){"
+        "while(document.querySelector('#partList .part-row.is-on')){"
+        "document.querySelector('#partList .part-row.is-on').click();"
+        "}"
+        f"var r1=document.querySelector('#partList [data-part-id={json.dumps(hub_part_id)}]');"
+        "if(!r1) return 'missing r1';"
+        "r1.click();"
+        f"var r2=document.querySelector('#partList [data-part-id={json.dumps(tire_part_id)}]');"
+        "if(!r2) return 'missing r2';"
+        "r2.click();"
+        "var btn=document.getElementById('combineBtn');"
+        "if(!btn||btn.disabled) return 'combine disabled';"
+        "btn.click();"
+        "var note=document.getElementById('assemblyNote');"
+        "return note?note.textContent.trim():'';"
+        "})()",
+    )
+    if mixed_err or "different materials" not in str(mixed_note or ""):
+        return [f"truck mixed hub+tire combine note {mixed_note or mixed_err!r}"]
+
+    final_state, problems = check_op("final 11-part truck", 11)
+    if problems or not isinstance(final_state, dict):
+        return problems
+    if final_state.get("exportAllowed") is not True or final_state.get("exportDisabled") is True:
+        return [f"truck export blocked {final_state!r}"]
+
+    # 7. Export STL and 3MF when C++ Module.gate() passes. Units stay mm.
+    # Skip numeric --expect-size / --expect-volume on the truck files.
+    for fmt, ext in (("STL", ".stl"), ("3MF", ".3mf")):
+        exported, exp_err = eval_expr(
+            cdp,
+            "(function(){"
+            "window.__cadcamLastDownload=null;"
+            f"var b=document.querySelector('[data-action=\"exportFmt\"][data-fmt=\"{fmt}\"]');"
+            "if(!b) return 'missing';"
+            "b.click();"
+            "return JSON.stringify(window.__cadcamLastDownload||null);"
+            "})()",
+        )
+        if exp_err or not isinstance(exported, str) or not exported.startswith("{"):
+            return [f"truck export {fmt} {exported or exp_err}"]
+        info = json.loads(exported)
+        if not str(info.get("name") or "").endswith(ext):
+            return [f"truck export {fmt} name {info!r}"]
+        if int(info.get("byteLength") or 0) <= 84:
+            return [f"truck export {fmt} bytes {info!r}"]
+        if fmt == "3MF":
+            head = info.get("head") or []
+            if not isinstance(head, list) or len(head) < 2 or head[0] != 80 or head[1] != 75:
+                return [f"truck export 3MF header {head!r}"]
+    units_text, units_err = eval_expr(
+        cdp,
+        "(function(){var u=document.getElementById('statusUnits');return u?u.textContent.trim():'';})()",
+    )
+    if units_err or units_text != "mm":
+        return [f"truck statusUnits {units_text or units_err!r}"]
+    print(
+        f"portrait_q5_truck: 11 parts (1 body PLA + 2 axles PLA + 4 hubs PLA + 4 tires TPU), "
+        f"volume {final_state.get('volumeMm3'):.3f} mm3, STL+3MF exported, units mm",
+        flush=True,
+    )
+    print("TRUCK_MVP_DONE", flush=True)
     return []
 
 
@@ -8179,6 +8582,11 @@ def run(omit: list[str]) -> int:
             if q5_problems:
                 failures.append("portrait_q5_lbracket")
                 failures.extend(q5_problems[:40])
+        if not failures:
+            truck_problems = run_portrait_q5_truck(cdp, origin)
+            if truck_problems:
+                failures.append("portrait_q5_truck")
+                failures.extend(truck_problems[:40])
         if not failures:
             delete_found = delete_problems(cdp, origin, desktop=True)
             if delete_found:
