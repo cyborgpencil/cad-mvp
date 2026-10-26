@@ -1937,7 +1937,7 @@
         <button type="button" class="tool-btn" data-tool="Sketch Fillet" title="Sketch Fillet"><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
         <button type="button" class="tool-btn" data-tool="Trim" title="Trim"><svg class="ico"><use href="#i-trim"></use></svg><span>Trim</span></button>
         <button type="button" class="tool-btn" data-tool="Offset" title="Offset"><svg class="ico"><use href="#i-offset"></use></svg><span>Offset</span></button>
-        <button type="button" class="tool-btn" data-tool="Dimension" title="Dimension"><svg class="ico"><use href="#i-dim"></use></svg><span>Dimension</span></button>
+        <button type="button" class="tool-btn" data-action="sketchDimension" data-tool="Dimension" title="Dimension. Show and focus sketch dimension callouts."><svg class="ico"><use href="#i-dim"></use></svg><span>Dimension</span></button>
       </div><div class="group-label">Modify</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" data-tool="Coincident" title="Coincident"><svg class="ico"><use href="#i-coin"></use></svg><span>Coin.</span></button>
@@ -2219,6 +2219,12 @@
         <div class="edge-sheet-row" id="sketchPolyRow" hidden>
           <label class="edge-size" title="Number of sides (integer, 3 or more)"><span>N</span><input id="sketchPolySides" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="6" aria-label="Sides"></label>
           <label class="edge-size" title="Diameter in millimetres"><span>Ø</span><input id="sketchPolyD" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Polygon diameter mm"><span>mm</span></label>
+        </div>
+        <div class="edge-sheet-row" id="sketchLineRow" hidden>
+          <label class="edge-size" title="Segment length in millimetres"><span>L</span><input id="sketchLineL" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Line length mm"><span>mm</span></label>
+        </div>
+        <div class="edge-sheet-row" id="sketchArcRow" hidden>
+          <label class="edge-size" title="Arc radius in millimetres"><span>R</span><input id="sketchArcR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Arc radius mm"><span>mm</span></label>
         </div>
         <div class="edge-sheet-row" id="sketchDepthRow" hidden>
           <label class="edge-size" title="Blind distance in millimetres"><span>Blind</span><input id="sketchDepth" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Blind distance mm"><span>mm</span></label>
@@ -2562,7 +2568,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     { name: 'Sketch Fillet', tab: 'sketch' },
     { name: 'Trim', tab: 'sketch' },
     { name: 'Offset', tab: 'sketch' },
-    { name: 'Dimension', tab: 'sketch' },
+    { name: 'Dimension', tab: 'sketch', action: 'sketchDimension' },
     { name: 'Coincident', tab: 'sketch' },
     { name: 'Horizontal', tab: 'sketch' },
     { name: 'Vertical', tab: 'sketch' },
@@ -3588,16 +3594,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   let calloutCommitLock = false;
 
   function isSketchDimId(dimId) {
-    return dimId === 'sketchL' || dimId === 'sketchW' || dimId === 'sketchD';
+    return dimId === 'sketchL' || dimId === 'sketchW' || dimId === 'sketchD'
+      || dimId === 'sketchPolyD' || dimId === 'sketchPolySides'
+      || dimId === 'sketchLineL' || dimId === 'sketchArcR';
   }
 
   function sketchCalloutActive(dimId) {
     if (state.sketchSheetMode === 'rect') return dimId === 'sketchL' || dimId === 'sketchW';
     if (state.sketchSheetMode === 'circle') return dimId === 'sketchD';
+    if (state.sketchSheetMode === 'polygon') return dimId === 'sketchPolyD' || dimId === 'sketchPolySides';
+    if (state.sketchSheetMode === 'line') return dimId === 'sketchLineL';
+    if (state.sketchSheetMode === 'arc') return dimId === 'sketchArcR';
     return false;
   }
 
-  // Null when the sheet is not a rect or circle edit, so primitive rows can show.
+  // Null when the sheet is not a sketch profile edit, so primitive rows can show.
   function sketchCalloutSpecs() {
     if (state.sketchSheetMode === 'rect') {
       return [
@@ -3607,6 +3618,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (state.sketchSheetMode === 'circle') {
       return [{ tag: 'Ø', dim: 'sketchD', label: 'Diameter', mm: readField('sketchD') }];
+    }
+    if (state.sketchSheetMode === 'polygon') {
+      return [
+        { tag: 'Ø', dim: 'sketchPolyD', label: 'Diameter', mm: readPolygonDiameterMm() },
+        { tag: 'N', dim: 'sketchPolySides', label: 'Sides', mm: readPolygonSides(), unit: 'int' }
+      ];
+    }
+    if (state.sketchSheetMode === 'line') {
+      return [{ tag: 'L', dim: 'sketchLineL', label: 'Length', mm: readField('sketchLineL') }];
+    }
+    if (state.sketchSheetMode === 'arc') {
+      return [{ tag: 'R', dim: 'sketchArcR', label: 'Radius', mm: readField('sketchArcR') }];
     }
     return null;
   }
@@ -3667,8 +3690,23 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (isSketchDimId(dimId)) {
         if (!sketchCalloutActive(dimId)) return;
         const parsed = Number(String(typed).trim().replace(',', '.'));
+        if (dimId === 'sketchPolySides') {
+          if (!Number.isInteger(parsed) || parsed < 3) return;
+          field.value = String(parsed);
+          refreshPolygonConfirm();
+          paintCallouts();
+          return;
+        }
         if (!Number.isFinite(parsed) || !(parsed > 0)) return;
         field.value = String(parsed);
+        if (dimId === 'sketchPolyD') refreshPolygonConfirm();
+        else if (dimId === 'sketchLineL') {
+          applySketchLineLength(parsed);
+          refreshLineConfirm();
+        } else if (dimId === 'sketchArcR') {
+          applySketchArcRadius(parsed);
+          refreshArcConfirm();
+        }
         paintCallouts();
         return;
       }
@@ -3691,7 +3729,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!field || field.disabled || !form || !entry) return;
     const stored = sketch ? readField(dimId) : Number(field.getAttribute('data-mm'));
     calloutDimId = dimId;
-    entry.value = Number.isFinite(stored) ? formatEntry(stored) : '';
+    entry.value = Number.isFinite(stored) ? (dimId === 'sketchPolySides' ? String(Math.round(stored)) : formatEntry(stored)) : '';
     entry.setAttribute('aria-label', (field.getAttribute('aria-label') || 'Dimension') + ' callout');
     form.hidden = false;
     placeCallouts();
@@ -3831,7 +3869,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       shown += 1;
       const tag = document.getElementById('calloutTag' + i);
       if (tag) tag.textContent = spec.tag;
-      const text = formatLength(spec.mm);
+      const text = spec.unit === 'int' ? String(Math.round(spec.mm)) : formatLength(spec.mm);
       const value = document.getElementById('calloutValue' + i);
       const minus = document.getElementById('calloutMinus' + i);
       const plus = document.getElementById('calloutPlus' + i);
@@ -3883,7 +3921,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const tag = document.getElementById('calloutTag' + i);
         const dim = value ? (value.getAttribute('data-dim') || '') : '';
         const field = dim ? document.getElementById(dim) : null;
-        const mm = field ? Number(field.getAttribute('data-mm')) : NaN;
+        const mm = field ? (isSketchDimId(dim) ? readField(dim) : Number(field.getAttribute('data-mm'))) : NaN;
         const valueRect = value ? value.getBoundingClientRect() : null;
         const minusRect = minus ? minus.getBoundingClientRect() : null;
         const plusRect = plus ? plus.getBoundingClientRect() : null;
@@ -3891,7 +3929,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           tag: tag ? String(tag.textContent || '').trim() : '',
           dim: dim,
           text: value ? String(value.textContent || '').trim() : '',
-          formatted: Number.isFinite(mm) ? formatLength(mm) : '',
+          formatted: Number.isFinite(mm) ? (dim === 'sketchPolySides' ? String(Math.round(mm)) : formatLength(mm)) : '',
           mm: Number.isFinite(mm) ? mm : null,
           valueW: valueRect ? valueRect.width : 0,
           valueH: valueRect ? valueRect.height : 0,
@@ -7731,9 +7769,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (!sketchCalloutActive(dimId)) return false;
       const current = readField(dimId);
       if (current == null) return false;
+      if (dimId === 'sketchPolySides') {
+        const nextSides = Math.round(current) + (sign * 1);
+        if (nextSides < 3) return false;
+        field.value = String(nextSides);
+        refreshPolygonConfirm();
+        paintCallouts();
+        return true;
+      }
       const next = Math.round((current + amount) * 1000) / 1000;
       if (!(next > 0)) return false;
       field.value = String(next);
+      if (dimId === 'sketchPolyD') refreshPolygonConfirm();
+      else if (dimId === 'sketchLineL') {
+        applySketchLineLength(next);
+        refreshLineConfirm();
+      } else if (dimId === 'sketchArcR') {
+        applySketchArcRadius(next);
+        refreshArcConfirm();
+      }
       paintCallouts();
       return true;
     }
@@ -10201,12 +10255,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const rectRow = document.getElementById('sketchRectRow');
     const circRow = document.getElementById('sketchCircRow');
     const polyRow = document.getElementById('sketchPolyRow');
+    const lineRow = document.getElementById('sketchLineRow');
+    const arcRow = document.getElementById('sketchArcRow');
     const depthRow = document.getElementById('sketchDepthRow');
     const note = document.getElementById('sketchNote');
     const confirmBtn = document.getElementById('sketchConfirm');
     if (rectRow) rectRow.hidden = mode !== 'rect';
     if (circRow) circRow.hidden = mode !== 'circle';
     if (polyRow) polyRow.hidden = mode !== 'polygon';
+    if (lineRow) lineRow.hidden = mode !== 'line';
+    if (arcRow) arcRow.hidden = mode !== 'arc';
     if (depthRow) depthRow.hidden = mode !== 'extrude';
     const modeRow = document.getElementById('sketchModeRow');
     if (modeRow) modeRow.hidden = mode !== 'extrude';
@@ -10215,6 +10273,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const polyDEl = document.getElementById('sketchPolyD');
       if (sidesEl && !String(sidesEl.value).trim()) sidesEl.value = '6';
       if (polyDEl && !String(polyDEl.value).trim()) polyDEl.value = '10';
+    }
+    if (mode === 'line') {
+      const lineLEl = document.getElementById('sketchLineL');
+      if (lineLEl && !String(lineLEl.value).trim()) {
+        lineLEl.value = '10';
+        lineLEl.dataset.autoValue = '10';
+      } else if (lineLEl && !lineLEl.dataset.autoValue) {
+        lineLEl.dataset.autoValue = String(lineLEl.value).trim();
+      }
+    }
+    if (mode === 'arc') {
+      const arcREl = document.getElementById('sketchArcR');
+      if (arcREl && !String(arcREl.value).trim()) {
+        arcREl.value = '10';
+        arcREl.dataset.autoValue = '10';
+      } else if (arcREl && !arcREl.dataset.autoValue) {
+        arcREl.dataset.autoValue = String(arcREl.value).trim();
+      }
     }
     if (mode === 'extrude') {
       const depth = document.getElementById('sketchDepth');
@@ -10236,11 +10312,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (mode === 'line') {
       text = state.sketchPlane ? 'Line' : needPlane;
       const clicks = state.sketchLineVertices ? state.sketchLineVertices.length : 0;
-      enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3;
+      enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3 && validLineFields();
     } else if (mode === 'arc') {
       text = state.sketchPlane ? 'Arc' : needPlane;
       const clicks = state.sketchArcPoints ? state.sketchArcPoints.length : 0;
-      enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks === 3;
+      enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks === 3 && validArcFields();
     } else if (mode === 'polygon') {
       text = state.sketchPlane ? 'Polygon' : needPlane;
       enabled = !!(state.sketchPlane && state.sketchPlane.frame) && validPolygonFields();
@@ -10413,6 +10489,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       lengthMm: fields.lengthMm || 0,
       widthMm: fields.widthMm || 0,
       diameterMm: fields.diameterMm || 0,
+      radiusMm: fields.radiusMm || 0,
       sides: fields.sides || 0,
       arcPoints: fields.arcPoints || 0
     };
@@ -10493,11 +10570,67 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return 0;
   }
 
+  function lastLineSegmentLengthMm() {
+    const verts = state.sketchLineVertices;
+    if (!verts || verts.length < 2) return null;
+    const a = verts[verts.length - 2];
+    const b = verts[verts.length - 1];
+    if (!a || !b) return null;
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    return Number.isFinite(len) && len > 0 ? len : null;
+  }
+
+  function validLineFields() {
+    const len = readField('sketchLineL');
+    return len != null && len > 0;
+  }
+
+  function syncSketchLineField() {
+    const el = document.getElementById('sketchLineL');
+    if (!el) return;
+    const len = lastLineSegmentLengthMm();
+    if (len != null && len > 0) {
+      el.value = formatEntry(len);
+    }
+    el.dataset.autoValue = String(el.value).trim();
+  }
+
+  function applySketchLineLength(lengthMm) {
+    const target = Number(lengthMm);
+    if (!Number.isFinite(target) || !(target > 0)) return false;
+    const verts = state.sketchLineVertices;
+    if (!verts || verts.length < 2) return false;
+    const a = verts[verts.length - 2];
+    const b = verts[verts.length - 1];
+    if (!a || !b) return false;
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    let dz = b[2] - a[2];
+    let cur = Math.hypot(dx, dy, dz);
+    if (!(cur > 1e-9)) {
+      const frame = state.sketchPlane && state.sketchPlane.frame;
+      const u = frame && frame.u ? frame.u : [1, 0, 0];
+      dx = u[0];
+      dy = u[1];
+      dz = u[2];
+      cur = Math.hypot(dx, dy, dz) || 1;
+    }
+    const scale = target / cur;
+    verts[verts.length - 1] = [
+      a[0] + dx * scale,
+      a[1] + dy * scale,
+      a[2] + dz * scale
+    ];
+    const el = document.getElementById('sketchLineL');
+    if (el) el.dataset.autoValue = String(el.value).trim();
+    return true;
+  }
+
   function refreshLineConfirm() {
     if (state.sketchSheetMode !== 'line') return;
     const confirmBtn = document.getElementById('sketchConfirm');
     const clicks = state.sketchLineVertices ? state.sketchLineVertices.length : 0;
-    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3;
+    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks >= 3 && validLineFields();
     if (confirmBtn) {
       confirmBtn.disabled = !enabled;
       confirmBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
@@ -10507,7 +10640,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   // Click on the sketch plane, in millimetres. The line tool and a plane
   // must already be set. Returns false otherwise. Does not snap.
   function placeLineVertex(uMm, vMm) {
-    if (state.activeTool !== 'Line') return false;
+    if (state.activeTool !== 'Line' && state.sketchSheetMode !== 'line') return false;
     const frame = state.sketchPlane && state.sketchPlane.frame;
     if (!frame || typeof frame.point !== 'function') return false;
     const u = Number(uMm);
@@ -10517,7 +10650,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!point || point.length < 3) return false;
     if (!state.sketchLineVertices) state.sketchLineVertices = [];
     state.sketchLineVertices.push([Number(point[0]), Number(point[1]), Number(point[2])]);
+    if (state.sketchLineVertices.length >= 2) syncSketchLineField();
     refreshLineConfirm();
+    paintCallouts();
     publishGateState();
     return true;
   }
@@ -10556,6 +10691,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       refreshLineConfirm();
       return 'Line';
     }
+    const lineEl = document.getElementById('sketchLineL');
+    const typedLen = readField('sketchLineL');
+    if (!(typedLen > 0)) {
+      refreshLineConfirm();
+      const why = 'Line length must be millimetres above 0.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    if (lineEl && String(lineEl.value).trim() !== String(lineEl.dataset.autoValue || '').trim()) {
+      applySketchLineLength(typedLen);
+    }
     if (!oc || !opsApi || typeof opsApi.makeLineFace !== 'function') {
       const why = 'FAIL: the line was rejected.';
       setHint(why);
@@ -10569,9 +10716,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(why);
       return why;
     }
+    const finalLen = lastLineSegmentLengthMm() || typedLen || 0;
     const loop = [];
     for (let i = 0; i < verts.length; i += 1) loop.push([verts[i][0], verts[i][1], verts[i][2]]);
-    storeSketchProfile('line', shape, loop, { lengthMm: 0, widthMm: 0, diameterMm: 0 });
+    storeSketchProfile('line', shape, loop, { lengthMm: finalLen, widthMm: 0, diameterMm: 0 });
     state.sketchLineVertices = [];
     closeSketchSheet();
     const note = 'Line';
@@ -10587,11 +10735,76 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return 0;
   }
 
+  function arcPointsRadiusMm(pts) {
+    if (!pts || pts.length < 3) return null;
+    const p1 = pts[0];
+    const p2 = pts[1];
+    const p3 = pts[2];
+    if (!p1 || !p2 || !p3) return null;
+    const ux = p2[0] - p1[0];
+    const uy = p2[1] - p1[1];
+    const uz = p2[2] - p1[2];
+    const vx = p3[0] - p1[0];
+    const vy = p3[1] - p1[1];
+    const vz = p3[2] - p1[2];
+    const wx = uy * vz - uz * vy;
+    const wy = uz * vx - ux * vz;
+    const wz = ux * vy - uy * vx;
+    const w = Math.hypot(wx, wy, wz);
+    if (!(w > 1e-6)) return null;
+    const a = Math.hypot(ux, uy, uz);
+    const b = Math.hypot(vx, vy, vz);
+    const c = Math.hypot(p3[0] - p2[0], p3[1] - p2[1], p3[2] - p2[2]);
+    const r = (a * b * c) / (2 * w);
+    return Number.isFinite(r) && r > 0 ? r : null;
+  }
+
+  function validArcFields() {
+    const rad = readField('sketchArcR');
+    return rad != null && rad > 0;
+  }
+
+  function syncSketchArcField() {
+    const el = document.getElementById('sketchArcR');
+    if (!el) return;
+    const rad = arcPointsRadiusMm(state.sketchArcPoints);
+    if (rad != null && rad > 0) {
+      el.value = formatEntry(rad);
+    }
+    el.dataset.autoValue = String(el.value).trim();
+  }
+
+  function applySketchArcRadius(radiusMm) {
+    const target = Number(radiusMm);
+    if (!Number.isFinite(target) || !(target > 0)) return false;
+    const pts = state.sketchArcPoints;
+    if (!pts || pts.length !== 3) return false;
+    const current = arcPointsRadiusMm(pts);
+    if (!(current > 1e-9)) return false;
+    const scale = target / current;
+    const p1 = pts[0];
+    const p2 = pts[1];
+    const p3 = pts[2];
+    pts[1] = [
+      p1[0] + (p2[0] - p1[0]) * scale,
+      p1[1] + (p2[1] - p1[1]) * scale,
+      p1[2] + (p2[2] - p1[2]) * scale
+    ];
+    pts[2] = [
+      p1[0] + (p3[0] - p1[0]) * scale,
+      p1[1] + (p3[1] - p1[1]) * scale,
+      p1[2] + (p3[2] - p1[2]) * scale
+    ];
+    const el = document.getElementById('sketchArcR');
+    if (el) el.dataset.autoValue = String(el.value).trim();
+    return true;
+  }
+
   function refreshArcConfirm() {
     if (state.sketchSheetMode !== 'arc') return;
     const confirmBtn = document.getElementById('sketchConfirm');
     const clicks = state.sketchArcPoints ? state.sketchArcPoints.length : 0;
-    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks === 3;
+    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && clicks === 3 && validArcFields();
     if (confirmBtn) {
       confirmBtn.disabled = !enabled;
       confirmBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
@@ -10599,7 +10812,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function placeArcPoint(uMm, vMm) {
-    if (state.activeTool !== 'Arc') return false;
+    if (state.activeTool !== 'Arc' && state.sketchSheetMode !== 'arc') return false;
     const frame = state.sketchPlane && state.sketchPlane.frame;
     if (!frame || typeof frame.point !== 'function') return false;
     const u = Number(uMm);
@@ -10609,7 +10822,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!point || point.length < 3) return false;
     if (!state.sketchArcPoints || state.sketchArcPoints.length >= 3) state.sketchArcPoints = [];
     state.sketchArcPoints.push([Number(point[0]), Number(point[1]), Number(point[2])]);
+    if (state.sketchArcPoints.length === 3) syncSketchArcField();
     refreshArcConfirm();
+    paintCallouts();
     publishGateState();
     return true;
   }
@@ -10626,6 +10841,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       refreshArcConfirm();
       return 'Arc';
     }
+    const arcEl = document.getElementById('sketchArcR');
+    const typedRad = readField('sketchArcR');
+    if (!(typedRad > 0)) {
+      refreshArcConfirm();
+      const why = 'Arc radius must be millimetres above 0.';
+      setHint(why);
+      toast(why);
+      return why;
+    }
+    if (arcEl && String(arcEl.value).trim() !== String(arcEl.dataset.autoValue || '').trim()) {
+      applySketchArcRadius(typedRad);
+    }
     if (!oc || !opsApi || typeof opsApi.makeArcFace !== 'function') {
       const why = 'FAIL: the arc was rejected.';
       setHint(why);
@@ -10639,9 +10866,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(why);
       return why;
     }
+    const finalRad = arcPointsRadiusMm(pts) || typedRad || 0;
     const loop = [];
     for (let i = 0; i < pts.length; i += 1) loop.push([pts[i][0], pts[i][1], pts[i][2]]);
-    storeSketchProfile('arc', shape, loop, { lengthMm: 0, widthMm: 0, diameterMm: 0, arcPoints: 3 });
+    storeSketchProfile('arc', shape, loop, { lengthMm: 0, widthMm: 0, diameterMm: 0, radiusMm: finalRad, arcPoints: 3 });
     state.sketchArcPoints = [];
     closeSketchSheet();
     const note = 'Arc';
@@ -11852,6 +12080,37 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.activeTool = 'Circle';
       openSketchSheet('circle');
       message = state.sketchPlane ? 'Circle' : sketchPlanePrompt();
+      setHint(message);
+      updateInspector();
+    } else if (action === 'sketchDimension') {
+      if (state.tab !== 'sketch') setTab('sketch', { keepTool: true });
+      const currentMode = state.sketchSheetMode;
+      let mode = 'rect';
+      if (currentMode === 'rect' || currentMode === 'circle' || currentMode === 'polygon' || currentMode === 'line' || currentMode === 'arc') {
+        mode = currentMode;
+      } else if (state.activeTool === 'Circle' || (state.sketchProfile && state.sketchProfile.kind === 'circle')) {
+        mode = 'circle';
+      } else if (state.activeTool === 'Polygon' || (state.sketchProfile && state.sketchProfile.kind === 'polygon')) {
+        mode = 'polygon';
+      } else if (state.activeTool === 'Line' || (state.sketchProfile && state.sketchProfile.kind === 'line')) {
+        mode = 'line';
+      } else if (state.activeTool === 'Arc' || (state.sketchProfile && state.sketchProfile.kind === 'arc')) {
+        mode = 'arc';
+      }
+      openSketchSheet(mode);
+      paintCallouts();
+      let focusId = 'sketchL';
+      if (mode === 'circle') focusId = 'sketchD';
+      else if (mode === 'polygon') focusId = 'sketchPolyD';
+      else if (mode === 'line') focusId = 'sketchLineL';
+      else if (mode === 'arc') focusId = 'sketchArcR';
+      const focusEl = document.getElementById(focusId);
+      if (focusEl && !focusEl.disabled && typeof focusEl.focus === 'function') {
+        focusEl.focus();
+        if (typeof focusEl.select === 'function') focusEl.select();
+      }
+      state.activeTool = 'Dimension';
+      message = 'Dimension';
       setHint(message);
       updateInspector();
     } else if (action === 'sketchExtrude') {
@@ -13407,14 +13666,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return;
         }
         if (state.tab === 'sketch' && !(ev.shiftKey || ev.ctrlKey || ev.metaKey)) {
-          if (state.activeTool === 'Line' && state.sketchPlane && state.sketchPlane.frame) {
+          if ((state.activeTool === 'Line' || state.sketchSheetMode === 'line') && state.sketchPlane && state.sketchPlane.frame) {
             const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
             if (uv) placeLineVertex(uv.u, uv.v);
             gesture = null;
             pinch = null;
             return;
           }
-          if (state.activeTool === 'Arc' && state.sketchPlane && state.sketchPlane.frame) {
+          if ((state.activeTool === 'Arc' || state.sketchSheetMode === 'arc') && state.sketchPlane && state.sketchPlane.frame) {
             const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
             if (uv) placeArcPoint(uv.u, uv.v);
             gesture = null;
@@ -13544,7 +13803,34 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const polyInput = document.getElementById(sketchPolygonIds[pi]);
     if (!polyInput) continue;
     polyInput.addEventListener('input', function () {
-      if (state.sketchSheetMode === 'polygon') refreshPolygonConfirm();
+      if (state.sketchSheetMode === 'polygon') {
+        refreshPolygonConfirm();
+        paintCallouts();
+      }
+    });
+  }
+  const sketchLineInput = document.getElementById('sketchLineL');
+  if (sketchLineInput) {
+    sketchLineInput.addEventListener('input', function () {
+      if (state.sketchSheetMode === 'line') {
+        const val = readField('sketchLineL');
+        if (val != null && val > 0) applySketchLineLength(val);
+        refreshLineConfirm();
+        paintCallouts();
+        publishGateState();
+      }
+    });
+  }
+  const sketchArcInput = document.getElementById('sketchArcR');
+  if (sketchArcInput) {
+    sketchArcInput.addEventListener('input', function () {
+      if (state.sketchSheetMode === 'arc') {
+        const val = readField('sketchArcR');
+        if (val != null && val > 0) applySketchArcRadius(val);
+        refreshArcConfirm();
+        paintCallouts();
+        publishGateState();
+      }
     });
   }
   const dimPanel = document.getElementById('dimPanel');
@@ -13859,7 +14145,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
         lineVertices: lineVertexCount(),
+        lineLengthMm: state.sketchProfile && state.sketchProfile.kind === 'line'
+          ? (state.sketchProfile.lengthMm || 0)
+          : (lastLineSegmentLengthMm() || readField('sketchLineL') || 0),
         arcPoints: arcPointCount(),
+        arcRadiusMm: state.sketchProfile && state.sketchProfile.kind === 'arc'
+          ? (state.sketchProfile.radiusMm || 0)
+          : (arcPointsRadiusMm(state.sketchArcPoints) || readField('sketchArcR') || 0),
         polygonSides: state.sketchProfile && state.sketchProfile.kind === 'polygon' ? (state.sketchProfile.sides || 0) : 0,
         extrudeMode: state.sketchExtrudeMode === 'join' || state.sketchExtrudeMode === 'cut' ? state.sketchExtrudeMode : 'new',
         emptyBodies: (function () {
