@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #151 (merged at 8ecaaa5): feat - Rust CLI port of tools/check_export.py (CI dual-run; tip 5882a35).
 - 2026-10-26 PR #148 (merged at 8f2259f): docs - Antigravity Rust #2 check_export CLI brief (prompts/antigravity-rust-check-export.md; tip 9f0b856).
 - 2026-10-26 PR #147 (merged at d161ba0): feat - sketch Polygon/Line/Arc callouts, typed mm rewrite, Dimension focus (web + deploy_smoke; tip 4ac01da).
 - 2026-10-26 PR #145 (merged at 41c6608): feat - lock view-cube swipe adjacent face step and keep L/R ring (web + smokes; tip 9f68528).
