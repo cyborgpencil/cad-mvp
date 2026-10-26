@@ -4090,7 +4090,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (topo.faces[i].id === faceId) face = topo.faces[i];
     }
     if (!face) return false;
-    const centre = state.bodies.length === 1 ? bodyCentroid(state.bodies[0]) : [0, 0, 0];
+    const centre = state.bodies.length === 1 ? bodyBoundsCenter(state.bodies[0]) : [0, 0, 0];
     const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
     if (!frame) {
       const why = 'That face is not planar. The solid was kept.';
@@ -5352,6 +5352,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       sz += vertices[i][2];
     }
     return [sx / vertices.length, sy / vertices.length, sz / vertices.length];
+  }
+
+  function bodyBoundsCenter(body) {
+    const vertices = body && body.mesh ? body.mesh.vertices : [];
+    if (!vertices.length) return [0, 0, 0];
+    let xmin = Infinity;
+    let ymin = Infinity;
+    let zmin = Infinity;
+    let xmax = -Infinity;
+    let ymax = -Infinity;
+    let zmax = -Infinity;
+    for (let i = 0; i < vertices.length; i += 1) {
+      const v = vertices[i];
+      if (v[0] < xmin) xmin = v[0];
+      if (v[0] > xmax) xmax = v[0];
+      if (v[1] < ymin) ymin = v[1];
+      if (v[1] > ymax) ymax = v[1];
+      if (v[2] < zmin) zmin = v[2];
+      if (v[2] > zmax) zmax = v[2];
+    }
+    return [(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2];
   }
 
   function paintOrderBadges() {
@@ -9810,6 +9831,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchProfile = null;
     state.sketchLineVertices = [];
     state.sketchArcPoints = [];
+    state.sketchCircleCenter = null;
     state.sketchPlane = null;
     paintSketchStatus();
     paintSketchVisuals();
@@ -10348,7 +10370,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (!face) return false;
     const owner = bodyOwningFace(face.id) || (state.bodies.length === 1 ? state.bodies[0] : null);
-    const centre = owner ? bodyCentroid(owner) : [0, 0, 0];
+    const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
     const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
     if (!frame) {
       const why = 'That face is not planar.';
@@ -10359,6 +10381,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchPlane = { faceId: face.id, bodyId: owner ? owner.id : '', frame: frame };
     state.sketchLineVertices = [];
     state.sketchArcPoints = [];
+    state.sketchCircleCenter = null;
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
@@ -10394,6 +10417,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.sketchProfile = null;
       state.sketchLineVertices = [];
       state.sketchArcPoints = [];
+      state.sketchCircleCenter = null;
     }
     state.sketchPlane = { faceId: '', bodyId: '', originPlane: key, frame: originPlaneFrame(key) };
     state.selectedIds = [];
@@ -10531,6 +10555,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return note;
   }
 
+  function placeCircleCenter(uMm, vMm) {
+    const u = Number(uMm);
+    const v = Number(vMm);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+      state.sketchCircleCenter = null;
+      return false;
+    }
+    state.sketchCircleCenter = [u, v];
+    return true;
+  }
+
   function commitSketchCircle() {
     const plane = state.sketchPlane;
     if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makeCircleFace !== 'function') {
@@ -10545,7 +10580,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       toast(why);
       return why;
     }
-    const center = plane.frame.point(plane.frame.uSpan / 2, plane.frame.vSpan / 2);
+    const customCenter = Array.isArray(state.sketchCircleCenter) && state.sketchCircleCenter.length === 2
+      ? plane.frame.point(state.sketchCircleCenter[0], state.sketchCircleCenter[1])
+      : null;
+    const center = customCenter || plane.frame.point(plane.frame.uSpan / 2, plane.frame.vSpan / 2);
     const shape = opsApi.makeCircleFace(oc, center, plane.frame.outward, diameterMm);
     if (!shape) {
       const why = 'FAIL: the circle was rejected.';
@@ -10556,6 +10594,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     storeSketchProfile('circle', shape, circleLoop(center, plane.frame.outward, diameterMm), {
       diameterMm: diameterMm
     });
+    state.sketchCircleCenter = null;
     closeSketchSheet();
     const note = 'Circle Ø' + diameterMm + ' mm';
     setHint(note);
@@ -11172,6 +11211,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function downloadBytes(bytes, filename) {
     const copy = new Uint8Array(bytes);
+    window.__cadcamLastDownload = {
+      name: filename,
+      byteLength: copy.length,
+      head: Array.from(copy.slice(0, 16))
+    };
     const blob = new Blob([copy], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -14109,6 +14153,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   window.__cadcamSketch = {
     topFace: function () { return topSketchFaceId(); },
     tapFace: function (id) { return setSketchPlane(id || topSketchFaceId()); },
+    tapHoleFace: function (id) {
+      state.selectedIds = id ? [id] : [];
+      const ok = rememberHoleFace(id);
+      paintPrimFields();
+      applyLook();
+      publishGateState();
+      return ok;
+    },
+    faces: function () {
+      const out = [];
+      const meshCad = state.meshCad;
+      const topo = state.topology;
+      if (!meshCad || !topo || !Array.isArray(topo.faces) || !viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') return out;
+      const owner = state.bodies.length === 1 ? state.bodies[0] : null;
+      const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
+      for (let i = 0; i < topo.faces.length; i += 1) {
+        const face = topo.faces[i];
+        const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
+        if (!frame) continue;
+        out.push({
+          id: face.id,
+          occtIndex: face.occtIndex || 0,
+          surface: face.surface || '',
+          centroid: face.centroid ? face.centroid.slice() : null,
+          outward: frame.outward ? frame.outward.slice() : null,
+          inward: frame.inward ? frame.inward.slice() : null,
+          origin: frame.origin ? frame.origin.slice() : null,
+          u: frame.u ? frame.u.slice() : null,
+          v: frame.v ? frame.v.slice() : null,
+          uSpan: frame.uSpan,
+          vSpan: frame.vSpan
+        });
+      }
+      return out;
+    },
+    placeCircleCenter: function (uMm, vMm) { return placeCircleCenter(uMm, vMm); },
     placeLineVertex: function (uMm, vMm) { return placeLineVertex(uMm, vMm); },
     placeArcPoint: function (uMm, vMm) { return placeArcPoint(uMm, vMm); },
     state: function () {

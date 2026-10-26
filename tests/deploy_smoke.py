@@ -4945,6 +4945,390 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
     return []
 
 
+def _q5_tools_point_expr(tool_name: str) -> str:
+    return (
+        "(function(){"
+        "var sheet=document.getElementById('toolsSheet');"
+        "if(!sheet) return 'missing toolsSheet';"
+        "if(sheet.hidden){"
+        "var openers=document.querySelectorAll('[data-action=\"toolsMenu\"]');"
+        "var opener=null;"
+        "for(var i=0;i<openers.length;i++){"
+        "var st=getComputedStyle(openers[i]);"
+        "var r=openers[i].getBoundingClientRect();"
+        "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
+        "opener=openers[i];break;"
+        "}"
+        "if(!opener) return 'missing toolsMenu';"
+        "opener.click();"
+        "}"
+        "var buttons=document.querySelectorAll('#sheetTools button');"
+        "var b=null;"
+        "for(var j=0;j<buttons.length;j++){"
+        "var span=buttons[j].querySelector('span');"
+        f"if(span&&span.textContent==={json.dumps(tool_name)}){{b=buttons[j];break;}}"
+        "}"
+        "if(!b) return 'missing';"
+        "var st=getComputedStyle(b);"
+        "if(st.display==='none'||st.visibility==='hidden') return 'hidden';"
+        "var r=b.getBoundingClientRect();"
+        "if(r.width<1||r.height<1) return 'empty';"
+        "return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height});"
+        "})()"
+    )
+
+
+def _q5_sketch_l_profile_and_extrude(
+    cdp: Cdp,
+    origin: str,
+    leg_a_mm: float,
+    leg_b_mm: float,
+    wall_mm: float,
+    extrude_depth_mm: float,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Sketch 6-vertex 90° L-profile with 4 mm wall thickness on XY and Blind Extrude."""
+    problems = _delete_default_body(cdp, origin)
+    if problems:
+        return None, ["q5 clear body", *problems]
+    problems = tap_point(cdp, create_point_expr('[data-action="newSketch"]'), "q5 newSketch")
+    if problems:
+        return None, ["q5 newSketch", *problems]
+    problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', "q5 pick Top XY")
+    if problems:
+        return None, ["q5 pick xy", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Line"), "q5 sketchLine")
+    if problems:
+        return None, ["q5 sketchLine", *problems]
+    loop_uv = (
+        (0.0, 0.0),
+        (leg_a_mm, 0.0),
+        (leg_a_mm, wall_mm),
+        (wall_mm, wall_mm),
+        (wall_mm, leg_b_mm),
+        (0.0, leg_b_mm),
+    )
+    for u_val, v_val in loop_uv:
+        placed, place_err = eval_expr(
+            cdp,
+            f"Boolean(window.__cadcamSketch && window.__cadcamSketch.placeLineVertex({u_val}, {v_val}))",
+        )
+        if place_err or placed is not True:
+            return None, [f"q5 placeLineVertex({u_val},{v_val}) {placed or place_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "q5 line confirm")
+    if problems:
+        return None, ["q5 line confirm", *problems]
+    problems = tap_selector(cdp, '#finishBar [data-action="finishSketch"]', "q5 finishSketch")
+    if problems:
+        return None, ["q5 finishSketch", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Extrude (Push/Pull)"), "q5 sketchExtrude")
+    if problems:
+        return None, ["q5 sketchExtrude", *problems]
+    edited, edit_err = eval_expr(cdp, edit_expr("sketchDepth", num_text(extrude_depth_mm)))
+    if edit_err or edited != "edited":
+        return None, [f"q5 sketchDepth {edited or edit_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "q5 extrude confirm")
+    if problems:
+        return None, ["q5 extrude confirm", *problems]
+    state, wait_problems = wait_hole_state(
+        cdp,
+        origin,
+        lambda s: (
+            int(s.get("bodyCount") or 0) == 1
+            and s.get("occtGate") is True
+            and s.get("gateOcct") == "PASS"
+            and s.get("unitsPass") is True
+        ),
+        PAGE_TIMEOUT_S,
+        f"q5 extrude {extrude_depth_mm}mm",
+    )
+    if wait_problems or not isinstance(state, dict):
+        return None, [f"q5 extrude {extrude_depth_mm}mm", *wait_problems[:12]]
+    return state, []
+
+
+def _q5_find_planar_face(cdp: Cdp, want_outward: tuple[float, float, float]) -> tuple[str, list[str]]:
+    raw, err = eval_expr(
+        cdp,
+        "JSON.stringify(window.__cadcamSketch && typeof window.__cadcamSketch.faces==='function' ? window.__cadcamSketch.faces() : [])",
+    )
+    if err or not isinstance(raw, str) or not raw.startswith("["):
+        return "", [f"q5 faces {raw or err}"]
+    try:
+        faces = json.loads(raw)
+    except json.JSONDecodeError:
+        return "", [f"q5 faces json {raw[:200]}"]
+    best_id = ""
+    best_area = -1.0
+    wx, wy, wz = want_outward
+    for face in faces:
+        if not isinstance(face, dict):
+            continue
+        out = face.get("outward")
+        if not isinstance(out, list) or len(out) < 3:
+            continue
+        dot = float(out[0]) * wx + float(out[1]) * wy + float(out[2]) * wz
+        area = float(face.get("uSpan") or 0.0) * float(face.get("vSpan") or 0.0)
+        if dot > 0.99 and area > best_area:
+            best_area = area
+            best_id = str(face.get("id") or "")
+    if not best_id:
+        return "", [f"q5 face not found for outward {want_outward} in {raw[:240]}"]
+    return best_id, []
+
+
+def run_portrait_q5_lbracket(cdp: Cdp, origin: str) -> list[str]:
+    """390x844 Q5 phone acceptance L-bracket rebuild: sketch -> Blind Extrude -> Union/Cut -> STL/3MF."""
+    try:
+        set_portrait(cdp)
+    except (RuntimeError, TimeoutError, OSError) as exc:
+        return [f"q5 portrait emulation failed: {exc}"]
+    url = origin + "/"
+    print(f"load portrait_q5_lbracket {url}", flush=True)
+    _loaded, load_problems = wait_for_case(cdp, origin, url, PAGE_TIMEOUT_S)
+    if load_problems:
+        return ["q5 load", *load_problems[:20]]
+
+    # Locked by Q5 (mvp/requirements.md #150 @ a38d89d & prompts/antigravity-l-bracket-rebuild.md):
+    wall_mm = 4.0
+    disc_thickness_mm = 4.0
+    # TBD test-only parameters (non-Blink values; not baked into app):
+    leg_a_mm = 44.0  # TBD leg A length
+    leg_b_mm = 36.0  # TBD leg B length
+    leg_w_mm = 28.0  # TBD leg width
+    disc_dia_mm = 12.0  # TBD disc diameter
+    disc_u_mm = 34.0  # TBD off-centre U on Leg A (centre is 22)
+    disc_v_mm = 8.0   # TBD off-centre V on Leg A (centre is 14)
+    hole_dia_mm = 4.0  # TBD hole diameter
+    cs_dia_mm = 7.0    # TBD countersink diameter
+    cs_ang_deg = 90.0  # TBD countersink angle
+    leg_a_holes_uv = ((12.0, 20.0), (22.0, 20.0), (34.0, 21.0))  # 3 CSK holes on Leg A
+    leg_b_holes_uv = ((12.0, 14.0), (20.0, 14.0), (28.0, 14.0))  # 3 CSK holes on Leg B
+
+    l_area_mm2 = leg_a_mm * wall_mm + (leg_b_mm - wall_mm) * wall_mm
+
+    # Step 1 & 2A: Sketch 90° L-profile on XY and Blind Extrude to locked 4 mm depth.
+    flat4_state, problems = _q5_sketch_l_profile_and_extrude(
+        cdp, origin, leg_a_mm, leg_b_mm, wall_mm, wall_mm
+    )
+    if problems or not isinstance(flat4_state, dict):
+        return ["q5 4mm blind extrude", *problems]
+    if not _near(flat4_state.get("volumeMm3"), l_area_mm2 * wall_mm, 0.5):
+        return [f"q5 4mm extrude volume {flat4_state.get('volumeMm3')!r} want {l_area_mm2 * wall_mm}"]
+
+    # Step 1 & 2B: Sketch 90° L-profile (4 mm wall thickness on both legs) on XY and Blind Extrude to leg_w_mm.
+    base_state, problems = _q5_sketch_l_profile_and_extrude(
+        cdp, origin, leg_a_mm, leg_b_mm, wall_mm, leg_w_mm
+    )
+    if problems or not isinstance(base_state, dict):
+        return ["q5 base lbracket extrude", *problems]
+    base_vol = l_area_mm2 * leg_w_mm
+    if not _near(base_state.get("volumeMm3"), base_vol, 0.5):
+        return [f"q5 base volume {base_state.get('volumeMm3')!r} want {base_vol}"]
+
+    # Step 3: Disc — sketch a circle off-centre on Leg A, Blind Extrude 4 mm, Union onto Leg A.
+    leg_a_face, problems = _q5_find_planar_face(cdp, (0.0, -1.0, 0.0))
+    if problems:
+        return problems
+    problems = tap_point(cdp, create_point_expr('[data-action="newSketch"]'), "q5 disc newSketch")
+    if problems:
+        return ["q5 disc newSketch", *problems]
+    tapped_face, tap_err = eval_expr(
+        cdp,
+        f"Boolean(window.__cadcamSketch && window.__cadcamSketch.tapFace({json.dumps(leg_a_face)}))",
+    )
+    if tap_err or tapped_face is not True:
+        return [f"q5 disc tapFace {tapped_face or tap_err}"]
+    problems = tap_point(cdp, _q5_tools_point_expr("Circle"), "q5 sketchCircle")
+    if problems:
+        return ["q5 sketchCircle", *problems]
+    placed_center, center_err = eval_expr(
+        cdp,
+        f"Boolean(window.__cadcamSketch && window.__cadcamSketch.placeCircleCenter({disc_u_mm}, {disc_v_mm}))",
+    )
+    if center_err or placed_center is not True:
+        return [f"q5 placeCircleCenter {placed_center or center_err}"]
+    edited, edit_err = eval_expr(cdp, edit_expr("sketchD", num_text(disc_dia_mm)))
+    if edit_err or edited != "edited":
+        return [f"q5 sketchD {edited or edit_err}"]
+    problems = tap_selector(cdp, "#sketchConfirm", "q5 circle confirm")
+    if problems:
+        return ["q5 circle confirm", *problems]
+    problems = tap_selector(cdp, '#finishBar [data-action="finishSketch"]', "q5 disc finishSketch")
+    if problems:
+        return ["q5 disc finishSketch", *problems]
+    problems = tap_point(cdp, _q5_tools_point_expr("Extrude (Push/Pull)"), "q5 disc sketchExtrude")
+    if problems:
+        return ["q5 disc sketchExtrude", *problems]
+    edited, edit_err = eval_expr(cdp, edit_expr("sketchDepth", num_text(disc_thickness_mm)))
+    if edit_err or edited != "edited":
+        return [f"q5 disc sketchDepth {edited or edit_err}"]
+    problems = tap_selector(
+        cdp, '[data-action="sketchExtrudeMode"][data-mode="new"]', "q5 disc mode new"
+    )
+    if problems:
+        return ["q5 disc mode new", *problems]
+    problems = tap_selector(cdp, "#sketchConfirm", "q5 disc extrude confirm")
+    if problems:
+        return ["q5 disc extrude confirm", *problems]
+    disc_extruded, wait_problems = wait_hole_state(
+        cdp,
+        origin,
+        lambda s: (
+            int(s.get("bodyCount") or 0) == 2
+            and s.get("occtGate") is True
+            and s.get("gateOcct") == "PASS"
+            and s.get("unitsPass") is True
+        ),
+        PAGE_TIMEOUT_S,
+        "q5 disc extrude 4mm",
+    )
+    if wait_problems or not isinstance(disc_extruded, dict):
+        return ["q5 disc extrude 4mm", *wait_problems[:12]]
+    body_ids = disc_extruded.get("bodyIds") or []
+    if not isinstance(body_ids, list) or len(body_ids) != 2:
+        return [f"q5 disc bodyIds {body_ids!r}"]
+    picked_pair, pick_err = eval_expr(
+        cdp,
+        "(function(){"
+        "var item=document.querySelector('[data-action=\"select\"][data-mode=\"item\"]');"
+        "if(item) item.click();"
+        "var buttons=document.querySelectorAll('[data-action=\"boolean\"][data-op=\"union\"]');"
+        "var picked=null;"
+        "for(var i=0;i<buttons.length;i++){if(!buttons[i].disabled){picked=buttons[i];break;}}"
+        "if(!picked) return 'disabled';"
+        "picked.click();"
+        "return 'clicked';"
+        "})()",
+    )
+    if pick_err or picked_pair != "clicked":
+        return [f"q5 disc union click {picked_pair or pick_err}"]
+    unioned, union_problems = wait_boolean(cdp, origin, "union", PAGE_TIMEOUT_S)
+    if union_problems or not isinstance(unioned, dict):
+        return ["q5 disc union", *union_problems[:12]]
+    want_union_vol = base_vol + math.pi * (disc_dia_mm / 2.0) ** 2 * disc_thickness_mm
+    if (
+        int(unioned.get("bodyCount") or 0) != 1
+        or unioned.get("unitsPass") is not True
+        or unioned.get("occtGate") is not True
+        or not _near(unioned.get("volumeMm3"), want_union_vol, 1.5)
+    ):
+        return [
+            f"q5 union state bodyCount={unioned.get('bodyCount')!r} "
+            f"vol={unioned.get('volumeMm3')!r} want={want_union_vol:.3f}"
+        ]
+
+    # Step 4: Cut 3 CSK holes on Leg A and 3 CSK holes on Leg B (6 CSK holes total).
+    problems = tap_point(cdp, create_point_expr('[data-action="holeTool"]'), "q5 holeTool")
+    if problems:
+        return ["q5 holeTool", *problems]
+    problems = tap_selector(cdp, "#dimToggle", "q5 open dim sheet")
+    if problems:
+        return ["q5 open dim sheet", *problems]
+    for field, val in (
+        ("holeDia", hole_dia_mm),
+        ("holeCsDia", cs_dia_mm),
+        ("holeCsAng", cs_ang_deg),
+    ):
+        edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(val)))
+        if edit_err or edited != "edited":
+            return [f"q5 {field} {edited or edit_err}"]
+
+    hole_specs = [
+        *(("A", (0.0, -1.0, 0.0), uv) for uv in leg_a_holes_uv),
+        *(("B", (-1.0, 0.0, 0.0), uv) for uv in leg_b_holes_uv),
+    ]
+    after_holes: dict[str, Any] | None = None
+    for index, (leg_label, outward, (u_val, v_val)) in enumerate(hole_specs):
+        face_id, face_problems = _q5_find_planar_face(cdp, outward)
+        if face_problems:
+            return [f"q5 hole {index + 1} leg {leg_label}", *face_problems]
+        selected_face, sel_err = eval_expr(
+            cdp,
+            f"Boolean(window.__cadcamSketch && window.__cadcamSketch.tapHoleFace({json.dumps(face_id)}))",
+        )
+        if sel_err or selected_face is not True:
+            return [f"q5 hole {index + 1} tapHoleFace {selected_face or sel_err}"]
+        for field, val in (("holeU", u_val), ("holeV", v_val)):
+            edited, edit_err = eval_expr(cdp, edit_expr(field, num_text(val)))
+            if edit_err or edited != "edited":
+                return [f"q5 hole {index + 1} {field} {edited or edit_err}"]
+        shown, shown_err = eval_expr(cdp, reveal_expr("#holeApply"))
+        if shown_err or shown != "shown":
+            return [f"q5 hole {index + 1} reveal {shown or shown_err}"]
+        problems = tap_selector(cdp, "#holeApply", f"q5 hole {index + 1} cut")
+        if problems:
+            return problems
+        want_count = index + 1
+        after_holes, cut_problems = wait_hole_state(
+            cdp,
+            origin,
+            lambda s, c=want_count: (
+                int(s.get("holeCount") or 0) == c
+                and s.get("occtGate") is True
+                and s.get("gateOcct") == "PASS"
+                and s.get("unitsPass") is True
+                and int(s.get("bodyCount") or 0) == 1
+            ),
+            PAGE_TIMEOUT_S,
+            f"q5 hole {want_count} leg {leg_label}",
+        )
+        if cut_problems or not isinstance(after_holes, dict):
+            return [f"q5 hole {want_count} leg {leg_label}", *cut_problems[:12]]
+        hole_log = after_holes.get("holeLog") or []
+        if not isinstance(hole_log, list) or len(hole_log) != want_count:
+            return [f"q5 holeLog len {len(hole_log) if isinstance(hole_log, list) else hole_log!r}"]
+        entry = hole_log[-1] if isinstance(hole_log[-1], dict) else {}
+        if (
+            entry.get("countersink") is not True
+            or entry.get("depthMode") != "through"
+            or abs(float(entry.get("depthMm") or 0.0) - wall_mm) > 0.25
+            or not (float(entry.get("volumeAfter") or 0.0) < float(entry.get("volumeBefore") or 0.0))
+        ):
+            return [f"q5 hole {want_count} entry {entry!r}"]
+
+    if not isinstance(after_holes, dict):
+        return ["q5 holes missing final state"]
+    if after_holes.get("exportAllowed") is not True or after_holes.get("exportDisabled") is True:
+        return [f"q5 export blocked {after_holes!r}"]
+
+    # Step 6: Export STL and 3MF when Module.gate() allows. Units stay mm. No printer send.
+    for fmt, ext in (("STL", ".stl"), ("3MF", ".3mf")):
+        exported, exp_err = eval_expr(
+            cdp,
+            "(function(){"
+            "window.__cadcamLastDownload=null;"
+            f"var b=document.querySelector('[data-action=\"exportFmt\"][data-fmt=\"{fmt}\"]');"
+            "if(!b) return 'missing';"
+            "b.click();"
+            "return JSON.stringify(window.__cadcamLastDownload||null);"
+            "})()",
+        )
+        if exp_err or not isinstance(exported, str) or not exported.startswith("{"):
+            return [f"q5 export {fmt} {exported or exp_err}"]
+        info = json.loads(exported)
+        if not str(info.get("name") or "").endswith(ext):
+            return [f"q5 export {fmt} name {info!r}"]
+        if int(info.get("byteLength") or 0) <= 84:
+            return [f"q5 export {fmt} bytes {info!r}"]
+        if fmt == "3MF":
+            head = info.get("head") or []
+            if not isinstance(head, list) or len(head) < 2 or head[0] != 80 or head[1] != 75:
+                return [f"q5 export 3MF header {head!r}"]
+    units_text, units_err = eval_expr(
+        cdp,
+        "(function(){var u=document.getElementById('statusUnits');return u?u.textContent.trim():'';})()",
+    )
+    if units_err or units_text != "mm":
+        return [f"q5 statusUnits {units_text or units_err!r}"]
+    print(
+        f"portrait_q5_lbracket: 90deg L ({leg_a_mm:g}x{leg_b_mm:g}x{leg_w_mm:g} mm, wall {wall_mm:g} mm), "
+        f"off-centre disc D={disc_dia_mm:g}x{disc_thickness_mm:g} mm Union, "
+        f"6 CSK holes Cut (3/leg), volume {after_holes.get('volumeMm3'):.3f} mm3, STL+3MF exported, units mm",
+        flush=True,
+    )
+    return []
+
+
 def click_boolean(cdp: Cdp, op: str, timeout: float = 30) -> str:
     expression = (
         "(function(){"
@@ -7790,6 +8174,11 @@ def run(omit: list[str]) -> int:
             if hole_problems:
                 failures.append("portrait_holes")
                 failures.extend(hole_problems[:40])
+        if not failures:
+            q5_problems = run_portrait_q5_lbracket(cdp, origin)
+            if q5_problems:
+                failures.append("portrait_q5_lbracket")
+                failures.extend(q5_problems[:40])
         if not failures:
             delete_found = delete_problems(cdp, origin, desktop=True)
             if delete_found:
