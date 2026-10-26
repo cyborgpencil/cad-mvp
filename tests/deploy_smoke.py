@@ -3582,7 +3582,8 @@ def home_target_ready(aim: dict[str, Any], selected: bool) -> bool:
     target = aim.get("target")
     if not isinstance(target, list) or len(target) != 3:
         return False
-    if any(abs(float(v)) > 1e-6 for v in target):
+    # SC: Home centers selected model else 0,0,0. Only require origin when cleared.
+    if not selected and any(abs(float(v)) > 1e-6 for v in target):
         return False
     count = int(aim.get("selectionCount") or 0)
     sel_ok = count > 0 if selected else count == 0
