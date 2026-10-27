@@ -1325,11 +1325,11 @@ SKETCH_PORTRAIT_EXPR = r"""
     var layerBox = boxOf(document.getElementById('calloutLayer'));
     var vpBox = boxOf(document.getElementById('viewport'));
     var hudBox = boxOf(document.querySelector('.hud'));
-    var homeBox = boxOf(document.getElementById('vcHome'));
+    var homeBox = boxOf(document.querySelector('#cameraShelf [data-action="view"][data-view="top"]'));
     if (layerBox && vpBox) {
       var expectTop = vpBox.top + 8;
       if (hudBox) expectTop = Math.max(expectTop, hudBox.bottom + 8);
-      if (homeBox) expectTop = Math.max(expectTop, homeBox.bottom + 8);
+      if (homeBox && homeBox.bottom <= vpBox.top + vpBox.height / 2) expectTop = Math.max(expectTop, homeBox.bottom + 8);
       if (Math.abs((layerBox.left - vpBox.left) - 8) > 2 || Math.abs(layerBox.top - Math.round(expectTop)) > 2) {
         problems.push(label + ' not docked under hud');
       }
@@ -1339,7 +1339,7 @@ SKETCH_PORTRAIT_EXPR = r"""
         problems.push(label + ' centered over viewport');
       }
     }
-    if (overlaps(layerBox, boxOf(document.getElementById('vcHome')))) problems.push(label + ' covers home');
+    if (overlaps(layerBox, homeBox)) problems.push(label + ' covers home');
     if (overlaps(layerBox, boxOf(document.getElementById('exportBtn')))) problems.push(label + ' covers export');
     if (overlaps(layerBox, boxOf(document.getElementById('statusUnits')))) problems.push(label + ' covers units');
   }
@@ -2324,7 +2324,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Line callout plus');
     var lineSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!lineSheetBox) problems.push('line sheet hidden');
-    var lineKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
+    var lineKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
     for (var lk = 0; lk < lineKeep.length; lk++) {
       var keepEl = document.querySelector(lineKeep[lk]);
       var keepBox = boxOf(keepEl);
@@ -2441,7 +2441,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Arc callout plus');
     var arcSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!arcSheetBox) problems.push('arc sheet hidden');
-    var arcKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
+    var arcKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
     for (var ak = 0; ak < arcKeep.length; ak++) {
       var arcKeepBox = boxOf(document.querySelector(arcKeep[ak]));
       if (arcKeepBox && overlaps(arcSheetBox, arcKeepBox)) problems.push('arc covers ' + arcKeep[ak]);
@@ -2577,7 +2577,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus1'), 'Polygon N plus');
     var polySheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!polySheetBox) problems.push('polygon sheet hidden');
-    var polyKeep = ['.phone-tabbar', '#vcHome', '#exportBtn', '#statusUnits'];
+    var polyKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
     for (var pk = 0; pk < polyKeep.length; pk++) {
       var polyKeepBox = boxOf(document.querySelector(polyKeep[pk]));
       if (polyKeepBox && overlaps(polySheetBox, polyKeepBox)) problems.push('polygon covers ' + polyKeep[pk]);
@@ -2699,7 +2699,7 @@ COVERAGE_EXPR = r"""
   }
   var cubeBox = shown(cube);
   if (!cube || !cubeBox) problems.push('view cube missing');
-  var selectors = ['.vp-bar', '#dimPanel', '#vcHome', '#viewCube', '.statusbar', '#searchDlg'];
+  var selectors = ['.vp-bar', '#dimPanel', '#cameraShelf [data-action="view"][data-view="top"]', '#viewCube', '.statusbar', '#searchDlg'];
   var rects = [];
   var cubeOnCanvas = false;
   for (var s = 0; s < selectors.length; s++) {
@@ -2799,7 +2799,13 @@ NAV_OVERLAP_EXPR = r"""
   }
   var problems = [];
   var cube = shown(document.getElementById('viewCube'));
-  var names = ['.vp-bar', '#dimPanel', '#vcHome', '.topbar'];
+  var names = ['.vp-bar', '#dimPanel', '.topbar'];
+  var topHome = document.querySelector('#cameraShelf [data-action="view"][data-view="top"]');
+  if (!topHome) problems.push('missing #cameraShelf [data-action="view"][data-view="top"]');
+  else if (cube) {
+    var topHomeBox = shown(topHome);
+    if (topHomeBox && hit(cube, topHomeBox)) problems.push('overlaps #cameraShelf [data-action="view"][data-view="top"]');
+  }
   if (!cube) problems.push('view cube missing');
   else {
     if (Math.abs(cube.width - 88) > 1 || Math.abs(cube.height - 88) > 1) {
@@ -3620,7 +3626,7 @@ def home_target_ready(aim: dict[str, Any], selected: bool) -> bool:
 def wait_home_aim(cdp: Cdp, label: str, selected: bool) -> list[str]:
     clicked, err = eval_expr(
         cdp,
-        "(function(){var b=document.getElementById('vcHome');if(!b)return 'missing';b.click();return 'ok';})()",
+        "(function(){var s=document.getElementById('cameraShelf');if(!s)return 'missing';var wasHidden=s.hidden===true;var t=document.getElementById('cameraShelfBtn')||document.querySelector('[data-action=\"cameraShelf\"]');if(wasHidden){if(!t)return 'missing';t.click();}if(s.hidden)return 'missing';var b=s.querySelector('[data-action=\"view\"][data-view=\"top\"]');if(!b)return 'missing';b.click();if(wasHidden&&t&&!s.hidden)t.click();return 'ok';})()",
     )
     if clicked != "ok":
         return [f"{label} home click {clicked or err}"]
