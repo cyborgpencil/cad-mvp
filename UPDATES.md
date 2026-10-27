@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #191 (merged at 24e5fa0): docs - Antigravity panel labels + always-visible chrome brief (tip 9deb589).
 - 2026-10-26 PR #189 (merged at 72b6ef4): feat - Antigravity sketch draw overhaul invent-free retip (tip 84223f4).
 - 2026-10-26 PR #185 (merged at 90d3125): docs - park + Antigravity brief sketch draw overhaul (tip 6ba0614).
 - 2026-10-26 PR #186 (merged at ddce415): feat - Antigravity sketch chrome Create->six ortho + floaters (tip e0fddd8).
