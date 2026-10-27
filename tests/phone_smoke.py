@@ -524,7 +524,14 @@ def _frame_pixels(png: bytes, aim: dict[str, Any], cube: dict[str, Any]) -> list
 
 def _frame_plate(page: Any, cdp: PwCdp) -> list[str]:
     """Home, then an empty tap so the plate, grid, and view cube are unobstructed."""
-    home = deploy_smoke.tap_selector(cdp, "#vcHome", "webkit home")
+    shelf_hidden = bool(page.evaluate("() => { const s = document.getElementById('cameraShelf'); return !s || s.hidden === true; }"))
+    if shelf_hidden:
+        opened_shelf = deploy_smoke.tap_selector(cdp, "#cameraShelfBtn", "webkit camera shelf")
+        if opened_shelf:
+            return opened_shelf
+    home = deploy_smoke.tap_selector(cdp, '#cameraShelf [data-action="view"][data-view="top"]', "webkit home")
+    if not home and shelf_hidden:
+        home = deploy_smoke.tap_selector(cdp, "#cameraShelfBtn", "webkit camera shelf close")
     if home:
         return home
     deadline = time.time() + 4
@@ -666,7 +673,7 @@ def shoot_plate(page: Any, cdp: PwCdp) -> list[str]:
             cap = page.evaluate(
                 """() => {
                   const panel = document.getElementById('dimPanel');
-                  const home = document.getElementById('vcHome');
+                  const home = document.querySelector('#cameraShelf [data-action="view"][data-view="top"]');
                   const vp = document.getElementById('viewport');
                   if (!panel || !home || !vp) return {ok:false, why:'missing'};
                   const pr = panel.getBoundingClientRect();
