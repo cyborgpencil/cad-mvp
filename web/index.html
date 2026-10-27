@@ -10746,9 +10746,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       closeSketchSheet();
     }
     if (!willOpen) return;
+    closeSketchSheet();
+    setSelectionShelfOpen(false);
+    setCameraShelfOpen(false);
     setModifyOpen(false, true);
     state.dimSheetOpen = false;
     state.propSheetOpen = false;
+    if (state.holeTool) state.holeTool = false;
+    if (state.edgeArm) {
+      state.edgeArm = '';
+      paintEdgeChrome();
+    }
     menu.hidden = false;
     const openers = document.querySelectorAll('[data-action="createMenu"]');
     for (let i = 0; i < openers.length; i += 1) {
@@ -10863,9 +10871,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
+    setAboutOpen(false);
     closeCreateMenu();
+    const chooser = document.getElementById('pickChooser');
+    if (chooser) chooser.hidden = true;
+    const chip = document.getElementById('pickFilter');
+    if (chip) chip.setAttribute('aria-expanded', 'false');
     setSelectionShelfOpen(false);
     setCameraShelfOpen(false);
+    setModifyOpen(false, true);
+    closeSketchSheet();
+    if (state.holeTool) state.holeTool = false;
+    if (state.edgeArm) {
+      state.edgeArm = '';
+      paintEdgeChrome();
+    }
+    state.dimSheetOpen = false;
+    state.propSheetOpen = false;
+    paintPrimFields();
     setToolsOpen(true);
     fillSheet('');
     const firstShelf = document.querySelector('#toolsSheet .sheet-shelves button');
@@ -11418,7 +11441,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function openSketchSheet(mode) {
+    setModifyOpen(false, true);
+    setSelectionShelfOpen(false);
+    setCameraShelfOpen(false);
+    state.dimSheetOpen = false;
+    state.propSheetOpen = false;
+    if (state.holeTool) state.holeTool = false;
+    if (state.edgeArm) {
+      state.edgeArm = '';
+      paintEdgeChrome();
+    }
     state.sketchSheetMode = mode;
+    paintPrimFields();
     const sheet = document.getElementById('sketchSheet');
     const rectRow = document.getElementById('sketchRectRow');
     const circRow = document.getElementById('sketchCircRow');
@@ -12586,12 +12620,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const wasTab = state.tab;
     state.tab = tab;
     if (tab === 'sketch') {
+      setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
       state.dimSheetOpen = false;
       state.propSheetOpen = false;
       const chooser = document.getElementById('pickChooser');
       if (chooser) chooser.hidden = true;
+      const chip = document.getElementById('pickFilter');
+      if (chip) chip.setAttribute('aria-expanded', 'false');
+    }
+    if (tab !== 'model') {
+      if (state.holeTool) state.holeTool = false;
+      if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+      }
     }
     if (tab === 'sketch' && state.bodies.length === 0) {
       state.selectedIds = [];
@@ -13227,6 +13271,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'fileMenu') {
       const open = fileMenu.hidden;
       closePopups();
+      if (open) {
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
+      }
       fileMenu.hidden = !open;
       document.getElementById('fileBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
       message = 'File';
@@ -13247,6 +13305,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         setCameraShelfOpen(false);
         setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
       }
       setSelectionShelfOpen(willOpen);
       message = willOpen ? 'Selection' : 'Hide selection';
@@ -13256,6 +13323,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         setSelectionShelfOpen(false);
         setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
       }
       setCameraShelfOpen(willOpen);
       message = willOpen ? 'Show/hide camera' : 'Hide camera';
@@ -13266,6 +13342,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
       }
       setAboutOpen(willOpen);
       message = 'About';
@@ -13282,8 +13367,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const willOpen = !shelf || shelf.hidden === true;
       closeCreateMenu();
       if (willOpen) {
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
         state.dimSheetOpen = false;
         state.propSheetOpen = false;
+      } else if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
       }
       setModifyOpen(willOpen, true);
       paintPrimFields();
@@ -13355,6 +13447,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'holeTool') {
       state.holeTool = !state.holeTool;
       if (state.holeTool) {
+        setModifyOpen(false, true);
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        closeSketchSheet();
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
         state.selection = 'face';
         state.selectedIds = [];
         state.hoverId = null;
@@ -13382,6 +13484,20 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const chooser = document.getElementById('pickChooser');
       const opening = !chooser || chooser.hidden === true;
       closePopups();
+      if (opening) {
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
+      }
       if (chooser && opening) chooser.hidden = false;
       paintPhoneChrome();
       message = 'Pick ' + (phoneApi && typeof phoneApi.filterLabel === 'function'
@@ -13407,6 +13523,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       message = 'Selection: ' + cap(state.selection);
       setHint(message);
     } else if (action === 'primitive') {
+      setModifyOpen(false, true);
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
+      closeSketchSheet();
+      if (state.holeTool) state.holeTool = false;
+      if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+      }
       const rawKind = btn.getAttribute('data-kind');
       const kind = rawKind === 'cylinder' || rawKind === 'disc' ? rawKind : 'box';
       const label = 'Create ' + primitiveLabel(kind);
@@ -13420,6 +13545,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       });
       message = primitiveLabel(kind);
     } else if (action === 'boolean') {
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
+      closeSketchSheet();
+      if (state.holeTool) state.holeTool = false;
+      if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+      }
       const opName = btn.getAttribute('data-op') || '';
       const whichOp = opsApi && typeof opsApi.normalizeBooleanOp === 'function'
         ? opsApi.normalizeBooleanOp(opName)
@@ -13434,6 +13567,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       runUndoable(boolLabel, function () { return applySceneBoolean(opName) === true; });
       return;
     } else if (action === 'armEdge') {
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
+      closeSketchSheet();
+      if (state.holeTool) state.holeTool = false;
+      state.dimSheetOpen = false;
+      state.propSheetOpen = false;
+      paintPrimFields();
       const op = btn.getAttribute('data-op') === 'chamfer' ? 'chamfer' : 'fillet';
       const armed = phoneApi && typeof phoneApi.armEdgeTool === 'function'
         ? phoneApi.armEdgeTool(op)
@@ -13476,6 +13616,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       applyDimStep(btn, false);
       message = btn.getAttribute('data-tool') || 'Dimension';
     } else if (action === 'gizmoMode') {
+      setSelectionShelfOpen(false);
+      setCameraShelfOpen(false);
+      closeSketchSheet();
+      if (state.holeTool) state.holeTool = false;
+      if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+      }
       setGizmoMode(btn.getAttribute('data-mode') || 'move');
       message = state.gizmoMode === 'rotate' ? 'Rotate' : state.gizmoMode === 'scale' ? 'Scale' : 'Move';
       applyLook();
@@ -13487,6 +13635,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         closeCreateMenu();
         setModifyOpen(false, true);
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        closeSketchSheet();
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
         state.propSheetOpen = false;
       }
       paintPrimFields();
@@ -13497,6 +13652,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         closeCreateMenu();
         setModifyOpen(false, true);
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
         state.dimSheetOpen = false;
         if (btn.id === 'propShelfBtn') setDrawer('inspector', true);
       }
@@ -13511,6 +13674,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (state.hudSizeCollapsed !== true) {
           closeCreateMenu();
           setModifyOpen(false, true);
+          setSelectionShelfOpen(false);
+          setCameraShelfOpen(false);
+          closeSketchSheet();
+          if (state.holeTool) state.holeTool = false;
+          if (state.edgeArm) {
+            state.edgeArm = '';
+            paintEdgeChrome();
+          }
         }
         message = state.hudSizeCollapsed ? 'Hide size' : 'Shape size';
       }
@@ -13766,7 +13937,23 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         message = exportBlockText();
         setHint(message);
       } else if (exportMenu) {
-        exportMenu.hidden = !exportMenu.hidden;
+        const willOpen = exportMenu.hidden === true;
+        closePopups();
+        if (willOpen) {
+          setSelectionShelfOpen(false);
+          setCameraShelfOpen(false);
+          setModifyOpen(false, true);
+          closeSketchSheet();
+          if (state.holeTool) state.holeTool = false;
+          if (state.edgeArm) {
+            state.edgeArm = '';
+            paintEdgeChrome();
+          }
+          state.dimSheetOpen = false;
+          state.propSheetOpen = false;
+          paintPrimFields();
+        }
+        exportMenu.hidden = !willOpen;
         message = 'Export';
       }
     } else if (action === 'exportFmt') {
