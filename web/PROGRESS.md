@@ -1,5 +1,7 @@
 # WASM GUI wiring progress
 
+- 2026-10-27 ~10:12 AM MT: item-9 app-wide redundancy pass = verify-only. Sessions 9489eca1 (~9:25 AM MT exit=0, coding_pr_needed=false) and relaunch 01d55e74 (~9:41 AM MT PID 5860) both left zero web/ edits; worktree clean @ main 0c36ba6; no commits/branch; no open impl PR. Brief + digest already on main. Items 4/5/8 on main (#217/#221/#223). Removals beyond 4–8, Create/Modify dest, Isolate/theme/selection/media-split stay TBD. Items 6–7 stay TBD.
+
 ## Checkpoint 1 ├óΓé¼ΓÇ¥ plan
 
 Done. Written here, then the session continued. No OCCT. No `-pthread`. No FixGaps. `mockup/` was not edited. `src/solid`, `src/units`, and `src/model` were not edited. The gate only reads them. See `web/BUILD.md`.
