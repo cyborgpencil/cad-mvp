@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-27
+
+- 2026-10-27 PR #217 (merged at 724db03): web - View popup to top lower tools bar + show/hide (tip 0ce3ba1).
 - 2026-10-27 PR #215 (merged at 9157450): docs - park overnight 4–9 invent-free View/chrome briefs (tip aa9e890).
 - 2026-10-27 PR #212 (merged at cf89656): web - switch tool/menu hides prior tool UI (tip 293bcf2).
 - 2026-10-27 PR #213 (merged at 6d4c384): web - sketch dims follow the angle they represent (tip 07c9382).
