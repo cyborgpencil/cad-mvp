@@ -1813,6 +1813,23 @@
   html[data-sketch-active] #sketchSheet .edge-sheet-row:last-child {
     flex: 0 0 auto;
   }
+  .edge-sheet .sketch-snap-btn {
+    flex: 0 0 auto;
+    min-width: 56px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--tab-bg);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    font-weight: 650;
+  }
+  .edge-sheet .sketch-snap-btn.is-on {
+    background: var(--active-fill);
+    border-color: var(--active-border);
+  }
+  .edge-sheet .sketch-snap-btn[hidden] { display: none !important; }
   .assembly-panel { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
   .part-list { display: flex; flex-direction: column; gap: 4px; }
   .part-row {
@@ -1905,6 +1922,15 @@
     white-space: nowrap;
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  }
+  .line-dim.start-callout {
+    transform: translate(-50%, -140%);
+    border-color: var(--active-border);
+    /* Empty TBD label; keep chip box via existing .line-dim padding. */
+    display: inline-block;
+  }
+  .line-dim.angle-dim {
+    transform: translate(-50%, 65%);
   }
 </style>
 </head>
@@ -2357,6 +2383,7 @@
         </div>
         <div class="edge-sheet-row" id="sketchLineRow" hidden>
           <label class="edge-size" title="Segment length in millimetres"><span>L</span><input id="sketchLineL" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Line length mm"><span>mm</span></label>
+          <label class="edge-size" title="Segment angle in degrees from previous segment or last vertex"><span>∠</span><input id="sketchLineA" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="0" aria-label="Line angle deg"><span>°</span></label>
         </div>
         <div class="edge-sheet-row" id="sketchArcRow" hidden>
           <label class="edge-size" title="Arc radius in millimetres"><span>R</span><input id="sketchArcR" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Arc radius mm"><span>mm</span></label>
@@ -2365,6 +2392,7 @@
           <label class="edge-size" title="Blind distance in millimetres"><span>Blind</span><input id="sketchDepth" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Blind distance mm"><span>mm</span></label>
         </div>
         <div class="edge-sheet-row">
+          <button type="button" class="sketch-snap-btn" id="sketchSnapBtn" data-action="sketchSnap" data-tool="Sketch snap" title="Snap to vertices and edges of the current draw chain" aria-pressed="false">Snap</button>
           <button type="button" class="edge-confirm" id="sketchConfirm" data-action="confirmSketch" data-tool="Sketch confirm" title="Apply the sketch profile or the blind extrude.">Confirm</button>
         </div>
       </div>
@@ -2831,6 +2859,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     sketchProfile: null,
     sketchLineVertices: [],
     sketchArcPoints: [],
+    sketchCircleCenter: null,
+    sketchStartPoint: null,
+    sketchHoverPoint: null,
+    // TBD: snap default on or off (park). Do not bake ON.
+    sketchSnap: false,
+    sketchSnapHit: null,
+    sketchDrawnLoops: [],
     sketchSheetMode: '',
     sketchExtrudeMode: 'new',
     projectDirty: false,
@@ -5542,45 +5577,145 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     host.innerHTML = html;
   }
 
+  function formatAngleDeg(deg) {
+    const n = Number(deg);
+    if (!Number.isFinite(n)) return '0°';
+    const rounded = Math.round(n * 1000) / 1000;
+    const clean = Object.is(rounded, -0) ? 0 : rounded;
+    return formatEntry(clean) + '°';
+  }
+
+  // Angle in degrees measured from the previous segment at the last vertex
+  // (or from the start vertex in the plane frame for the first segment).
+  // FreeCAD sketch-X is not the datum for subsequent segments.
+  function segmentAngleFromPrevDeg(prevPt, startPt, endPt, frame) {
+    if (!startPt || !endPt) return 0;
+    const activeFrame = frame || (state.sketchPlane && state.sketchPlane.frame);
+    if (activeFrame && typeof activeFrame.uvOf === 'function') {
+      const uvStart = activeFrame.uvOf(startPt);
+      const uvEnd = activeFrame.uvOf(endPt);
+      const curDu = uvEnd.u - uvStart.u;
+      const curDv = uvEnd.v - uvStart.v;
+      const curLen = Math.hypot(curDu, curDv);
+      if (!(curLen > 1e-6)) return 0;
+      if (prevPt) {
+        const uvPrev = activeFrame.uvOf(prevPt);
+        const prevDu = uvStart.u - uvPrev.u;
+        const prevDv = uvStart.v - uvPrev.v;
+        const prevLen = Math.hypot(prevDu, prevDv);
+        if (prevLen > 1e-6) {
+          const dot = prevDu * curDu + prevDv * curDv;
+          const cross = prevDu * curDv - prevDv * curDu;
+          let deg = Math.atan2(cross, dot) * 180 / Math.PI;
+          if (Math.abs(deg + 180) < 1e-6) deg = 180;
+          const rounded = Math.round(deg * 1000) / 1000;
+          return Object.is(rounded, -0) ? 0 : rounded;
+        }
+      }
+      let deg0 = Math.atan2(curDv, curDu) * 180 / Math.PI;
+      if (Math.abs(deg0 + 180) < 1e-6) deg0 = 180;
+      const rounded0 = Math.round(deg0 * 1000) / 1000;
+      return Object.is(rounded0, -0) ? 0 : rounded0;
+    }
+    const curDx = endPt[0] - startPt[0];
+    const curDy = endPt[1] - startPt[1];
+    const curDz = endPt[2] - startPt[2];
+    const curL = Math.hypot(curDx, curDy, curDz);
+    if (!(curL > 1e-6)) return 0;
+    if (prevPt) {
+      const prevDx = startPt[0] - prevPt[0];
+      const prevDy = startPt[1] - prevPt[1];
+      const prevDz = startPt[2] - prevPt[2];
+      const prevL = Math.hypot(prevDx, prevDy, prevDz);
+      if (prevL > 1e-6) {
+        const dot3 = prevDx * curDx + prevDy * curDy + prevDz * curDz;
+        const cx = prevDy * curDz - prevDz * curDy;
+        const cy = prevDz * curDx - prevDx * curDz;
+        const cz = prevDx * curDy - prevDy * curDx;
+        const cross3 = Math.hypot(cx, cy, cz);
+        const deg3 = Math.atan2(cross3, dot3) * 180 / Math.PI;
+        return Math.round(deg3 * 1000) / 1000;
+      }
+    }
+    return 0;
+  }
+
+  function activeSketchStartPoint() {
+    if (Array.isArray(state.sketchStartPoint) && state.sketchStartPoint.length >= 3) {
+      return state.sketchStartPoint;
+    }
+    if (state.sketchLineVertices && state.sketchLineVertices.length >= 1 && state.sketchLineVertices[0]) {
+      return state.sketchLineVertices[0];
+    }
+    if (state.sketchArcPoints && state.sketchArcPoints.length >= 1 && state.sketchArcPoints[0]) {
+      return state.sketchArcPoints[0];
+    }
+    if (Array.isArray(state.sketchCircleCenter) && state.sketchCircleCenter.length === 2 && state.sketchPlane && state.sketchPlane.frame) {
+      return state.sketchPlane.frame.point(state.sketchCircleCenter[0], state.sketchCircleCenter[1]);
+    }
+    if (state.sketchProfile && Array.isArray(state.sketchProfile.loop) && state.sketchProfile.loop.length >= 1) {
+      return state.sketchProfile.loop[0];
+    }
+    return null;
+  }
+
+  function appendLoopSegments(segs, loop, closed, frame, liveLast) {
+    if (!Array.isArray(loop) || loop.length < 2) return;
+    const count = closed && loop.length >= 3 ? loop.length : loop.length - 1;
+    for (let i = 0; i < count; i += 1) {
+      const a = loop[i];
+      const b = loop[(i + 1) % loop.length];
+      if (!a || !b) continue;
+      const mm = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      if (!(mm > 1e-6)) continue;
+      const prev = i > 0 ? loop[i - 1] : (closed && loop.length >= 3 ? loop[loop.length - 1] : null);
+      const angleDeg = segmentAngleFromPrevDeg(prev, a, b, frame);
+      segs.push({
+        index: segs.length,
+        a: [a[0], a[1], a[2]],
+        b: [b[0], b[1], b[2]],
+        mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2],
+        mm: mm,
+        angleDeg: angleDeg,
+        angleText: formatAngleDeg(angleDeg),
+        text: formatLength(mm),
+        live: !!(liveLast && i === count - 1)
+      });
+    }
+  }
+
   function lineSegmentsForDimensions() {
     const segs = [];
-    const verts = state.sketchLineVertices;
-    if (verts && verts.length >= 2) {
-      for (let i = 0; i + 1 < verts.length; i += 1) {
-        const a = verts[i];
-        const b = verts[i + 1];
-        if (!a || !b) continue;
-        const mm = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-        if (!(mm > 1e-6)) continue;
-        segs.push({
-          index: i,
-          a: [a[0], a[1], a[2]],
-          b: [b[0], b[1], b[2]],
-          mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2],
-          mm: mm,
-          text: formatLength(mm)
-        });
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    const drawn = state.sketchDrawnLoops;
+    if (Array.isArray(drawn) && drawn.length) {
+      for (let d = 0; d < drawn.length; d += 1) {
+        const item = drawn[d];
+        if (item && Array.isArray(item.loop)) {
+          appendLoopSegments(segs, item.loop, item.closed === true, frame, false);
+        }
       }
-      return segs;
+    }
+    const verts = state.sketchLineVertices;
+    if (verts && verts.length >= 1) {
+      const chain = verts.slice();
+      let hasLive = false;
+      if (Array.isArray(state.sketchHoverPoint) && state.sketchHoverPoint.length >= 3) {
+        const last = chain[chain.length - 1];
+        if (last && Math.hypot(state.sketchHoverPoint[0] - last[0], state.sketchHoverPoint[1] - last[1], state.sketchHoverPoint[2] - last[2]) > 1e-6) {
+          chain.push(state.sketchHoverPoint);
+          hasLive = true;
+        }
+      }
+      if (chain.length >= 2) {
+        appendLoopSegments(segs, chain, false, frame, hasLive);
+        return segs;
+      }
     }
     const profile = state.sketchProfile;
-    if (profile && profile.kind === 'line' && Array.isArray(profile.loop) && profile.loop.length >= 2) {
-      const loop = profile.loop;
-      const count = loop.length >= 3 ? loop.length : 1;
-      for (let i = 0; i < count; i += 1) {
-        const a = loop[i];
-        const b = loop[(i + 1) % loop.length];
-        if (!a || !b) continue;
-        const mm = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-        if (!(mm > 1e-6)) continue;
-        segs.push({
-          index: i,
-          a: [a[0], a[1], a[2]],
-          b: [b[0], b[1], b[2]],
-          mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2],
-          mm: mm,
-          text: formatLength(mm)
-        });
+    if (profile && Array.isArray(profile.loop) && profile.loop.length >= 2 && (!drawn || !drawn.length)) {
+      if (profile.kind === 'line' || profile.kind === 'polygon' || profile.kind === 'rect') {
+        appendLoopSegments(segs, profile.loop, profile.loop.length >= 3, frame, false);
       }
     }
     return segs;
@@ -5590,29 +5725,79 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const host = document.getElementById('lineDimLayer');
     if (!host) return;
     const segs = lineSegmentsForDimensions();
-    if (!segs.length) {
+    // Current draw start only (park). Do not invent callout on committed profiles.
+    const startPt = (Array.isArray(state.sketchStartPoint) && state.sketchStartPoint.length >= 3)
+      ? state.sketchStartPoint
+      : null;
+    const items = [];
+    // Callout is intentional (SC1). Visual/label text stays TBD — no baked Start string.
+    if (startPt) {
+      items.push({
+        id: 'sketchStartCallout',
+        cls: 'line-dim start-callout',
+        kind: 'start',
+        index: 0,
+        mm: 0,
+        deg: 0,
+        pos: startPt,
+        text: ''
+      });
+    }
+    for (let i = 0; i < segs.length; i += 1) {
+      const seg = segs[i];
+      items.push({
+        id: '',
+        cls: 'line-dim',
+        kind: 'length',
+        index: seg.index,
+        mm: seg.mm,
+        deg: seg.angleDeg,
+        pos: seg.mid,
+        text: seg.text
+      });
+      items.push({
+        id: '',
+        cls: 'line-dim angle-dim',
+        kind: 'angle',
+        index: seg.index,
+        mm: seg.mm,
+        deg: seg.angleDeg,
+        pos: seg.a,
+        text: seg.angleText
+      });
+    }
+    if (!items.length) {
       host.hidden = true;
       if (host.firstChild) host.replaceChildren();
       return;
     }
     host.hidden = false;
-    while (host.children.length > segs.length) {
+    while (host.children.length > items.length) {
       host.removeChild(host.lastChild);
     }
-    while (host.children.length < segs.length) {
+    while (host.children.length < items.length) {
       const badge = document.createElement('span');
       badge.className = 'line-dim';
       host.appendChild(badge);
     }
-    for (let i = 0; i < segs.length; i += 1) {
-      const seg = segs[i];
-      const at = screenOfCad(seg.mid);
+    const vw = viewport.clientWidth || 390;
+    const vh = viewport.clientHeight || 500;
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      const at = screenOfCad(item.pos);
       const badge = host.children[i];
-      badge.setAttribute('data-line-index', String(seg.index));
-      badge.setAttribute('data-mm', String(seg.mm));
-      badge.textContent = seg.text;
-      badge.style.left = at.x.toFixed(1) + 'px';
-      badge.style.top = at.y.toFixed(1) + 'px';
+      if (item.id) badge.id = item.id;
+      else badge.removeAttribute('id');
+      badge.className = item.cls;
+      badge.setAttribute('data-kind', item.kind);
+      badge.setAttribute('data-line-index', String(item.index));
+      badge.setAttribute('data-mm', String(item.mm));
+      badge.setAttribute('data-deg', String(item.deg));
+      badge.textContent = item.text;
+      const cx = Math.max(16, Math.min(vw - 16, Number.isFinite(at.x) ? at.x : vw / 2));
+      const cy = Math.max(16, Math.min(vh - 16, Number.isFinite(at.y) ? at.y : vh / 2));
+      badge.style.left = cx.toFixed(1) + 'px';
+      badge.style.top = cy.toFixed(1) + 'px';
     }
   }
 
@@ -7234,6 +7419,34 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function updateHover(ev) {
     if (!selApi || gesture) return;
+    if (
+      state.tab === 'sketch'
+      && state.sketchPlane
+      && state.sketchPlane.frame
+      && state.sketchLineVertices
+      && state.sketchLineVertices.length >= 1
+      && (state.activeTool === 'Line' || state.sketchSheetMode === 'line' || state.activeTool === 'Polygon' || state.sketchSheetMode === 'polygon')
+    ) {
+      const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
+      if (uv && typeof state.sketchPlane.frame.point === 'function') {
+        const snapped = snapToCurrentDrawChain(uv.u, uv.v);
+        state.sketchSnapHit = snapped.snapped ? snapped : null;
+        const pt = state.sketchPlane.frame.point(snapped.u, snapped.v);
+        if (pt && pt.length >= 3) {
+          state.sketchHoverPoint = [Number(pt[0]), Number(pt[1]), Number(pt[2])];
+          const activeEl = document.activeElement;
+          const typingLineField = activeEl && (activeEl.id === 'sketchLineL' || activeEl.id === 'sketchLineA');
+          if (!typingLineField) syncSketchLineField();
+          paintSketchVisuals();
+          paintLineDimensions();
+          paintCallouts();
+        }
+      }
+    } else if (state.sketchHoverPoint) {
+      state.sketchHoverPoint = null;
+      paintSketchVisuals();
+      paintLineDimensions();
+    }
     const handle = pickHandle(ev.clientX, ev.clientY);
     gizmo.setHover(handle || null);
     const next = handle ? null : pickElement(ev.clientX, ev.clientY, ev.pointerType);
@@ -10161,9 +10374,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchLineVertices = [];
     state.sketchArcPoints = [];
     state.sketchCircleCenter = null;
+    state.sketchStartPoint = null;
+    state.sketchHoverPoint = null;
+    state.sketchSnapHit = null;
+    state.sketchDrawnLoops = [];
     state.sketchPlane = null;
     paintSketchStatus();
     paintSketchVisuals();
+    paintLineDimensions();
     paintOriginPicker();
   }
 
@@ -10387,11 +10605,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
     }
     const profile = state.sketchProfile;
-    const activeLineVerts = state.sketchLineVertices && state.sketchLineVertices.length >= 2 ? state.sketchLineVertices : null;
+    let activeLineVerts = null;
+    if (state.sketchLineVertices && state.sketchLineVertices.length >= 1) {
+      const chain = state.sketchLineVertices.slice();
+      if (Array.isArray(state.sketchHoverPoint) && state.sketchHoverPoint.length >= 3) {
+        const last = chain[chain.length - 1];
+        if (last && Math.hypot(state.sketchHoverPoint[0] - last[0], state.sketchHoverPoint[1] - last[1], state.sketchHoverPoint[2] - last[2]) > 1e-6) {
+          chain.push(state.sketchHoverPoint);
+        }
+      }
+      if (chain.length >= 2) activeLineVerts = chain;
+    }
     if (!sketchProfileLine) return;
-    const drawLoop = (profile && profile.loop && profile.loop.length >= 3)
-      ? profile.loop
-      : activeLineVerts;
+    const drawLoop = activeLineVerts
+      ? activeLineVerts
+      : ((profile && profile.loop && profile.loop.length >= 3) ? profile.loop : null);
     if (!drawLoop || drawLoop.length < 2) {
       sketchProfileLine.visible = false;
       return;
@@ -10670,6 +10898,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return note;
   }
 
+  function paintSketchSnapBtn() {
+    const btn = document.getElementById('sketchSnapBtn');
+    if (!btn) return;
+    const on = state.sketchSnap === true;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.hidden = state.sketchSheetMode === 'extrude';
+  }
+
   function openSketchSheet(mode) {
     state.sketchSheetMode = mode;
     const sheet = document.getElementById('sketchSheet');
@@ -10684,24 +10921,33 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (rectRow) rectRow.hidden = mode !== 'rect';
     if (circRow) circRow.hidden = mode !== 'circle';
     if (polyRow) polyRow.hidden = mode !== 'polygon';
-    if (lineRow) lineRow.hidden = mode !== 'line';
+    const hasPolyChain = mode === 'polygon' && state.sketchLineVertices && state.sketchLineVertices.length >= 1;
+    if (lineRow) lineRow.hidden = !(mode === 'line' || hasPolyChain);
     if (arcRow) arcRow.hidden = mode !== 'arc';
     if (depthRow) depthRow.hidden = mode !== 'extrude';
     const modeRow = document.getElementById('sketchModeRow');
     if (modeRow) modeRow.hidden = mode !== 'extrude';
+    paintSketchSnapBtn();
     if (mode === 'polygon') {
       const sidesEl = document.getElementById('sketchPolySides');
       const polyDEl = document.getElementById('sketchPolyD');
       if (sidesEl && !String(sidesEl.value).trim()) sidesEl.value = '6';
       if (polyDEl && !String(polyDEl.value).trim()) polyDEl.value = '10';
     }
-    if (mode === 'line') {
+    if (mode === 'line' || hasPolyChain) {
       const lineLEl = document.getElementById('sketchLineL');
       if (lineLEl && !String(lineLEl.value).trim()) {
         lineLEl.value = '10';
         lineLEl.dataset.autoValue = '10';
       } else if (lineLEl && !lineLEl.dataset.autoValue) {
         lineLEl.dataset.autoValue = String(lineLEl.value).trim();
+      }
+      const lineAEl = document.getElementById('sketchLineA');
+      if (lineAEl && !String(lineAEl.value).trim()) {
+        lineAEl.value = '0';
+        lineAEl.dataset.autoValue = '0';
+      } else if (lineAEl && !lineAEl.dataset.autoValue) {
+        lineAEl.dataset.autoValue = String(lineAEl.value).trim();
       }
     }
     if (mode === 'arc') {
@@ -10823,6 +11069,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sketchLineVertices = [];
     state.sketchArcPoints = [];
     state.sketchCircleCenter = null;
+    state.sketchStartPoint = null;
+    state.sketchHoverPoint = null;
+    state.sketchSnapHit = null;
+    state.sketchDrawnLoops = [];
     state.selectedIds = [];
     state.hoverId = null;
     state.lastError = '';
@@ -10873,6 +11123,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.sketchLineVertices = [];
       state.sketchArcPoints = [];
       state.sketchCircleCenter = null;
+      state.sketchStartPoint = null;
+      state.sketchHoverPoint = null;
+      state.sketchSnapHit = null;
+      state.sketchDrawnLoops = [];
     }
     state.sketchPlane = { faceId: '', bodyId: '', originPlane: key, frame: originPlaneFrame(key) };
     state.selectedIds = [];
@@ -10973,8 +11227,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       sides: fields.sides || 0,
       arcPoints: fields.arcPoints || 0
     };
+    if ((kind === 'line' || kind === 'polygon' || kind === 'rect') && Array.isArray(loop) && loop.length >= 2) {
+      if (!Array.isArray(state.sketchDrawnLoops)) state.sketchDrawnLoops = [];
+      state.sketchDrawnLoops.push({
+        kind: kind,
+        loop: loop.map(function (p) { return [p[0], p[1], p[2]]; }),
+        closed: loop.length >= 3
+      });
+    }
+    state.sketchHoverPoint = null;
     paintSketchStatus();
     applyLook();
+    paintLineDimensions();
     publishGateState();
   }
 
@@ -11011,6 +11275,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return note;
   }
 
+  function placeRectStart(uMm, vMm) {
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (!frame || typeof frame.point !== 'function') return false;
+    const u = Number(uMm);
+    const v = Number(vMm);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
+    const pt = frame.point(u, v);
+    if (!pt || pt.length < 3) return false;
+    state.sketchStartPoint = [Number(pt[0]), Number(pt[1]), Number(pt[2])];
+    if (state.tab === 'sketch') openSketchSheet('rect');
+    paintLineDimensions();
+    publishGateState();
+    return true;
+  }
+
   function placeCircleCenter(uMm, vMm) {
     const u = Number(uMm);
     const v = Number(vMm);
@@ -11019,6 +11298,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return false;
     }
     state.sketchCircleCenter = [u, v];
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (frame && typeof frame.point === 'function') {
+      const pt = frame.point(u, v);
+      if (pt && pt.length >= 3) {
+        state.sketchStartPoint = [Number(pt[0]), Number(pt[1]), Number(pt[2])];
+      }
+    }
+    if (state.tab === 'sketch' && (state.activeTool === 'Circle' || state.sketchSheetMode === 'circle')) {
+      openSketchSheet('circle');
+    }
+    paintLineDimensions();
+    publishGateState();
     return true;
   }
 
@@ -11067,12 +11358,37 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function lastLineSegmentLengthMm() {
     const verts = state.sketchLineVertices;
-    if (!verts || verts.length < 2) return null;
+    if (!verts || !verts.length) return null;
+    if (Array.isArray(state.sketchHoverPoint) && state.sketchHoverPoint.length >= 3) {
+      const last = verts[verts.length - 1];
+      const hoverLen = last ? Math.hypot(state.sketchHoverPoint[0] - last[0], state.sketchHoverPoint[1] - last[1], state.sketchHoverPoint[2] - last[2]) : 0;
+      if (hoverLen > 1e-6) return hoverLen;
+    }
+    if (verts.length < 2) return null;
     const a = verts[verts.length - 2];
     const b = verts[verts.length - 1];
     if (!a || !b) return null;
     const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     return Number.isFinite(len) && len > 0 ? len : null;
+  }
+
+  function lastLineSegmentAngleDeg() {
+    const verts = state.sketchLineVertices;
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (!verts || !verts.length) return null;
+    if (Array.isArray(state.sketchHoverPoint) && state.sketchHoverPoint.length >= 3) {
+      const last = verts[verts.length - 1];
+      const hoverLen = last ? Math.hypot(state.sketchHoverPoint[0] - last[0], state.sketchHoverPoint[1] - last[1], state.sketchHoverPoint[2] - last[2]) : 0;
+      if (hoverLen > 1e-6) {
+        const prev = verts.length >= 2 ? verts[verts.length - 2] : null;
+        return segmentAngleFromPrevDeg(prev, last, state.sketchHoverPoint, frame);
+      }
+    }
+    if (verts.length < 2) return null;
+    const a = verts[verts.length - 2];
+    const b = verts[verts.length - 1];
+    const prev = verts.length >= 3 ? verts[verts.length - 3] : null;
+    return segmentAngleFromPrevDeg(prev, a, b, frame);
   }
 
   function validLineFields() {
@@ -11082,18 +11398,41 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function syncSketchLineField() {
     const el = document.getElementById('sketchLineL');
-    if (!el) return;
-    const len = lastLineSegmentLengthMm();
-    if (len != null && len > 0) {
-      el.value = formatEntry(len);
+    if (el) {
+      const len = lastLineSegmentLengthMm();
+      if (len != null && len > 0) {
+        el.value = formatEntry(len);
+      }
+      el.dataset.autoValue = String(el.value).trim();
     }
-    el.dataset.autoValue = String(el.value).trim();
+    const angEl = document.getElementById('sketchLineA');
+    if (angEl) {
+      const deg = lastLineSegmentAngleDeg();
+      if (deg != null && Number.isFinite(deg)) {
+        angEl.value = formatEntry(deg);
+      }
+      angEl.dataset.autoValue = String(angEl.value).trim();
+    }
   }
 
   function applySketchLineLength(lengthMm) {
     const target = Number(lengthMm);
     if (!Number.isFinite(target) || !(target > 0)) return false;
     const verts = state.sketchLineVertices;
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (verts && verts.length === 1 && frame && typeof frame.uvOf === 'function' && typeof frame.point === 'function') {
+      const startUv = frame.uvOf(verts[0]);
+      const angEl = document.getElementById('sketchLineA');
+      const rawAng = angEl ? Number(String(angEl.value).trim().replace(',', '.')) : 0;
+      const rad = (Number.isFinite(rawAng) ? rawAng : 0) * Math.PI / 180;
+      state.sketchHoverPoint = frame.point(
+        startUv.u + Math.cos(rad) * target,
+        startUv.v + Math.sin(rad) * target
+      );
+      const el1 = document.getElementById('sketchLineL');
+      if (el1) el1.dataset.autoValue = String(el1.value).trim();
+      return true;
+    }
     if (!verts || verts.length < 2) return false;
     const a = verts[verts.length - 2];
     const b = verts[verts.length - 1];
@@ -11103,7 +11442,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     let dz = b[2] - a[2];
     let cur = Math.hypot(dx, dy, dz);
     if (!(cur > 1e-9)) {
-      const frame = state.sketchPlane && state.sketchPlane.frame;
       const u = frame && frame.u ? frame.u : [1, 0, 0];
       dx = u[0];
       dy = u[1];
@@ -11121,6 +11459,124 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return true;
   }
 
+  function applySketchLineAngle(angleDeg) {
+    const deg = Number(angleDeg);
+    if (!Number.isFinite(deg)) return false;
+    const verts = state.sketchLineVertices;
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    if (!frame || typeof frame.uvOf !== 'function' || typeof frame.point !== 'function') return false;
+    const rad = deg * Math.PI / 180;
+    if (verts && verts.length === 1) {
+      const startUv = frame.uvOf(verts[0]);
+      const len = readField('sketchLineL') || 10;
+      state.sketchHoverPoint = frame.point(
+        startUv.u + Math.cos(rad) * len,
+        startUv.v + Math.sin(rad) * len
+      );
+      const angEl1 = document.getElementById('sketchLineA');
+      if (angEl1) angEl1.dataset.autoValue = String(angEl1.value).trim();
+      return true;
+    }
+    if (!verts || verts.length < 2) return false;
+    const a = verts[verts.length - 2];
+    const b = verts[verts.length - 1];
+    if (!a || !b) return false;
+    const uvA = frame.uvOf(a);
+    const uvB = frame.uvOf(b);
+    let segLen = Math.hypot(uvB.u - uvA.u, uvB.v - uvA.v);
+    if (!(segLen > 1e-9)) segLen = readField('sketchLineL') || 10;
+    let refU = 1;
+    let refV = 0;
+    if (verts.length >= 3) {
+      const uvPrev = frame.uvOf(verts[verts.length - 3]);
+      const pdu = uvA.u - uvPrev.u;
+      const pdv = uvA.v - uvPrev.v;
+      const plen = Math.hypot(pdu, pdv);
+      if (plen > 1e-9) {
+        refU = pdu / plen;
+        refV = pdv / plen;
+      }
+    }
+    const dirU = refU * Math.cos(rad) - refV * Math.sin(rad);
+    const dirV = refU * Math.sin(rad) + refV * Math.cos(rad);
+    const nextPt = frame.point(uvA.u + dirU * segLen, uvA.v + dirV * segLen);
+    verts[verts.length - 1] = [Number(nextPt[0]), Number(nextPt[1]), Number(nextPt[2])];
+    const angEl = document.getElementById('sketchLineA');
+    if (angEl) angEl.dataset.autoValue = String(angEl.value).trim();
+    return true;
+  }
+
+  // Snap v1: vertices and edges of the current draw chain only.
+  function snapToCurrentDrawChain(uMm, vMm) {
+    const u = Number(uMm);
+    const v = Number(vMm);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+      return { u: 0, v: 0, snapped: false, kind: '', index: -1 };
+    }
+    if (state.sketchSnap !== true) {
+      return { u: u, v: v, snapped: false, kind: '', index: -1 };
+    }
+    const frame = state.sketchPlane && state.sketchPlane.frame;
+    const verts = state.sketchLineVertices;
+    if (!frame || typeof frame.uvOf !== 'function' || !Array.isArray(verts) || !verts.length) {
+      return { u: u, v: v, snapped: false, kind: '', index: -1 };
+    }
+    // Reuse existing SNAP_MM team lock (viewport-selection). Do not invent 1.5.
+    const tolMm = (viewApi && viewApi.SNAP_MM) ? Number(viewApi.SNAP_MM) : 1;
+    const uvVerts = [];
+    for (let i = 0; i < verts.length; i += 1) {
+      uvVerts.push(frame.uvOf(verts[i]));
+    }
+    let bestVertI = -1;
+    let bestVertD = tolMm;
+    for (let i = 0; i < uvVerts.length; i += 1) {
+      if (uvVerts.length >= 2 && i === uvVerts.length - 1) continue;
+      const d = Math.hypot(u - uvVerts[i].u, v - uvVerts[i].v);
+      if (d <= bestVertD) {
+        bestVertD = d;
+        bestVertI = i;
+      }
+    }
+    if (bestVertI >= 0) {
+      return {
+        u: uvVerts[bestVertI].u,
+        v: uvVerts[bestVertI].v,
+        snapped: true,
+        kind: 'vertex',
+        index: bestVertI
+      };
+    }
+    let bestEdge = null;
+    let bestEdgeD = tolMm;
+    for (let i = 0; i + 1 < uvVerts.length; i += 1) {
+      const a = uvVerts[i];
+      const b = uvVerts[i + 1];
+      const dx = b.u - a.u;
+      const dy = b.v - a.v;
+      const len2 = dx * dx + dy * dy;
+      if (!(len2 > 1e-9)) continue;
+      let t = ((u - a.u) * dx + (v - a.v) * dy) / len2;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+      const projU = a.u + dx * t;
+      const projV = a.v + dy * t;
+      if (i === uvVerts.length - 2 && Math.hypot(projU - b.u, projV - b.v) <= tolMm) continue;
+      const d = Math.hypot(u - projU, v - projV);
+      if (d <= bestEdgeD) {
+        bestEdgeD = d;
+        bestEdge = {
+          u: projU,
+          v: projV,
+          snapped: true,
+          kind: 'edge',
+          index: i
+        };
+      }
+    }
+    if (bestEdge) return bestEdge;
+    return { u: u, v: v, snapped: false, kind: '', index: -1 };
+  }
+
   function refreshLineConfirm() {
     if (state.sketchSheetMode !== 'line') return;
     const confirmBtn = document.getElementById('sketchConfirm');
@@ -11132,21 +11588,41 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   }
 
-  // Click on the sketch plane, in millimetres. The line tool and a plane
-  // must already be set. Returns false otherwise. Does not snap.
+  // Click on the sketch plane, in millimetres. Snaps to current draw chain
+  // vertices and edges when floating-panel snap is enabled. Opens the
+  // floating end-adjust panel on the start tap.
   function placeLineVertex(uMm, vMm) {
-    if (state.activeTool !== 'Line' && state.sketchSheetMode !== 'line') return false;
+    const isPoly = state.activeTool === 'Polygon' || state.sketchSheetMode === 'polygon';
+    const isLine = state.activeTool === 'Line' || state.sketchSheetMode === 'line';
+    if (!isLine && !isPoly) return false;
     const frame = state.sketchPlane && state.sketchPlane.frame;
     if (!frame || typeof frame.point !== 'function') return false;
-    const u = Number(uMm);
-    const v = Number(vMm);
-    if (!Number.isFinite(u) || !Number.isFinite(v)) return false;
-    const point = frame.point(u, v);
+    const rawU = Number(uMm);
+    const rawV = Number(vMm);
+    if (!Number.isFinite(rawU) || !Number.isFinite(rawV)) return false;
+    const snapped = snapToCurrentDrawChain(rawU, rawV);
+    state.sketchSnapHit = snapped.snapped ? snapped : null;
+    const point = frame.point(snapped.u, snapped.v);
     if (!point || point.length < 3) return false;
     if (!state.sketchLineVertices) state.sketchLineVertices = [];
-    state.sketchLineVertices.push([Number(point[0]), Number(point[1]), Number(point[2])]);
+    const cadPt = [Number(point[0]), Number(point[1]), Number(point[2])];
+    state.sketchLineVertices.push(cadPt);
+    state.sketchHoverPoint = null;
+    if (state.sketchLineVertices.length === 1) {
+      state.sketchStartPoint = cadPt.slice();
+    }
+    const sheet = document.getElementById('sketchSheet');
+    const targetMode = isPoly ? 'polygon' : 'line';
+    if (!sheet || sheet.hidden || state.sketchSheetMode !== targetMode) {
+      openSketchSheet(targetMode);
+    } else {
+      const lineRow = document.getElementById('sketchLineRow');
+      if (lineRow) lineRow.hidden = false;
+      paintSketchSnapBtn();
+    }
     if (state.sketchLineVertices.length >= 2) syncSketchLineField();
     refreshLineConfirm();
+    refreshPolygonConfirm();
     paintSketchVisuals();
     paintLineDimensions();
     paintCallouts();
@@ -11200,6 +11676,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (lineEl && String(lineEl.value).trim() !== String(lineEl.dataset.autoValue || '').trim()) {
       applySketchLineLength(typedLen);
     }
+    const angleEl = document.getElementById('sketchLineA');
+    const typedAngle = readField('sketchLineA');
+    if (angleEl && typedAngle != null && String(angleEl.value).trim() !== String(angleEl.dataset.autoValue || '').trim()) {
+      applySketchLineAngle(typedAngle);
+    }
     if (!oc || !opsApi || typeof opsApi.makeLineFace !== 'function') {
       const why = 'FAIL: the line was rejected.';
       setHint(why);
@@ -11218,6 +11699,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < verts.length; i += 1) loop.push([verts[i][0], verts[i][1], verts[i][2]]);
     storeSketchProfile('line', shape, loop, { lengthMm: finalLen, widthMm: 0, diameterMm: 0 });
     state.sketchLineVertices = [];
+    state.sketchHoverPoint = null;
     closeSketchSheet();
     const note = 'Line';
     setHint(note);
@@ -11318,9 +11800,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const point = frame.point(u, v);
     if (!point || point.length < 3) return false;
     if (!state.sketchArcPoints || state.sketchArcPoints.length >= 3) state.sketchArcPoints = [];
-    state.sketchArcPoints.push([Number(point[0]), Number(point[1]), Number(point[2])]);
+    const cadPt = [Number(point[0]), Number(point[1]), Number(point[2])];
+    state.sketchArcPoints.push(cadPt);
+    if (state.sketchArcPoints.length === 1) {
+      state.sketchStartPoint = cadPt.slice();
+      const sheet = document.getElementById('sketchSheet');
+      if (!sheet || sheet.hidden || state.sketchSheetMode !== 'arc') {
+        openSketchSheet('arc');
+      }
+    }
     if (state.sketchArcPoints.length === 3) syncSketchArcField();
     refreshArcConfirm();
+    paintSketchVisuals();
+    paintLineDimensions();
     paintCallouts();
     publishGateState();
     return true;
@@ -11418,6 +11910,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function refreshPolygonConfirm() {
     if (state.sketchSheetMode !== 'polygon') return;
     const confirmBtn = document.getElementById('sketchConfirm');
+    // TBD: polygon chain-close (park). Do not bake close-at-N; Confirm uses regular N-gon fields.
     const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && validPolygonFields();
     if (confirmBtn) {
       confirmBtn.disabled = !enabled;
@@ -11427,7 +11920,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function commitSketchPolygon() {
     const plane = state.sketchPlane;
-    if (!plane || !plane.frame || !oc || !opsApi || typeof opsApi.makePolygonFace !== 'function') {
+    if (!plane || !plane.frame) {
+      const why = sketchPlanePrompt() || 'Tap a planar face';
+      setHint(why);
+      return why;
+    }
+    // TBD: polygon chain-close (park). Draw-chain verts stay for snap targets; Confirm uses regular N-gon fields only.
+    state.sketchLineVertices = state.sketchLineVertices || [];
+    if (!oc || !opsApi || typeof opsApi.makePolygonFace !== 'function') {
       const why = sketchPlanePrompt() || 'Tap a planar face';
       setHint(why);
       return why;
@@ -11458,6 +11958,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       diameterMm: diameterMm,
       sides: sides
     });
+    state.sketchLineVertices = [];
+    state.sketchHoverPoint = null;
     closeSketchSheet();
     const note = 'Polygon ' + sides + ' × Ø' + diameterMm + ' mm';
     setHint(note);
@@ -12588,6 +13090,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'sketchLine') {
       setTab('sketch');
       state.activeTool = 'Line';
+      state.sketchLineVertices = [];
+      state.sketchHoverPoint = null;
       openSketchSheet('line');
       message = state.sketchPlane ? 'Line' : sketchPlanePrompt();
       setHint(message);
@@ -12596,6 +13100,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setTab('sketch');
       state.activeTool = 'Arc';
       state.sketchArcPoints = [];
+      state.sketchLineVertices = [];
+      state.sketchHoverPoint = null;
       openSketchSheet('arc');
       message = state.sketchPlane ? 'Arc' : sketchPlanePrompt();
       setHint(message);
@@ -12603,6 +13109,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'sketchPolygon') {
       setTab('sketch');
       state.activeTool = 'Polygon';
+      state.sketchLineVertices = [];
+      state.sketchHoverPoint = null;
       openSketchSheet('polygon');
       message = state.sketchPlane ? 'Polygon' : sketchPlanePrompt();
       setHint(message);
@@ -12610,6 +13118,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'sketchRect') {
       setTab('sketch');
       state.activeTool = 'Rectangle';
+      state.sketchLineVertices = [];
+      state.sketchHoverPoint = null;
       openSketchSheet('rect');
       message = state.sketchPlane ? 'Rectangle' : sketchPlanePrompt();
       setHint(message);
@@ -12617,6 +13127,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'sketchCircle') {
       setTab('sketch');
       state.activeTool = 'Circle';
+      state.sketchLineVertices = [];
+      state.sketchHoverPoint = null;
       openSketchSheet('circle');
       message = state.sketchPlane ? 'Circle' : sketchPlanePrompt();
       setHint(message);
@@ -12664,6 +13176,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       paintExtrudeModes();
       message = state.sketchExtrudeMode === 'join' ? 'Join' : state.sketchExtrudeMode === 'cut' ? 'Cut' : 'New';
       setHint(message);
+    } else if (action === 'sketchSnap') {
+      state.sketchSnap = state.sketchSnap === false;
+      paintSketchSnapBtn();
+      publishGateState();
+      message = state.sketchSnap ? 'Snap on' : 'Snap off';
+      setHint(message);
+      return;
     } else if (action === 'confirmSketch') {
       if (state.sketchSheetMode === 'circle') message = commitSketchCircle();
       else if (state.sketchSheetMode === 'extrude') message = commitSketchExtrude();
@@ -13858,7 +14377,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     noteFrameSample();
     document.getElementById('viewLabel').textContent = viewCaption();
     paintOrderBadges();
-    paintLineDimensions();
+    // Skip during view-cube ease: dim DOM work pushed headless snap frames past 500 ms (deploy_smoke).
+    if (!cubeSnap) paintLineDimensions();
   }
 
   function noteFrameSample() {
@@ -14207,7 +14727,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           return;
         }
         if (state.tab === 'sketch' && !(ev.shiftKey || ev.ctrlKey || ev.metaKey)) {
-          if ((state.activeTool === 'Line' || state.sketchSheetMode === 'line') && state.sketchPlane && state.sketchPlane.frame) {
+          if (
+            (state.activeTool === 'Line' || state.sketchSheetMode === 'line' || state.activeTool === 'Polygon' || state.sketchSheetMode === 'polygon')
+            && state.sketchPlane && state.sketchPlane.frame
+          ) {
             const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
             if (uv) placeLineVertex(uv.u, uv.v);
             gesture = null;
@@ -14221,12 +14744,36 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             pinch = null;
             return;
           }
+          if ((state.activeTool === 'Circle' || state.sketchSheetMode === 'circle') && state.sketchPlane && state.sketchPlane.frame) {
+            const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
+            if (uv) placeCircleCenter(uv.u, uv.v);
+            gesture = null;
+            pinch = null;
+            return;
+          }
+          if ((state.activeTool === 'Rectangle' || state.sketchSheetMode === 'rect') && state.sketchPlane && state.sketchPlane.frame) {
+            const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
+            if (uv) placeRectStart(uv.u, uv.v);
+            gesture = null;
+            pinch = null;
+            return;
+          }
           const faceId = pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
-          if (faceId) {
+          if (faceId && (!state.sketchPlane || faceId !== state.sketchPlane.faceId)) {
             setSketchPlane(faceId);
             gesture = null;
             pinch = null;
             return;
+          }
+          if (state.sketchPlane && state.sketchPlane.frame) {
+            const uv = sketchPlaneHitUv(ev.clientX, ev.clientY);
+            if (uv) {
+              state.activeTool = 'Line';
+              placeLineVertex(uv.u, uv.v);
+              gesture = null;
+              pinch = null;
+              return;
+            }
           }
         }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
@@ -14353,10 +14900,28 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const sketchLineInput = document.getElementById('sketchLineL');
   if (sketchLineInput) {
     sketchLineInput.addEventListener('input', function () {
-      if (state.sketchSheetMode === 'line') {
+      if (state.sketchSheetMode === 'line' || state.sketchSheetMode === 'polygon') {
         const val = readField('sketchLineL');
         if (val != null && val > 0) applySketchLineLength(val);
         refreshLineConfirm();
+        refreshPolygonConfirm();
+        paintSketchVisuals();
+        paintLineDimensions();
+        paintCallouts();
+        publishGateState();
+      }
+    });
+  }
+  const sketchLineAngleInput = document.getElementById('sketchLineA');
+  if (sketchLineAngleInput) {
+    sketchLineAngleInput.addEventListener('input', function () {
+      if (state.sketchSheetMode === 'line' || state.sketchSheetMode === 'polygon') {
+        const val = readField('sketchLineA');
+        if (val != null && Number.isFinite(val)) applySketchLineAngle(val);
+        refreshLineConfirm();
+        refreshPolygonConfirm();
+        paintSketchVisuals();
+        paintLineDimensions();
         paintCallouts();
         publishGateState();
       }
@@ -14717,8 +15282,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return out;
     },
     placeCircleCenter: function (uMm, vMm) { return placeCircleCenter(uMm, vMm); },
+    placeRectStart: function (uMm, vMm) { return placeRectStart(uMm, vMm); },
     placeLineVertex: function (uMm, vMm) { return placeLineVertex(uMm, vMm); },
     placeArcPoint: function (uMm, vMm) { return placeArcPoint(uMm, vMm); },
+    snapToCurrentDrawChain: function (uMm, vMm) { return snapToCurrentDrawChain(uMm, vMm); },
+    setSketchSnap: function (on) {
+      state.sketchSnap = on === true;
+      paintSketchSnapBtn();
+      publishGateState();
+      return state.sketchSnap;
+    },
     state: function () {
       const frame = state.sketchPlane && state.sketchPlane.frame;
       const bar = document.getElementById('originPlanes');
@@ -14737,6 +15310,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         }
         bounds = { kind: body.kind || '', min: min, max: max };
       }
+      const startPt = activeSketchStartPoint();
       return {
         tab: state.tab,
         plane: !!state.sketchPlane,
@@ -14753,10 +15327,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         highlight: selectionHighlighted(),
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
+        startCallout: startPt ? startPt.slice() : null,
+        sketchSnap: state.sketchSnap === true,
+        lastSnap: state.sketchSnapHit ? Object.assign({}, state.sketchSnapHit) : null,
         lineVertices: lineVertexCount(),
         lineLengthMm: state.sketchProfile && state.sketchProfile.kind === 'line'
           ? (state.sketchProfile.lengthMm || 0)
           : (lastLineSegmentLengthMm() || readField('sketchLineL') || 0),
+        lineAngleDeg: lastLineSegmentAngleDeg() != null
+          ? lastLineSegmentAngleDeg()
+          : (readField('sketchLineA') || 0),
         lineDimensions: lineSegmentsForDimensions(),
         arcPoints: arcPointCount(),
         arcRadiusMm: state.sketchProfile && state.sketchProfile.kind === 'arc'
