@@ -1926,6 +1926,8 @@
   .line-dim.start-callout {
     transform: translate(-50%, -140%);
     border-color: var(--active-border);
+    /* Empty TBD label; keep chip box via existing .line-dim padding. */
+    display: inline-block;
   }
   .line-dim.angle-dim {
     transform: translate(-50%, 65%);
@@ -2390,7 +2392,7 @@
           <label class="edge-size" title="Blind distance in millimetres"><span>Blind</span><input id="sketchDepth" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="10" aria-label="Blind distance mm"><span>mm</span></label>
         </div>
         <div class="edge-sheet-row">
-          <button type="button" class="sketch-snap-btn is-on" id="sketchSnapBtn" data-action="sketchSnap" data-tool="Sketch snap" title="Snap to vertices and edges of the current draw chain" aria-pressed="true">Snap</button>
+          <button type="button" class="sketch-snap-btn" id="sketchSnapBtn" data-action="sketchSnap" data-tool="Sketch snap" title="Snap to vertices and edges of the current draw chain" aria-pressed="false">Snap</button>
           <button type="button" class="edge-confirm" id="sketchConfirm" data-action="confirmSketch" data-tool="Sketch confirm" title="Apply the sketch profile or the blind extrude.">Confirm</button>
         </div>
       </div>
@@ -2860,7 +2862,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     sketchCircleCenter: null,
     sketchStartPoint: null,
     sketchHoverPoint: null,
-    sketchSnap: true,
+    // TBD: snap default on or off (park). Do not bake ON.
+    sketchSnap: false,
     sketchSnapHit: null,
     sketchDrawnLoops: [],
     sketchSheetMode: '',
@@ -5722,8 +5725,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const host = document.getElementById('lineDimLayer');
     if (!host) return;
     const segs = lineSegmentsForDimensions();
-    const startPt = activeSketchStartPoint();
+    // Current draw start only (park). Do not invent callout on committed profiles.
+    const startPt = (Array.isArray(state.sketchStartPoint) && state.sketchStartPoint.length >= 3)
+      ? state.sketchStartPoint
+      : null;
     const items = [];
+    // Callout is intentional (SC1). Visual/label text stays TBD — no baked Start string.
     if (startPt) {
       items.push({
         id: 'sketchStartCallout',
@@ -5733,7 +5740,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         mm: 0,
         deg: 0,
         pos: startPt,
-        text: 'Start'
+        text: ''
       });
     }
     for (let i = 0; i < segs.length; i += 1) {
@@ -11514,7 +11521,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!frame || typeof frame.uvOf !== 'function' || !Array.isArray(verts) || !verts.length) {
       return { u: u, v: v, snapped: false, kind: '', index: -1 };
     }
-    const tolMm = 1.5;
+    // Reuse existing SNAP_MM team lock (viewport-selection). Do not invent 1.5.
+    const tolMm = (viewApi && viewApi.SNAP_MM) ? Number(viewApi.SNAP_MM) : 1;
     const uvVerts = [];
     for (let i = 0; i < verts.length; i += 1) {
       uvVerts.push(frame.uvOf(verts[i]));
@@ -11902,9 +11910,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function refreshPolygonConfirm() {
     if (state.sketchSheetMode !== 'polygon') return;
     const confirmBtn = document.getElementById('sketchConfirm');
-    const clicks = state.sketchLineVertices ? state.sketchLineVertices.length : 0;
-    const chainReady = clicks >= 3 && validLineFields();
-    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && (chainReady || validPolygonFields());
+    // TBD: polygon chain-close (park). Do not bake close-at-N; Confirm uses regular N-gon fields.
+    const enabled = !!(state.sketchPlane && state.sketchPlane.frame) && validPolygonFields();
     if (confirmBtn) {
       confirmBtn.disabled = !enabled;
       confirmBtn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
@@ -11918,37 +11925,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(why);
       return why;
     }
-    const verts = state.sketchLineVertices || [];
-    if (verts.length >= 3 && oc && opsApi && typeof opsApi.makeLineFace === 'function') {
-      const lineEl = document.getElementById('sketchLineL');
-      const typedLen = readField('sketchLineL');
-      if (typedLen > 0 && lineEl && String(lineEl.value).trim() !== String(lineEl.dataset.autoValue || '').trim()) {
-        applySketchLineLength(typedLen);
-      }
-      const angleEl = document.getElementById('sketchLineA');
-      const typedAngle = readField('sketchLineA');
-      if (angleEl && typedAngle != null && String(angleEl.value).trim() !== String(angleEl.dataset.autoValue || '').trim()) {
-        applySketchLineAngle(typedAngle);
-      }
-      const chainShape = opsApi.makeLineFace(oc, verts);
-      if (chainShape) {
-        const finalLen = lastLineSegmentLengthMm() || typedLen || 0;
-        const loop = [];
-        for (let i = 0; i < verts.length; i += 1) loop.push([verts[i][0], verts[i][1], verts[i][2]]);
-        storeSketchProfile('polygon', chainShape, loop, {
-          lengthMm: finalLen,
-          diameterMm: readPolygonDiameterMm() || 0,
-          sides: verts.length
-        });
-        state.sketchLineVertices = [];
-        state.sketchHoverPoint = null;
-        closeSketchSheet();
-        const note = 'Polygon ' + verts.length;
-        setHint(note);
-        toast(note);
-        return note;
-      }
-    }
+    // TBD: polygon chain-close (park). Draw-chain verts stay for snap targets; Confirm uses regular N-gon fields only.
+    state.sketchLineVertices = state.sketchLineVertices || [];
     if (!oc || !opsApi || typeof opsApi.makePolygonFace !== 'function') {
       const why = sketchPlanePrompt() || 'Tap a planar face';
       setHint(why);
@@ -14399,7 +14377,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     noteFrameSample();
     document.getElementById('viewLabel').textContent = viewCaption();
     paintOrderBadges();
-    paintLineDimensions();
+    // Skip during view-cube ease: dim DOM work pushed headless snap frames past 500 ms (deploy_smoke).
+    if (!cubeSnap) paintLineDimensions();
   }
 
   function noteFrameSample() {
@@ -15308,7 +15287,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     placeArcPoint: function (uMm, vMm) { return placeArcPoint(uMm, vMm); },
     snapToCurrentDrawChain: function (uMm, vMm) { return snapToCurrentDrawChain(uMm, vMm); },
     setSketchSnap: function (on) {
-      state.sketchSnap = on !== false;
+      state.sketchSnap = on === true;
       paintSketchSnapBtn();
       publishGateState();
       return state.sketchSnap;
@@ -15349,7 +15328,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         profile: state.sketchProfile ? state.sketchProfile.kind : '',
         closed: !!(state.sketchProfile && state.sketchProfile.closed),
         startCallout: startPt ? startPt.slice() : null,
-        sketchSnap: state.sketchSnap !== false,
+        sketchSnap: state.sketchSnap === true,
         lastSnap: state.sketchSnapHit ? Object.assign({}, state.sketchSnapHit) : null,
         lineVertices: lineVertexCount(),
         lineLengthMm: state.sketchProfile && state.sketchProfile.kind === 'line'
