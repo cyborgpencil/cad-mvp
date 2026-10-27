@@ -2046,6 +2046,18 @@
       <button type="button" class="tool-btn" id="cameraShelfBtn" data-action="cameraShelf" data-tool="Show/hide camera" title="Show/hide camera" aria-label="Show/hide camera" aria-controls="cameraShelf" aria-expanded="false">
         <svg class="ico"><use href="#i-eye"></use></svg><span>Camera</span>
       </button>
+      <div class="menu-wrap">
+        <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="Info" aria-haspopup="true" aria-expanded="false">Info</button>
+        <div class="menu" role="region" aria-label="About" hidden>
+          <h2 class="panel-h">About</h2>
+          <p class="fine">Version: <b>TBD</b></p>
+          <div class="muted">Theme</div>
+          <div class="units" role="group" aria-label="Theme">
+            <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
+            <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tools panel" data-panel="sketch" role="region" aria-label="Sketch" hidden>
       <h2 class="panel-h">Sketch</h2>
@@ -2457,6 +2469,15 @@
         <h2 class="panel-h">Lists</h2>
         <p class="fine side-note">TBD. Vertex maps, the tool pipe, and statistics are not in this build. The Items list above is the part list.</p>
       </div>
+      <div class="prop" role="region" aria-label="About" hidden>
+        <h2 class="panel-h">About</h2>
+        <p class="fine">Version: <b>TBD</b></p>
+        <div class="muted">Theme</div>
+        <div class="units" role="group" aria-label="Theme">
+          <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
+          <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
+        </div>
+      </div>
     </aside>
     <div class="backdrop" id="backdrop" hidden></div>
   </div>
@@ -2790,9 +2811,60 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     'Mesh repair': { title: 'Mesh repair', sub: 'repair_manifold' }
   };
 
+  // Freeze snapshot on main b0dd4df (research/modo-theme-gui-tokens.md at f38aa66).
+  // Chief lock (2026-10-26 ~10:36 PM MT): Active chrome = B (muted-teal active via
+  // existing --accent #14756e; orange is selection only).
+  // Modo factory selection orange hex, viewport gradient gray stops, app version string,
+  // and exact placement of info / About / switcher stay TBD.
+  const DEFAULT_THEME_TOKENS = {
+    '--bg': '#0e2429',
+    '--top': '#10262b',
+    '--panel': '#123038',
+    '--panel-2': '#163840',
+    '--ribbon': '#14343c',
+    '--field': '#0e2429',
+    '--status': '#10262b',
+    '--finish': '#123830',
+    '--ink': '#f4fbfb',
+    '--muted': '#d5e4e2',
+    '--tab-ink': '#d5e4e2',
+    '--tab-bg': '#1a3036',
+    '--tab-track': '#0e2429',
+    '--tab-active': '#1b454c',
+    '--line': 'rgba(244, 251, 251, 0.14)',
+    '--line-strong': '#0a181c',
+    '--accent': '#14756e',
+    '--accent-dim': 'color-mix(in srgb, var(--accent) 32%, transparent)',
+    '--hover-color': '#d7f4ff',
+    '--sel-color': '#ff4fd8',
+    '--axis-x': '#ff2d2d',
+    '--axis-y': '#2ee66b',
+    '--axis-z': '#3d7eff',
+    '--handle-hover': '#efe07a',
+    '--centre-color': '#d8dde6',
+    '--active-fill': '#5b3cc4',
+    '--active-border': '#ffffff',
+    '--measure': '#fff8e8',
+    '--pass': '#c8f5df',
+    '--pass-bg': '#0e3d2c',
+    '--fail': '#ffd0d0',
+    '--fail-bg': '#3f1518',
+    '--banner-bg': '#12343a',
+    '--banner-ink': '#f4fbfb',
+    '--disabled-bg': '#2a454a',
+    '--disabled-ink': '#d5e4e2',
+    '--shadow': '0 10px 28px rgba(0, 0, 0, 0.45)',
+    '--top-h': 'calc(48px + env(safe-area-inset-top, 0px))',
+    '--status-h': '44px',
+    '--phone-tabs-h': 'calc(56px + env(safe-area-inset-bottom, 0px))'
+  };
+  const DEFAULT_VIEWPORT_BACKGROUND = 'radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%)';
+
   const state = {
     tab: 'model',
     unit: 'mm',
+    theme: 'default',
+    aboutOpen: false,
     selection: 'item',
     selectedIds: [],
     phoneMulti: false,
@@ -10183,6 +10255,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       selectionShelfOpen: !!(selectionShelf && selectionShelf.hidden !== true),
       cameraShelfOpen: !!(cameraShelf && cameraShelf.hidden !== true),
       toolsOpen: !!(toolsSheet && toolsSheet.hidden !== true),
+      theme: state.theme || 'default',
+      aboutOpen: state.aboutOpen === true,
       selectionMode: state.selection,
       selectionCount: state.selectedIds.length,
       selectedIds: state.selectedIds.slice(),
@@ -10451,6 +10525,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     markPressed('[data-action="select"]', 'mode', state.selection);
     markPressed('[data-action="display"]', 'mode', state.display);
     markPressed('[data-action="units"]', 'unit', state.unit);
+    markPressed('[data-action="theme"]', 'theme', state.theme || 'default');
     markPressed('[data-action="gizmoMode"]', 'mode', state.gizmoMode || 'move');
     const toggles = [
       ['[data-action="section"]', state.section],
@@ -10503,11 +10578,54 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     else inspector.removeAttribute('inert');
   }
 
+  function applyThemeTokens(themeName) {
+    const next = themeName === 'modo' ? 'modo' : 'default';
+    state.theme = next;
+    document.documentElement.setAttribute('data-theme', next);
+    const rootStyle = document.documentElement.style;
+    const keys = Object.keys(DEFAULT_THEME_TOKENS);
+    for (let i = 0; i < keys.length; i += 1) {
+      const k = keys[i];
+      rootStyle.setProperty(k, DEFAULT_THEME_TOKENS[k]);
+    }
+    if (next === 'modo') {
+      // Active chrome = B: muted-teal active via existing --accent (#14756e); orange is selection only.
+      // Modo factory selection orange hex (--sel-color) stays TBD; do not invent a stand-in hex.
+      rootStyle.setProperty('--active-fill', DEFAULT_THEME_TOKENS['--accent']);
+    }
+    if (viewport) {
+      viewport.style.background = DEFAULT_VIEWPORT_BACKGROUND;
+    }
+    markPressed('[data-action="theme"]', 'theme', next);
+  }
+
+  function setTheme(themeName) {
+    applyThemeTokens(themeName);
+    applyLook();
+    publishGateState();
+  }
+
+  function setAboutOpen(open) {
+    const next = open === true;
+    state.aboutOpen = next;
+    const buttons = document.querySelectorAll('[data-action="aboutMenu"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', next ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', next);
+      const wrap = buttons[i].closest('.menu-wrap');
+      const menu = wrap ? wrap.querySelector('.menu') : null;
+      if (menu) menu.hidden = !next;
+    }
+    publishGateState();
+  }
+
   function setDrawer(which, open) {
     const browserOpen = !!(open && which === 'browser');
     const inspectorOpen = !!(open && which === 'inspector');
     document.getElementById('browser').classList.toggle('open', browserOpen);
     document.getElementById('inspector').classList.toggle('open', inspectorOpen);
+    const inspAbout = document.querySelector('#inspector [aria-label="About"]');
+    if (inspAbout) inspAbout.hidden = !inspectorOpen;
     const buttons = document.querySelectorAll('[data-action="drawer"]');
     for (let i = 0; i < buttons.length; i += 1) {
       const target = buttons[i].getAttribute('data-drawer');
@@ -10524,6 +10642,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function closeDrawers() {
     document.getElementById('browser').classList.remove('open');
     document.getElementById('inspector').classList.remove('open');
+    const inspAbout = document.querySelector('#inspector [aria-label="About"]');
+    if (inspAbout) inspAbout.hidden = true;
     const buttons = document.querySelectorAll('[data-action="drawer"]');
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', 'false');
@@ -10666,6 +10786,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     searchDlg.hidden = true;
     if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
     setToolsOpen(false);
+    setAboutOpen(false);
     closeCreateMenu();
     const chooser = document.getElementById('pickChooser');
     if (chooser) chooser.hidden = true;
@@ -10902,6 +11023,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.documentElement.toggleAttribute('data-sketch-plane', hasPlane);
     const sketchPanel = document.querySelector('[data-panel="sketch"]');
     if (sketchPanel) sketchPanel.hidden = !hasPlane;
+    const aboutBtn = document.querySelector('.topbar-shelves [data-action="aboutMenu"]');
+    const aboutWrap = aboutBtn ? aboutBtn.closest('.menu-wrap') : null;
+    if (aboutWrap) aboutWrap.hidden = sketchActive;
+    if (sketchActive && state.aboutOpen) setAboutOpen(false);
     if (!bar) return;
     const show = sketchActive && !state.sketchPlane;
     bar.hidden = !show;
@@ -13077,7 +13202,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter' && action !== 'aboutMenu' && action !== 'theme') {
       closePopups();
     }
     if (action === 'tab') {
@@ -13122,6 +13247,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       setCameraShelfOpen(willOpen);
       message = willOpen ? 'Show/hide camera' : 'Hide camera';
+    } else if (action === 'aboutMenu') {
+      const willOpen = !state.aboutOpen;
+      closePopups();
+      if (willOpen) {
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        setModifyOpen(false, true);
+      }
+      setAboutOpen(willOpen);
+      message = 'About';
+    } else if (action === 'theme') {
+      const want = btn.getAttribute('data-theme') === 'modo' ? 'modo' : 'default';
+      setTheme(want);
+      message = 'Theme: ' + state.theme;
+      setHint(message);
     } else if (action === 'createMenu') {
       toggleCreateMenu(btn);
       message = 'Create';
@@ -15856,6 +15996,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   };
 
+  applyThemeTokens('default');
   onViewportChange();
   syncFromKernel();
   spherical.radius = fitDistance();
