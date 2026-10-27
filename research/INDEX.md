@@ -30,6 +30,13 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 ## Notes
 
 Update research here first. Propagate only confirmed changes into MVP or vision docs. Keep documents consistent with the project-organizer skill (`../.grok/skills/project-organizer/`). Note: a "document-upgrader" skill was referenced here but does not exist in the repo.
+- [overnight-10-rebuild-screenshots-note.md](overnight-10-rebuild-screenshots-note.md): overnight item 10 — rebuild L-bracket + truck with latest tools, Orca plates, morning screenshots; note only; no `prompts/` chrome brief (2026-10-27 ~1:15 AM MT).
+- [overnight-app-wide-redundancy-pass.md](overnight-app-wide-redundancy-pass.md): overnight item 9 — app-wide redundancy pass; tip `c713ce4` duplicate inventory only; no punch list (2026-10-27 ~1:15 AM MT).
+- [overnight-consolidate-remove-bottom-bar.md](overnight-consolidate-remove-bottom-bar.md): overnight item 8 — consolidate then remove the bottom Create/Modify bar; units bar bottommost; Chief lock 2026-10-27 ~1:17 AM MT; relocate only if an existing path fits, else TBD (2026-10-27 ~1:15 AM MT).
+- [overnight-sketch-clutter-verts-edit.md](overnight-sketch-clutter-verts-edit.md): overnight item 7 — less sketch create clutter, brighter verts/edges, edit+delete, flesh sketches+solids; unspecified clauses stay TBD; no punch list (2026-10-27 ~1:15 AM MT).
+- [overnight-view-cube-double-tap-iso.md](overnight-view-cube-double-tap-iso.md): overnight item 6 — view-cube double-tap iso↔non-iso stretch; Chief lock drops the Home double-tap; stretch and non-iso meanings stay TBD (2026-10-27 ~1:15 AM MT).
+- [overnight-home-onto-top-view-control.md](overnight-home-onto-top-view-control.md): overnight item 5 — move Home off viewport mid-top `#vcHome` onto the top-view control; destination node unnamed on tip `c713ce4` (2026-10-27 ~1:15 AM MT).
+- [overnight-view-popup-top-tools-bar.md](overnight-view-popup-top-tools-bar.md): overnight item 4 — View popup into the top lower tools bar with its own show/hide icon; tip `c713ce4` View UI is `.vp-bar`, not `.topbar-shelves` (2026-10-27 ~1:15 AM MT).
 - [overnight-sketch-dims-follow-angle.md](overnight-sketch-dims-follow-angle.md): overnight item 3 — sketch dims follow the angle they represent; tip `529df18` `.line-dim` badges stay screen-upright (CSS translate only, no rotate); flip, offset, chip kinds, and the implementation path stay TBD (2026-10-27 ~1:10 AM MT).
 - [gui/ui-layout-review.md](gui/ui-layout-review.md): Fusion, Onshape, FreeCAD and Blender UI layout review with tab-layout takeaways (2026-10-21).
 - [gui/usability-checks.md](gui/usability-checks.md): pass/fail GUI checklist for touch targets, shortcuts, the Export gate, layout, the Repair tab and rotation (2026-10-21).

@@ -254,6 +254,43 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, ~10
   - **Gap on tip `529df18`:** `.line-dim` badges are screen-upright. CSS is `translate` only (no `rotate`). `paintLineDimensions()` sets `left` / `top` from `screenOfCad`. `data-deg` is stored and is not used for orientation.
   - **Status: discuss / parked.** Overnight 1-2 tip-matched on main ([#208](https://github.com/cyborgpencil/cad-mvp/pull/208) @ `c713ce4`). Pilot holds the item-3 `agy` until this brief tip-matches on main. This bullet does not close the earlier **Dimensions** park ("which dimension style" stays **TBD**). It does not re-spec `prompts/antigravity-sketch-dims.md` or the sketch draw overhaul.
   - **TBD:** length vs angle vs both (default invent-free read: both kinds already in `paintLineDimensions`, excluding the empty start-callout); screen-space vs sketch-plane rotation; flip / keep-readable; offset (pixels or mm); `data-deg` / CSS `rotate()` / SVG text; phone vs desktop; `#calloutLayer` / Dimension tool focus beyond orientation; vendor parallel-dim matrices Dig did not source. Do not invent flip, offset, or control ids.
+- **View popup → top lower tools bar, own show/hide icon**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (4), via CAD Chief. Invent-free. Digest `research/overnight-view-popup-top-tools-bar.md`. Brief `prompts/antigravity-view-popup-top-tools-bar.md`.
+  - **Gap on tip `c713ce4`:** View tools are the viewport `.vp-bar` (`aria-label="View"`), not `.topbar-shelves`. No own show/hide icon (unlike `#selectionShelfBtn` / `#cameraShelfBtn`).
+  - **Status: discuss / parked.** Pilot holds the coding `agy` until overnight item 1 Tool Search exit and related tip-matches land, and until this brief tip-matches. This bullet does not start an `agy`.
+  - **TBD:** whether “View popup” is only the Analyze+Display `vp-bar` or also part of `#cameraShelf` Views; control id / icon / label; whether the viewport `.vp-bar` is removed, emptied, or kept; phone vs desktop; sketch-active hide; whether Measure/Section/Display stay together. Do not invent those.
+- **Move Home from viewport mid-top onto top-view control**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (5), via CAD Chief. Invent-free. Digest `research/overnight-home-onto-top-view-control.md`. Brief `prompts/antigravity-home-onto-top-view-control.md`.
+  - **Gap on tip `c713ce4`:** `#vcHome` is still mid-top in `#viewport`. “Top-view control” is not named among the tip Home / Iso / Top controls.
+  - Chief lock on item 6 (2026-10-27 ~1:17 AM MT via 3T · Chief): Home leaves the view cube. This item is that move. The lock does not name the destination node.
+  - **Status: discuss / parked.** Same Pilot hold as item 4. This bullet does not start an `agy`.
+  - **TBD:** which tip node is the top-view control; whether the Camera-shelf Home stays, merges, or is the destination; phone layout after `#vcHome` leaves. Do not invent a destination. Home aim stays the View cube park (selected model, else 0,0,0). Home key binding stays TBD in that park.
+- **View-cube double-tap stretch iso↔non-iso**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (6), via CAD Chief. Digest `research/overnight-view-cube-double-tap-iso.md`. Brief `prompts/antigravity-view-cube-double-tap-iso.md`.
+  - **Chief lock, 2026-10-27 ~1:17 AM MT via 3T · Chief:** Erik wins. View-cube double-tap = iso↔non-iso stretch. Home leaves the cube and moves to the top-view control (item 5). Drop the cube’s current Home double-tap binding. Do not invent stretch timing or pixel sizes. What “stretch” means and what “non-iso” means stay **TBD** where Dig left them.
+  - **Gap on tip `c713ce4`:** cube double-tap still runs `goView('home')`. No iso↔non-iso stretch on that gesture.
+  - **Status: discuss / parked.** Same Pilot hold. This bullet does not start an `agy`. It supersedes the cube double-tap Home-iso success cite for this gesture only. Adjacent swipe and viewport (non-cube) double-tap fit stay as already locked.
+  - **TBD:** stretch meaning; non-iso meaning; phone vs desktop. Triple-tap stays TBD and out of scope.
+- **Sketch: less create clutter; brighter verts/edges; edit+delete; flesh sketches+solids**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (7), via CAD Chief. Invent-free. Digest `research/overnight-sketch-clutter-verts-edit.md`. Brief `prompts/antigravity-sketch-clutter-verts-edit.md`.
+  - **Gaps on tip `c713ce4` (Dig):** Create clutter is only partly reduced (Constrain hides while sketch-active; Draw and Modify remain). No all-component brighter verts/edges. Edit+delete and “flesh” are unspecified.
+  - **Status: discuss / parked.** Same Pilot hold. This bullet does not start an `agy`. No invented punch list.
+  - **TBD:** which create tools stay vs hide/move; brightness metric / hex; what edit means; what delete means; what “flesh” adds. Modo orange selection hex stays out of scope.
+- **Consolidate then remove bottom bar; units bar = bottommost**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (8), via CAD Chief. Digest `research/overnight-consolidate-remove-bottom-bar.md`. Brief `prompts/antigravity-consolidate-remove-bottom-bar.md`.
+  - **Chief lock, 2026-10-27 ~1:17 AM MT via 3T · Chief:** Erik’s newer overnight wins over the always-on bottom Create/Modify lock. Consolidate, then remove that bottom bar. The units bar is bottommost. Relocate Create/Modify only if an existing path already fits; otherwise the destination stays **TBD**. Do not invent a new home.
+  - **Gap on tip `c713ce4`:** Create/Modify bottom bars (`.desk-bottom` and `.phone-tabbar` Create/Modify) are still present. The units footer is `footer.statusbar` (`aria-label="Units"`).
+  - **Status: discuss / parked.** Same Pilot hold. This bullet does not start an `agy`. This supersedes the always-visible “very bottom (Modify / Create)” stay-on rule, and the sketch-overhaul “very bottom stays on” rule, for that bottom bar only. Very top and the tools menu bar are not retargeted here.
+  - **TBD:** which existing path fits Create/Modify, if any; phone-tabbar fate beyond Create/Modify; whether the viewport `.vp-bar` is in this item (item 4 owns that View popup). Do not invent a home.
+- **App-wide redundancy pass**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (9), via CAD Chief. Invent-free. Digest `research/overnight-app-wide-redundancy-pass.md`. Brief `prompts/antigravity-app-wide-redundancy-pass.md`.
+  - Dig inventoried tip duplicates only. That inventory is not a punch list. Removals beyond items 4–8 need an Erik or Chief cite or they stay **TBD**.
+  - **Status: discuss / parked.** Same Pilot hold. This bullet does not start an `agy`. No invented punch list.
+  - **TBD:** ordered punch list and which duplicate wins; whether phone/desktop media-split pairs count; whether Isolate / theme / selection pairs are in scope.
+- **Rebuild L-bracket + truck → Orca plates + morning screenshots**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (10), via CAD Chief. Note only: `research/overnight-10-rebuild-screenshots-note.md`. **No** Antigravity coding prompt. Not a `web/` chrome brief.
+  - **Status: discuss / parked** as a verification / rebuild / plate / screenshot note. This bullet does not start an `agy`.
+  - **TBD:** truck sizes (Q5 park: truck is discuss/spec until sizes exist); which “latest tools” build / tip / Pages URL; Orca plate settings; who captures morning screenshots and where they are filed. Do not invent sizes. Cite the Q5 L-bracket park when executing.
 
 ## Success Criteria
 
