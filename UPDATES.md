@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #197 (merged at 58611e2): web - X-ray select-through gated on existing display state (tip d0514a4).
 - 2026-10-26 PR #195 (merged at aa635b6): prompts - Antigravity X-ray select-through brief (tip dd5a5c7).
 - 2026-10-26 PR #193 (merged at b99f5f9): web - panel labels + always-visible chrome shelves (tip 146cb9e).
 - 2026-10-26 PR #191 (merged at 24e5fa0): docs - Antigravity panel labels + always-visible chrome brief (tip 9deb589).
