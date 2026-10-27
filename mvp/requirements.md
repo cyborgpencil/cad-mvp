@@ -241,11 +241,22 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, ~10
   - **Dims stay while drawing (Erik).** Keep angles and dimensions on the sketch as drawn. They are not only a temporary preview that vanishes. Confirm model (preview HUD vs committed driving dims) stays **TBD**, as under floating end adjust.
   - **Top and bottom stay on (Erik, same message).** While sketching, the very top (tree + filename) and the very bottom (Modify / Create) stay visible. Do not hide them for this overhaul. The earlier Arc-dialog TBD on the chrome park is superseded by this overhaul; do not invent Arc-specific behavior here.
   - **TBD (do not invent):** control ids; pixel sizes; hex colors; icon art; phone vs desktop layout; touch vs pointer layout.
+<<<<<<< HEAD
 - **Sketch dims follow the angle they represent**
   - Erik overnight ~11:55 PM MT 2026-10-26, item (3), via Chief. Team decides; invent-free. Digest `research/overnight-sketch-dims-follow-angle.md`. Brief `prompts/antigravity-sketch-dims-follow-angle.md`.
   - **Gap on tip `529df18`:** `.line-dim` badges are screen-upright. CSS is `translate` only (no `rotate`). `paintLineDimensions()` sets `left` / `top` from `screenOfCad`. `data-deg` is stored and is not used for orientation.
   - **Status: discuss / parked.** Pilot holds the item-3 `agy` until this brief tip-matches **and** overnight 1–2 ([#208](https://github.com/cyborgpencil/cad-mvp/pull/208)) tip-match on main. #208 is still open. This bullet does not put items 1–2 on main. It does not close the earlier **Dimensions** park (“which dimension style” stays **TBD**). It does not re-spec `prompts/antigravity-sketch-dims.md` or the sketch draw overhaul.
   - **TBD:** length vs angle vs both (default invent-free read: both kinds already in `paintLineDimensions`, excluding the empty start-callout); screen-space vs sketch-plane rotation; flip / keep-readable; offset (pixels or mm); `data-deg` / CSS `rotate()` / SVG text; phone vs desktop; `#calloutLayer` / Dimension tool focus beyond orientation; vendor parallel-dim matrices Dig did not source. Do not invent flip, offset, or control ids.
+=======
+- **Tool Search exit**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (1), via Chief. Dig hard bar at tip `e805614` (`research/overnight-tool-search-exit.md`; brief `prompts/antigravity-tool-search-exit.md`): Escape, outside click, `#searchBtn` toggle, and pick-to-close already exist. No in-dialog Cancel. Hotkey `X` opens only.
+  - **Status: discuss / parked.**
+  - **TBD:** `X` toggle; in-dialog Cancel; Escape scope; requirements park vs brief-only. This bullet records the gap. It does not close those TBDs.
+- **Switch tool/menu → hide prior tool UI**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (2). Extends P4 (`prompts/p4-tool-shelf-show-hide.md`) and always-visible chrome (very top, tools menu bar, very bottom stay; everything else show/hide). Digest `research/overnight-switch-hide-prior-tool-ui.md`. Brief `prompts/antigravity-switch-hide-prior-tool-ui.md`.
+  - **Status: discuss / parked.**
+  - **TBD:** panel-id taxonomy; Tool Search vs sketch-edge-modify hide matrix; cancel-vs-hide. Do not invent that matrix here.
+>>>>>>> origin/main
 
 ## Success Criteria
 
