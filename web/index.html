@@ -2815,8 +2815,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   // Freeze snapshot on main b0dd4df (research/modo-theme-gui-tokens.md at f38aa66).
   // Chief lock (2026-10-26 ~10:36 PM MT): Active chrome = B (muted-teal active via
   // existing --accent #14756e; orange is selection only).
-  // Modo factory selection orange hex, viewport gradient gray stops, app version string,
-  // and exact placement of info / About / switcher stay TBD.
+  // Erik approved (2026-10-27): Modo factory --sel-color #ffa829 and --hover-color #8cb4c7.
+  // Exact placement of info / About / switcher stays TBD.
   const DEFAULT_THEME_TOKENS = {
     '--bg': '#0e2429',
     '--top': '#10262b',
@@ -10613,8 +10613,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (next === 'modo') {
       // Active chrome = B: muted-teal active via existing --accent (#14756e); orange is selection only.
-      // Modo factory selection orange hex (--sel-color) stays TBD; do not invent a stand-in hex.
+      // Erik approved (2026-10-27): Modo factory --sel-color #ffa829 and --hover-color #8cb4c7.
       rootStyle.setProperty('--active-fill', DEFAULT_THEME_TOKENS['--accent']);
+      rootStyle.setProperty('--sel-color', '#ffa829');
+      rootStyle.setProperty('--hover-color', '#8cb4c7');
     }
     if (viewport) {
       viewport.style.background = DEFAULT_VIEWPORT_BACKGROUND;
