@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-27
+- 2026-10-27 PR #210 (merged at 1b8a57f): docs - overnight sketch dims follow-angle brief (tip 0c2710c).
 - 2026-10-27 PR #208 (merged at c713ce4): docs - overnight Tool Search exit + hide-prior tool UI briefs (tip 389e33f).
 - 2026-10-27 PR #206 (merged at e805614): web - Default + Modo theme switcher (Active chrome B), About/version (tip 9b758b4).
 
