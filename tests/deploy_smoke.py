@@ -959,6 +959,16 @@ def create_point_expr(selector: str) -> str:
         "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
         "opener=openers[i];break;"
         "}"
+        "if(!opener){"
+        "var tm=document.querySelector('[data-action=\"toolsMenu\"]');"
+        "if(tm)tm.click();"
+        "for(var j=0;j<openers.length;j++){"
+        "var st2=getComputedStyle(openers[j]);"
+        "var r2=openers[j].getBoundingClientRect();"
+        "if(st2.display==='none'||st2.visibility==='hidden'||r2.width<1||r2.height<1) continue;"
+        "opener=openers[j];break;"
+        "}"
+        "}"
         "if(!opener) return 'missing create';"
         "opener.click();"
         "}"
@@ -1160,6 +1170,14 @@ CREATE_MENU_EXPR = r"""
       if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
       return openers[n];
     }
+    var tm = document.querySelector('[data-action="toolsMenu"]');
+    if (tm) tm.click();
+    for (var m = 0; m < openers.length; m++) {
+      var st2 = getComputedStyle(openers[m]);
+      var r2 = openers[m].getBoundingClientRect();
+      if (st2.display === 'none' || st2.visibility === 'hidden' || r2.width < 1 || r2.height < 1) continue;
+      return openers[m];
+    }
     return null;
   }
   var opener = visibleOpener();
@@ -1270,6 +1288,15 @@ SKETCH_PORTRAIT_EXPR = r"""
     var nodes = document.querySelectorAll(selector);
     for (var i = 0; i < nodes.length; i++) {
       if (boxOf(nodes[i])) { nodes[i].click(); return true; }
+    }
+    if (selector === '[data-action="createMenu"]') {
+      var tm = document.querySelector('[data-action="toolsMenu"]');
+      if (tm && boxOf(tm)) {
+        tm.click();
+        for (var j = 0; j < nodes.length; j++) {
+          if (boxOf(nodes[j])) { nodes[j].click(); return true; }
+        }
+      }
     }
     return false;
   }
@@ -1794,6 +1821,15 @@ ORIGIN_PLANE_EXPR = r"""
     var nodes = document.querySelectorAll(selector);
     for (var i = 0; i < nodes.length; i++) {
       if (boxOf(nodes[i])) { nodes[i].click(); return true; }
+    }
+    if (selector === '[data-action="createMenu"]') {
+      var tm = document.querySelector('[data-action="toolsMenu"]');
+      if (tm && boxOf(tm)) {
+        tm.click();
+        for (var j = 0; j < nodes.length; j++) {
+          if (boxOf(nodes[j])) { nodes[j].click(); return true; }
+        }
+      }
     }
     return false;
   }
@@ -4011,7 +4047,7 @@ WRAPUP_PHONE_EXPR = r"""
   var redo = tab('redo');
   var create = tab('createMenu');
   var modify = tab('modifyShelf');
-  [['undo', undo], ['redo', redo], ['create', create], ['modify', modify]].forEach(function (pair) {
+  [['undo', undo], ['redo', redo]].forEach(function (pair) {
     if (!pair[1]) problems.push(pair[0] + ' missing');
     else if (pair[1].r.width + 0.5 < 44 || pair[1].r.height + 0.5 < 44) {
       problems.push(pair[0] + ' ' + pair[1].r.width.toFixed(1) + 'x' + pair[1].r.height.toFixed(1));
@@ -4019,21 +4055,10 @@ WRAPUP_PHONE_EXPR = r"""
       problems.push(pair[0] + ' outside ' + window.innerWidth);
     }
   });
-  if (bar && create && modify) {
-    var buttons = bar.querySelectorAll('button');
-    var ci = -1;
-    var mi = -1;
-    for (var n = 0; n < buttons.length; n++) {
-      if (buttons[n] === create.el) ci = n;
-      if (buttons[n] === modify.el) mi = n;
-    }
-    if (mi !== ci + 1) problems.push('modify index ' + mi + ' create ' + ci);
-  }
+  if (create) problems.push('phone create still present');
+  if (modify) problems.push('phone modify still present');
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
-  if (modify && modify.el.getAttribute('aria-expanded') !== 'false') {
-    problems.push('phone aria ' + (modify ? modify.el.getAttribute('aria-expanded') : ''));
-  }
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
   return JSON.stringify(problems);
 })()
@@ -4046,17 +4071,7 @@ WRAPUP_DESK_EXPR = r"""
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not collapsed at load');
   var btn = document.getElementById('modifyDesktop');
-  if (!btn) problems.push('missing modifyDesktop');
-  else {
-    var st = getComputedStyle(btn);
-    var rect = btn.getBoundingClientRect();
-    if (st.display === 'none' || rect.width < 1) problems.push('modifyDesktop hidden');
-    if (rect.width + 0.5 < 44 || rect.height + 0.5 < 44) {
-      problems.push('modifyDesktop ' + rect.width.toFixed(1) + 'x' + rect.height.toFixed(1));
-    }
-    if (btn.getAttribute('aria-expanded') !== 'false') problems.push('desktop aria ' + btn.getAttribute('aria-expanded'));
-    if (btn.getAttribute('aria-controls') !== 'modifyShelf') problems.push('aria-controls ' + btn.getAttribute('aria-controls'));
-  }
+  if (btn) problems.push('modifyDesktop still present');
   if (shelf) {
     shelf.hidden = false;
     var cs = getComputedStyle(shelf);
@@ -4077,12 +4092,7 @@ WRAPUP_DESK_EXPR = r"""
     shelf.hidden = true;
   }
   var desk = document.querySelector('.desk-bottom');
-  var kids = desk ? desk.querySelectorAll('button') : [];
-  if (kids.length < 2) problems.push('desk buttons ' + kids.length);
-  else {
-    if (kids[0].getAttribute('data-action') !== 'createMenu') problems.push('desk first ' + kids[0].getAttribute('data-action'));
-    if (kids[1].id !== 'modifyDesktop') problems.push('desk second ' + kids[1].id);
-  }
+  if (desk) problems.push('desk-bottom still present');
   var phone = document.querySelector('.phone-tabbar');
   if (phone && getComputedStyle(phone).display !== 'none') problems.push('phone bar shown on desktop');
   var menu = document.getElementById('createMenu');
@@ -4166,8 +4176,7 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         cdp,
         "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));"
         "var shelf=document.getElementById('modifyShelf');"
-        "var btn=document.getElementById('modifyDesktop');"
-        "return JSON.stringify({hidden:!!(shelf&&shelf.hidden),aria:btn?btn.getAttribute('aria-expanded'):''});})()",
+        "return JSON.stringify({hidden:!!(shelf&&shelf.hidden)});})()",
     )
     if esc_err or not isinstance(escaped, str):
         return [f"wrapup esc {escaped or esc_err}"]
@@ -4175,29 +4184,14 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         esc_state = json.loads(escaped)
     except json.JSONDecodeError:
         return [f"wrapup esc {escaped}"]
-    if esc_state.get("hidden") is not True or esc_state.get("aria") != "false":
+    if esc_state.get("hidden") is not True:
         return [f"wrapup esc left the shelf open {esc_state}"]
-    toggled, toggle_err = eval_expr(
-        cdp,
-        "(function(){var b=document.getElementById('modifyDesktop');if(!b)return 'missing';b.click();"
-        "var shelf=document.getElementById('modifyShelf');"
-        "var menu=document.getElementById('createMenu');"
-        "return JSON.stringify({open:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true),"
-        "aria:b.getAttribute('aria-expanded')});})()",
-    )
-    if toggle_err or not isinstance(toggled, str):
-        return [f"wrapup modify {toggled or toggle_err}"]
-    try:
-        opened = json.loads(toggled)
-    except json.JSONDecodeError:
-        return [f"wrapup modify {toggled}"]
-    if opened.get("open") is not True or opened.get("aria") != "true" or opened.get("menu") is True:
-        return [f"wrapup modify did not open {opened}"]
     created, create_err = eval_expr(
         cdp,
-        "(function(){var b=document.querySelector('.desk-bottom [data-action=\"createMenu\"]');"
+        "(function(){var tm=document.querySelector('[data-action=\"toolsMenu\"]');if(tm)tm.click();"
+        "var shelf=document.getElementById('modifyShelf');if(shelf)shelf.hidden=false;"
+        "var b=document.querySelector('#toolsSheet [data-action=\"createMenu\"]');"
         "if(!b)return 'missing';b.click();"
-        "var shelf=document.getElementById('modifyShelf');"
         "var menu=document.getElementById('createMenu');"
         "return JSON.stringify({shelf:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true)});})()",
     )
@@ -4209,21 +4203,10 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return [f"wrapup create {created}"]
     if created_state.get("shelf") is not False or created_state.get("menu") is not True:
         return [f"wrapup create did not close the shelf {created_state}"]
-    again, again_err = eval_expr(
+    eval_expr(
         cdp,
-        "(function(){var b=document.getElementById('modifyDesktop');if(!b)return 'missing';b.click();"
-        "var shelf=document.getElementById('modifyShelf');"
-        "var menu=document.getElementById('createMenu');"
-        "return JSON.stringify({open:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true)});})()",
+        "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return 'ok';})()",
     )
-    if again_err or not isinstance(again, str):
-        return [f"wrapup modify again {again or again_err}"]
-    try:
-        again_state = json.loads(again)
-    except json.JSONDecodeError:
-        return [f"wrapup modify again {again}"]
-    if again_state.get("open") is not True or again_state.get("menu") is not False:
-        return [f"wrapup modify did not close create {again_state}"]
     downloaded, down_err = eval_expr(
         cdp,
         "(function(){var file=document.getElementById('fileBtn');if(!file)return 'missing file';file.click();"
@@ -6495,6 +6478,17 @@ SAVELOAD_EXPR = r"""
           opener = openers[i];
           break;
         }
+        if (!opener) {
+          var tm = document.querySelector('[data-action="toolsMenu"]');
+          if (tm) tm.click();
+          for (var j = 0; j < openers.length; j++) {
+            var st2 = getComputedStyle(openers[j]);
+            var r2 = openers[j].getBoundingClientRect();
+            if (st2.display === 'none' || st2.visibility === 'hidden' || r2.width < 1 || r2.height < 1) continue;
+            opener = openers[j];
+            break;
+          }
+        }
         if (!opener) { problems.push('create opener hidden'); return false; }
         opener.click();
       }
@@ -6515,6 +6509,22 @@ SAVELOAD_EXPR = r"""
         if (r.width < 1 || r.height < 1) continue;
         el.click();
         return true;
+      }
+      if (selector === '[data-action="createMenu"]') {
+        var tm = document.querySelector('[data-action="toolsMenu"]');
+        if (tm) {
+          tm.click();
+          for (var j = 0; j < nodes.length; j++) {
+            var el2 = nodes[j];
+            if (!el2 || (el2.closest && el2.closest('[hidden]'))) continue;
+            var st2 = getComputedStyle(el2);
+            if (st2.display === 'none' || st2.visibility === 'hidden') continue;
+            var r2 = el2.getBoundingClientRect();
+            if (r2.width < 1 || r2.height < 1) continue;
+            el2.click();
+            return true;
+          }
+        }
       }
       return false;
     }
@@ -7980,6 +7990,16 @@ def _click_create_kind(cdp: Cdp, kind: str) -> tuple[dict[str, Any] | None, str]
         "var r=openers[i].getBoundingClientRect();"
         "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
         "opener=openers[i];break;"
+        "}"
+        "if(!opener){"
+        "var tm=document.querySelector('[data-action=\"toolsMenu\"]');"
+        "if(tm)tm.click();"
+        "for(var j=0;j<openers.length;j++){"
+        "var st2=getComputedStyle(openers[j]);"
+        "var r2=openers[j].getBoundingClientRect();"
+        "if(st2.display==='none'||st2.visibility==='hidden'||r2.width<1||r2.height<1) continue;"
+        "opener=openers[j];break;"
+        "}"
         "}"
         "if(!opener) return JSON.stringify({error:'missing create'});"
         "opener.click();"

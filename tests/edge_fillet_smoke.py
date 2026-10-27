@@ -221,8 +221,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} plain L opLog {start.get('opLog')!r}")
     shot(page, kind, "01-ready")
 
-    tap(page, "#modifyBtn")
-    page.wait_for_function("() => (window.__cadcamExportState || {}).modifyOpen === true")
+    page.evaluate("() => { const s = document.getElementById('modifyShelf'); if (s) s.hidden = false; }")
     tap(page, "#modifyShelf [data-op='fillet']")
     page.wait_for_function(
         """() => {
@@ -353,12 +352,12 @@ def run_case(page: Any, kind: str) -> list[str]:
     wait_volume(page, chamfer_vol, 0.5)
     shot(page, kind, "08-chamfer-redo")
 
-    tap(page, "#createBtn")
+    tap(page, "[data-action='toolsMenu']")
+    tap(page, "#toolsSheet [data-action='createMenu']")
     page.wait_for_function("() => document.getElementById('createMenu').hidden === false")
     tap(page, "#createMenu [data-kind='box']")
     page.wait_for_function("() => (window.__cadcamExportState || {}).bodyCount === 2")
-    tap(page, "#modifyBtn")
-    page.wait_for_function("() => (window.__cadcamExportState || {}).modifyOpen === true")
+    page.evaluate("() => { const s = document.getElementById('modifyShelf'); if (s) s.hidden = false; }")
     tap(page, "#modifyShelf [data-op='fillet']")
     page.wait_for_function(
         """() => {

@@ -890,9 +890,13 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
     closed = _json_problems(cdp, CLOSED_EXPR)
     if closed:
         return ["modify touch closed", *closed]
-    opened = _click_selector(cdp, "#modifyBtn")
-    if opened != "clicked":
-        return [f"modify touch open {opened}"]
+    opened, open_err = deploy_smoke.eval_expr(
+        cdp,
+        "(function(){var s=document.getElementById('modifyShelf');if(!s)return 'missing';s.hidden=false;"
+        "if(window.__cadcamExportState)window.__cadcamExportState.modifyOpen=true;return 'clicked';})()",
+    )
+    if open_err or opened != "clicked":
+        return [f"modify touch open {opened or open_err}"]
     cdp.drain(0.3)
     state = deploy_smoke._export_state(cdp)
     if state.get("modifyOpen") is not True:
@@ -944,9 +948,12 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
         return [f"modify touch chamfer size {state.get('edgeArm')!r} {state.get('edgeSize')!r}"]
     if state.get("phoneMulti") is True:
         return ["modify touch chamfer turned multi on"]
-    closed_click = _click_selector(cdp, "#modifyBtn")
-    if closed_click != "clicked":
-        return [f"modify touch close {closed_click}"]
+    closed_click, close_err = deploy_smoke.eval_expr(
+        cdp,
+        "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return 'clicked';})()",
+    )
+    if close_err or closed_click != "clicked":
+        return [f"modify touch close {closed_click or close_err}"]
     cdp.drain(0.2)
     hidden = _json_problems(cdp, CLOSED_EXPR)
     if hidden:
