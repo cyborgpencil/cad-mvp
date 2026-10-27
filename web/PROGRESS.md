@@ -1,5 +1,6 @@
 # WASM GUI wiring progress
 
+- 2026-10-27 ~10:19 AM MT: item-10 L-bracket agy = invent-free verify-only stop. Session `61a4934c` exit=0, `coding_pr_needed=false`; zero `web/` edits @ tip `0c36ba6` (main now `694607a` after #225). Boot gate/units/OCCT PASS on live Pages; L-profile sketch opened on XY then halted. Erik TBD: leg A/B length + width; disc diameter / which leg / off-centre `(u,v)`; hole dia + CSK geometry + spacing. Truck/Orca/screenshots TBD. No second L-bracket agy. Items 6–7 stay TBD.
 - 2026-10-27 ~10:12 AM MT: item-9 app-wide redundancy pass = verify-only. Sessions 9489eca1 (~9:25 AM MT exit=0, coding_pr_needed=false) and relaunch 01d55e74 (~9:41 AM MT PID 5860) both left zero web/ edits; worktree clean @ main 0c36ba6; no commits/branch; no open impl PR. Brief + digest already on main. Items 4/5/8 on main (#217/#221/#223). Removals beyond 4–8, Create/Modify dest, Isolate/theme/selection/media-split stay TBD. Items 6–7 stay TBD.
 
 ## Checkpoint 1 ├óΓé¼ΓÇ¥ plan
