@@ -320,7 +320,8 @@ def run_case(page: Any, kind: str) -> list[str]:
 
     page.locator("#multiToggle").click()
     wait_field(page, "() => (window.__cadcamExportState || {}).phoneMulti === true")
-    page.locator("#createBtn").click()
+    page.locator("[data-action='toolsMenu']").click()
+    page.locator("#toolsSheet [data-action='createMenu']").click()
     page.locator("#createMenu [data-kind='box']").click()
     wait_field(page, "() => (window.__cadcamExportState || {}).bodyCount === 2")
     shot(page, kind, "11-two-bodies")

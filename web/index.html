@@ -1327,7 +1327,6 @@
     color: var(--muted);
     padding: 0 8px;
   }
-  .desk-bottom { display: none; flex: none; }
   /* Stay out of the flex column. Hiding the banner on a passing OCCT gate
      must not change #viewport, or WebKit drops the presented WebGL layer. */
   .interim-banner {
@@ -1347,8 +1346,8 @@
     font-weight: 650;
   }
   /* Always-visible chrome: topbar (tree + filename), toolbox ribbon (tools menu bar),
-     and bottom bar (Modify / Create etc.). Everything else uses show/hide shelves.
-     Exact region mapping, shelf list, and exceptions stay TBD (mvp/requirements.md park). */
+     and bottommost units statusbar (bottom Create/Modify bar consolidated and removed).
+     Everything else uses show/hide shelves. Exact region mapping, shelf list, and exceptions stay TBD (mvp/requirements.md park). */
   .toolbox {
     width: auto;
     flex: none;
@@ -1530,7 +1529,6 @@
       align-items: stretch;
     }
     .phone-tabs { display: contents; }
-    .desk-bottom { display: none !important; }
     .phone-tabbar .tab {
       flex: 1;
       border-bottom: 0;
@@ -1673,17 +1671,6 @@
     .hide-tight { display: none !important; }
     .vp-cluster { display: contents; }
     .vc-home { z-index: 8; }
-  }
-  @media (min-width: 821px) {
-    .desk-bottom {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 52px;
-      padding: 0 8px;
-      background: var(--top);
-      border-top: 1px solid var(--line-strong);
-    }
   }
   @media (max-height: 520px) {
     .interim-banner { min-height: 28px; padding: 2px 8px; }
@@ -2491,12 +2478,6 @@
     <div class="backdrop" id="backdrop" hidden></div>
   </div>
 
-  <footer class="statusbar" aria-label="Units">
-    <span class="stat">Units <b id="statusUnits">mm</b></span>
-    <span class="hint" id="statusHint">Loading checks…</span>
-    <span id="buildStamp" class="build-stamp"></span>
-  </footer>
-
   <div id="modifyShelf" class="modify-shelf" role="toolbar" aria-label="Modify" data-hscroll hidden>
     <span id="modifyOrder" class="modify-order">1 = target, 2 = tool</span>
     <button type="button" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move">Move</button>
@@ -2509,24 +2490,24 @@
     <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
     <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
   </div>
-  <div class="desk-bottom" role="toolbar" aria-label="Create and modify">
-    <button type="button" class="tool-btn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
-    <button type="button" class="tool-btn" id="modifyDesktop" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg><span>Modify</span></button>
-  </div>
 
   <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
     <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
     <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
     <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
     <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
-    <button type="button" class="tab" id="createBtn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg>Create</button>
-    <button type="button" class="tab" id="modifyBtn" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg>Modify</button>
     <div class="phone-tabs" role="tablist" aria-label="Workbench">
     <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
     </div>
   </nav>
+
+  <footer class="statusbar" aria-label="Units">
+    <span class="stat">Units <b id="statusUnits">mm</b></span>
+    <span class="hint" id="statusHint">Loading checks…</span>
+    <span id="buildStamp" class="build-stamp"></span>
+  </footer>
   <div id="pickChooser" class="pick-chooser" hidden role="menu" aria-label="Pick filter">
     <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="body" data-tool="Pick Body" aria-checked="true">Body</button>
     <button type="button" role="menuitemradio" data-action="pickChoose" data-filter="face" data-tool="Pick Face" aria-checked="false">Face</button>
@@ -10688,10 +10669,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const openers = document.querySelectorAll('[data-action="createMenu"]');
     for (let i = 0; i < openers.length; i += 1) {
       const opener = openers[i];
+      if (opener.closest && opener.closest('[hidden]')) continue;
       const style = getComputedStyle(opener);
       if (style.display === 'none' || style.visibility === 'hidden') continue;
       const rect = opener.getBoundingClientRect();
       if (rect.width >= 1 && rect.height >= 1) return opener;
+    }
+    const toolsBtn = document.querySelector('[data-action="toolsMenu"]');
+    if (toolsBtn) {
+      const style = getComputedStyle(toolsBtn);
+      const rect = toolsBtn.getBoundingClientRect();
+      if (style.display !== 'none' && style.visibility !== 'hidden' && rect.width >= 1 && rect.height >= 1) {
+        return toolsBtn;
+      }
     }
     return null;
   }
