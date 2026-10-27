@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #231 (merged at 12f7ac3): web - invent-free Modo sel/hover hex (#ffa829 / #8cb4c7; tip 113d76b; session 99a648e7).
 - 2026-10-27 PR #229 (merged at ccf30f2): web - invent-free flat viewport backdrop (Erik lock: no gradient; tip 5e80dc0; session 0beb800e).
 - 2026-10-27 PR #227 (merged at 56a54ed): web - B1 About Version=#buildStamp; B2 Units footer dedupe; B4 sticky tooltip dismiss (tip 24b5f54; session 6f792ab8).
 - 2026-10-27 docs - item-10 L-bracket agy verify-only (session 61a4934c; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false; invent-free stop — Erik TBD dims).
