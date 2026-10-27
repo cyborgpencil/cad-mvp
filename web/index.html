@@ -519,20 +519,28 @@
   .workspace {
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 272px minmax(160px, 1fr) 300px;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     position: relative;
+    overflow: hidden;
   }
   .browser, .inspector {
-    width: 252px;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 24;
+    width: min(300px, 86vw);
     flex: none;
     background: var(--panel);
     overflow: auto;
     min-height: 0;
+    box-shadow: var(--shadow);
+    transition: transform 0.18s ease;
   }
-  .browser { border-right: 1px solid var(--line-strong); }
-  .inspector { width: 280px; border-left: 1px solid var(--line-strong); }
+  .browser { left: 0; border-right: 1px solid var(--line-strong); transform: translateX(-105%); }
+  .inspector { right: 0; left: auto; border-left: 1px solid var(--line-strong); transform: translateX(105%); }
+  .browser.open, .inspector.open { transform: none; }
+  .browser:not(.open), .inspector:not(.open) { pointer-events: none; }
   .panel-h {
     margin: 0;
     padding: 12px 12px 6px;
@@ -1331,98 +1339,55 @@
     border-bottom: 3px solid var(--accent);
     font-weight: 650;
   }
+  /* Always-visible chrome: topbar (tree + filename), toolbox ribbon (tools menu bar),
+     and bottom bar (Modify / Create etc.). Everything else uses show/hide shelves.
+     Exact region mapping, shelf list, and exceptions stay TBD (mvp/requirements.md park). */
   .toolbox {
-    width: 272px;
+    width: auto;
     flex: none;
-    display: flex;
-    flex-direction: column;
+    display: block;
     min-height: 0;
     background: var(--panel);
-    border-right: 1px solid var(--line-strong);
+    border-right: 0;
   }
-  .tool-tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 6px;
-    flex: none;
-    background: var(--tab-track);
-  }
-  .tool-tabs .tab {
-    width: 100%;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    padding: 0 12px;
-    text-align: left;
-    color: var(--tab-ink);
-    background: var(--tab-bg);
-    border-bottom: 0;
-    border-left: 3px solid transparent;
-    border-radius: 8px;
-  }
-  .tool-tabs .tab.is-on {
-    color: var(--ink);
-    background: var(--tab-active);
-    border-left-color: var(--accent);
-    box-shadow: inset 0 0 0 1px var(--accent);
-  }
+  .tool-tabs { display: none; }
   .toolbox .ribbon {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow: auto;
-    flex-direction: column;
-    border-bottom: 0;
+    overflow: visible;
+    flex-direction: row;
   }
   .toolbox .tools {
-    flex-direction: column;
+    flex-direction: row;
     align-items: stretch;
-    height: auto;
     min-height: 0;
-    overflow: auto;
+    overflow-x: auto;
+  }
+  .toolbox .tools:not(.export-tools) { display: none; }
+  html[data-sketch-plane] .toolbox .tools[data-panel="sketch"]:not([hidden]) {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 2px;
+    gap: 2px;
+  }
+  html[data-sketch-plane] .toolbox .tools[data-panel="sketch"] .group {
+    padding: 0;
+    border: 0;
+  }
+  html[data-sketch-plane] .toolbox .tools[data-panel="sketch"] .group-btns {
+    gap: 2px;
   }
   .toolbox .group {
-    width: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    align-items: stretch;
+    width: auto;
+    border-bottom: 0;
+    align-items: center;
   }
   .toolbox .group-btns {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-  }
-  .toolbox .tool-btn,
-  .toolbox .tool-btn.wide {
-    width: 100%;
-    height: 44px;
-    min-height: 44px;
     flex-direction: row;
-    justify-content: flex-start;
-    padding: 0 10px;
-    gap: 8px;
-  }
-  .toolbox .tool-btn span { font-size: 13px; }
-  .toolbox .gate { flex-direction: column; align-items: stretch; }
-  .toolbox .gate-col,
-  .toolbox .gate-actions { min-width: 0; width: 100%; }
-  .toolbox .export-btn { width: 100%; }
-  .toolbox { grid-column: 1; grid-row: 1 / span 2; width: auto; }
-  .browser {
-    grid-column: 3;
-    grid-row: 1;
+    align-items: flex-end;
     width: auto;
-    border-right: 0;
-    border-left: 1px solid var(--line-strong);
   }
-  .inspector {
-    grid-column: 3;
-    grid-row: 2;
-    width: auto;
-    border-top: 1px solid var(--line-strong);
-    z-index: 1;
-  }
-  #viewport { grid-column: 2; grid-row: 1 / span 2; }
   .side-head {
     display: flex;
     flex-direction: column;
@@ -1604,7 +1569,7 @@
       min-height: 0;
       overflow-x: auto;
     }
-    .toolbox .tools:not(.export-tools) { height: 52px; }
+    .toolbox .tools:not(.export-tools) { display: none; }
     .toolbox .group { width: auto; border-bottom: 0; align-items: center; }
     .toolbox .group-btns { flex-direction: row; width: auto; align-items: flex-end; }
     .toolbox .tool-btn,
@@ -2008,8 +1973,9 @@
 </svg>
 
 <div id="app">
-  <header class="topbar">
-    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree">Tree</button>
+  <!-- Panel labels: reuse existing control/aria labels; exact per-panel label text, which surfaces count as panels, and phone vs desktop placement stay TBD (mvp/requirements.md park). -->
+  <header class="topbar" aria-label="CAD/CAM">
+    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
     <div class="brand">
       <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9z" fill="currentColor"/><path d="M12 12 22 7.5M12 12 2 7.5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
       <span class="brand-name">CAD/CAM</span>
@@ -2018,7 +1984,7 @@
       <button type="button" class="menu-btn" id="fileBtn" data-action="fileMenu" data-tool="File" aria-haspopup="true" aria-expanded="false" title="File">
         <svg class="ico"><use href="#i-file"></use></svg><span>File</span>
       </button>
-      <div class="menu" id="fileMenu" hidden>
+      <div class="menu" id="fileMenu" role="menu" aria-label="File" hidden>
         <button type="button" data-tool="New">New</button>
         <button type="button" data-tool="Open">Open</button>
         <button type="button" id="saveProjectBtn" data-action="saveProject" data-tool="Save">Save</button>
@@ -2034,7 +2000,7 @@
     <button type="button" class="icon-btn hide-tight" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
     <button type="button" class="icon-btn hide-tight" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
     <span class="spacer"></span>
-    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector">Info</button>
+    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector" aria-controls="inspector" aria-expanded="false">Info</button>
     <input class="doc" id="docName" value="Part 1" title="Part 1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
     <button type="button" class="icon-btn" id="searchBtn" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search" aria-expanded="false" aria-controls="searchDlg"><svg class="ico"><use href="#i-search"></use></svg></button>
@@ -2044,7 +2010,7 @@
     </div>
   </header>
 
-  <div class="finish-bar" id="finishBar" hidden>
+  <div class="finish-bar" id="finishBar" hidden role="region" aria-label="Finish Sketch">
     <button type="button" class="finish-btn" data-action="finishSketch" data-tool="Finish Sketch">Finish Sketch</button>
     <span class="muted" id="sketchStatus">Tap a planar face · returns to Model</span>
   </div>
@@ -2058,15 +2024,15 @@
   </div>
 
   <div class="workspace">
-    <aside class="toolbox" id="toolbox">
+    <aside class="toolbox" id="toolbox" aria-label="Tools">
       <nav class="tool-tabs" role="tablist" aria-label="Toolbox">
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (Alt+1)">Sketch</button>
         <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (Alt+2)">Model</button>
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (Alt+3)">Repair</button>
         <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (Alt+4)">Export</button>
       </nav>
-      <div class="ribbon">
-    <div class="topbar-shelves">
+      <div class="ribbon" role="region" aria-label="Tools">
+    <div class="topbar-shelves" role="toolbar" aria-label="Tools">
       <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
         <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
       </button>
@@ -2081,7 +2047,8 @@
         <svg class="ico"><use href="#i-eye"></use></svg><span>Camera</span>
       </button>
     </div>
-    <div class="tools panel" data-panel="sketch" hidden>
+    <div class="tools panel" data-panel="sketch" role="region" aria-label="Sketch" hidden>
+      <h2 class="panel-h">Sketch</h2>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" data-action="sketchLine" data-tool="Line" title="Line. Click points on the sketch plane. Confirm closes at 3 or more."><svg class="ico"><use href="#i-line"></use></svg><span>Line</span></button>
         <button type="button" class="tool-btn" data-action="sketchRect" data-tool="Rectangle" title="Corner rectangle. Length and width in millimetres."><svg class="ico"><use href="#i-rect"></use></svg><span>Rectangle</span></button>
@@ -2106,7 +2073,8 @@
         <button type="button" class="tool-btn" data-tool="Fixed" title="Fixed"><svg class="ico"><use href="#i-fixed"></use></svg><span>Fixed</span></button>
       </div><div class="group-label">Constrain</div></div>
     </div>
-    <div class="tools panel" data-panel="model">
+    <div class="tools panel" data-panel="model" role="region" aria-label="Model">
+      <h2 class="panel-h">Model</h2>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
         <button type="button" class="tool-btn wide" id="createDesktop" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
@@ -2133,7 +2101,8 @@
         <button type="button" class="tool-btn is-on" id="snapBtn" data-action="snap" data-tool="Snapping" title="Snapping 1 mm / 15 deg" aria-pressed="true"><svg class="ico"><use href="#i-snap"></use></svg><span>Snap</span></button>
       </div><div class="group-label">Snap</div></div>
     </div>
-    <div class="tools panel" data-panel="repair" hidden>
+    <div class="tools panel" data-panel="repair" role="region" aria-label="Repair" hidden>
+      <h2 class="panel-h">Repair</h2>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn wide" data-action="checkShape" data-tool="Check shape" title="Check shape"><svg class="ico"><use href="#i-check"></use></svg><span>Check shape</span></button>
         <button type="button" class="tool-btn wide" data-action="findOpen" data-tool="Find open edges" title="Find open edges"><svg class="ico"><use href="#i-open"></use></svg><span>Open edges</span></button>
@@ -2141,7 +2110,8 @@
         <button type="button" class="tool-btn wide" data-action="meshRepair" data-tool="Mesh repair" title="Mesh repair"><svg class="ico"><use href="#i-mesh"></use></svg><span>Mesh repair</span></button>
       </div><div class="group-label">Heal</div></div>
     </div>
-    <div class="tools panel export-tools" data-panel="export" hidden>
+    <div class="tools panel export-tools" data-panel="export" role="region" aria-label="Export" hidden>
+      <h2 class="panel-h">Export</h2>
       <div class="gate">
         <div class="gate-col">
           <div class="gate-title">Units</div>
@@ -2156,7 +2126,7 @@
         <div class="gate-actions">
           <div class="export-wrap">
             <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Checking units.">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
-            <div class="menu" id="exportMenu" hidden>
+            <div class="menu" id="exportMenu" role="menu" aria-label="Export" hidden>
               <button type="button" data-action="exportFmt" data-fmt="STL" data-tool="Export STL">STL</button>
               <button type="button" data-action="exportFmt" data-fmt="3MF" data-tool="Export 3MF">3MF</button>
             </div>
@@ -2167,7 +2137,7 @@
     </div>
       </div>
     </aside>
-    <aside class="browser" id="browser">
+    <aside class="browser" id="browser" aria-label="Items">
       <h2 class="panel-h">Items</h2>
       <div class="branch">
         <button type="button" class="branch-name" data-tool="Bodies">Bodies</button>
@@ -2201,7 +2171,7 @@
       </div>
     </aside>
 
-    <main id="viewport" tabindex="-1">
+    <main id="viewport" tabindex="-1" aria-label="View">
       <canvas id="canvas"></canvas>
       <div id="viewCube" class="view-cube" aria-hidden="true"></div>
       <div id="safeProbe" aria-hidden="true"></div>
@@ -2213,7 +2183,7 @@
         <polygon id="mArrow2" fill="#fff8e8"></polygon>
         <text id="mText" text-anchor="middle"></text>
       </svg>
-      <div id="measureReadout" class="measure-readout" hidden>
+      <div id="measureReadout" class="measure-readout" role="region" aria-label="Measure" hidden>
         <div id="measureSpanLabel"></div>
         <div id="measureVolume"></div>
       </div>
@@ -2240,11 +2210,11 @@
           <input id="calloutEntry" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Callout value">
         </form>
       </div>
-      <div class="hud">
+      <div class="hud" role="region" aria-label="View">
         <div><b id="hudName">Body1</b></div>
         <div><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel">Iso</span></div>
       </div>
-      <form id="dimPanel" class="dim-panel" hidden>
+      <form id="dimPanel" class="dim-panel" aria-label="Dimensions" hidden>
         <div class="dim-head">
           <button type="button" class="dim-toggle" id="dimToggle" data-action="dimSheet" data-tool="Dimensions" aria-expanded="false" aria-controls="dimBody" aria-label="Primitive dimensions"><span id="primTitle">Primitive</span><span class="chev" aria-hidden="true"></span></button>
           <span id="selectionCount" class="dim-count" aria-live="polite">0 selected</span>
@@ -2326,6 +2296,7 @@
       <div id="lineDimLayer" class="line-dim-layer" aria-hidden="true" hidden></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
+        <span class="modify-order">View</span>
         <div class="vp-cluster" role="group" aria-label="Analyze">
           <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
           <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
@@ -2338,6 +2309,7 @@
         </div>
       </div>
       <div id="selectionShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Selection" data-hscroll hidden>
+        <span class="modify-order">Selection</span>
         <div class="vp-cluster" role="group" aria-label="Select">
           <button type="button" data-action="select" data-mode="vertex" data-tool="Selection: Vertex" title="Vertex (1)"><svg class="ico"><use href="#i-vertex"></use></svg></button>
           <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
@@ -2346,6 +2318,7 @@
         </div>
       </div>
       <div id="cameraShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Show/hide camera" data-hscroll hidden>
+        <span class="modify-order">Camera</span>
         <div class="vp-cluster" role="group" aria-label="Navigate">
           <button type="button" data-action="hint" data-hint="Orbit: one finger or left drag" data-tool="Orbit" title="Orbit"><svg class="ico"><use href="#i-orbit"></use></svg></button>
           <button type="button" data-action="hint" data-hint="Pan: right-drag, middle-drag, or two fingers" data-tool="Pan" title="Pan"><svg class="ico"><use href="#i-pan"></use></svg></button>
@@ -2363,7 +2336,7 @@
           <button type="button" data-action="hide" data-tool="Hide" title="Hide"><svg class="ico"><use href="#i-eyeoff"></use></svg></button>
         </div>
       </div>
-      <div id="sketchSheet" class="edge-sheet sketch-sheet" hidden>
+      <div id="sketchSheet" class="edge-sheet sketch-sheet" role="region" aria-label="Sketch" hidden>
         <p id="sketchNote" class="edge-note">Rectangle</p>
         <div class="edge-sheet-row extrude-modes" id="sketchModeRow" hidden role="group" aria-label="Extrude mode">
           <button type="button" data-action="sketchExtrudeMode" data-mode="new" data-tool="Extrude New" title="New body" aria-pressed="true">New</button>
@@ -2396,15 +2369,17 @@
           <button type="button" class="edge-confirm" id="sketchConfirm" data-action="confirmSketch" data-tool="Sketch confirm" title="Apply the sketch profile or the blind extrude.">Confirm</button>
         </div>
       </div>
-      <div id="edgeSheet" class="edge-sheet" hidden>
+      <div id="edgeSheet" class="edge-sheet" role="region" aria-label="Modify" hidden>
+        <h2 class="panel-h">Modify</h2>
         <p id="edgeNote" class="edge-note" hidden></p>
         <div class="edge-sheet-row">
           <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="2" aria-label="Edge size mm"><span>mm</span></label>
           <button type="button" class="edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges." disabled aria-disabled="true">Confirm</button>
         </div>
       </div>
-      <div class="sheet" id="toolsSheet" hidden>
+      <div class="sheet" id="toolsSheet" role="dialog" aria-label="Tools" hidden>
         <div class="sheet-h">
+          <h2 class="panel-h">Tools</h2>
           <button type="button" class="icon-btn" data-action="closeSheet" data-tool="Close tools menu" aria-label="Close"><span>Close</span></button>
         </div>
         <div class="sheet-shelves" role="group" aria-label="Shelves">
@@ -2417,7 +2392,8 @@
       </div>
     </main>
 
-    <aside class="inspector" id="inspector">
+    <aside class="inspector" id="inspector" aria-label="Inspector">
+      <h2 class="panel-h">Inspector</h2>
       <div class="side-head">
         <nav class="side-tabs" role="tablist" aria-label="Item panels">
           <button type="button" class="side-tab is-on" data-action="sideTab" data-side="properties" data-tool="Properties" role="tab" aria-selected="true">Properties</button>
@@ -2427,9 +2403,9 @@
         </nav>
         <button type="button" class="preview-btn" id="previewBtn" data-action="preview" data-tool="Preview" aria-pressed="false" title="Preview tool handles">Preview</button>
       </div>
-      <div class="prop" id="toolProp" data-side-panel="properties">
+      <div class="prop" id="toolProp" data-side-panel="properties" role="tabpanel" aria-label="Properties">
         <button type="button" class="prop-toggle" id="propToggle" data-action="propShelf" data-tool="Properties" title="Properties" aria-expanded="false" aria-controls="propBody" aria-label="Properties">Properties</button>
-        <div id="propBody" hidden>
+        <div id="propBody" role="region" aria-label="Properties" hidden>
         <h3 id="inspTitle">Body1</h3>
         <div class="muted" id="inspSub">Solid body · placeholder cube</div>
         <div class="kv" id="inspKv"></div>
@@ -2453,7 +2429,7 @@
         <p class="fine" id="primNote">Dimensions for a box, cylinder, or disc open on the model.</p>
         <p class="fine" id="primEllipse" hidden>Circles may become ellipses.</p>
         </div>
-        <div id="assemblyPanel" class="assembly-panel">
+        <div id="assemblyPanel" class="assembly-panel" role="region" aria-label="Parts">
           <div class="muted">Parts</div>
           <p class="fine" id="selectionCountSide">0 selected</p>
           <button type="button" id="combineBtn" data-action="combine" data-tool="Combine" disabled aria-disabled="true">Combine</button>
@@ -2469,15 +2445,15 @@
           <p class="fine" id="assemblyNote"></p>
         </div>
       </div>
-      <div data-side-panel="channels" hidden>
+      <div data-side-panel="channels" role="tabpanel" aria-label="Channels" hidden>
         <h2 class="panel-h">Channels</h2>
         <p class="fine side-note">TBD. No channel list until the kernel exposes one.</p>
       </div>
-      <div data-side-panel="display" hidden>
+      <div data-side-panel="display" role="tabpanel" aria-label="Display" hidden>
         <h2 class="panel-h">Display</h2>
         <p class="fine side-note">Active display: <b id="displayReadout">Shaded + Edges</b>. Change it from the view bar.</p>
       </div>
-      <div data-side-panel="lists" hidden>
+      <div data-side-panel="lists" role="tabpanel" aria-label="Lists" hidden>
         <h2 class="panel-h">Lists</h2>
         <p class="fine side-note">TBD. Vertex maps, the tool pipe, and statistics are not in this build. The Items list above is the part list.</p>
       </div>
@@ -2485,13 +2461,13 @@
     <div class="backdrop" id="backdrop" hidden></div>
   </div>
 
-  <footer class="statusbar">
+  <footer class="statusbar" aria-label="Units">
     <span class="stat">Units <b id="statusUnits">mm</b></span>
     <span class="hint" id="statusHint">Loading checks…</span>
     <span id="buildStamp" class="build-stamp"></span>
   </footer>
 
-  <div id="modifyShelf" class="modify-shelf" data-hscroll hidden>
+  <div id="modifyShelf" class="modify-shelf" role="toolbar" aria-label="Modify" data-hscroll hidden>
     <span id="modifyOrder" class="modify-order">1 = target, 2 = tool</span>
     <button type="button" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move">Move</button>
     <button type="button" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate">Rotate</button>
@@ -2503,7 +2479,7 @@
     <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
     <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
   </div>
-  <div class="desk-bottom" aria-label="Create and modify">
+  <div class="desk-bottom" role="toolbar" aria-label="Create and modify">
     <button type="button" class="tool-btn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
     <button type="button" class="tool-btn" id="modifyDesktop" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg><span>Modify</span></button>
   </div>
@@ -2515,7 +2491,7 @@
     <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
     <button type="button" class="tab" id="createBtn" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg>Create</button>
     <button type="button" class="tab" id="modifyBtn" data-action="modifyShelf" data-tool="Modify" title="Modify" aria-expanded="false" aria-controls="modifyShelf" aria-label="Modify"><svg class="ico"><use href="#i-modify"></use></svg>Modify</button>
-    <div class="phone-tabs" role="tablist">
+    <div class="phone-tabs" role="tablist" aria-label="Workbench">
     <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
     <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
@@ -2536,7 +2512,8 @@
   <button type="button" role="menuitem" data-action="holeTool" data-tool="Hole" title="Hole">Hole</button>
   <button type="button" role="menuitem" data-action="newSketch" data-tool="Sketch" title="Sketch">Sketch</button>
 </div>
-<div class="search-dlg" id="searchDlg" hidden>
+<div class="search-dlg" id="searchDlg" role="dialog" aria-label="Tool search" hidden>
+  <h2 class="panel-h">Tool search</h2>
   <input id="searchInput" placeholder="Search tools" aria-label="Search tools" autocomplete="off" spellcheck="false" autocapitalize="off">
   <ul class="search-list" id="searchList"></ul>
 </div>
@@ -10145,20 +10122,34 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function setDrawer(which, open) {
-    if (!isNarrow()) return;
-    document.getElementById('browser').classList.toggle('open', open && which === 'browser');
-    document.getElementById('inspector').classList.toggle('open', open && which === 'inspector');
-    const any = document.getElementById('browser').classList.contains('open')
-      || document.getElementById('inspector').classList.contains('open');
+    const browserOpen = !!(open && which === 'browser');
+    const inspectorOpen = !!(open && which === 'inspector');
+    document.getElementById('browser').classList.toggle('open', browserOpen);
+    document.getElementById('inspector').classList.toggle('open', inspectorOpen);
+    const buttons = document.querySelectorAll('[data-action="drawer"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      const target = buttons[i].getAttribute('data-drawer');
+      const isOn = target === 'inspector' ? inspectorOpen : browserOpen;
+      buttons[i].setAttribute('aria-expanded', isOn ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', isOn);
+    }
+    const any = browserOpen || inspectorOpen;
     document.getElementById('backdrop').hidden = !any;
     syncClosedPanels();
+    publishGateState();
   }
 
   function closeDrawers() {
     document.getElementById('browser').classList.remove('open');
     document.getElementById('inspector').classList.remove('open');
+    const buttons = document.querySelectorAll('[data-action="drawer"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', 'false');
+      buttons[i].classList.remove('is-on');
+    }
     document.getElementById('backdrop').hidden = true;
     syncClosedPanels();
+    publishGateState();
   }
 
   function closeCreateMenu() {
@@ -12109,7 +12100,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!opts.keepTool) state.activeTool = '';
     updateInspector();
     updateGate();
-    if (isNarrow() && !toolsSheet.hidden) fillSheet('');
+    if (!toolsSheet.hidden) fillSheet('');
   }
 
   function filterTools(query) {
@@ -12973,6 +12964,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         closeCreateMenu();
         setModifyOpen(false, true);
         state.dimSheetOpen = false;
+        if (btn.id === 'propShelfBtn') setDrawer('inspector', true);
       }
       paintPrimFields();
       message = willOpen ? 'Properties' : 'Hide properties';
