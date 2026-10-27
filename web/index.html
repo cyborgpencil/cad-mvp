@@ -613,7 +613,7 @@
     min-width: 0;
     position: relative;
     z-index: 2;
-    background: radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%);
+    background: var(--bg);
     box-shadow: inset 0 0 0 2px var(--accent);
     touch-action: none;
     -webkit-user-select: none;
@@ -2859,7 +2859,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     '--status-h': '44px',
     '--phone-tabs-h': 'calc(56px + env(safe-area-inset-bottom, 0px))'
   };
-  const DEFAULT_VIEWPORT_BACKGROUND = 'radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%)';
+  const DEFAULT_VIEWPORT_BACKGROUND = 'var(--bg)';
 
   const state = {
     tab: 'model',
