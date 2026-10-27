@@ -3114,6 +3114,42 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     ? fingerApi.createThreeFingerSession()
     : null;
   let releasingCapture = false;
+  let lastTouchGesture = '';
+  const touchGestureLog = [];
+  let tapChainCount = 0;
+  let tapChainMs = 0;
+  let tapChainX = 0;
+  let tapChainY = 0;
+  let tapChainSelectionMode = '';
+  let tapChainPreSelectedIds = null;
+  const panelDockState = new Map();
+
+  function touchGestureMs() {
+    return fingerApi && fingerApi.SWIPE_MS;
+  }
+
+  function recordTouchGesture(type, action) {
+    lastTouchGesture = type;
+    touchGestureLog.push({ type: type, action: action });
+    if (touchGestureLog.length > 32) touchGestureLog.shift();
+  }
+
+  function floatingPanelStates() {
+    const out = {};
+    panelDockState.forEach(function (info, el) {
+      const key = (el && (el.id || el.getAttribute('aria-label') || el.tagName)) || 'panel';
+      const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+      out[key] = {
+        dock: info.dock,
+        left: rect ? Math.round(rect.left) : info.left,
+        top: rect ? Math.round(rect.top) : info.top,
+        right: rect ? Math.round(rect.right) : info.right,
+        width: rect ? Math.round(rect.width) : info.width,
+        height: rect ? Math.round(rect.height) : info.height
+      };
+    });
+    return out;
+  }
   const panX = new THREE.Vector3();
   const panY = new THREE.Vector3();
   const proj = new THREE.Vector3();
@@ -10248,7 +10284,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       projectError: state.projectError || '',
       projectPartCount: state.bodies.length,
       projectNames: state.bodies.map(function (body) { return body.name; }),
-      projectBlank: state.projectBlank === true
+      projectBlank: state.projectBlank === true,
+      lastGesture: lastTouchGesture,
+      gestureLog: touchGestureLog.slice(),
+      floatingPanels: floatingPanelStates()
     };
   }
 
@@ -14839,7 +14878,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!onCubeEl) {
       try { viewport.setPointerCapture(ev.pointerId); } catch (err) { /* already captured */ }
     }
-    ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, button: ev.button });
+    ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, sx: ev.clientX, sy: ev.clientY, moved: false, button: ev.button });
     if (fingerSession) fingerSession.down(ev.pointerId, ev.clientX, ev.clientY, performance.now());
     if (ptrs.size >= 2) {
       if (gizmoDrag) {
@@ -14853,6 +14892,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         gesture = {
           type: 'three',
           moved: true,
+          twoFingerTap: false,
           sx: ev.clientX,
           sy: ev.clientY,
           button: 0,
@@ -14861,7 +14901,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         };
         return;
       }
-      gesture = { type: 'pinch', moved: false, sx: ev.clientX, sy: ev.clientY, button: 0, pid: ev.pointerId };
+      const priorMoved = !!(gesture && gesture.moved) || ptrs.size > 2;
+      const priorT0 = (gesture && gesture.t0) || performance.now();
+      gesture = {
+        type: 'pinch',
+        moved: priorMoved,
+        twoFingerTap: !priorMoved && ptrs.size === 2,
+        sx: ev.clientX,
+        sy: ev.clientY,
+        button: 0,
+        pid: ev.pointerId,
+        t0: priorT0
+      };
       pinch = currentPinch();
       return;
     }
@@ -14882,6 +14933,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     gesture = {
       type: pointerType,
       moved: false,
+      longHold: false,
+      twoFingerTap: false,
       sx: ev.clientX,
       sy: ev.clientY,
       button: ev.button,
@@ -14903,7 +14956,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     rec.y = ev.clientY;
     if (fingerSession) fingerSession.move(ev.pointerId, ev.clientX, ev.clientY);
     if (gesture.type === 'three' || (threeFingerOn() && ptrs.size >= 3)) return;
-    if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) >= tapSlopPx()) gesture.moved = true;
+    if (Math.hypot(ev.clientX - rec.sx, ev.clientY - rec.sy) >= tapSlopPx()) {
+      rec.moved = true;
+      gesture.moved = true;
+      gesture.twoFingerTap = false;
+    }
+    if (Math.hypot(ev.clientX - gesture.sx, ev.clientY - gesture.sy) >= tapSlopPx()) {
+      gesture.moved = true;
+      gesture.twoFingerTap = false;
+    }
     if (gesture.type === 'gizmo' && gesture.pid === ev.pointerId) {
       dragGizmo(ev.clientX, ev.clientY);
       return;
@@ -14944,6 +15005,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function onPointerDone(ev) {
     const g = gesture;
+    const endedRec = ptrs.get(ev.pointerId);
+    const endedMoved = !!(
+      endedRec && (endedRec.moved || Math.hypot(ev.clientX - endedRec.sx, ev.clientY - endedRec.sy) >= tapSlopPx())
+    );
     const threeAction = takeThreeFinger(ev);
     ptrs.delete(ev.pointerId);
     releasingCapture = true;
@@ -14966,6 +15031,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         gesture = {
           type: 'pinch',
           moved: true,
+          twoFingerTap: false,
           sx: rest.x,
           sy: rest.y,
           button: rest.button,
@@ -14979,6 +15045,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         gesture = {
           type: rest.button === 1 || rest.button === 2 ? 'pan' : 'orbit',
           moved: true,
+          twoFingerTap: false,
           sx: rest.x,
           sy: rest.y,
           button: rest.button,
@@ -14995,14 +15062,35 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (ptrs.size === 1) {
       const id = Array.from(ptrs.keys())[0];
       const rest = ptrs.get(id);
+      const stillTwoFingerTap = !!(
+        g && g.type === 'pinch' && g.twoFingerTap && !g.moved && !endedMoved
+        && ev.type !== 'pointercancel' && !rest.moved
+      );
       gesture = {
         type: rest.button === 1 || rest.button === 2 ? 'pan' : 'orbit',
         moved: true,
+        twoFingerTap: stillTwoFingerTap,
+        t0: (g && g.t0) || performance.now(),
         sx: rest.x,
         sy: rest.y,
         button: rest.button,
         pid: id
       };
+      pinch = null;
+      return;
+    }
+    if (g && g.twoFingerTap) {
+      if (ev.type !== 'pointercancel' && !endedMoved) {
+        const now2 = performance.now();
+        const winMs2 = touchGestureMs();
+        if (!winMs2 || (now2 - (g.t0 || 0)) <= winMs2) {
+          tapChainCount = 0;
+          tapChainMs = 0;
+          recordTouchGesture('2-finger-tap', 'tbd');
+          publishGateState();
+        }
+      }
+      gesture = null;
       pinch = null;
       return;
     }
@@ -15055,15 +15143,33 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         const dx = ev.clientX - g.sx;
         const dy = ev.clientY - g.sy;
         const cancelled = ev.type === 'pointercancel';
+        const now = performance.now();
+        const winMs = touchGestureMs();
+        const withinSlop = !g.moved && Math.hypot(dx, dy) < tapSlopPx();
+        if (!cancelled && (g.longHold || (withinSlop && winMs && (now - (g.t0 || 0)) >= winMs))) {
+          if (!g.longHold) recordTouchGesture('long-hold', 'tbd');
+          g.longHold = true;
+          tapChainCount = 0;
+          tapChainMs = 0;
+          publishGateState();
+          gesture = null;
+          pinch = null;
+          return;
+        }
         const tap = phoneApi && typeof phoneApi.shouldSelect === 'function'
           ? phoneApi.shouldSelect(dx, dy, tapSlopPx(), cancelled)
           : (!g.moved && !cancelled);
         if (!tap || !selApi) {
+          tapChainCount = 0;
+          tapChainMs = 0;
           gesture = null;
           pinch = null;
           return;
         }
         if (state.tab === 'sketch' && !(ev.shiftKey || ev.ctrlKey || ev.metaKey)) {
+          tapChainCount = 0;
+          tapChainMs = 0;
+          recordTouchGesture('tap', 'select');
           if (
             (state.activeTool === 'Line' || state.sketchSheetMode === 'line' || state.activeTool === 'Polygon' || state.sketchSheetMode === 'polygon')
             && state.sketchPlane && state.sketchPlane.frame
@@ -15114,8 +15220,54 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           }
         }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
-        if (state.measure) noteMeasureTap(ev.clientX, ev.clientY, ev.pointerType);
         const modified = !!(ev.shiftKey || ev.ctrlKey || ev.metaKey);
+        const multiBodyToggle = state.phoneMulti === true && !!hitId;
+        const sameChain = !modified
+          && !multiBodyToggle
+          && tapChainCount > 0
+          && winMs
+          && (now - tapChainMs) <= winMs
+          && Math.hypot(ev.clientX - tapChainX, ev.clientY - tapChainY) < tapSlopPx()
+          && tapChainSelectionMode === state.selection;
+        if (sameChain && tapChainCount === 1) {
+          tapChainCount = 2;
+          tapChainMs = now;
+          tapChainX = ev.clientX;
+          tapChainY = ev.clientY;
+          if (Array.isArray(tapChainPreSelectedIds)) {
+            if (state.bodies.length > 1 && state.selection === 'item') {
+              applyPickedIds(tapChainPreSelectedIds.slice());
+            } else {
+              state.selectedIds = tapChainPreSelectedIds.slice();
+              state.hoverId = null;
+              refreshAnchor();
+              applyLook();
+            }
+          }
+          recordTouchGesture('double-tap', 'fit');
+          goView('fit');
+          publishGateState();
+          gesture = null;
+          pinch = null;
+          return;
+        }
+        if (sameChain && tapChainCount >= 2) {
+          tapChainCount = 0;
+          tapChainMs = 0;
+          recordTouchGesture('triple-tap', 'tbd');
+          publishGateState();
+          gesture = null;
+          pinch = null;
+          return;
+        }
+        tapChainCount = (!modified && !multiBodyToggle) ? 1 : 0;
+        tapChainMs = now;
+        tapChainX = ev.clientX;
+        tapChainY = ev.clientY;
+        tapChainSelectionMode = state.selection;
+        tapChainPreSelectedIds = state.selectedIds.slice();
+        recordTouchGesture('tap', 'select');
+        if (state.measure) noteMeasureTap(ev.clientX, ev.clientY, ev.pointerType);
         const next = (!modified && phoneApi && typeof phoneApi.selectionFromTap === 'function')
           ? phoneApi.selectionFromTap(state.selection, state.selectedIds, hitId, state.phoneMulti === true)
           : selApi.applyPointerSelection(state.selection, state.selectedIds, hitId, {
@@ -15828,6 +15980,155 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       commitCalloutEntry();
     });
   }
+  function stepTouchHold(now) {
+    if (!gesture || gesture.type !== 'orbit' || gesture.button !== 0 || gesture.moved || gesture.longHold || ptrs.size !== 1) return;
+    const winMs = touchGestureMs();
+    if (!winMs || now - (gesture.t0 || 0) < winMs) return;
+    gesture.longHold = true;
+    tapChainCount = 0;
+    tapChainMs = 0;
+    recordTouchGesture('long-hold', 'tbd');
+    publishGateState();
+  }
+
+  function setupFloatingPanelDock() {
+    const floatPanels = Array.from(
+      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #searchDlg, #browser, #inspector')
+    );
+    let dragState = null;
+    let suppressPanelClick = false;
+
+    document.addEventListener('click', function (ev) {
+      if (!suppressPanelClick) return;
+      suppressPanelClick = false;
+      ev.stopPropagation();
+      ev.preventDefault();
+    }, true);
+
+    function applyPanelPosition(panel, rawLeft, rawTop, hostRect, fallbackW, fallbackH) {
+      const isDrawer = panel.id === 'browser' || panel.id === 'inspector';
+      if (isDrawer) {
+        panel.style.position = 'fixed';
+        panel.style.bottom = 'auto';
+        panel.style.transform = 'none';
+        const bd = document.getElementById('backdrop');
+        if (bd) bd.classList.remove('show');
+      } else {
+        if (panel.id === 'sketchSheet' || panel.id === 'edgeSheet' || panel.id === 'toolsSheet') {
+          panel.style.width = 'fit-content';
+          panel.style.maxWidth = '100%';
+        }
+        panel.style.bottom = 'auto';
+        panel.style.transform = 'none';
+        panel.style.margin = '0';
+      }
+      const rect = panel.getBoundingClientRect();
+      const panelW = rect.width || fallbackW || 0;
+      const panelH = rect.height || fallbackH || 0;
+      const maxLeft = Math.max(0, hostRect.width - panelW);
+      const maxTop = Math.max(0, hostRect.height - panelH);
+      const clampedTop = Math.min(Math.max(0, rawTop), maxTop);
+      const topPx = isDrawer ? (hostRect.top + clampedTop) : clampedTop;
+      let dock = 'float';
+      let leftVal = Math.round(rawLeft);
+      if (rawLeft <= 0) {
+        dock = 'left';
+        leftVal = isDrawer ? Math.round(hostRect.left) : 0;
+        panel.style.left = leftVal + 'px';
+        panel.style.right = 'auto';
+      } else if (rawLeft >= maxLeft) {
+        dock = 'right';
+        leftVal = isDrawer ? Math.round(hostRect.left + maxLeft) : Math.round(maxLeft);
+        panel.style.right = isDrawer ? Math.round(window.innerWidth - hostRect.right) + 'px' : '0px';
+        panel.style.left = 'auto';
+      } else {
+        dock = 'float';
+        leftVal = isDrawer ? Math.round(hostRect.left + rawLeft) : Math.round(rawLeft);
+        panel.style.left = leftVal + 'px';
+        panel.style.right = 'auto';
+      }
+      panel.style.top = Math.round(topPx) + 'px';
+      const afterRect = panel.getBoundingClientRect();
+      panelDockState.set(panel, {
+        dock: dock,
+        left: Math.round(afterRect.left),
+        top: Math.round(afterRect.top),
+        right: Math.round(afterRect.right),
+        width: Math.round(afterRect.width),
+        height: Math.round(afterRect.height)
+      });
+      publishGateState();
+    }
+
+    function onPanelPointerDown(ev) {
+      if (ev.button !== 0 && ev.pointerType !== 'touch' && ev.pointerType !== 'pen') return;
+      if (ev.target && ev.target.closest && ev.target.closest('input, textarea, select, a, label.menu-file')) return;
+      const panel = ev.currentTarget;
+      if (!panel || panel.hidden) return;
+      const host = (panel.id === 'browser' || panel.id === 'inspector')
+        ? viewport
+        : (panel.offsetParent || viewport);
+      const hostRect = host.getBoundingClientRect();
+      const rect = panel.getBoundingClientRect();
+      dragState = {
+        panel: panel,
+        host: host,
+        pid: ev.pointerId,
+        sx: ev.clientX,
+        sy: ev.clientY,
+        startLeft: rect.left - hostRect.left,
+        startTop: rect.top - hostRect.top,
+        width: rect.width,
+        height: rect.height,
+        fromButton: !!(ev.target && ev.target.closest && ev.target.closest('button')),
+        active: false
+      };
+    }
+
+    function onPanelPointerMove(ev) {
+      if (!dragState || dragState.pid !== ev.pointerId) return;
+      const dx = ev.clientX - dragState.sx;
+      const dy = ev.clientY - dragState.sy;
+      if (!dragState.active) {
+        if (Math.hypot(dx, dy) < tapSlopPx()) return;
+        dragState.active = true;
+        if (dragState.fromButton) suppressPanelClick = true;
+        try { dragState.panel.setPointerCapture(ev.pointerId); } catch (_err) { /* ignore */ }
+      }
+      ev.preventDefault();
+      ev.stopPropagation();
+      const hostRect = dragState.host.getBoundingClientRect();
+      applyPanelPosition(
+        dragState.panel,
+        dragState.startLeft + dx,
+        dragState.startTop + dy,
+        hostRect,
+        dragState.width,
+        dragState.height
+      );
+    }
+
+    function onPanelPointerEnd(ev) {
+      if (!dragState || dragState.pid !== ev.pointerId) return;
+      const finished = dragState;
+      dragState = null;
+      if (finished.active) {
+        try { finished.panel.releasePointerCapture(ev.pointerId); } catch (_err) { /* ignore */ }
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    }
+
+    for (let i = 0; i < floatPanels.length; i += 1) {
+      const panel = floatPanels[i];
+      panel.addEventListener('pointerdown', onPanelPointerDown);
+      panel.addEventListener('pointermove', onPanelPointerMove);
+      panel.addEventListener('pointerup', onPanelPointerEnd);
+      panel.addEventListener('pointercancel', onPanelPointerEnd);
+    }
+  }
+  setupFloatingPanelDock();
+
   function stepCubeHold(now) {
     if (!gesture || gesture.type !== 'cube' || gesture.moved || ptrs.size !== 1) return;
     const holdDelay = (viewApi && viewApi.LONG_PRESS_MS) || CUBE_SNAP_MS;
@@ -15856,7 +16157,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   renderFrame();
 
   function frame(now) {
-    stepCubeHold(typeof now === 'number' ? now : performance.now());
+    const tick = typeof now === 'number' ? now : performance.now();
+    stepCubeHold(tick);
+    stepTouchHold(tick);
     if (state.measure) updateMeasure();
     renderFrame();
     requestAnimationFrame(frame);
