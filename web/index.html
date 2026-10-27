@@ -2329,7 +2329,6 @@
       </form>
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <div id="lineDimLayer" class="line-dim-layer" aria-hidden="true" hidden></div>
-      <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
       <div id="selectionShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Selection" data-hscroll hidden>
         <span class="modify-order">Selection</span>
         <div class="vp-cluster" role="group" aria-label="Select">
@@ -8882,8 +8881,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     cubeRight = marginRight;
     const home = document.getElementById('vcHome');
     const pad = phone ? CUBE_HIT_PX : 0;
-    home.style.top = marginTop + 'px';
-    home.style.right = (marginRight + cubeCss + pad + 8) + 'px';
+    if (home) home.style.top = marginTop + 'px';
+    if (home) home.style.right = (marginRight + cubeCss + pad + 8) + 'px';
     placeViewCube();
     layoutDimSheet();
     placeCreateMenu();
@@ -13761,7 +13760,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
       message = 'Display: ' + (names[state.display] || state.display);
       applyLook();
-    } else if (action === 'view') goView(btn.getAttribute('data-view') || 'home');
+    } else if (action === 'view') {
+      const isTopHome = !!(cameraShelf && cameraShelf.contains(btn) && btn.getAttribute('data-view') === 'top');
+      const viewName = isTopHome ? 'home' : (btn.getAttribute('data-view') || 'home');
+      if (isTopHome) message = 'Home view';
+      goView(viewName);
+    }
     else if (action === 'fit') {
       goView('fit');
       message = 'Zoom to Fit';
