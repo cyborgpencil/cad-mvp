@@ -30,6 +30,7 @@ Organized knowledge for high-performance custom CAD/CAM combining Autodesk, Adob
 ## Notes
 
 Update research here first. Propagate only confirmed changes into MVP or vision docs. Keep documents consistent with the project-organizer skill (`../.grok/skills/project-organizer/`). Note: a "document-upgrader" skill was referenced here but does not exist in the repo.
+- [overnight-sketch-dims-follow-angle.md](overnight-sketch-dims-follow-angle.md): overnight item 3 — sketch dims follow the angle they represent; tip `529df18` `.line-dim` badges stay screen-upright (CSS translate only, no rotate); flip, offset, chip kinds, and the implementation path stay TBD (2026-10-27 ~1:10 AM MT).
 - [gui/ui-layout-review.md](gui/ui-layout-review.md): Fusion, Onshape, FreeCAD and Blender UI layout review with tab-layout takeaways (2026-10-21).
 - [gui/usability-checks.md](gui/usability-checks.md): pass/fail GUI checklist for touch targets, shortcuts, the Export gate, layout, the Repair tab and rotation (2026-10-21).
 - [gui/wire-target.md](gui/wire-target.md): Qt app in src/ vs WASM browser page as the GUI wiring target, for Erik's choice (2026-10-21).
