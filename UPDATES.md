@@ -3,6 +3,9 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-27
+- 2026-10-27 PR #206 (merged at e805614): web - Default + Modo theme switcher (Active chrome B), About/version (tip 9b758b4).
+
 ## 2026-10-26
 - 2026-10-26 PR #204 (merged at 2bbece5): web - iPad/Kiwi gestures + float-dock invent-free (tip 3a6daad).
 - 2026-10-26 PR #202 (merged at 5e2d268): prompts - invent-free Default + Modo theme brief, active chrome B (tip c4475f9).
