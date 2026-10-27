@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-26
+- 2026-10-26 PR #202 (merged at 5e2d268): prompts - invent-free Default + Modo theme brief, active chrome B (tip c4475f9).
 - 2026-10-26 PR #200 (merged at b0dd4df): research - invent-free Modo GUI theme token digest (tip f38aa66).
 - 2026-10-26 PR #199 (merged at d167e21): prompts - invent-free iPad/Kiwi gestures + float-dock brief (tip be0d5f3).
 - 2026-10-26 PR #197 (merged at 58611e2): web - X-ray select-through gated on existing display state (tip d0514a4).
