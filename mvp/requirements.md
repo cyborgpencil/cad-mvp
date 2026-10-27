@@ -241,6 +241,14 @@ End of queue (Erik via 3T, 2026-10-26 ~8:31 AM MT, ~8:46 AM MT, ~9:44 AM MT, ~10
   - **Dims stay while drawing (Erik).** Keep angles and dimensions on the sketch as drawn. They are not only a temporary preview that vanishes. Confirm model (preview HUD vs committed driving dims) stays **TBD**, as under floating end adjust.
   - **Top and bottom stay on (Erik, same message).** While sketching, the very top (tree + filename) and the very bottom (Modify / Create) stay visible. Do not hide them for this overhaul. The earlier Arc-dialog TBD on the chrome park is superseded by this overhaul; do not invent Arc-specific behavior here.
   - **TBD (do not invent):** control ids; pixel sizes; hex colors; icon art; phone vs desktop layout; touch vs pointer layout.
+- **Tool Search exit**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (1), via Chief. Dig hard bar at tip `e805614` (`research/overnight-tool-search-exit.md`; brief `prompts/antigravity-tool-search-exit.md`): Escape, outside click, `#searchBtn` toggle, and pick-to-close already exist. No in-dialog Cancel. Hotkey `X` opens only.
+  - **Status: discuss / parked.**
+  - **TBD:** `X` toggle; in-dialog Cancel; Escape scope; requirements park vs brief-only. This bullet records the gap. It does not close those TBDs.
+- **Switch tool/menu → hide prior tool UI**
+  - Erik overnight ~11:55 PM MT 2026-10-26, item (2). Extends P4 (`prompts/p4-tool-shelf-show-hide.md`) and always-visible chrome (very top, tools menu bar, very bottom stay; everything else show/hide). Digest `research/overnight-switch-hide-prior-tool-ui.md`. Brief `prompts/antigravity-switch-hide-prior-tool-ui.md`.
+  - **Status: discuss / parked.**
+  - **TBD:** panel-id taxonomy; Tool Search vs sketch-edge-modify hide matrix; cancel-vs-hide. Do not invent that matrix here.
 
 ## Success Criteria
 
