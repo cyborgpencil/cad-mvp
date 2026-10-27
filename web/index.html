@@ -4478,9 +4478,51 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (meshCad && topo && mode === 'item') {
       if (selected.indexOf('item') >= 0) selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, allTris());
       else if (hover === 'item') hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, allTris());
-    } else if (meshCad && topo && mode === 'face') {
-      selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf(selected));
-      if (hover) hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf([hover]));
+    } else if (mode === 'face') {
+      if (state.bodies.length > 1) {
+        const selChunks = [];
+        const hoverChunks = [];
+        function collectBodyFaces(ids, out) {
+          for (let i = 0; i < ids.length; i += 1) {
+            const raw = String(ids[i] || '');
+            const cut = raw.indexOf(':');
+            const bId = cut > 0 ? raw.slice(0, cut) : '';
+            const fId = cut > 0 ? raw.slice(cut + 1) : raw;
+            const bObj = bId ? findBody(bId) : null;
+            if (!bObj || !bObj.mesh || !bObj.topology || !bObj.topology.faces) continue;
+            const tris = [];
+            for (let k = 0; k < bObj.topology.faces.length; k += 1) {
+              if (bObj.topology.faces[k].id === fId) {
+                const fTris = bObj.topology.faces[k].tris || [];
+                for (let t = 0; t < fTris.length; t += 1) tris.push(fTris[t]);
+              }
+            }
+            if (tris.length) {
+              out.push(viewApi.faceVertexArray(bObj.mesh.vertices, bObj.mesh.triangles, tris));
+            }
+          }
+        }
+        function joinFloat32(chunks) {
+          if (!chunks.length) return empty;
+          if (chunks.length === 1) return chunks[0];
+          let total = 0;
+          for (let i = 0; i < chunks.length; i += 1) total += chunks[i].length;
+          const merged = new Float32Array(total);
+          let offset = 0;
+          for (let i = 0; i < chunks.length; i += 1) {
+            merged.set(chunks[i], offset);
+            offset += chunks[i].length;
+          }
+          return merged;
+        }
+        collectBodyFaces(selected, selChunks);
+        if (hover) collectBodyFaces([hover], hoverChunks);
+        selPos = joinFloat32(selChunks);
+        hoverPos = joinFloat32(hoverChunks);
+      } else if (meshCad && topo) {
+        selPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf(selected));
+        if (hover) hoverPos = viewApi.faceVertexArray(meshCad.vertices, meshCad.triangles, facesOf([hover]));
+      }
     } else if (mode === 'edge') {
       const selPts = [];
       const hoverPts = [];
@@ -4491,12 +4533,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       selLine = viewApi.polylineArray(selPts);
       hoverLine = viewApi.polylineArray(hoverPts);
-    } else if (topo && mode === 'vertex') {
+    } else if (mode === 'vertex') {
       const selPts = [];
       const hoverPts = [];
-      for (let i = 0; i < topo.vertices.length; i += 1) {
-        if (selected.indexOf(topo.vertices[i].id) >= 0) selPts.push(topo.vertices[i].p);
-        else if (hover === topo.vertices[i].id) hoverPts.push(topo.vertices[i].p);
+      const vertexRows = listVertexRows();
+      for (let i = 0; i < vertexRows.length; i += 1) {
+        if (selected.indexOf(vertexRows[i].id) >= 0) selPts.push(vertexRows[i].p);
+        else if (hover === vertexRows[i].id) hoverPts.push(vertexRows[i].p);
       }
       selPt = viewApi.pointArray(selPts);
       hoverPt = viewApi.pointArray(hoverPts);
@@ -7314,26 +7357,180 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
   }
 
+  const occludeRaycaster = new THREE.Raycaster();
+
+  function intersectMeshes(rc, targets, doubleSide) {
+    const list = Array.isArray(targets) ? targets : [targets];
+    const saved = [];
+    for (let i = 0; i < list.length; i += 1) {
+      const m = list[i];
+      if (m && m.material) {
+        saved.push({ mat: m.material, side: m.material.side });
+        m.material.side = doubleSide ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    }
+    try {
+      return rc.intersectObjects(list, false);
+    } finally {
+      for (let i = 0; i < saved.length; i += 1) {
+        saved[i].mat.side = saved[i].side;
+      }
+    }
+  }
+
+  // X-ray select-through (mvp/requirements.md, PR #163):
+  // Select-through-objects (click-through / pick past front faces) is allowed only when X-ray is on.
+  // When X-ray is off, pick must hit the frontmost surface only — no click-through to objects behind.
+  // TBD: what the app's X-ray control is named/where it lives, any pick-tolerance or depth-buffer details not stated by Erik.
+  function pickFromRayIds(ids, selectedIds, xray) {
+    if (!ids || !ids.length) return null;
+    if (!xray || ids.length === 1) return ids[0];
+    const sel = Array.isArray(selectedIds) ? selectedIds : [];
+    const selIndices = [];
+    for (let i = 0; i < ids.length; i += 1) {
+      if (sel.indexOf(ids[i]) >= 0) selIndices.push(i);
+    }
+    if (selIndices.length === 0 || selIndices.length === ids.length) {
+      return ids[0];
+    }
+    const lastIdx = selIndices[selIndices.length - 1];
+    for (let step = 1; step <= ids.length; step += 1) {
+      const nextIdx = (lastIdx + step) % ids.length;
+      if (sel.indexOf(ids[nextIdx]) < 0) return ids[nextIdx];
+    }
+    return ids[(lastIdx + 1) % ids.length];
+  }
+
+  function buildBodySurfaceInfo(meshData, topo) {
+    if (!meshData || !meshData.vertices || !meshData.triangles || !topo || !topo.triFace) return null;
+    const verts = meshData.vertices;
+    const tris = meshData.triangles;
+    const triFace = topo.triFace;
+    const vCount = verts.length;
+    const vertexFaces = Array.from({ length: vCount }, function () { return new Set(); });
+    const vertexFrontFaces = Array.from({ length: vCount }, function () { return new Set(); });
+    const camCad = [camera.position.x, camera.position.z, camera.position.y];
+    for (let t = 0; t < tris.length; t += 1) {
+      const tri = tris[t];
+      const fId = triFace[t];
+      if (!tri || !fId) continue;
+      const ia = tri[0];
+      const ib = tri[1];
+      const ic = tri[2];
+      if (vertexFaces[ia]) vertexFaces[ia].add(fId);
+      if (vertexFaces[ib]) vertexFaces[ib].add(fId);
+      if (vertexFaces[ic]) vertexFaces[ic].add(fId);
+      const a = verts[ia];
+      const b = verts[ib];
+      const c = verts[ic];
+      if (!a || !b || !c) continue;
+      const ux = b[0] - a[0];
+      const uy = b[1] - a[1];
+      const uz = b[2] - a[2];
+      const vx = c[0] - a[0];
+      const vy = c[1] - a[1];
+      const vz = c[2] - a[2];
+      const nx = uy * vz - uz * vy;
+      const ny = uz * vx - ux * vz;
+      const nz = ux * vy - uy * vx;
+      const dot = nx * (camCad[0] - a[0]) + ny * (camCad[1] - a[1]) + nz * (camCad[2] - a[2]);
+      if (dot > 0) {
+        if (vertexFrontFaces[ia]) vertexFrontFaces[ia].add(fId);
+        if (vertexFrontFaces[ib]) vertexFrontFaces[ib].add(fId);
+        if (vertexFrontFaces[ic]) vertexFrontFaces[ic].add(fId);
+      }
+    }
+    function nearestVertexIdx(p) {
+      if (!p) return -1;
+      let bestIdx = -1;
+      let bestD2 = Infinity;
+      for (let i = 0; i < vCount; i += 1) {
+        const mv = verts[i];
+        const dx = mv[0] - p[0];
+        const dy = mv[1] - p[1];
+        const dz = mv[2] - p[2];
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          bestIdx = i;
+          if (d2 === 0) break;
+        }
+      }
+      return bestIdx;
+    }
+    function facesForVertex(p, idxHint) {
+      const vi = (typeof idxHint === 'number' && idxHint >= 0 && idxHint < vCount)
+        ? idxHint
+        : nearestVertexIdx(p);
+      return {
+        all: (vi >= 0 && vertexFaces[vi]) ? vertexFaces[vi] : new Set(),
+        front: (vi >= 0 && vertexFrontFaces[vi]) ? vertexFrontFaces[vi] : new Set()
+      };
+    }
+    function facesForEdgeSegment(pts, k) {
+      const vi0 = nearestVertexIdx(pts[0]);
+      let vi1 = nearestVertexIdx(pts[pts.length - 1]);
+      if (vi0 === vi1 && pts.length > 2) vi1 = nearestVertexIdx(pts[Math.floor(pts.length / 2)]);
+      const f0 = (vi0 >= 0 && vertexFaces[vi0]) ? vertexFaces[vi0] : new Set();
+      const f1 = (vi1 >= 0 && vertexFaces[vi1]) ? vertexFaces[vi1] : new Set();
+      const inc = new Set();
+      f0.forEach(function (f) { if (f1.has(f)) inc.add(f); });
+      if (inc.size === 0) {
+        f0.forEach(function (f) { inc.add(f); });
+        f1.forEach(function (f) { inc.add(f); });
+      }
+      const touch = new Set();
+      f0.forEach(function (f) { touch.add(f); });
+      f1.forEach(function (f) { touch.add(f); });
+      const viA = nearestVertexIdx(pts[k]);
+      const viB = nearestVertexIdx(pts[k + 1]);
+      if (viA >= 0 && vertexFaces[viA]) vertexFaces[viA].forEach(function (f) { touch.add(f); });
+      if (viB >= 0 && vertexFaces[viB]) vertexFaces[viB].forEach(function (f) { touch.add(f); });
+      const frontA = (viA >= 0 && vertexFrontFaces[viA]) ? vertexFrontFaces[viA] : new Set();
+      const frontB = (viB >= 0 && vertexFrontFaces[viB]) ? vertexFrontFaces[viB] : new Set();
+      const front = new Set();
+      inc.forEach(function (f) { if (frontA.has(f) || frontB.has(f)) front.add(f); });
+      return { inc: inc, touch: touch, front: front };
+    }
+    return {
+      topo: topo,
+      facesForVertex: facesForVertex,
+      facesForEdgeSegment: facesForEdgeSegment
+    };
+  }
+
   function pickElement(clientX, clientY, pointerType) {
     const mode = state.selection;
     const topo = state.topology;
+    const xray = state.display === 'xray';
     pointerNdc(clientX, clientY);
     if (state.bodies.length > 1 && mode === 'item') {
-      const bodyHits = raycaster.intersectObjects(bodyRoot.children, false);
+      const bodyHits = intersectMeshes(raycaster, bodyRoot.children, xray);
       if (!bodyHits.length) return null;
-      return bodyHits[0].object.userData.bodyId || null;
+      const bodyIds = [];
+      for (let i = 0; i < bodyHits.length; i += 1) {
+        const bId = bodyHits[i].object && bodyHits[i].object.userData ? bodyHits[i].object.userData.bodyId : '';
+        if (bId && bodyIds.indexOf(bId) < 0) bodyIds.push(bId);
+      }
+      return pickFromRayIds(bodyIds, state.selectedIds, xray);
     }
     if (state.bodies.length > 1 && mode === 'face') {
-      const bodyHits = raycaster.intersectObjects(bodyRoot.children, false);
+      const bodyHits = intersectMeshes(raycaster, bodyRoot.children, xray);
       if (!bodyHits.length) return null;
-      const bHit = bodyHits[0];
-      const bId = bHit.object && bHit.object.userData ? bHit.object.userData.bodyId : '';
-      const bObj = bId ? findBody(bId) : null;
-      if (!bObj || !bObj.topology || !bObj.topology.triFace || bHit.faceIndex == null) return null;
-      const fId = bObj.topology.triFace[bHit.faceIndex] || null;
-      return fId ? (bObj.id + ':' + fId) : null;
+      const faceIds = [];
+      for (let i = 0; i < bodyHits.length; i += 1) {
+        const bHit = bodyHits[i];
+        const bId = bHit.object && bHit.object.userData ? bHit.object.userData.bodyId : '';
+        const bObj = bId ? findBody(bId) : null;
+        if (!bObj || !bObj.topology || !bObj.topology.triFace || bHit.faceIndex == null) continue;
+        const fId = bObj.topology.triFace[bHit.faceIndex] || null;
+        if (!fId) continue;
+        const fullId = bObj.id + ':' + fId;
+        if (faceIds.indexOf(fullId) < 0) faceIds.push(fullId);
+      }
+      return pickFromRayIds(faceIds, state.selectedIds, xray);
     }
-    const meshHits = raycaster.intersectObject(mesh, false);
+    const meshHits = intersectMeshes(raycaster, mesh, xray);
     const hit = meshHits.length ? meshHits[0] : null;
     if (mode === 'item') return hit ? 'item' : null;
     if (!selApi) return null;
@@ -7345,48 +7542,183 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       : (pointerType === 'touch' && selApi.TOUCH_PICK_TOLERANCE_PX
         ? selApi.TOUCH_PICK_TOLERANCE_PX
         : selApi.PICK_TOLERANCE_PX);
+    let cursorBodyId = '';
+    let cursorBodyDist = Infinity;
+    if (!xray && state.bodies.length > 1 && (mode === 'edge' || mode === 'vertex')) {
+      const cursorHits = intersectMeshes(raycaster, bodyRoot.children, false);
+      if (cursorHits.length && cursorHits[0].object && cursorHits[0].object.userData) {
+        cursorBodyId = cursorHits[0].object.userData.bodyId || '';
+        cursorBodyDist = cursorHits[0].distance;
+      }
+    }
+    const surfCache = {};
+    function getSurfaceInfo(bodyId) {
+      const key = (state.bodies.length > 1 && bodyId) ? String(bodyId) : '__single__';
+      if (Object.prototype.hasOwnProperty.call(surfCache, key)) return surfCache[key];
+      let mData = null;
+      let tData = null;
+      if (state.bodies.length > 1 && bodyId) {
+        const bObj = findBody(bodyId);
+        mData = bObj && bObj.mesh ? bObj.mesh : null;
+        tData = bObj && bObj.topology ? bObj.topology : null;
+      } else {
+        const only = state.bodies.length === 1 ? state.bodies[0] : null;
+        mData = (only && only.mesh && only.mesh.vertices && only.mesh.triangles) ? only.mesh : state.meshCad;
+        tData = (only && only.topology) ? only.topology : topo;
+      }
+      surfCache[key] = buildBodySurfaceInfo(mData, tData);
+      return surfCache[key];
+    }
+    function isOccludedByFrontSurface(targetCad, candidateBodyId, allowedFaces) {
+      const targetThree = new THREE.Vector3(targetCad[0], targetCad[2], targetCad[1]);
+      const dir = targetThree.clone().sub(camera.position);
+      const targetDist = dir.length();
+      if (!(targetDist > 0)) return false;
+      dir.divideScalar(targetDist);
+      occludeRaycaster.ray.origin.copy(camera.position);
+      occludeRaycaster.ray.direction.copy(dir);
+      const targets = state.bodies.length > 1 ? bodyRoot.children : [mesh];
+      const hits = intersectMeshes(occludeRaycaster, targets, false);
+      const ownBodyId = candidateBodyId || singleBodyId() || '';
+      for (let i = 0; i < hits.length; i += 1) {
+        const h = hits[i];
+        if (h.distance >= targetDist) break;
+        const hBodyId = state.bodies.length > 1
+          ? (h.object && h.object.userData ? (h.object.userData.bodyId || '') : '')
+          : (singleBodyId() || '');
+        if (hBodyId !== ownBodyId) return true;
+        const hSurf = getSurfaceInfo(hBodyId);
+        const hFaceId = hSurf && hSurf.topo && hSurf.topo.triFace && h.faceIndex != null
+          ? hSurf.topo.triFace[h.faceIndex]
+          : '';
+        if (hFaceId && allowedFaces && allowedFaces.has(hFaceId)) continue;
+        return true;
+      }
+      return false;
+    }
     if (mode === 'edge') {
       const rows = listEdgeRows();
-      let best = null;
-      let bestD = limit;
+      const candidates = [];
       for (let i = 0; i < rows.length; i += 1) {
-        const pts = rows[i].pts;
+        const row = rows[i];
+        const pts = row.pts;
+        const surf = !xray ? getSurfaceInfo(row.bodyId) : null;
+        let rowBestD = limit + 1;
+        let rowBestCamDist = Infinity;
         for (let k = 0; k + 1 < pts.length; k += 1) {
           if (!inFront(pts[k]) && !inFront(pts[k + 1])) continue;
           const a = screenOfCad(pts[k]);
           const b = screenOfCad(pts[k + 1]);
           const d = distToSeg(px, py, a.x, a.y, b.x, b.y);
-          if (d <= bestD) {
-            bestD = d;
-            best = rows[i].id;
+          if (d > limit) continue;
+          const midCad = [
+            0.5 * (pts[k][0] + pts[k + 1][0]),
+            0.5 * (pts[k][1] + pts[k + 1][1]),
+            0.5 * (pts[k][2] + pts[k + 1][2])
+          ];
+          const camDist = Math.hypot(
+            midCad[0] - camera.position.x,
+            midCad[2] - camera.position.y,
+            midCad[1] - camera.position.z
+          );
+          if (!xray) {
+            if (cursorBodyId && row.bodyId && row.bodyId !== cursorBodyId && cursorBodyDist < camDist) continue;
+            if (surf) {
+              const segFaces = surf.facesForEdgeSegment(pts, k);
+              if (segFaces.front.size === 0) continue;
+              if (isOccludedByFrontSurface(midCad, row.bodyId, segFaces.touch)) continue;
+            }
+          }
+          if (d < rowBestD || (d === rowBestD && camDist < rowBestCamDist)) {
+            rowBestD = d;
+            rowBestCamDist = camDist;
           }
         }
+        if (rowBestD <= limit) {
+          candidates.push({ id: row.id, d: rowBestD, camDist: rowBestCamDist });
+        }
       }
-      return best;
+      if (!candidates.length) return null;
+      candidates.sort(function (a, b) {
+        if (a.d !== b.d) return a.d - b.d;
+        return a.camDist - b.camDist;
+      });
+      if (!xray) return candidates[0].id;
+      const first = candidates[0];
+      const depthOrdered = [first.id];
+      for (let i = 1; i < candidates.length; i += 1) {
+        if (candidates[i].camDist > first.camDist && depthOrdered.indexOf(candidates[i].id) < 0) {
+          depthOrdered.push(candidates[i].id);
+        }
+      }
+      return pickFromRayIds(depthOrdered, state.selectedIds, true);
     }
-    if (!topo) return null;
     if (mode === 'vertex') {
-      let best = null;
-      let bestD = limit;
-      for (let i = 0; i < topo.vertices.length; i += 1) {
-        const v = topo.vertices[i];
+      const rows = listVertexRows();
+      if (!rows.length) return null;
+      const candidates = [];
+      for (let i = 0; i < rows.length; i += 1) {
+        const v = rows[i];
         if (!inFront(v.p)) continue;
         const s = screenOfCad(v.p);
         const d = Math.hypot(s.x - px, s.y - py);
-        if (d <= bestD) {
-          bestD = d;
-          best = v.id;
+        if (d > limit) continue;
+        const camDist = Math.hypot(
+          v.p[0] - camera.position.x,
+          v.p[2] - camera.position.y,
+          v.p[1] - camera.position.z
+        );
+        if (!xray) {
+          if (cursorBodyId && v.bodyId && v.bodyId !== cursorBodyId && cursorBodyDist < camDist) continue;
+          const surf = getSurfaceInfo(v.bodyId);
+          if (surf) {
+            const vFaces = surf.facesForVertex(v.p, v.index);
+            if (vFaces.front.size === 0) continue;
+            if (isOccludedByFrontSurface(v.p, v.bodyId, vFaces.all)) continue;
+          }
+        }
+        candidates.push({ id: v.id, d: d, camDist: camDist });
+      }
+      if (!candidates.length) return null;
+      candidates.sort(function (a, b) {
+        if (a.d !== b.d) return a.d - b.d;
+        return a.camDist - b.camDist;
+      });
+      if (!xray) return candidates[0].id;
+      const first = candidates[0];
+      const depthOrdered = [first.id];
+      for (let i = 1; i < candidates.length; i += 1) {
+        if (candidates[i].camDist > first.camDist && depthOrdered.indexOf(candidates[i].id) < 0) {
+          depthOrdered.push(candidates[i].id);
         }
       }
-      return best;
+      return pickFromRayIds(depthOrdered, state.selectedIds, true);
     }
+    if (!topo) return null;
     if (!hit || hit.faceIndex == null || !topo.triFace) {
       lastPick = null;
       return null;
     }
-    const faceId = topo.triFace[hit.faceIndex] || null;
-    if (faceId && hit.point) {
-      const local = mesh.worldToLocal(hit.point.clone());
+    const faceHits = [];
+    const faceIds = [];
+    for (let i = 0; i < meshHits.length; i += 1) {
+      const mh = meshHits[i];
+      if (mh.faceIndex == null) continue;
+      const fId = topo.triFace[mh.faceIndex] || null;
+      if (!fId || faceIds.indexOf(fId) >= 0) continue;
+      faceIds.push(fId);
+      faceHits.push({ id: fId, hit: mh });
+    }
+    const faceId = pickFromRayIds(faceIds, state.selectedIds, xray);
+    let chosenHit = hit;
+    for (let i = 0; i < faceHits.length; i += 1) {
+      if (faceHits[i].id === faceId) {
+        chosenHit = faceHits[i].hit;
+        break;
+      }
+    }
+    if (faceId && chosenHit && chosenHit.point) {
+      const local = mesh.worldToLocal(chosenHit.point.clone());
       lastPick = { id: faceId, point: [local.x, local.z, local.y] };
     } else {
       lastPick = null;
@@ -10020,8 +10352,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             child.material.emissive.set(on ? sel : 0x000000);
             child.material.emissiveIntensity = on ? 0.25 : 0;
           }
+          child.material.transparent = mode === 'xray';
+          child.material.opacity = mode === 'xray' ? 0.28 : 1;
+          child.material.depthWrite = mode !== 'xray';
+          child.material.clippingPlanes = state.section ? [clip] : [];
+          child.material.needsUpdate = true;
         }
-        if (child.children[0]) child.children[0].visible = mode !== 'shaded';
+        if (child.children[0]) {
+          child.children[0].visible = mode !== 'shaded';
+          if (child.children[0].material && child.children[0].material.color) {
+            child.children[0].material.color.set(mode === 'xray' ? 0xd7e4f2 : 0x10283a);
+            child.children[0].material.clippingPlanes = state.section ? [clip] : [];
+          }
+        }
       }
     }
     corners.visible = false;
@@ -13526,19 +13869,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function listVertexRows() {
     const rows = [];
+    const count = state.bodies.length;
     function add(vertices, bodyId) {
       if (!vertices) return;
       for (let i = 0; i < vertices.length; i += 1) {
         const v = vertices[i];
         if (!v || !v.p || v.p.length < 3) continue;
-        rows.push({ id: v.id, p: v.p, bodyId: bodyId || '' });
+        const id = count > 1 && bodyId ? (String(bodyId) + ':' + v.id) : String(v.id);
+        rows.push({ id: id, vertexId: v.id, index: v.index, p: v.p, bodyId: bodyId || '' });
       }
     }
-    if (state.topology && state.topology.vertices && state.topology.vertices.length) {
-      add(state.topology.vertices, '');
+    if (count <= 1 && state.topology && state.topology.vertices && state.topology.vertices.length) {
+      add(state.topology.vertices, singleBodyId());
       return rows;
     }
-    for (let i = 0; i < state.bodies.length; i += 1) {
+    for (let i = 0; i < count; i += 1) {
       const body = state.bodies[i];
       if (body && body.topology) add(body.topology.vertices, body.id);
     }
