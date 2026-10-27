@@ -5,7 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
-- 2026-10-27 docs - item-10 L-bracket+truck rebuild parked verify-only (session 61a4934c; coding_pr_needed=false; Erik TBD dims; zero repo edits @ tip 0c36ba6; main tip 694607a).
+- 2026-10-27 docs - item-10 L-bracket agy verify-only (session 61a4934c; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false; invent-free stop — Erik TBD dims).
 - 2026-10-27 docs - item-9 app-wide redundancy pass verify-only (sessions 9489eca1 + 01d55e74; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false).
 - 2026-10-27 PR #223 (merged at c2101d2): web - item-8 consolidate/remove bottom Create-Modify bar (tip ef3659a).
 - 2026-10-27 PR #221 (merged at 72b7f0f): web - Home onto Camera-shelf Top control (tip 3fac582).
