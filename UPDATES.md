@@ -4,6 +4,8 @@
 Newest entries at the top.
 
 ## 2026-10-27
+- 2026-10-27 PR #215 (merged at 9157450): docs - park overnight 4–9 invent-free View/chrome briefs (tip aa9e890).
+- 2026-10-27 PR #212 (merged at cf89656): web - switch tool/menu hides prior tool UI (tip 293bcf2).
 - 2026-10-27 PR #213 (merged at 6d4c384): web - sketch dims follow the angle they represent (tip 07c9382).
 - 2026-10-27 PR #210 (merged at 1b8a57f): docs - overnight sketch dims follow-angle brief (tip 0c2710c).
 - 2026-10-27 PR #208 (merged at c713ce4): docs - overnight Tool Search exit + hide-prior tool UI briefs (tip 389e33f).
