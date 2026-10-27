@@ -1,102 +1,130 @@
-# Antigravity sketch clutter, verts, edit
+# Antigravity item 7 → **7-C1 + 7-B1 + 7-E1** (flesh HOLD)
 
-Sketch: less create clutter; brighter verts and edges on all components; edit and delete; flesh sketches and solids. Dig’s tip scan leaves each unspecified clause TBD. This file does not turn those clauses into a punch list. This file is the Antigravity feed. It does not change the app by itself.
+Sketch create clutter stays the tip status quo (**7-C1**). Vert and edge contrast stays on the existing tip materials, with the brightness metric **TBD** (**7-B1**). Edit and delete stay on the existing re-enter / select / Delete / Trim path (**7-E1**). **Flesh** is **HOLD**. Chief final lock (**7-C1 + 7-B1 + 7-E1**, flesh hold, 2026-10-27 ~11:15 AM MT via 3T · Chief) supersedes the overnight all-TBD item-7 prompt as the live must. This file is the Antigravity feed. It does not change the app by itself.
 
-**Gate:** This item’s **code** starts only after this file tip-matches on main **and** overnight item 1 Tool Search exit plus related tip-matches have landed. Overnight 1–2 briefs are on main ([#208](https://github.com/cyborgpencil/cad-mvp/pull/208) @ `c713ce4`). Item 3 brief is on main ([#210](https://github.com/cyborgpencil/cad-mvp/pull/210) @ `1b8a57f`; UPDATES [#211](https://github.com/cyborgpencil/cad-mvp/pull/211)). Pilot holds the coding `agy`. This prompts file does not start an `agy` by itself. Docs base is main @ `7214005` (`72140052f516b59d6560133fc4240f13e5d257c7`, tip after #211). Dig’s scan tip for `web/` remains `c713ce4` (`c713ce4479349fe11d56a53921edb7dafe866038`). #209/#210/#211 are docs/UPDATES only relative to that Dig scan for View/chrome facts. Do not re-spec #208. Do not re-spec item 3. Do not re-spec themes / Active chrome B.
+**Gate:** Base tip `507a019` (`507a019255c8b8127c32c5906e396d85b6285c41`, main after [#236](https://github.com/cyborgpencil/cad-mvp/pull/236)). Overnight tip-scan in `research/overnight-sketch-clutter-verts-edit.md` was at `c713ce4`. The facts below were re-read in `web/index.html` at `507a019`. Rust #4 **HOLD**. Triple-tap **HOLD**. No web theme apply. This docs file does not start an `agy`.
 
-**Hard lock:** Implementation is **Antigravity-only on Z13**. Pilot holds one `agy` until this file tip-matches on main and the item-1 hold above has lifted, then owns one `agy`. Do not use Grok Build or Cursor for the handoff into code. Prefer a worktree under `C:\Dev\`; do not invent a new path or create folders from this brief. Do not commit from Antigravity; Pilot/Repo Keeper commit path owns that. Do not invent Erik specs. Stay in `web/` (JS, HTML, CSS). No kernel, C++, `src/`, bindings, or wasm rebuild. No new control ids, hex, pixel sizes, gesture maps, themes, Active chrome B changes, or invented relocation homes. No invented punch list.
+**Hard lock:** Invent-free. **Verify-only preferred** where the tip already matches. **No hex invent.** No new control id. No new pixel size. No gesture map. No 7-C2 overflow or dropdown. Flesh stays **HOLD**. Stay in `web/` (JS, HTML, CSS) for the later coding `agy`. No kernel, C++, `src/`, bindings, or wasm rebuild. Watertight / units (mm) only if a solid export path is touched. Do not invent export work. This item does not touch export.
 
-**Source of truth:**
+---
 
-- Erik overnight ~11:55 PM MT 2026-10-26, item **(7) Sketch: less create clutter; brighter verts/edges all components; edit+delete; flesh sketches+solids**, via CAD Chief. Invent-free. Do not expand beyond these clauses.
-- `research/overnight-sketch-clutter-verts-edit.md` (Dig, 2026-10-27 ~1:15 AM MT), scanned at tip `c713ce4`. Cite that digest. Anything it marks **TBD** stays **TBD**.
-- Sketch chrome park and `prompts/antigravity-sketch-chrome-flow.md`: while sketch is active, minimize non-sketch chrome; Create → six ortho planes → sketch-create tools; keep Finish Sketch. Do not re-spec that flow.
-- Sketch draw overhaul park and `prompts/antigravity-sketch-draw-overhaul.md`: live length and angle; dims stay; #183 strip and Finish stay. The overhaul’s “very bottom (Modify / Create) stay on” line is not retargeted here (item 8 is the bottom-bar brief). Do not re-spec the overhaul.
+## Source of truth (cite)
 
-Quoted from Dig’s scan of `web/index.html` at `c713ce4` (baseline only; not a new color spec):
+1. **Chief final lock (7-C1 + 7-B1 + 7-E1, flesh hold):** 3T · Chief final 2026-10-27 ~11:15 AM MT (`/workspace/research/chief-lock-items-6-7-10-2026-10-27.md`). Draw + Modify status quo. Contrast raised on existing tip materials only, no hex. Edit + delete = re-enter sketch + select + Delete/Trim on the existing path. Flesh hold. Brightness target/metric is a true gap.
+2. **Dig cite pack (Doc second PASS ~2:45 PM MT):** `/workspace/research/cite-pack-item7-C1-B1-E1-2026-10-27.md`. Dig invent-free second on the retip brief **PASS** ~2:47 PM MT (`/workspace/research/antigravity-item7-C1-B1-E1-brief-2026-10-27.md`).
+3. **Overnight scan, superseded as the live must:** `research/overnight-sketch-clutter-verts-edit.md` (Dig, 2026-10-27 ~1:15 AM MT, tip `c713ce4`). Its four-way TBD list is not the live scope. Tip quotes in it were re-read at `507a019`.
+4. **Park, do not re-spec:** `prompts/antigravity-sketch-chrome-flow.md` (minimize non-sketch chrome while sketch is active; Create → six ortho planes → sketch-create tools; keep Finish Sketch). `prompts/antigravity-sketch-draw-overhaul.md` (live length and angle; dims stay; #183 strip and Finish stay). Item 8 owns the bottom bar.
+5. **Tip facts re-read at `507a019` in `web/index.html`:**
+   - Sketch panel `data-panel="sketch"` (`web/index.html:2072-2096`): **Draw** (Line, Rectangle, Circle, Arc, Polygon; each has a `data-action`); **Modify** (Sketch Fillet, Trim, Offset have `data-tool` and no `data-action`; Dimension has `data-action="sketchDimension"`); **Constrain** (third `.group`: Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent, Fixed).
+   - Sketch-active CSS (`web/index.html:1737-1748`) includes `html[data-sketch-active] [data-panel="sketch"] .group:nth-child(n+3) { display: none !important; }`. Constrain is that third group. The Draw group and the Modify group are not in that selector. The same block also hides `[data-panel="sketch"] .tool-btn:not([data-action])`, plus the View `vp-bar`, `#selectionShelf`, `#cameraShelf`, `#edgeSheet`, `#pickChooser`, `.hud`, and tools-sheet shelves.
+   - `data-sketch-active` is set when `state.tab === 'sketch'` (`paintOriginPicker`, `web/index.html:11120-11122`). The sketch panel is shown when a sketch plane is set (`web/index.html:11124-11125`).
+   - Finish Sketch is `#finishBar` / `data-action="finishSketch"` (`web/index.html:2007-2008`). `setTab` shows `#finishBar` on the sketch tab (`web/index.html:12722`). `finishSketch` returns to the Model tab (`web/index.html:13882-13889`).
+   - Sketch line material: `THREE.LineBasicMaterial({ color: 0xf0c14e })` on the sketch `LineLoop` and the profile line (`web/index.html:3076-3078`, `3093-3095`). Boot-cube corner points: `PointsMaterial({ color: 0xf2c14e, size: 8, sizeAttenuation: false })`, then `corners.visible = false` (`web/index.html:3050-3054`). Body edge overlay: `edgeMat` `0x10283a` (`web/index.html:3043`); display paths set `0xd7e4f2` / `0x10283a` (`web/index.html:10500`, `10512`, `10517`). These literals are the baseline quote. They are not a brightness target.
+   - `#modifyShelf` (`web/index.html:2481`) includes `data-action="delete"` Delete (`web/index.html:2491`). `runAction` sends that action to `deleteSelection()` (`web/index.html:14070-14072`). `deleteSelection` (`web/index.html:7176-7189`) requires `state.selectedIds`, then branches on `state.selection === 'face'`, `'edge'` or `'vertex'`, or bodies. `setTab('sketch')` calls `setModifyOpen(false, true)` (`web/index.html:12686-12687`), which hides `#modifyShelf`. The sketch-active CSS block does not name `#modifyShelf`.
+   - Trim is the Modify button `data-tool="Trim"` with no `data-action` (`web/index.html:2083`). A click with an empty `data-action` sets `state.activeTool` from `data-tool` (`web/index.html:14073-14091`). The sketch-active rule `.tool-btn:not([data-action])` includes that button. No new Trim id is in this tip.
+   - Modo `--sel-color` `#ffa829` is already set on the modo theme path (`web/index.html:2818`, `10618`). That lock is out of scope here.
 
-- Sketch panel `data-panel="sketch"`: **Draw** (Line, Rectangle, Circle, Arc, Polygon); **Modify** (Sketch Fillet, Trim, Offset, Dimension); **Constrain** (Coincident, Horizontal, Vertical, Parallel, Perpendicular, Equal, Tangent, Fixed).
-- While sketch-active, CSS hides the third group (Constrain). Draw and Modify stay.
-- Other sketch-active hides include the View `vp-bar`, selection shelf, camera shelf, `#edgeSheet`, `#pickChooser`, `.hud`, and tools-sheet shelves.
-- Finish Sketch is `#finishBar` / `data-action="finishSketch"`.
-- Sketch line material uses `0xf0c14e`. Boot-cube corner points use `0xf2c14e` at size 8 and start `visible = false`. Body edge overlay uses `0x10283a`, with theme paths `0xd7e4f2` / `0x10283a`. Do not treat these literals as a brightness target. Do not invent a replacement hex.
-- `#modifyShelf` has `data-action="delete"` Delete. That is the body/modify shelf, not a sketch editor labeled Edit.
-- Inspector copy already says vertex maps, the tool pipe, and statistics are not in this build.
-- No sketch-panel control is named Edit.
+---
 
-**Gaps (do not invent fixes):**
+## Sourced CAD patterns (lean first)
 
-1. Less create clutter — Constrain is already hidden while sketch-active. What else is clutter is TBD.
-2. Brighter verts/edges for all components — no tip pass does that. Brightness and hex are TBD. Modo orange selection hex stays TBD and out of scope.
-3. Edit+delete — sketch-entity edit/delete is not specified beyond Finish / Trim / Offset / Fillet and the modify-shelf Delete.
-4. Flesh sketches+solids — “flesh” has no tip spec. Content is TBD.
+Lock note: these rows support the locked clauses. They are not new MVP chrome. Do not import Onshape overflow, Fusion toggles, a SolidWorks S-bar, or any vendor hex.
+
+### Create clutter (supports **7-C1** status quo)
+
+| App | Pattern | Source |
+| --- | --- | --- |
+| **Onshape** (lean) | Sketch toolbar only while the sketch is open; tools in dropdowns / overflow | [Sketch Tools](https://cad.onshape.com/help/Content/Sketch/sketch_tools.htm) |
+| **Fusion** (check) | Sketch Palette toggles Show Constraints / Dimensions / Points | [Sketch Palette](https://help.autodesk.com/cloudhelp/ENU/Fusion-Sketch/files/GUID-4183A4B7-E002-4396-AD5A-7FF3C8B2F33A.htm) |
+| **Shapr3D** (lean) | Adaptive tools; constraints can live aside | [Gestures/hotkeys](https://support.shapr3d.com/hc/en-us/articles/7873906073884-Keyboard-shortcuts-gestures-and-hotkeys) |
+| **SolidWorks** (check) | Context **S** shortcut bar in Edit Sketch | [SW shortcuts blog](https://blogs.solidworks.com/products/solidworks/shortcuts-for-solidworks-beginners/) (secondary) |
+
+**7-C1** keeps tip Draw + Modify and Constrain-hidden. Do not invent Onshape overflow, Fusion toggles, or a SolidWorks S-bar. That overflow/dropdown collapse was **7-C2** and is not locked.
+
+### Brighter verts/edges (supports **7-B1** — no hex bake)
+
+| App | Pattern | Source |
+| --- | --- | --- |
+| **Onshape** | Publishes selection/hover colors. Reference pattern only. Not an MVP lock. | [Colors](https://cad.onshape.com/help/Content/Home/colors.htm) |
+| **Shapr3D** | Show Edges / enhanced selection visibility | [Display Modes](https://support.shapr3d.com/hc/en-us/articles/26807298276124-Display-Modes); [Enhanced selection visibility](https://support.shapr3d.com/hc/en-us/articles/19006027312028-5-820-Enhanced-selection-visibility) |
+| **Fusion** | Sketch Palette Show Points | Sketch Palette (above) |
+| **Modo** | Selected Item Drawing enlarges verts. Chrome lean only. Modo sel `#ffa829` is already product-locked elsewhere. Do not invent a second brightness hex here. | Viewport Properties (prior Dig) |
+
+### Edit + delete (supports **7-E1**)
+
+| App | Pattern | Source |
+| --- | --- | --- |
+| **Shapr3D** | In sketch: select → Delete; Trim for segments | [Delete (Sketch)](https://support.shapr3d.com/hc/en-us/articles/9310918605980-Delete-Sketch); [Trim](https://support.shapr3d.com/hc/en-us/articles/7874324658204-Trim) |
+| **Onshape** | Open sketch; select; Delete / Trim | [Sketch Tools](https://cad.onshape.com/help/Content/Sketch/sketch_tools.htm); [Trim](https://cad.onshape.com/help/Content/Sketch/trim.htm) |
+| **Fusion** | Edit Sketch → Delete geometry/constraints | [Unable to modify a sketch](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Unable-to-modify-a-sketch-in-Fusion-360.html) |
+| **SolidWorks** | Edit Sketch → select → Delete; Trim PropertyManager | [Trim PropertyManager](https://help.solidworks.com/2022/English/SolidWorks/sldworks/HIDD_TRIM_CHOICES.htm) |
+
+---
 
 ## Goal
-Record Erik’s four clauses in `web/` only where a clause is already specified. No kernel, C++, `src/`, bindings, or wasm rebuild. Watertight / units are N/A. Do not touch export to invent “flesh”.
 
-Erik’s clauses, and only these:
+Lock item 7 to these clauses only:
 
-1. Less sketch **create clutter**. Do not invent which Draw tools leave.
-2. **Brighter** verts and edges for **all components**. Tip colors are the baseline quote. Do not invent a hex.
-3. **Edit+delete** in the sketch context. Do not invent a control id. Do not decide that `#modifyShelf` Delete is or is not the control.
-4. **Flesh sketches+solids**. Implementation content is TBD. Do not invent it.
+1. **7-C1.** Keep **Draw + Modify**. **Constrain stays hidden** while sketch-active. That is the tip status quo. Verify it. Do not invent which Draw tools to hide.
+2. **7-B1.** Raise contrast on **existing tip materials only** (the gold/dark line and point baselines quoted above). Brightness metric and target are **TBD**. Do not invent a hex. Do not bake the Onshape color table or Modo sel `#ffa829` into this item. Modo sel `#ffa829` is already locked elsewhere and is out of scope here.
+3. **7-E1.** Re-enter sketch → select entity → Delete/Trim on the existing path. Whether `#modifyShelf` Delete applies in sketch is **TBD read from tip**. Do not add a control id.
+4. **Flesh.** **HOLD.** True gap. Omit it from coding scope.
 
-A stand-in tool list, hex, Edit button, delete rule, or flesh feature fails.
+## Coding bar — verify-only where the tip already matches
 
-## Workflow
-1. Read `research/overnight-sketch-clutter-verts-edit.md`. Copy the four clauses and the gaps. Do not add a fifth ask.
-2. Leave every Dig TBD as TBD. Do not choose tools to hide, a brightness number, an edit gesture, a delete target, or a flesh feature.
-3. Keep Finish Sketch. Do not re-spec the #183 strip, the six-plane Create flow, or the draw overhaul.
-4. Do not retune theme colors or Active chrome B while quoting the tip materials.
-5. If a clause is still unspecified at coding time, record the gap. Do not ship a partial punch list for that clause.
+Later coding is one Antigravity-only `agy` on Z13, from main, after this file is on main. Prefer a worktree under `C:\Dev\`. Do not invent a new path. Do not commit from Antigravity. This docs PR does not edit `web/`.
 
-## Do not bake / TBD
-Do not invent and do not bake any of the following. They stay **TBD**:
+1. **7-C1.** Re-verify the sketch-active CSS still hides the third sketch group (Constrain) and still leaves the Draw and Modify groups in place. No tool add or remove. No edit to that CSS for this item when the tip still matches.
+2. **7-B1.** If no sourced brightness delta or metric is available, leave the metric **TBD**. Do not invent one. Do not change material colors. Adjust only the existing tip materials if Chief names a metric. No new hex.
+3. **7-E1.** Document the existing Delete/Trim path from the tip read above. Reuse existing controls only. The tip read at `507a019` is: sketch tab entry hides `#modifyShelf` via `setModifyOpen(false, true)`; `data-action="delete"` calls `deleteSelection()` (face, edge/vertex, or bodies); Trim is the existing `data-tool="Trim"` button with no `data-action`. Whether `#modifyShelf` Delete applies to a sketch entity while sketch-active stays **TBD**. Do not add a control id. Do not add a `data-action` to unhide Trim.
+4. **Flesh.** Omit it.
 
-- Which create tools stay, hide, or move
-- Brightness metric, hex, or shader path
-- Per-component versus sketch-only brightness
-- What “edit” means (re-enter sketch, drag verts, properties, or anything else)
-- What “delete” means (sketch entities, whole sketch, or bodies)
-- Whether edit+delete reuses `#modifyShelf` Delete
-- What “flesh” adds to sketches and solids
-- Collision with the Constrain-hide CSS and with #183 / the overhaul locks
-- Modo orange selection hex
-- Any new control id
-- Any new pixel size
-- Icon art
-- Hotkeys
-- Gesture maps
-- Themes or Active chrome B
-- A punch list assembled from the gaps
+## MUST NOT
+
+- Invent a hex, a brightness metric, a control id, a pixel size, or which Draw tools to hide.
+- Invent **7-C2** overflow or dropdown collapse.
+- Implement flesh.
+- Bake the Onshape color table, or Modo sel `#ffa829`, as this item’s brightness lock.
+- Touch item 6 stretch, item 10 dims, theme tokens, Active chrome B, or Rust #4.
+- Create a versioned copy of this prompt.
+- Edit `web/` from this docs PR. Edit `UPDATES.md`, `mvp/requirements.md`, or `research/` from the coding `agy`.
+
+## True gap / HOLD (do not bake)
+
+- **Flesh:** **HOLD.** No vendor help page in the cite pack uses “flesh” as a sketch or solid feature. True gap until Erik or Chief defines it. Omit from coding scope.
+- **Brightness metric / target:** **TBD.** No sourced delta is in the cite pack or in the tip materials.
+- **`#modifyShelf` Delete in sketch:** **TBD read from tip.** The shelf button, the `deleteSelection` branches, and the sketch-tab close of the shelf are recorded above. Do not decide a new delete target.
+- **Triple-tap:** Standing **HOLD** (out of scope).
+- **Rust #4:** Standing **HOLD** (out of scope).
 
 ## Out of scope
+
+- **7-C2** (overflow / dropdown). Not locked.
+- Item 6 stretch. Item 10 dims.
+- Theme web tokens and Active chrome B. Modo sel `#ffa829` stays where it already is.
+- Sketch chrome flow and the sketch draw overhaul, except to avoid re-specifying them. Item 8 owns the bottom bar.
 - Constraint solver / PlaneGCS.
-- Items 1–6, 8, and 9. Item 8 owns the bottom bar. Item 10 is a rebuild note with no coding brief.
-- Sketch chrome flow and the sketch draw overhaul, except to avoid re-specifying them.
-- Rust #4 / triple-tap.
-- Editing `research/overnight-sketch-clutter-verts-edit.md`, `mvp/requirements.md`, or `UPDATES.md` from the coding `agy`.
-- Editing `web/` from this docs PR.
-- Kernel / C++ / wasm rebuild. Do not commit `.wasm`, `web/cadcam.wasm`, or `web/dist/`. Do not edit a root `PROGRESS.md`.
+- `UPDATES.md` (Repo Keeper).
+- Kernel, C++, `src/`, bindings, or `.wasm` rebuild. Do not commit `.wasm`, `web/cadcam.wasm`, or `web/dist/`. Do not edit a root `PROGRESS.md`.
 
 ## Smoke
-Manual wake smoke on Pages. No new smoke harness. Reuse `tests/deploy_smoke.py` only if that reuse is clearly required; this brief does not require it. No invented pixel asserts. No invented color asserts. Because no smoke path is added here, do not print a done marker.
 
-Check sourced behavior only. Do not assert a hidden Draw tool, a new hex, an Edit control, a delete target, or a flesh feature.
+Check sourced behavior only. No invented pixel asserts. No invented hex asserts. Watertight / units only if an export path is touched. This item does not touch export, so do not add that assert.
 
-1. Finish Sketch is still present.
-2. No punch-list change shipped for a clause Dig left unspecified.
-3. Tip material colors were not replaced with an invented hex.
+1. Sketch-active: the Constrain group is hidden; the Draw group and the Modify group are present. No tool was added or removed.
+2. Re-enter sketch on the existing Sketch-tab path. Delete and Trim stay on the controls already in the tip (`#modifyShelf` `data-action="delete"`, Modify `data-tool="Trim"`). Do not assert a new sketch-entity delete result while that `#modifyShelf` applicability is TBD.
+3. Tip material colors were not replaced with an invented hex. Modo sel `#ffa829` was not copied onto sketch materials.
 
 ## Success Criteria
-Must PASS at tip-match. Cite Erik overnight item (7) ~11:55 PM MT 2026-10-26 via CAD Chief; `research/overnight-sketch-clutter-verts-edit.md`; tip `c713ce4`. Only Erik’s four clauses are in scope, and only where they are specified. They are not specified past the words below.
 
-1. The scope is less create clutter, brighter verts/edges on all components, edit+delete, and flesh sketches+solids. No fifth ask.
-2. Each unspecified gap stays TBD. No invented punch list.
-3. No invented control id, hex, pixel size, icon, hotkey, gesture, theme, or Active chrome B change.
-4. This docs PR does not change `web/`.
+Must PASS at tip-match. Cite 3T · Chief final **7-C1 + 7-B1 + 7-E1** (flesh hold, 2026-10-27 ~11:15 AM MT); Dig cite pack (Doc second PASS); tip re-read at `507a019`.
 
-Outside this hard bar: which create tools move; brightness metric and hex; edit meaning; delete meaning; flesh content; Constrain-hide collisions; Modo orange hex; items 1–6 and 8–10; the sketch overhaul’s bottom-bar line; `UPDATES.md`; kernel / C++ / wasm.
+1. The prompt states **7-C1** (Draw + Modify stay; Constrain stays hidden while sketch-active; verify only; no invented Draw-tool hide list; no **7-C2**).
+2. The prompt states **7-B1** (existing tip materials only; brightness metric/target **TBD**; no hex invent; Onshape colors and Modo sel `#ffa829` are not this item’s lock).
+3. The prompt states **7-E1** (re-enter sketch → select entity → Delete/Trim on the existing path; `#modifyShelf` Delete in sketch is **TBD read from tip**; no new control id).
+4. **Flesh** is **HOLD** and is outside coding scope.
+5. This docs change does not edit `web/`.
 
 ## Done
-Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds the coding `agy` for this item until overnight item 1 Tool Search exit and related tip-matches have landed **and** this brief tip-matches on main. This file does not start an `agy`. One Antigravity-only `agy` on Z13, `web/` only, after that hold lifts. Report the prompt PR link and tip SHA. Pilot reports any implementation PR separately.
+
+Re-read on `507a019`: sketch-active CSS still hides the third sketch group; Draw and Modify groups remain; line/point materials are the quoted baselines; `#modifyShelf` Delete and Modify Trim are the existing controls, with sketch applicability of that Delete left **TBD**. Prompt updated in place. Dig primary tip-match, Doc Steward second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. After this file is on main, Pilot runs one Antigravity-only coding `agy` on Z13 from main. This file does not start that `agy`.
