@@ -1,105 +1,98 @@
-# Antigravity view-cube double-tap iso↔non-iso
+# Antigravity item 6 → **6-D**: view-cube double-tap = Home iso
 
-View-cube double-tap is a stretch that toggles iso and non-iso. Chief locked Erik’s overnight line over the older double-tap Home cite. Home leaves the cube (item 5). What “stretch” means and what “non-iso” means stay TBD. This file is the Antigravity feed. It does not change the app by itself.
+View-cube **double-tap** is **Home iso** (recenter + iso spherical angles via `goView('home')` and `toast('View: Home')`, matching current tip behavior). Chief final lock (**6-D**, 2026-10-27 ~11:15 AM MT via 3T · Chief) **supersedes** the overnight ~1:17 AM MT stretch lock as a live must. Stretch iso↔non-iso is a **true gap** until Erik or Chief names the mechanism (FOV, dolly, ortho↔perspective, or aim — none chosen). Triple-tap remains on **HOLD**. This file is the Antigravity feed and tip-verification record.
 
-**Gate:** This item’s **code** starts only after this file tip-matches on main **and** overnight item 1 Tool Search exit plus related tip-matches have landed. Overnight 1–2 briefs are on main ([#208](https://github.com/cyborgpencil/cad-mvp/pull/208) @ `c713ce4`). Item 3 brief is on main ([#210](https://github.com/cyborgpencil/cad-mvp/pull/210) @ `1b8a57f`; UPDATES [#211](https://github.com/cyborgpencil/cad-mvp/pull/211)). Pilot holds the coding `agy`. This prompts file does not start an `agy` by itself. Docs base is main @ `7214005` (`72140052f516b59d6560133fc4240f13e5d257c7`, tip after #211). Dig’s scan tip for `web/` remains `c713ce4` (`c713ce4479349fe11d56a53921edb7dafe866038`). #209/#210/#211 are docs/UPDATES only relative to that Dig scan for View/chrome facts. Do not re-spec #208. Do not re-spec item 3. Do not re-spec themes / Active chrome B.
+**Gate:** Base tip `de0d89d` (`de0d89db83852944a61a6d728367747faa915a58`, main after [#233](https://github.com/cyborgpencil/cad-mvp/pull/233); prior brief gate `62c2feb` after [#232](https://github.com/cyborgpencil/cad-mvp/pull/232), Dig scan `c713ce4`). Triple-tap **HOLD**. Rust #4 **HOLD**. Items 7 and 10 out of scope. No web theme apply.
 
-**Hard lock:** Implementation is **Antigravity-only on Z13**. Pilot holds one `agy` until this file tip-matches on main and the item-1 hold above has lifted, then owns one `agy`. Do not use Grok Build or Cursor for the handoff into code. Prefer a worktree under `C:\Dev\`; do not invent a new path or create folders from this brief. Do not commit from Antigravity; Pilot/Repo Keeper commit path owns that. Do not invent Erik specs. Stay in `web/` (JS, HTML, CSS). No kernel, C++, `src/`, bindings, or wasm rebuild. No new control ids, hex, pixel sizes, gesture maps, themes, Active chrome B changes, or invented relocation homes. Do not invent stretch timing, stretch pixels, or a stretch mechanism.
+**Hard lock:** Invent-free. **Verify-only preferred** when tip already matches **6-D**. No stretch meaning, no second gesture channel, no new hotkey or control id, no timing other than tip `CUBE_DOUBLE_MS` (`320` ms). Stay out of kernel, C++, `src/`, bindings, and wasm rebuild. Watertight / units are **N/A** (camera chrome only).
 
-**Source of truth:**
+---
 
-- Erik overnight ~11:55 PM MT 2026-10-26, item **(6) View-cube double-tap stretch iso↔non-iso**, via CAD Chief. Invent-free.
-- Chief lock, 2026-10-27 ~1:17 AM MT via 3T · Chief: **Erik wins.** View-cube double-tap = iso↔non-iso stretch. Home leaves the cube and moves to the top-view control (item 5, `prompts/antigravity-home-onto-top-view-control.md`). Drop the cube’s current Home double-tap binding. No invent on stretch timing or pixel sizes. Stretch meaning and non-iso meaning stay **TBD** where Dig left them.
-- `research/overnight-view-cube-double-tap-iso.md` (Dig, 2026-10-27 ~1:15 AM MT), scanned at tip `c713ce4`. Cite that digest. Anything it still marks **TBD** stays **TBD**.
-- Overnight lock (c) / `prompts/antigravity-view-cube.md`: adjacent-face swipe only. Its success cite “double-tap Home iso” is superseded **for this cube gesture only**. Do not re-spec adjacent swipe.
-- iPad / Kiwi brief (`prompts/antigravity-ipad-kiwi-gestures-float-dock.md`): viewport double-tap → `goView('fit')`. Its line that view-cube double-tap Home is unchanged is superseded **for this cube gesture only**. Do not retarget viewport double-tap fit. Do not re-spec the rest of that brief.
-- Triple-tap stays **TBD** and out of this item.
+## Source of truth (cite)
 
-Quoted from Dig’s scan at `c713ce4`:
+1. **Chief final lock (6-D):** 3T · Chief final 2026-10-27 ~11:15 AM MT (`/workspace/research/chief-lock-items-6-7-10-2026-10-27.md`, gather `erik-noreply-gather-items-6-7-10.md`). View-cube double-tap = **Home iso** (**6-D**). The earlier overnight Chief lock (2026-10-27 ~1:17 AM MT in `research/overnight-view-cube-double-tap-iso.md`) is **superseded** and struck as a live must.
+2. **Dig cite pack (Doc second PASS):** `/workspace/research/cite-pack-item6-6D-2026-10-27.md` and brief `/workspace/research/antigravity-item6-6D-home-iso-brief-2026-10-27.md` (`item6-6d-brief.md` / `item6-6d-cite-pack.md`).
+3. **Prior briefs aligned with 6-D:**
+   - `prompts/antigravity-view-cube.md`: adjacent-face swipe only; success cite preserves “Face tap … still snaps; **double-tap Home iso**.”
+   - `prompts/antigravity-ipad-kiwi-gestures-float-dock.md`: viewport (non-cube) double-tap → `goView('fit')`; view-cube double-tap Home is unchanged.
+4. **Tip facts (scanned at `c713ce4`, re-verified unchanged at `de0d89d` in `web/index.html`):**
+   - Cube DOM: `<div id="viewCube" class="view-cube" aria-hidden="true"></div>` (`web/index.html:2198`).
+   - Detector constants/state: `const CUBE_DOUBLE_MS = 320;` (`web/index.html:2697`) and `let cubeTapMs = 0;` (`web/index.html:3180`).
+   - Pointer release on cube (`onPointerDone`, `web/index.html:15544-15586`):
+     - Committed adjacent swipe or hold clears `cubeTapMs = 0` (`web/index.html:15565`).
+     - With no swipe, no hold, `ev.type !== 'pointercancel'`, and `!pastSlop` (`web/index.html:15568-15574`): if `cubeTapMs > 0 && (now - cubeTapMs) <= CUBE_DOUBLE_MS`, sets `cubeTapMs = 0; goView('home'); toast('View: Home');` else records `cubeTapMs = now` and runs single-tap `pickViewCube` + `snapToDirection` (`web/index.html:15578-15583`).
+   - `VIEWS.home` and `VIEWS.iso` share `theta: Math.PI / 4`, `phi: 0.96` (`web/index.html:2681-2682`). `goView('home')` (`web/index.html:9138-9155`) recenters and fits distance via `homeTargetAndRadius()` and `animateSpherical(view.theta, view.phi, fitDistance(aim.radius), aim.center)` with hint `'Home view'`.
+   - Main camera is `THREE.PerspectiveCamera(40, …)` (`web/index.html:3000`). No tip path toggles a perspective stretch or ortho “non-iso” on cube double-tap.
+   - `web/view-cube.mjs` contains adjacent-swipe helpers only.
+   - `#viewLabel` / `viewCaption()` displays a dominant face name or `'Iso'` (`web/index.html:15199`).
 
-- Cube: `<div id="viewCube" class="view-cube" aria-hidden="true"></div>`.
-- `const CUBE_DOUBLE_MS = 320` and `cubeTapMs`. On pointer release with no swipe, no hold, and within slop: if `(now - cubeTapMs) <= CUBE_DOUBLE_MS` then `goView('home'); toast('View: Home');` else single-tap `pickViewCube`.
-- A committed swipe or hold clears `cubeTapMs`.
-- `VIEWS.home` and `VIEWS.iso` share `theta: Math.PI/4`, `phi: 0.96`. `goView('home')` also recenters via `homeTargetAndRadius()`.
-- Camera is `THREE.PerspectiveCamera(40, …)`. No tip path toggles a perspective stretch or an ortho “non-iso” on cube double-tap.
-- `view-cube.mjs` has adjacent swipe helpers only. No double-tap or iso-stretch logic there.
-- `#viewLabel` / `viewCaption()` shows a dominant face name or `'Iso'`. That caption is not a stretch toggle.
+---
 
-**Gap:** Cube double-tap runs Home. It does not stretch iso↔non-iso. No tip function defines that stretch.
+## Sourced CAD patterns (lean first)
+
+| App | Pattern used for **6-D** | Not used | Source |
+| --- | --- | --- | --- |
+| **Shapr3D** (lean) | Orientation Cube **double-click / double-tap → reset to default view** (help + video: default isometric). Closest match to Home iso. | Appearance ortho/perspective (not cube double-tap) | [Orientation Cube](https://support.shapr3d.com/hc/en-us/articles/7873937480604-Orientation-Cube); [Gestures](https://support.shapr3d.com/hc/en-us/articles/7873906073884-Keyboard-shortcuts-gestures-and-hotkeys); [Control the view](https://support.shapr3d.com/hc/en-us/articles/13079128172956-Control-the-view-of-your-modeling-environment) |
+| **Foundry Modo** (chrome lean / Kiwi stand-in) | **No ViewCube.** Fixed views + pie menu; **A** = fit. Chrome lean only — do **not** invent a Modo cube gesture. | N/A | [3D Viewport](https://learn.foundry.com/modo/current/content/help/pages/modo_interface/3d_viewport.html); `research/ipad-cad-kiwi-modo-gestures-panels.md` |
+| **Kiwi!3D** | Rhino/Grasshopper IGA plug-in — **no** public view-cube docs. True gap for cube gestures. | — | [Kiwi!3D](https://www.kiwi3d.com/) |
+| **Onshape** (lean check) | View cube face/corner; Isometric/Dimetric/Trimetric + Perspective in **menu**. Mobile double-tap = clear selection, **not** Home. | Do not retarget cube double-tap to perspective toggle | [View Navigation and the View Cube](https://cad.onshape.com/help/Content/View/view_navigation_and_the_view_cube.htm); [Isometric/Dimetric/Trimetric](https://cad.onshape.com/help/Content/View/isometric_dimetric_trimetric_projections.htm) |
+| **Fusion 360** (check) | ViewCube face→ortho / corner→iso; **Home icon** separate; Camera projection in RMB menu | Do not invent Home-icon remapping | [ViewCube reference](https://help.autodesk.com/cloudhelp/ENU/Fusion-GetStarted/files/GS-VIEWCUBE.htm) |
+| **SolidWorks** (check) | View Selector cube; Ctrl+7 Isometric — named orientation, not double-tap stretch | — | [View Selector](https://help.solidworks.com/2014/English/SolidWorks/sldworks/c_view_selector.htm) |
+
+---
 
 ## Goal
-Implement these sourced behaviors in `web/` (JS, HTML, and CSS). The double-tap Dig scanned is the cube pointer path in `web/index.html`. `web/view-cube.mjs` has adjacent-swipe helpers only. Do not add double-tap or stretch logic to that module. No kernel, C++, `src/`, bindings, or wasm rebuild. Watertight / units are N/A.
 
-Erik + Chief: view-cube **double-tap** is **stretch iso↔non-iso**. It is not Home.
+Lock item 6 to **6-D**: view-cube **double-tap** = **Home iso** (`goView('home')` + `toast('View: Home')`, recenter + iso angles as on tip today). Strike the overnight stretch lock (~1:17 AM MT) as a live must; **stretch iso↔non-iso** is a **true gap** until Erik or Chief names FOV, dolly, ortho↔perspective, or aim (none chosen).
 
-Coding bar:
+## Coding bar — **verify-only preferred**
 
-1. The cube double-tap binding to `goView('home')` / `toast('View: Home')` is dropped. That is the Chief lock. Home’s button moves in item 5. Do not move `#vcHome` here.
-2. The same gesture is the iso↔non-iso stretch once “stretch” and “non-iso” are defined. They are **not** defined. Do not ship a stand-in (FOV, dolly, ortho↔perspective, `animateSpherical` only, last face, nearest face, Front, or `#viewLabel`).
-3. Reuse the existing detector. Do not add a second gesture channel. Do not change `CUBE_DOUBLE_MS`, the slop, or any pixel threshold. Do not invent a stretch duration.
-4. Adjacent swipe stays. Viewport (non-cube) double-tap fit stays. Triple-tap stays out.
-5. If stretch and non-iso are still TBD at coding time, record the gap and do not edit the double-tap branch into a guessed effect. Dropping Home without a sourced stretch is not a pass. Leaving the Home binding in place is also not a pass once the meanings exist. Until those meanings exist, do not pretend either half is finished by a stand-in.
+1. Re-verify on current tip (`de0d89d`) that view-cube double-tap still runs `goView('home')` + `toast('View: Home')` via the existing `CUBE_DOUBLE_MS` / `cubeTapMs` detector in `web/index.html` (no alternate detector invent).
+2. Because tip already matches **6-D** (`web/index.html:15570-15574`), make **no code change** in `web/` — prompt/docs update only.
+3. If tip ever drifts away from `goView('home')` + `toast('View: Home')`, restore that tip-known behavior only (no stretch invent, no second gesture channel, no timing change beyond `CUBE_DOUBLE_MS`).
+4. Do **not** implement stretch, FOV, dolly, ortho↔perspective toggle, or triple-tap.
+5. Adjacent-face swipe (`web/index.html:15548-15562`) and viewport (non-cube) double-tap fit (`goView('fit')`, `web/index.html:15677-15698`) **stay as-is** (out of scope).
 
-Where stretch or non-iso is **TBD**, leave it **TBD**.
+## MUST NOT
 
-## Workflow
-1. Read `research/overnight-view-cube-double-tap-iso.md`, the Chief lock, and the tip facts above. Copy behavior from those sources only.
-2. Treat the prior “double-tap Home iso” success cite as superseded for cube double-tap only.
-3. Do not define stretch. Do not define non-iso. Do not pick a camera mode.
-4. Do not change double-tap timing or pixel slop.
-5. Do not add triple-tap. Do not retarget viewport double-tap fit. Do not remap adjacent swipe.
-6. Do not move Home. Item 5 owns placement, and its destination node is still TBD.
+- Invent a stretch meaning or a second gesture channel for stretch.
+- Invent control ids, hotkeys, pixel slop, timings other than tip `CUBE_DOUBLE_MS` (`320` ms), or triple-tap behavior.
+- Create a versioned copy of this prompt.
+- Touch items 7 or 10, theme hex / web theme apply, Rust #4, `UPDATES.md`, kernel / C++ / `src/` / wasm.
 
-## Do not bake / TBD
-Do not invent and do not bake any of the following. They stay **TBD**:
+## True gap / HOLD (do not bake)
 
-- What “stretch” means
-- What “non-iso” means
-- Phone vs desktop differences for this gesture
-- Triple-tap
-- Any new timing or pixel size, including a stretch duration and any change to `CUBE_DOUBLE_MS` or slop
-- Any new control id
-- Any new hex
-- Icon art
-- Hotkeys
-- A new gesture map
-- Themes or Active chrome B
-- A destination node for Home (item 5)
-
-Resolved, and therefore not TBD: cube double-tap is not Home. Home leaves the cube (placement is item 5). Chief, 2026-10-27 ~1:17 AM MT via 3T · Chief.
+- **Stretch iso↔non-iso:** **True gap.** No listed CAD reference documents view-cube double-tap as stretch. No stretch work until Erik/Chief names FOV, dolly, ortho↔perspective, or aim.
+- **Triple-tap:** Standing **HOLD** (out of scope).
+- **Rust #4:** Standing **HOLD** (out of scope).
 
 ## Out of scope
-- Item 5 destination choice and `#vcHome` placement. Separate brief.
-- Adjacent swipe remapping.
-- Viewport double-tap fit (`goView('fit')`).
-- Items 4, 7–9. Item 10 rebuild note (no coding brief).
-- Overnight 1–2 (#208) and item 3. Do not re-spec them.
-- Rust #4 / Modo orange selection hex / triple-tap.
-- Editing `research/overnight-view-cube-double-tap-iso.md`, `mvp/requirements.md`, or `UPDATES.md` from the coding `agy`.
-- Editing `web/` from this docs PR.
-- Kernel / C++ / wasm rebuild. Do not commit `.wasm`, `web/cadcam.wasm`, or `web/dist/`. Do not edit a root `PROGRESS.md`.
+
+- Adjacent-face swipe remapping (stays as locked in `prompts/antigravity-view-cube.md`).
+- Viewport (non-cube) double-tap fit (`goView('fit')`, `prompts/antigravity-ipad-kiwi-gestures-float-dock.md`).
+- Item 5 (`#vcHome` / top-view control placement), items 7 and 10, theme web apply, Rust #4, triple-tap.
+- `UPDATES.md` (Repo Keeper cascade).
+- Kernel, C++, `src/`, bindings, or `.wasm` rebuild.
 
 ## Smoke
-Manual wake smoke on Pages. No new smoke harness. Reuse `tests/deploy_smoke.py` or `tests/view_cube_swipe_smoke.py` only if that reuse is clearly required; this brief does not require a new assert. No invented pixel asserts. Because no smoke path is added here, do not print a done marker.
 
-Check sourced behavior only. Do not assert FOV, ortho, dolly, a face name, a millisecond value other than the existing detector, or a pixel slop.
+Check sourced behavior only (no invented pixel or angle asserts):
 
-1. Cube double-tap is not a Home action (`goView('home')` / “View: Home”) once a sourced stretch exists. A Home double-tap does not pass.
-2. A stand-in stretch does not pass while stretch and non-iso are TBD. Record the gap instead of shipping one.
-3. `CUBE_DOUBLE_MS` and the existing slop are unchanged.
-4. Adjacent-face swipe still matches lock (c). Viewport double-tap still fits. There is no triple-tap.
+1. Double-tap `#viewCube` within `CUBE_DOUBLE_MS` (`320` ms) → `goView('home')` (Home iso recenter + `VIEWS.home` angles) and `toast('View: Home')`.
+2. Single face/zone tap on `#viewCube` still snaps via `pickViewCube` + `snapToDirection`.
+3. Adjacent-face swipe on `#viewCube` still snaps to the adjacent face and clears `cubeTapMs`.
+4. Viewport (non-cube) double-tap still runs `goView('fit')`.
 
 ## Success Criteria
-Must PASS at tip-match. Cite Erik overnight item (6) ~11:55 PM MT 2026-10-26 via CAD Chief; Chief lock 2026-10-27 ~1:17 AM MT via 3T · Chief; `research/overnight-view-cube-double-tap-iso.md`; tip `c713ce4`. Only that bar is in scope.
 
-1. The spec for view-cube double-tap is iso↔non-iso stretch, not Home. That supersedes the Home-iso cite for this gesture only.
-2. The cube’s Home double-tap binding is not the spec. Drop it when a sourced stretch exists. Do not replace it with a stand-in while stretch and non-iso are still TBD. Placement of Home is item 5.
-3. Stretch meaning and non-iso meaning stay TBD. A guessed mechanism fails. No stand-in ships from this brief while those words are undefined.
-4. No invented stretch timing or pixel size. The existing 320 ms detector and slop are not a new spec and are not retuned.
-5. No new gesture channel, no triple-tap, no theme or Active chrome B work, no kernel or wasm.
-6. This docs PR does not change `web/`.
+Must PASS at tip-match. Cite 3T · Chief final **6-D** lock (2026-10-27 ~11:15 AM MT); Dig cite pack (`cite-pack-item6-6D-2026-10-27.md`, Doc second PASS); Shapr3D Orientation Cube default-view double-tap cite; tip scan `c713ce4` re-verified at `de0d89d`.
 
-Outside this hard bar: the meaning of stretch; the meaning of non-iso; phone vs desktop; triple-tap; item 5’s destination node; adjacent swipe; viewport double-tap fit; items 1–4 and 7–10; `UPDATES.md`; kernel / C++ / wasm.
+1. Prompt states **6-D**: view-cube double-tap = **Home iso** (`goView('home')` + `toast('View: Home')`).
+2. Overnight stretch lock (~1:17 AM MT) is marked superseded; stretch iso↔non-iso is recorded as a **true gap** until Erik/Chief names FOV / dolly / ortho↔persp / aim.
+3. Shapr3D Orientation Cube cite for double-tap reset to default view is preserved alongside the CAD check table.
+4. Triple-tap remains **HOLD**; adjacent-face swipe and viewport double-tap fit remain as-is out of scope.
+5. Tip `web/index.html` is verified to match **6-D** with **no `web/` code changes**.
 
 ## Done
-Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds the coding `agy` for this item until overnight item 1 Tool Search exit and related tip-matches have landed **and** this brief tip-matches on main. This file does not start an `agy`. One Antigravity-only `agy` on Z13, `web/` only, after that hold lifts. Report the prompt PR link and tip SHA. Pilot reports any implementation PR separately.
+
+Verified on `de0d89d`: `web/index.html` already matches **6-D** (`CUBE_DOUBLE_MS` / `cubeTapMs` → `goView('home')` + `toast('View: Home')`). Prompt updated in place on `feat/antigravity-item6-6d-home-iso`. Dig primary tip-match, Doc Steward second, Repo Keeper merge.
