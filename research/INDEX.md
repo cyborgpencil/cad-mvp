@@ -56,3 +56,4 @@ Update research here first. Propagate only confirmed changes into MVP or vision 
 - [cursor-and-tooling.md](cursor-and-tooling.md): Cursor vs Grok Build (cloud agents, Bugbot, rules/skills, MCP) plus tools to add (Playwright MCP, GitHub Actions + trimesh, OrcaSlicer CLI, lib3mf); top 3 recommended, sourced.
 - [project-save-load.md](project-save-load.md): wrap-up item 4, end-to-end .cadmvp save, fresh-tab reload and compare checklist (P1-P7); undo stops at the loaded state (team ruling).
 - [touch-gestures.md](touch-gestures.md): swipe gestures for the phone app: repo touch map, Onshape/Shapr3D/Nomad orbit, pan, undo and view-cube patterns, touch-action and pointercancel; 3T build order view-cube swipe, 3-finger undo/redo, value nudge (2026-10-23).
+- [modo-theme-gui-tokens.md](modo-theme-gui-tokens.md): Modo → cad-mvp GUI token map (theme prep); invent-free, factory hex TBD (2026-10-26).
