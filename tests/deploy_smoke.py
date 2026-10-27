@@ -954,20 +954,20 @@ def create_point_expr(selector: str) -> str:
         "var openers=document.querySelectorAll('[data-action=\"createMenu\"]');"
         "var opener=null;"
         "for(var i=0;i<openers.length;i++){"
+        "if(openers[i].closest&&openers[i].closest('[hidden]')) continue;"
         "var st=getComputedStyle(openers[i]);"
         "var r=openers[i].getBoundingClientRect();"
         "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
         "opener=openers[i];break;"
         "}"
         "if(!opener){"
+        "var sheet=document.getElementById('toolsSheet');"
+        "if(!sheet||sheet.hidden){"
         "var tm=document.querySelector('[data-action=\"toolsMenu\"]');"
         "if(tm)tm.click();"
-        "for(var j=0;j<openers.length;j++){"
-        "var st2=getComputedStyle(openers[j]);"
-        "var r2=openers[j].getBoundingClientRect();"
-        "if(st2.display==='none'||st2.visibility==='hidden'||r2.width<1||r2.height<1) continue;"
-        "opener=openers[j];break;"
         "}"
+        "var sc=document.querySelector('#toolsSheet [data-action=\"createMenu\"]');"
+        "if(sc&&sheet&&!sheet.hidden) opener=sc;"
         "}"
         "if(!opener) return 'missing create';"
         "opener.click();"
@@ -1165,19 +1165,19 @@ CREATE_MENU_EXPR = r"""
   function visibleOpener() {
     var openers = document.querySelectorAll('[data-action="createMenu"]');
     for (var n = 0; n < openers.length; n++) {
+      if (openers[n].closest && openers[n].closest('[hidden]')) continue;
       var st = getComputedStyle(openers[n]);
       var r = openers[n].getBoundingClientRect();
       if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
       return openers[n];
     }
-    var tm = document.querySelector('[data-action="toolsMenu"]');
-    if (tm) tm.click();
-    for (var m = 0; m < openers.length; m++) {
-      var st2 = getComputedStyle(openers[m]);
-      var r2 = openers[m].getBoundingClientRect();
-      if (st2.display === 'none' || st2.visibility === 'hidden' || r2.width < 1 || r2.height < 1) continue;
-      return openers[m];
+    var sheet = document.getElementById('toolsSheet');
+    if (!sheet || sheet.hidden) {
+      var tm = document.querySelector('[data-action="toolsMenu"]');
+      if (tm) tm.click();
     }
+    var sc = document.querySelector('#toolsSheet [data-action="createMenu"]');
+    if (sc && sheet && !sheet.hidden) return sc;
     return null;
   }
   var opener = visibleOpener();
@@ -1290,12 +1290,15 @@ SKETCH_PORTRAIT_EXPR = r"""
       if (boxOf(nodes[i])) { nodes[i].click(); return true; }
     }
     if (selector === '[data-action="createMenu"]') {
-      var tm = document.querySelector('[data-action="toolsMenu"]');
-      if (tm && boxOf(tm)) {
-        tm.click();
-        for (var j = 0; j < nodes.length; j++) {
-          if (boxOf(nodes[j])) { nodes[j].click(); return true; }
-        }
+      var sheet = document.getElementById('toolsSheet');
+      if (!sheet || sheet.hidden) {
+        var tm = document.querySelector('[data-action="toolsMenu"]');
+        if (tm && boxOf(tm)) tm.click();
+      }
+      var sc = document.querySelector('#toolsSheet [data-action="createMenu"]');
+      if (sc && (boxOf(sc) || (sheet && !sheet.hidden))) {
+        sc.click();
+        return true;
       }
     }
     return false;
@@ -1823,12 +1826,15 @@ ORIGIN_PLANE_EXPR = r"""
       if (boxOf(nodes[i])) { nodes[i].click(); return true; }
     }
     if (selector === '[data-action="createMenu"]') {
-      var tm = document.querySelector('[data-action="toolsMenu"]');
-      if (tm && boxOf(tm)) {
-        tm.click();
-        for (var j = 0; j < nodes.length; j++) {
-          if (boxOf(nodes[j])) { nodes[j].click(); return true; }
-        }
+      var sheet = document.getElementById('toolsSheet');
+      if (!sheet || sheet.hidden) {
+        var tm = document.querySelector('[data-action="toolsMenu"]');
+        if (tm && boxOf(tm)) tm.click();
+      }
+      var sc = document.querySelector('#toolsSheet [data-action="createMenu"]');
+      if (sc && (boxOf(sc) || (sheet && !sheet.hidden))) {
+        sc.click();
+        return true;
       }
     }
     return false;
@@ -6469,28 +6475,10 @@ SAVELOAD_EXPR = r"""
     function clickCreate(kind) {
       var menu = document.getElementById('createMenu');
       if (!menu || menu.hidden) {
-        var openers = document.querySelectorAll('[data-action="createMenu"]');
-        var opener = null;
-        for (var i = 0; i < openers.length; i++) {
-          var st = getComputedStyle(openers[i]);
-          var r = openers[i].getBoundingClientRect();
-          if (st.display === 'none' || st.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
-          opener = openers[i];
-          break;
+        if (!visibleClick('[data-action="createMenu"]')) {
+          problems.push('create opener hidden');
+          return false;
         }
-        if (!opener) {
-          var tm = document.querySelector('[data-action="toolsMenu"]');
-          if (tm) tm.click();
-          for (var j = 0; j < openers.length; j++) {
-            var st2 = getComputedStyle(openers[j]);
-            var r2 = openers[j].getBoundingClientRect();
-            if (st2.display === 'none' || st2.visibility === 'hidden' || r2.width < 1 || r2.height < 1) continue;
-            opener = openers[j];
-            break;
-          }
-        }
-        if (!opener) { problems.push('create opener hidden'); return false; }
-        opener.click();
       }
       menu = document.getElementById('createMenu');
       var button = menu ? menu.querySelector('[data-action="primitive"][data-kind="' + kind + '"]') : null;
@@ -6511,19 +6499,15 @@ SAVELOAD_EXPR = r"""
         return true;
       }
       if (selector === '[data-action="createMenu"]') {
-        var tm = document.querySelector('[data-action="toolsMenu"]');
-        if (tm) {
-          tm.click();
-          for (var j = 0; j < nodes.length; j++) {
-            var el2 = nodes[j];
-            if (!el2 || (el2.closest && el2.closest('[hidden]'))) continue;
-            var st2 = getComputedStyle(el2);
-            if (st2.display === 'none' || st2.visibility === 'hidden') continue;
-            var r2 = el2.getBoundingClientRect();
-            if (r2.width < 1 || r2.height < 1) continue;
-            el2.click();
-            return true;
-          }
+        var sheet = document.getElementById('toolsSheet');
+        if (!sheet || sheet.hidden) {
+          var tm = document.querySelector('[data-action="toolsMenu"]');
+          if (tm) tm.click();
+        }
+        var sc = document.querySelector('#toolsSheet [data-action="createMenu"]');
+        if (sc && sheet && !sheet.hidden) {
+          sc.click();
+          return true;
         }
       }
       return false;
@@ -7986,20 +7970,20 @@ def _click_create_kind(cdp: Cdp, kind: str) -> tuple[dict[str, Any] | None, str]
         "var openers=document.querySelectorAll('[data-action=\"createMenu\"]');"
         "var opener=null;"
         "for(var i=0;i<openers.length;i++){"
+        "if(openers[i].closest&&openers[i].closest('[hidden]')) continue;"
         "var st=getComputedStyle(openers[i]);"
         "var r=openers[i].getBoundingClientRect();"
         "if(st.display==='none'||st.visibility==='hidden'||r.width<1||r.height<1) continue;"
         "opener=openers[i];break;"
         "}"
         "if(!opener){"
+        "var sheet=document.getElementById('toolsSheet');"
+        "if(!sheet||sheet.hidden){"
         "var tm=document.querySelector('[data-action=\"toolsMenu\"]');"
         "if(tm)tm.click();"
-        "for(var j=0;j<openers.length;j++){"
-        "var st2=getComputedStyle(openers[j]);"
-        "var r2=openers[j].getBoundingClientRect();"
-        "if(st2.display==='none'||st2.visibility==='hidden'||r2.width<1||r2.height<1) continue;"
-        "opener=openers[j];break;"
         "}"
+        "var sc=document.querySelector('#toolsSheet [data-action=\"createMenu\"]');"
+        "if(sc&&sheet&&!sheet.hidden) opener=sc;"
         "}"
         "if(!opener) return JSON.stringify({error:'missing create'});"
         "opener.click();"
