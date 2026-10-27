@@ -3,9 +3,9 @@
 Status: invent-free digest. Compiled **2026-10-27 ~1:10 AM MT** (America/Denver).
 Antigravity feed: `prompts/antigravity-sketch-dims-follow-angle.md`. This digest does not start an `agy`.
 
-**Owner draft:** MVP Doc Steward (Chief idle-fill while Dig seconds #208). Dig may second or amend invent-free.  
+**Owner draft:** MVP Doc Steward. Dig may second or amend invent-free.
 **Date:** 2026-10-27 ~1:10 AM MT (America/Denver)  
-**Gate tip:** main @ `529df18` (#207 UPDATES; theme #206 @ `e805614`). Overnight 1–2 briefs still draft [#208](https://github.com/cyborgpencil/cad-mvp/pull/208) @ `389e33f` — Pilot starts item-1 agy first after #208 tip-matches; this item-3 brief does **not** start an agy ahead of 1–2.  
+**Gate tip:** [#208](https://github.com/cyborgpencil/cad-mvp/pull/208) overnight items 1–2 on main @ `c713ce4`. Pilot holds item-3 agy until **this** brief tip-matches. Branched from main @ `529df18` (#207 UPDATES; theme #206 @ `e805614`).
 **Scope:** Sketch dimension / length / angle **badge orientation** so dims follow the angle of the geometry they represent. UI chrome only (`web/`). Watertight / units N/A.  
 **Hard lock:** Invent-free. Do not invent gesture maps, themes, Active chrome B, panel taxonomy, or new dim values.
 
@@ -64,7 +64,7 @@ Erik: sketch dims **follow the angle they represent**.
 
 ## Out of scope
 
-- Overnight items 1–2 (#208 Tool Search exit / hide prior tool UI) — do not re-spec; Pilot runs those first after tip-match.
+- Overnight items 1–2 (#208 Tool Search exit / hide prior tool UI) — already on main @ `c713ce4`; do not re-spec.
 - Themes / Active chrome B / gestures.
 - Constraint solver / PlaneGCS / Trim / Offset.
 - Kernel / C++ / wasm / UPDATES.md.
@@ -78,4 +78,4 @@ Erik: sketch dims **follow the angle they represent**.
 
 ## Done
 
-Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds coding `agy` for this item until overnight 1–2 are on main **and** this brief tip-matches; one Antigravity-only `agy` on Z13, `web/` only.
+Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds coding `agy` for this item until this brief tip-matches (#208 already on main @ `c713ce4`); one Antigravity-only `agy` on Z13, `web/` only.

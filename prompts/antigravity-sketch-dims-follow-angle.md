@@ -2,9 +2,9 @@
 
 Sketch dimension badges follow the angle they represent. On tip `529df18` they stay screen-upright. This file is the Antigravity feed. It does not change the app by itself.
 
-**Gate:** Item-3 **code** starts only after this file tip-matches on main **and** overnight items 1–2 tip-match on main. Those briefs are still draft [#208](https://github.com/cyborgpencil/cad-mvp/pull/208) @ `389e33f` (`prompts/antigravity-tool-search-exit.md`, `prompts/antigravity-switch-hide-prior-tool-ui.md`). #208 is not on main. Pilot holds this item-3 `agy` until #208 tip-matches **and** this brief tip-matches. Pilot starts the item-1 `agy` first after #208 tip-matches. This prompts file does not start an `agy` by itself. Base for this brief is main @ `529df18` (#207 UPDATES; theme #206 @ `e805614`). Do not re-spec #208. Do not re-spec the older overnight queue (1) file `prompts/antigravity-sketch-dims.md`. Do not re-spec `prompts/antigravity-sketch-draw-overhaul.md`.
+**Gate:** [#208](https://github.com/cyborgpencil/cad-mvp/pull/208) overnight items 1–2 are on main @ `c713ce4`. Pilot holds this item-3 `agy` until **this** brief tip-matches on main. This prompts file does not start an `agy` by itself. Base for this brief is main after #208 @ `c713ce4` (branched from `529df18` / #207). Do not re-spec #208. Do not re-spec the older overnight queue (1) file `prompts/antigravity-sketch-dims.md`. Do not re-spec `prompts/antigravity-sketch-draw-overhaul.md`.
 
-**Hard lock:** Implementation is **Antigravity-only on Z13**. Pilot holds one `agy` until this file tip-matches on main **and** overnight 1–2 (#208) have tip-matched on main, then owns one `agy`. Do not use Grok Build or Cursor for the handoff into code. Prefer a worktree under `C:\Dev\`; do not invent a new path or create folders from this brief. Do not commit from Antigravity; Pilot/Repo Keeper commit path owns that. Do not invent Erik specs. Stay in `web/` (JS, HTML, CSS). No kernel, C++, `src/`, bindings, or wasm rebuild.
+**Hard lock:** Implementation is **Antigravity-only on Z13**. Pilot holds one `agy` until this file tip-matches on main, then owns one `agy`. Do not use Grok Build or Cursor for the handoff into code. Prefer a worktree under `C:\Dev\`; do not invent a new path or create folders from this brief. Do not commit from Antigravity; Pilot/Repo Keeper commit path owns that. Do not invent Erik specs. Stay in `web/` (JS, HTML, CSS). No kernel, C++, `src/`, bindings, or wasm rebuild.
 
 **Source of truth:**
 
@@ -73,7 +73,7 @@ Do not invent and do not bake any of the following. They stay **TBD**:
 - New dimension values
 
 ## Out of scope
-- Overnight items 1–2 (#208 Tool Search exit / hide prior tool UI). Separate briefs on that draft. Pilot runs those first after #208 tip-matches. Do not re-spec them. Do not claim they are already on main.
+- Overnight items 1–2 (#208 Tool Search exit / hide prior tool UI) — already on main @ `c713ce4`. Do not re-spec them.
 - Older overnight queue (1): `prompts/antigravity-sketch-dims.md` (typed mm, callouts, Dimension focus). Do not re-spec it. Interaction with `#calloutLayer` beyond orientation stays **TBD**.
 - Sketch draw interaction overhaul (`prompts/antigravity-sketch-draw-overhaul.md`, #185 / #189). Preserve its locks. Do not re-spec it. It does not state badge rotation.
 - `prompts/antigravity-view-cube-gizmo-line-dims.md` (#179 / #181). Do not re-spec it. It does not state dim-badge rotation.
@@ -108,4 +108,4 @@ Must PASS at tip-match. Cite Erik overnight item (3) ~11:55 PM MT 2026-10-26 via
 Outside this hard bar: which of length, angle, or both rotate if a narrower lock is required; screen-space rotation vs sketch-plane rotation; flip / keep-readable; offset distance (pixels or mm); `data-deg` / CSS `rotate()` / SVG text; phone vs desktop; `#calloutLayer` / Dimension tool focus beyond orientation; vendor Fusion/FreeCAD parallel-dim matrices; new control ids; new hex; new pixel sizes; icon art; hotkeys; gesture maps; themes / Active chrome B; panel taxonomy; new dimension values; overnight items 1–2 (#208); `prompts/antigravity-sketch-dims.md`; the sketch draw overhaul brief; `prompts/antigravity-view-cube-gizmo-line-dims.md`; `UPDATES.md`; kernel / C++ / wasm.
 
 ## Done
-Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds the coding `agy` for this item until overnight 1–2 (#208) are tip-matched on main **and** this brief tip-matches. #208 is still open, so that hold is in force. One Antigravity-only `agy` on Z13, `web/` only. Report the prompt PR link and tip SHA. Pilot reports any implementation PR separately.
+Draft until tip-match: Doc Steward primary (COMMENT), Research Digest second. Author does not self-APPROVE. Repo Keeper undrafts and plain-merges. Pilot holds the coding `agy` for this item until this brief tip-matches (#208 already on main @ `c713ce4`). One Antigravity-only `agy` on Z13, `web/` only. Report the prompt PR link and tip SHA. Pilot reports any implementation PR separately.
