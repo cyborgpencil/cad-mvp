@@ -2577,7 +2577,18 @@ function showError(msg) {
   el.textContent = msg;
 }
 
+function syncAboutVersion() {
+  const stampEl = document.getElementById('buildStamp');
+  const stamp = stampEl ? (stampEl.textContent || '').replace(/\s+/g, '') : '';
+  if (!stamp) return;
+  const nodes = document.querySelectorAll('[aria-label="About"] .fine b');
+  for (let i = 0; i < nodes.length; i += 1) {
+    nodes[i].textContent = stamp;
+  }
+}
+
 async function boot() {
+  syncAboutVersion();
   if (!THREE || !THREE.WebGLRenderer) {
     showError('three.js did not load.');
     return;
@@ -3218,6 +3229,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const proj = new THREE.Vector3();
   const tmpA = new THREE.Vector3();
   const tmpB = new THREE.Vector3();
+
+  const parkedTitles = [];
+
+  function clearToasts() {
+    const stack = document.getElementById('toasts');
+    if (!stack) return;
+    while (stack.firstChild) stack.removeChild(stack.firstChild);
+  }
 
   function toast(message) {
     const stack = document.getElementById('toasts');
@@ -9496,7 +9515,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (state.sceneCleared) return 'Nothing to export.';
     if (state.unitsPass !== true) return state.unitsMessage || state.failReason || 'Export blocked until units pass.';
     if (state.meshPass === false) return state.meshMessage || state.failReason || 'Export blocked until mesh passes.';
-    return state.unit === 'in' ? 'Units: inch' : 'Units: mm';
+    return '';
   }
 
   function recomputeExport() {
@@ -10612,6 +10631,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function setAboutOpen(open) {
     const next = open === true;
     state.aboutOpen = next;
+    syncAboutVersion();
     const buttons = document.querySelectorAll('[data-action="aboutMenu"]');
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', next ? 'true' : 'false');
@@ -10620,12 +10640,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const menu = wrap ? wrap.querySelector('.menu') : null;
       if (menu) menu.hidden = !next;
     }
+    if (!next) {
+      clearToasts();
+      dismissStuckTooltips();
+    }
     publishGateState();
   }
 
   function setDrawer(which, open) {
     const browserOpen = !!(open && which === 'browser');
     const inspectorOpen = !!(open && which === 'inspector');
+    syncAboutVersion();
     document.getElementById('browser').classList.toggle('open', browserOpen);
     document.getElementById('inspector').classList.toggle('open', inspectorOpen);
     const inspAbout = document.querySelector('#inspector [aria-label="About"]');
@@ -10639,6 +10664,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const any = browserOpen || inspectorOpen;
     document.getElementById('backdrop').hidden = !any;
+    if (!any) {
+      clearToasts();
+      dismissStuckTooltips();
+    }
     syncClosedPanels();
     publishGateState();
   }
@@ -10654,6 +10683,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       buttons[i].classList.remove('is-on');
     }
     document.getElementById('backdrop').hidden = true;
+    clearToasts();
+    dismissStuckTooltips();
     syncClosedPanels();
     publishGateState();
   }
@@ -10775,6 +10806,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', open === true);
     }
+    if (open !== true) {
+      clearToasts();
+      dismissStuckTooltips();
+    }
     publishGateState();
   }
 
@@ -10785,6 +10820,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', open === true);
+    }
+    if (open !== true) {
+      clearToasts();
+      dismissStuckTooltips();
     }
     publishGateState();
   }
@@ -10797,6 +10836,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', open === true);
     }
+    if (open !== true) {
+      clearToasts();
+      dismissStuckTooltips();
+    }
     publishGateState();
   }
 
@@ -10807,6 +10850,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', open === true);
+    }
+    if (open !== true) {
+      clearToasts();
+      dismissStuckTooltips();
     }
     publishGateState();
   }
@@ -10824,6 +10871,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (chooser) chooser.hidden = true;
     const chip = document.getElementById('pickFilter');
     if (chip) chip.setAttribute('aria-expanded', 'false');
+    clearToasts();
+    dismissStuckTooltips();
   }
 
   function placeSearch() {
@@ -10869,6 +10918,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const wasOpen = !searchDlg.hidden;
     searchDlg.hidden = true;
     if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
+    clearToasts();
+    dismissStuckTooltips();
     if (restoreFocus && wasOpen && searchBtn) searchBtn.focus();
   }
 
@@ -13281,6 +13332,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const id = btn.getAttribute('data-drawer') === 'inspector' ? 'inspector' : 'browser';
       const open = !document.getElementById(id).classList.contains('open');
       setDrawer(btn.getAttribute('data-drawer'), open);
+      if (!open) return;
     } else if (action === 'fileMenu') {
       const open = fileMenu.hidden;
       closePopups();
@@ -13300,14 +13352,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       fileMenu.hidden = !open;
       document.getElementById('fileBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) return;
       message = 'File';
     } else if (action === 'search') {
       toggleSearch();
+      if (searchDlg.hidden) return;
       message = 'Tool search';
     } else if (action === 'toolsMenu') {
       if (toolsSheet && !toolsSheet.hidden) {
         setToolsOpen(false);
-        message = 'Close tools menu';
+        return;
       } else {
         openToolsMenu();
         message = 'Tools menu';
@@ -13329,7 +13383,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         paintPrimFields();
       }
       setSelectionShelfOpen(willOpen);
-      message = willOpen ? 'Selection' : 'Hide selection';
+      if (!willOpen) return;
+      message = 'Selection';
     } else if (action === 'cameraShelf') {
       const willOpen = !cameraShelf || cameraShelf.hidden === true;
       closePopups();
@@ -13347,7 +13402,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         paintPrimFields();
       }
       setCameraShelfOpen(willOpen);
-      message = willOpen ? 'Show/hide camera' : 'Hide camera';
+      if (!willOpen) return;
+      message = 'Show/hide camera';
     } else if (isViewBarToggle) {
       const willOpen = !viewBar || viewBar.hidden === true;
       closePopups();
@@ -13366,7 +13422,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         paintPrimFields();
       }
       setViewBarOpen(willOpen);
-      message = willOpen ? 'View' : 'Hide view';
+      if (!willOpen) return;
+      message = 'View';
     } else if (action === 'aboutMenu') {
       const willOpen = !state.aboutOpen;
       closePopups();
@@ -13385,6 +13442,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         paintPrimFields();
       }
       setAboutOpen(willOpen);
+      if (!willOpen) return;
       message = 'About';
     } else if (action === 'theme') {
       const want = btn.getAttribute('data-theme') === 'modo' ? 'modo' : 'default';
@@ -13393,6 +13451,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setHint(message);
     } else if (action === 'createMenu') {
       toggleCreateMenu(btn);
+      const cMenu = document.getElementById('createMenu');
+      if (!cMenu || cMenu.hidden) return;
       message = 'Create';
     } else if (action === 'modifyShelf') {
       const shelf = document.getElementById('modifyShelf');
@@ -13411,13 +13471,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       setModifyOpen(willOpen, true);
       paintPrimFields();
-      message = willOpen ? 'Modify' : 'Modify closed';
+      if (!willOpen) {
+        clearToasts();
+        dismissStuckTooltips();
+        return;
+      }
+      message = 'Modify';
     } else if (action === 'downloadLog') {
       downloadText(window.__cadcamLogText || '', 'cadmvp-log.txt', 'text/plain');
       message = 'Download log';
     } else if (action === 'closeSheet') {
       setToolsOpen(false);
-      message = 'Close tools menu';
+      return;
     } else if (action === 'units') {
       const want = btn.getAttribute('data-unit') === 'in' ? 'in' : 'mm';
       if (state.unit !== want) Module.toggleUnits();
@@ -13991,6 +14056,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           paintPrimFields();
         }
         exportMenu.hidden = !willOpen;
+        if (!willOpen) return;
         message = 'Export';
       }
     } else if (action === 'exportFmt') {
@@ -15688,7 +15754,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   document.getElementById('backdrop').addEventListener('click', function () {
     closeDrawers();
-    toast('Close panel');
   });
 
   document.addEventListener('click', function (ev) {
@@ -15993,8 +16058,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   });
 
-  const parkedTitles = [];
-
   function parkTitle(el) {
     if (!el || el.nodeType !== 1 || !el.hasAttribute('title')) return;
     if (el.hasAttribute('data-parked-title')) return;
@@ -16025,8 +16088,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     parkedTitles.length = 0;
   }
 
+  function onControlLeave(ev) {
+    const t = ev && ev.target && ev.target.nodeType === 1 ? ev.target : null;
+    if (!t) return;
+    const fromCtrl = t.closest ? t.closest('[data-tool], [title], [data-parked-title], button, label') : null;
+    if (!fromCtrl) return;
+    const toEl = ev.relatedTarget;
+    if (toEl && fromCtrl.contains && fromCtrl.contains(toEl)) return;
+    clearToasts();
+    dismissStuckTooltips(ev);
+  }
+
   document.addEventListener('pointerup', dismissStuckTooltips, true);
   document.addEventListener('touchend', dismissStuckTooltips, true);
+  document.addEventListener('pointerout', onControlLeave, true);
+  document.addEventListener('pointerleave', onControlLeave, true);
+  document.addEventListener('mouseleave', onControlLeave, true);
   window.addEventListener('blur', dismissStuckTooltips);
   document.addEventListener('pointermove', function () {
     if (parkedTitles.length) restoreParkedTitles();
@@ -16233,6 +16310,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
   };
 
+  syncAboutVersion();
   applyThemeTokens('default');
   onViewportChange();
   syncFromKernel();
