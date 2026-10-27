@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #227 (merged at 56a54ed): web - B1 About Version=#buildStamp; B2 Units footer dedupe; B4 sticky tooltip dismiss (tip 24b5f54; session 6f792ab8).
 - 2026-10-27 docs - item-10 L-bracket agy verify-only (session 61a4934c; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false; invent-free stop — Erik TBD dims).
 - 2026-10-27 docs - item-9 app-wide redundancy pass verify-only (sessions 9489eca1 + 01d55e74; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false).
 - 2026-10-27 PR #223 (merged at c2101d2): web - item-8 consolidate/remove bottom Create-Modify bar (tip ef3659a).
