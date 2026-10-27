@@ -5,6 +5,8 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #235 (merged at e2a32dc): docs - invent-free 6-D Home iso verify-only prompt retip (tip 4f944e5).
+
 - 2026-10-27 PR #233 (merged at de0d89d): docs - invent-free flat viewport theme brief + research fold (tip 9db2012).
 - 2026-10-27 PR #231 (merged at 12f7ac3): web - invent-free Modo sel/hover hex (#ffa829 / #8cb4c7; tip 113d76b; session 99a648e7).
 - 2026-10-27 PR #229 (merged at ccf30f2): web - invent-free flat viewport backdrop (Erik lock: no gradient; tip 5e80dc0; session 0beb800e).
