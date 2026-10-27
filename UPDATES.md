@@ -5,7 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
-- 2026-10-27: web - item-9 invent-free redundancy verify-only pass @ 0c36ba6 (zero web/ edits; sessions 9489eca1 + 01d55e74).
+- 2026-10-27 docs - item-9 app-wide redundancy pass verify-only (sessions 9489eca1 + 01d55e74; zero web/ edits @ tip 0c36ba6; coding_pr_needed=false).
 - 2026-10-27 PR #223 (merged at c2101d2): web - item-8 consolidate/remove bottom Create-Modify bar (tip ef3659a).
 - 2026-10-27 PR #221 (merged at 72b7f0f): web - Home onto Camera-shelf Top control (tip 3fac582).
 - 2026-10-27 PR #219 (merged at 0c31442): docs - Home brief retip Camera-shelf Top destination (tip ccfa2dc).
