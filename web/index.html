@@ -1875,7 +1875,7 @@
   }
   .line-dim {
     position: absolute;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) rotate(var(--line-dim-deg, 0deg));
     padding: 2px 6px;
     border-radius: 6px;
     background: rgba(18, 22, 30, 0.88);
@@ -1895,7 +1895,7 @@
     display: inline-block;
   }
   .line-dim.angle-dim {
-    transform: translate(-50%, 65%);
+    transform: translate(-50%, 65%) rotate(var(--line-dim-deg, 0deg));
   }
 </style>
 </head>
@@ -5921,6 +5921,18 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       badge.setAttribute('data-line-index', String(item.index));
       badge.setAttribute('data-mm', String(item.mm));
       badge.setAttribute('data-deg', String(item.deg));
+      // Default invent-free read (prompts/antigravity-sketch-dims-follow-angle.md):
+      // orient length and angle badges by seg.angleDeg (item.deg); exclude start-callout.
+      // Flip, offset, screen-space vs sketch-plane, and narrower kind lock stay TBD.
+      if (item.kind === 'length' || item.kind === 'angle') {
+        const deg = Number.isFinite(Number(item.deg)) ? Number(item.deg) : 0;
+        const baseTranslate = item.kind === 'angle' ? 'translate(-50%, 65%)' : 'translate(-50%, -50%)';
+        badge.style.setProperty('--line-dim-deg', deg + 'deg');
+        badge.style.transform = baseTranslate + ' rotate(' + deg + 'deg)';
+      } else {
+        badge.style.removeProperty('--line-dim-deg');
+        badge.style.transform = '';
+      }
       badge.textContent = item.text;
       const cx = Math.max(16, Math.min(vw - 16, Number.isFinite(at.x) ? at.x : vw / 2));
       const cy = Math.max(16, Math.min(vh - 16, Number.isFinite(at.y) ? at.y : vh / 2));
