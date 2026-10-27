@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #221 (merged at 72b7f0f): web - Home onto Camera-shelf Top control (tip 3fac582).
 - 2026-10-27 PR #219 (merged at 0c31442): docs - Home brief retip Camera-shelf Top destination (tip ccfa2dc).
 - 2026-10-27 PR #217 (merged at 724db03): web - View popup to top lower tools bar + show/hide (tip 0ce3ba1).
 - 2026-10-27 PR #215 (merged at 9157450): docs - park overnight 4–9 invent-free View/chrome briefs (tip aa9e890).
