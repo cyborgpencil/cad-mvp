@@ -232,7 +232,7 @@
     cursor: pointer;
     font-size: 16px;
   }
-  .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; align-items: stretch; }
+  .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; flex-wrap: wrap; align-items: stretch; }
   .ribbon > .tools { flex: 1; min-width: 0; }
   .topbar-shelves {
     display: flex;
@@ -241,6 +241,13 @@
     gap: 4px;
     padding: 4px 8px;
     flex: none;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .topbar-shelves .vp-bar {
+    position: static;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .tools-menu-btn { align-self: center; margin: 0; }
   .topbar-shelves .selection-shelf-group,
@@ -2046,6 +2053,9 @@
       <button type="button" class="tool-btn" id="cameraShelfBtn" data-action="cameraShelf" data-tool="Show/hide camera" title="Show/hide camera" aria-label="Show/hide camera" aria-controls="cameraShelf" aria-expanded="false">
         <svg class="ico"><use href="#i-eye"></use></svg><span>Camera</span>
       </button>
+      <button type="button" class="tool-btn is-on" data-tool="View" title="View" aria-label="View" aria-expanded="true">
+        <svg class="ico"><use href="#i-eye"></use></svg><span>View</span>
+      </button>
       <div class="menu-wrap">
         <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="Info" aria-haspopup="true" aria-expanded="false">Info</button>
         <div class="menu" role="region" aria-label="About" hidden>
@@ -2056,6 +2066,19 @@
             <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
             <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
           </div>
+        </div>
+      </div>
+      <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
+        <span class="modify-order">View</span>
+        <div class="vp-cluster" role="group" aria-label="Analyze">
+          <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
+          <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
+        </div>
+        <div class="vp-cluster" role="group" aria-label="Display">
+          <button type="button" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
+          <button type="button" class="is-on" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
+          <button type="button" data-action="display" data-mode="wire" data-tool="Display: Wireframe" title="Wireframe"><svg class="ico"><use href="#i-wire"></use></svg></button>
+          <button type="button" data-action="display" data-mode="xray" data-tool="Display: X-Ray" title="X-Ray"><svg class="ico"><use href="#i-xray"></use></svg></button>
         </div>
       </div>
     </div>
@@ -2307,19 +2330,6 @@
       <div id="boolBadges" class="bool-badges" aria-hidden="true"></div>
       <div id="lineDimLayer" class="line-dim-layer" aria-hidden="true" hidden></div>
       <button type="button" class="vc-home" id="vcHome" data-action="view" data-view="home" data-tool="Home view" title="Home view">Home</button>
-      <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
-        <span class="modify-order">View</span>
-        <div class="vp-cluster" role="group" aria-label="Analyze">
-          <button type="button" data-action="measure" data-tool="Measure" title="Measure"><svg class="ico"><use href="#i-dim"></use></svg></button>
-          <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
-        </div>
-        <div class="vp-cluster" role="group" aria-label="Display">
-          <button type="button" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
-          <button type="button" class="is-on" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
-          <button type="button" data-action="display" data-mode="wire" data-tool="Display: Wireframe" title="Wireframe"><svg class="ico"><use href="#i-wire"></use></svg></button>
-          <button type="button" data-action="display" data-mode="xray" data-tool="Display: X-Ray" title="X-Ray"><svg class="ico"><use href="#i-xray"></use></svg></button>
-        </div>
-      </div>
       <div id="selectionShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Selection" data-hscroll hidden>
         <span class="modify-order">Selection</span>
         <div class="vp-cluster" role="group" aria-label="Select">
@@ -2973,6 +2983,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const toolsSheet = document.getElementById('toolsSheet');
   const selectionShelf = document.getElementById('selectionShelf');
   const cameraShelf = document.getElementById('cameraShelf');
+  const viewBar = document.querySelector('.topbar-shelves .vp-bar[aria-label="View"]');
   const sheetTools = document.getElementById('sheetTools');
 
   const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
@@ -8750,9 +8761,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function layoutPortraitStack() {
-    const bar = viewport.querySelector('.vp-bar');
+    const bar = document.querySelector('.vp-bar');
     const gap = 8;
-    const barH = bar ? bar.offsetHeight : 56;
+    const barH = (bar && bar.offsetHeight) ? bar.offsetHeight : 56;
     if (!isPortraitSheet()) return gap;
     return gap + barH + gap;
   }
@@ -8855,8 +8866,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const narrow = isNarrow();
     const safe = viewportSafeInsets();
     const h = viewport.clientHeight || 0;
-    const bar = viewport.querySelector('.vp-bar');
-    const barH = bar ? bar.offsetHeight : 56;
+    const bar = document.querySelector('.vp-bar');
+    const barH = (bar && bar.offsetHeight) ? bar.offsetHeight : 56;
     const barGap = narrow ? 8 : 10;
     const minMargin = phone ? 8 : (narrow ? 8 : 12);
     const marginTop = Math.max(minMargin, safe.top);
@@ -9486,6 +9497,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.getElementById('inspFine').textContent = info.fine || (state.node === 'body' ? 'Triangle mesh from the wasm checks.' : 'TBD. This control does not edit the mesh.');
     const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool], .touch-tool[data-tool]');
     for (let i = 0; i < toolBtns.length; i++) {
+      if (toolBtns[i].closest('.topbar-shelves')) continue;
       if (toolBtns[i].id === 'snapBtn' || toolBtns[i].getAttribute('data-action') === 'snap') continue;
       if (toolBtns[i].getAttribute('data-action') === 'gizmoMode') continue;
       toolBtns[i].classList.toggle('is-on', toolBtns[i].getAttribute('data-tool') === state.activeTool);
@@ -10792,6 +10804,17 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (!cameraShelf) return;
     cameraShelf.hidden = open !== true;
     const buttons = document.querySelectorAll('[data-action="cameraShelf"]');
+    for (let i = 0; i < buttons.length; i += 1) {
+      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttons[i].classList.toggle('is-on', open === true);
+    }
+    publishGateState();
+  }
+
+  function setViewBarOpen(open) {
+    if (!viewBar) return;
+    viewBar.hidden = open !== true;
+    const buttons = document.querySelectorAll('.topbar-shelves > button[data-tool="View"]');
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', open === true);
@@ -13257,8 +13280,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function runAction(btn) {
     const action = btn.getAttribute('data-action') || '';
+    const isViewBarToggle = !action && btn.getAttribute('data-tool') === 'View' && !!btn.closest('.topbar-shelves');
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter' && action !== 'aboutMenu' && action !== 'theme') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && !isViewBarToggle && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter' && action !== 'aboutMenu' && action !== 'theme') {
       closePopups();
     }
     if (action === 'tab') {
@@ -13335,6 +13359,25 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       setCameraShelfOpen(willOpen);
       message = willOpen ? 'Show/hide camera' : 'Hide camera';
+    } else if (isViewBarToggle) {
+      const willOpen = !viewBar || viewBar.hidden === true;
+      closePopups();
+      if (willOpen) {
+        setSelectionShelfOpen(false);
+        setCameraShelfOpen(false);
+        setModifyOpen(false, true);
+        closeSketchSheet();
+        if (state.holeTool) state.holeTool = false;
+        if (state.edgeArm) {
+          state.edgeArm = '';
+          paintEdgeChrome();
+        }
+        state.dimSheetOpen = false;
+        state.propSheetOpen = false;
+        paintPrimFields();
+      }
+      setViewBarOpen(willOpen);
+      message = willOpen ? 'View' : 'Hide view';
     } else if (action === 'aboutMenu') {
       const willOpen = !state.aboutOpen;
       closePopups();
@@ -14898,6 +14941,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       shelfAfter: false
     };
     try {
+      if (viewBar && viewBar.hidden) setViewBarOpen(true);
       const btn = document.querySelector('[data-action="measure"]');
       const rect = btn ? btn.getBoundingClientRect() : { width: 0, height: 0 };
       result.buttonW = rect.width;
