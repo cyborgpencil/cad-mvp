@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #223 (merged at c2101d2): web - item-8 consolidate/remove bottom Create-Modify bar (tip ef3659a).
 - 2026-10-27 PR #221 (merged at 72b7f0f): web - Home onto Camera-shelf Top control (tip 3fac582).
 - 2026-10-27 PR #219 (merged at 0c31442): docs - Home brief retip Camera-shelf Top destination (tip ccfa2dc).
 - 2026-10-27 PR #217 (merged at 724db03): web - View popup to top lower tools bar + show/hide (tip 0ce3ba1).
