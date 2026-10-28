@@ -1,6 +1,8 @@
 # Antigravity off-bar menus float + drag + Close
 
-Off-bar menus float over the viewport, drag with the existing float-dock path, and show an explicit Close control. This file is the Antigravity feed. It does not change the app by itself.
+Active multi-agy feed (Chief FINAL LOCK 2026-10-27, merge order 1→2→3): `prompts/antigravity-offbar-agy-float-register.md`, then `prompts/antigravity-offbar-agy-close-chrome.md`, then `prompts/antigravity-offbar-agy-regression-smoke.md`. This file stays.
+
+Off-bar menus float over the viewport, drag with the existing float-dock path, and show an explicit Close control. This file is the combined lock. It does not change the app by itself.
 
 **Gate:** Chief lock piece (3) only, on main tip `bacb3f78a5de3b72872d5a44d81b4c3f0c2bd18a` (merge #238). Item-7 attempt3 is already DONE VALID on this tip (7-C1+B1+E1 @ `91369e1`, merge #237). No coding PR for item-7. This tip is unblocked. This prompts file does not start the `agy` by itself.
 
