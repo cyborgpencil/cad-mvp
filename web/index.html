@@ -16451,7 +16451,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function setupFloatingPanelDock() {
     const floatPanels = Array.from(
-      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #searchDlg, #browser, #inspector')
+      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #searchDlg, #browser, #inspector, #fileMenu, #exportMenu, #createMenu, .menu-wrap .menu[aria-label="About"]')
     );
     let dragState = null;
     let suppressPanelClick = false;
@@ -16463,14 +16463,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       ev.preventDefault();
     }, true);
 
+    function isOffbarMenu(panel) {
+      return !!(
+        panel && (
+          panel.id === 'fileMenu' ||
+          panel.id === 'exportMenu' ||
+          panel.id === 'createMenu' ||
+          (panel.matches && panel.matches('.menu-wrap .menu[aria-label="About"]'))
+        )
+      );
+    }
+
     function applyPanelPosition(panel, rawLeft, rawTop, hostRect, fallbackW, fallbackH) {
       const isDrawer = panel.id === 'browser' || panel.id === 'inspector';
-      if (isDrawer) {
+      const isFixed = isDrawer || isOffbarMenu(panel);
+      if (isFixed) {
         panel.style.position = 'fixed';
         panel.style.bottom = 'auto';
         panel.style.transform = 'none';
-        const bd = document.getElementById('backdrop');
-        if (bd) bd.classList.remove('show');
+        if (panel.id === 'createMenu') {
+          panel.style.width = 'fit-content';
+          panel.style.maxWidth = '100%';
+        }
+        if (isDrawer) {
+          const bd = document.getElementById('backdrop');
+          if (bd) bd.classList.remove('show');
+        }
       } else {
         if (panel.id === 'sketchSheet' || panel.id === 'edgeSheet' || panel.id === 'toolsSheet') {
           panel.style.width = 'fit-content';
@@ -16486,22 +16504,22 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const maxLeft = Math.max(0, hostRect.width - panelW);
       const maxTop = Math.max(0, hostRect.height - panelH);
       const clampedTop = Math.min(Math.max(0, rawTop), maxTop);
-      const topPx = isDrawer ? (hostRect.top + clampedTop) : clampedTop;
+      const topPx = isFixed ? (hostRect.top + clampedTop) : clampedTop;
       let dock = 'float';
       let leftVal = Math.round(rawLeft);
       if (rawLeft <= 0) {
         dock = 'left';
-        leftVal = isDrawer ? Math.round(hostRect.left) : 0;
+        leftVal = isFixed ? Math.round(hostRect.left) : 0;
         panel.style.left = leftVal + 'px';
         panel.style.right = 'auto';
       } else if (rawLeft >= maxLeft) {
         dock = 'right';
-        leftVal = isDrawer ? Math.round(hostRect.left + maxLeft) : Math.round(maxLeft);
-        panel.style.right = isDrawer ? Math.round(window.innerWidth - hostRect.right) + 'px' : '0px';
+        leftVal = isFixed ? Math.round(hostRect.left + maxLeft) : Math.round(maxLeft);
+        panel.style.right = isFixed ? Math.round(window.innerWidth - hostRect.right) + 'px' : '0px';
         panel.style.left = 'auto';
       } else {
         dock = 'float';
-        leftVal = isDrawer ? Math.round(hostRect.left + rawLeft) : Math.round(rawLeft);
+        leftVal = isFixed ? Math.round(hostRect.left + rawLeft) : Math.round(rawLeft);
         panel.style.left = leftVal + 'px';
         panel.style.right = 'auto';
       }
@@ -16523,7 +16541,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (ev.target && ev.target.closest && ev.target.closest('input, textarea, select, a, label.menu-file')) return;
       const panel = ev.currentTarget;
       if (!panel || panel.hidden) return;
-      const host = (panel.id === 'browser' || panel.id === 'inspector')
+      const host = (panel.id === 'browser' || panel.id === 'inspector' || isOffbarMenu(panel))
         ? viewport
         : (panel.offsetParent || viewport);
       const hostRect = host.getBoundingClientRect();
