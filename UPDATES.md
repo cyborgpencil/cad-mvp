@@ -3,6 +3,9 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-28
+- 2026-10-28 PR #255 (merged at ef968be): web - phone-tabbar REMOVE + Units pad 10->8 keep min-width 44 + Tree first in topbar-shelves (T1+U0; tip 599aab5).
+
 ## 2026-10-27
 - 2026-10-27 PR #253 (merged at 409fca3): web - plane-pick toggle disable hit-testing when off (tip 1a52386).
 - 2026-10-27 PR #251 (merged at 7eba344): research - claim invent-free mvp-core-gaps-2026-10-27 (tip 3b4bd4e).
