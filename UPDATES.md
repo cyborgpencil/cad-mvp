@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-28
+- 2026-10-28 PR #267 (merged at 19d90e9): web - Menu audit DROP M9/M13/M14/M15 + M10 shelves About (LOCK AMEND; tip 6c8bf49).
 - 2026-10-28 PR #265 (merged at 6908eca): web - PROJECTION H+A Persp/Ortho HUD + cube dbltap toggle (LOCK PROJECTION H+A YES; tip a8e11bb).
 - 2026-10-28 PR #263 (merged at e5d21a1): web - EMPTY_START no cold-start seed + smoke rewrite (LOCK EMPTY_START YES; tip a18f39d).
 - 2026-10-28 PR #261 (merged at efc210c): web - overnight C create flow plane->dims->Confirm/Cancel (LOCK CREATE_FLOW C YES; tip cc889e4).
