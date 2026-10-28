@@ -1287,32 +1287,6 @@
     background: var(--active-fill);
     color: var(--ink);
   }
-  .modify-shelf {
-    display: flex;
-    flex: none;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 4px;
-    height: 52px;
-    min-height: 52px;
-    max-height: 52px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 0 8px;
-    background: var(--panel);
-    border-top: 1px solid var(--line-strong);
-    scrollbar-width: none;
-  }
-  .modify-shelf::-webkit-scrollbar { display: none; }
-  .modify-shelf button {
-    flex: 0 0 auto;
-    min-width: 44px;
-    min-height: 44px;
-    height: 44px;
-    padding: 0 10px;
-    border-radius: 8px;
-    background: var(--tab-bg);
-  }
   .modify-order {
     flex: 0 0 auto;
     align-self: center;
@@ -1354,7 +1328,6 @@
     background: var(--panel);
     border-right: 0;
   }
-  .tool-tabs { display: none; }
   .toolbox .ribbon {
     flex: none;
     min-height: 0;
@@ -1525,7 +1498,6 @@
       padding-bottom: 4px;
     }
     .hint { flex: 1 1 120px; }
-    .tool-tabs { display: none; }
     .toolbox { width: auto; display: block; border-right: 0; }
     .toolbox .ribbon { flex-direction: row; overflow: visible; flex: none; }
     .toolbox .tools {
@@ -1978,12 +1950,6 @@
 
   <div class="workspace">
     <aside class="toolbox" id="toolbox" aria-label="Tools">
-      <nav class="tool-tabs" role="tablist" aria-label="Toolbox">
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="sketch" data-tool="Sketch" aria-selected="false" title="Sketch (Alt+1)">Sketch</button>
-        <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true" title="Model (Alt+2)">Model</button>
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false" title="Repair (Alt+3)">Repair</button>
-        <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false" title="Export (Alt+4)">Export</button>
-      </nav>
       <div class="ribbon" role="region" aria-label="Tools">
     <div class="topbar-shelves" role="toolbar" aria-label="Tools">
       <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
@@ -2004,7 +1970,7 @@
         <svg class="ico"><use href="#i-eye"></use></svg><span>View</span>
       </button>
       <div class="menu-wrap">
-        <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="Info" aria-haspopup="true" aria-expanded="false">Info</button>
+        <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="About" aria-haspopup="true" aria-expanded="false">About</button>
         <div class="menu" role="region" aria-label="About" hidden>
           <div class="sheet-h">
             <h2 class="panel-h">About</h2>
@@ -2042,21 +2008,8 @@
         <button type="button" class="tool-btn" data-action="sketchPolygon" data-tool="Polygon" title="Polygon. Regular N-gon centered on the sketch plane."><svg class="ico"><use href="#i-poly"></use></svg><span>Polygon</span></button>
       </div><div class="group-label">Draw</div></div>
       <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Sketch Fillet" title="Sketch Fillet"><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
-        <button type="button" class="tool-btn" data-tool="Trim" title="Trim"><svg class="ico"><use href="#i-trim"></use></svg><span>Trim</span></button>
-        <button type="button" class="tool-btn" data-tool="Offset" title="Offset"><svg class="ico"><use href="#i-offset"></use></svg><span>Offset</span></button>
         <button type="button" class="tool-btn" data-action="sketchDimension" data-tool="Dimension" title="Dimension. Show and focus sketch dimension callouts."><svg class="ico"><use href="#i-dim"></use></svg><span>Dimension</span></button>
       </div><div class="group-label">Modify</div></div>
-      <div class="group"><div class="group-btns">
-        <button type="button" class="tool-btn" data-tool="Coincident" title="Coincident"><svg class="ico"><use href="#i-coin"></use></svg><span>Coin.</span></button>
-        <button type="button" class="tool-btn" data-tool="Horizontal" title="Horizontal"><svg class="ico"><use href="#i-horiz"></use></svg><span>Horiz</span></button>
-        <button type="button" class="tool-btn" data-tool="Vertical" title="Vertical"><svg class="ico"><use href="#i-vert"></use></svg><span>Vert</span></button>
-        <button type="button" class="tool-btn" data-tool="Parallel" title="Parallel"><svg class="ico"><use href="#i-para"></use></svg><span>Para</span></button>
-        <button type="button" class="tool-btn" data-tool="Perpendicular" title="Perpendicular"><svg class="ico"><use href="#i-perp"></use></svg><span>Perp</span></button>
-        <button type="button" class="tool-btn" data-tool="Equal" title="Equal"><svg class="ico"><use href="#i-equal"></use></svg><span>Equal</span></button>
-        <button type="button" class="tool-btn" data-tool="Tangent" title="Tangent"><svg class="ico"><use href="#i-tan"></use></svg><span>Tangent</span></button>
-        <button type="button" class="tool-btn" data-tool="Fixed" title="Fixed"><svg class="ico"><use href="#i-fixed"></use></svg><span>Fixed</span></button>
-      </div><div class="group-label">Constrain</div></div>
     </div>
     <div class="tools panel" data-panel="model" role="region" aria-label="Model">
       <h2 class="panel-h">Model</h2>
@@ -2064,13 +2017,10 @@
         <button type="button" class="tool-btn wide" data-action="newSketch" data-tool="New Sketch" title="New Sketch"><svg class="ico"><use href="#i-sketch"></use></svg><span>New Sketch</span></button>
         <button type="button" class="tool-btn wide" id="createDesktop" data-action="createMenu" data-tool="Create" title="Create" aria-haspopup="menu" aria-expanded="false" aria-controls="createMenu" aria-label="Create"><svg class="ico"><use href="#i-plus"></use></svg><span>Create</span></button>
         <button type="button" class="tool-btn" data-action="sketchExtrude" data-tool="Extrude (Push/Pull)" title="Extrude. Blind distance, default 10 mm. New, Join, or Cut."><svg class="ico"><use href="#i-extrude"></use></svg><span>Extrude</span></button>
-        <button type="button" class="tool-btn" data-tool="Inset" title="Inset"><svg class="ico"><use href="#i-inset"></use></svg><span>Inset</span></button>
       </div><div class="group-label">Create</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" id="filletBtn" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet. Pick edges, then Confirm. Default 2 mm."><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
         <button type="button" class="tool-btn" id="chamferBtn" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer. Pick edges, then Confirm. Default 0.5 mm."><svg class="ico"><use href="#i-chamfer"></use></svg><span>Chamfer</span></button>
-        <button type="button" class="tool-btn" data-tool="Loop Cut" title="Loop Cut"><svg class="ico"><use href="#i-loop"></use></svg><span>Loop Cut</span></button>
-        <button type="button" class="tool-btn" data-tool="Knife" title="Knife"><svg class="ico"><use href="#i-knife"></use></svg><span>Knife</span></button>
       </div><div class="group-label">Modify</div></div>
       <div class="group"><div class="group-btns">
         <button type="button" class="tool-btn" data-action="gizmoMode" data-mode="move" data-tool="Grab" title="Move"><svg class="ico"><use href="#i-grab"></use></svg><span>Move</span></button>
@@ -2438,30 +2388,8 @@
         <h2 class="panel-h">Lists</h2>
         <p class="fine side-note">TBD. Vertex maps, the tool pipe, and statistics are not in this build. The Items list above is the part list.</p>
       </div>
-      <div class="prop" role="region" aria-label="About" hidden>
-        <h2 class="panel-h">About</h2>
-        <p class="fine">Version: <b>TBD</b></p>
-        <div class="muted">Theme</div>
-        <div class="units" role="group" aria-label="Theme">
-          <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
-          <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
-        </div>
-      </div>
     </aside>
     <div class="backdrop" id="backdrop" hidden></div>
-  </div>
-
-  <div id="modifyShelf" class="modify-shelf" role="toolbar" aria-label="Modify" data-hscroll hidden>
-    <span id="modifyOrder" class="modify-order">1 = target, 2 = tool</span>
-    <button type="button" data-action="gizmoMode" data-mode="move" data-tool="Move" title="Move">Move</button>
-    <button type="button" data-action="gizmoMode" data-mode="rotate" data-tool="Rotate" title="Rotate">Rotate</button>
-    <button type="button" data-action="gizmoMode" data-mode="scale" data-tool="Resize" title="Resize">Resize</button>
-    <button type="button" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet">Fillet</button>
-    <button type="button" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer">Chamfer</button>
-    <button type="button" class="bool-op" data-action="boolean" data-op="union" data-tool="Union" title="Union" disabled aria-disabled="true">Union</button>
-    <button type="button" class="bool-op" data-action="boolean" data-op="cut" data-tool="Cut" title="Cut" disabled aria-disabled="true">Cut</button>
-    <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
-    <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
   </div>
 
   <footer class="statusbar" aria-label="Units">
@@ -2686,18 +2614,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     { name: 'Circle', tab: 'sketch', action: 'sketchCircle' },
     { name: 'Arc', tab: 'sketch', action: 'sketchArc' },
     { name: 'Polygon', tab: 'sketch', action: 'sketchPolygon' },
-    { name: 'Sketch Fillet', tab: 'sketch' },
-    { name: 'Trim', tab: 'sketch' },
-    { name: 'Offset', tab: 'sketch' },
     { name: 'Dimension', tab: 'sketch', action: 'sketchDimension' },
-    { name: 'Coincident', tab: 'sketch' },
-    { name: 'Horizontal', tab: 'sketch' },
-    { name: 'Vertical', tab: 'sketch' },
-    { name: 'Parallel', tab: 'sketch' },
-    { name: 'Perpendicular', tab: 'sketch' },
-    { name: 'Equal', tab: 'sketch' },
-    { name: 'Tangent', tab: 'sketch' },
-    { name: 'Fixed', tab: 'sketch' },
     { name: 'Finish Sketch', tab: 'sketch', action: 'finishSketch' },
     { name: 'New Sketch', tab: 'model', action: 'newSketch' },
     { name: 'Box', tab: 'model', action: 'primitive', kind: 'box' },
@@ -2705,12 +2622,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     { name: 'Disc', tab: 'model', action: 'primitive', kind: 'disc' },
     { name: 'Hole', tab: 'model', action: 'holeTool' },
     { name: 'Extrude (Push/Pull)', tab: 'model', action: 'sketchExtrude' },
-    { name: 'Inset', tab: 'model' },
     { name: 'Fillet', tab: 'model', action: 'armEdge', op: 'fillet' },
     { name: 'Chamfer', tab: 'model', action: 'armEdge', op: 'chamfer' },
     { name: 'Confirm', tab: 'model', action: 'confirmEdge' },
-    { name: 'Loop Cut', tab: 'model' },
-    { name: 'Knife', tab: 'model' },
     { name: 'Grab', tab: 'model' },
     { name: 'Rotate', tab: 'model' },
     { name: 'Scale', tab: 'model' },
@@ -2750,15 +2664,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     'Circle': { title: 'Circle', sub: 'Center circle', kv: [['Diameter', 10, 'len']] },
     'Arc': { title: 'Arc', sub: 'Sketch tool', kv: [['Radius', 10, 'len']] },
     'Polygon': { title: 'Polygon', sub: 'Sketch tool', kv: [['Sides', '6'], ['Radius', 10, 'len']] },
-    'Sketch Fillet': { title: 'Sketch Fillet', sub: 'Sketch tool', kv: [['Radius', 2, 'len']] },
-    'Trim': { title: 'Trim', sub: 'Sketch tool', kv: [['Mode', 'first hit']] },
-    'Offset': { title: 'Offset', sub: 'Sketch tool', kv: [['Distance', 2, 'len']] },
     'Dimension': { title: 'Dimension', sub: 'Sketch tool', kv: [['Value', 20, 'len']] },
     'Extrude (Push/Pull)': { title: 'Extrude', sub: 'Blind distance. New, Join, or Cut.', kv: [['Distance', 10, 'len']] },
-    'Inset': { title: 'Inset', sub: 'Model tool', kv: [['Distance', 2, 'len']] },
     'Fillet': { title: 'Fillet', sub: 'Rounds selected edges', kv: [['Radius', 2, 'len']] },
-    'Loop Cut': { title: 'Loop Cut', sub: 'Model tool', kv: [['Cuts', '1']] },
-    'Knife': { title: 'Knife', sub: 'Model tool', kv: [['Snap', 'edge']] },
     'Grab': { title: 'Grab', sub: 'Model tool', kv: [['Axis', 'free']] },
     'Rotate': { title: 'Rotate', sub: 'Model tool', kv: [['Angle', '15°']] },
     'Scale': { title: 'Scale', sub: 'Model tool', kv: [['Factor', '1.0']] },
@@ -4830,7 +4738,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     function blocked(client) {
       const el = document.elementFromPoint(client.x, client.y);
       if (!el) return true;
-      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .statusbar, .topbar, .create-menu, .edge-sheet, #viewCube')) return true;
       if (el !== canvas && el !== viewport) return true;
       if (handles.visible && pickHandle(client.x, client.y)) return true;
       return false;
@@ -10326,7 +10234,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     paintAssembly();
     const btn = document.getElementById('exportBtn');
     const gateLabel = state.occtReady !== true ? 'PENDING' : (state.occtGate ? 'PASS' : 'FAIL');
-    const shelf = document.getElementById('modifyShelf');
     window.__cadcamExportState = {
       fixture: Module.fixtureName(),
       occtReady: state.occtReady === true,
@@ -10347,7 +10254,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       bboxMm: state.bboxMm,
       exactVolume: state.exactVolume === true,
       logText: window.__cadcamLogText || '',
-      modifyOpen: !!(shelf && shelf.hidden !== true),
+      modifyOpen: false,
       selectionShelfOpen: !!(selectionShelf && selectionShelf.hidden !== true),
       cameraShelfOpen: !!(cameraShelf && cameraShelf.hidden !== true),
       toolsOpen: !!(toolsSheet && toolsSheet.hidden !== true),
@@ -10735,8 +10642,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     syncAboutVersion();
     document.getElementById('browser').classList.toggle('open', browserOpen);
     document.getElementById('inspector').classList.toggle('open', inspectorOpen);
-    const inspAbout = document.querySelector('#inspector [aria-label="About"]');
-    if (inspAbout) inspAbout.hidden = !inspectorOpen;
     const buttons = document.querySelectorAll('[data-action="drawer"]');
     for (let i = 0; i < buttons.length; i += 1) {
       const target = buttons[i].getAttribute('data-drawer');
@@ -10757,8 +10662,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function closeDrawers() {
     document.getElementById('browser').classList.remove('open');
     document.getElementById('inspector').classList.remove('open');
-    const inspAbout = document.querySelector('#inspector [aria-label="About"]');
-    if (inspAbout) inspAbout.hidden = true;
     const buttons = document.querySelectorAll('[data-action="drawer"]');
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', 'false');
@@ -10827,27 +10730,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     menu.style.width = width + 'px';
   }
 
-  let modifyUserSet = false;
-
   function phoneWidth() {
     return window.matchMedia('(max-width: 820px)').matches;
-  }
-
-  function setModifyOpen(open, fromUser) {
-    const shelf = document.getElementById('modifyShelf');
-    if (!shelf) return;
-    shelf.hidden = open !== true;
-    const buttons = document.querySelectorAll('[data-action="modifyShelf"]');
-    for (let i = 0; i < buttons.length; i += 1) {
-      buttons[i].setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    if (fromUser) modifyUserSet = true;
-    publishGateState();
-  }
-
-  function applyModifyDefault() {
-    if (modifyUserSet) return;
-    setModifyOpen(false, false);
   }
 
   function toggleCreateMenu(opener) {
@@ -10863,7 +10747,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     closeSketchSheet();
     setSelectionShelfOpen(false);
     setCameraShelfOpen(false);
-    setModifyOpen(false, true);
     state.dimSheetOpen = false;
     state.propSheetOpen = false;
     if (state.holeTool) state.holeTool = false;
@@ -10968,7 +10851,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (chip) chip.setAttribute('aria-expanded', 'false');
     setSelectionShelfOpen(false);
     setCameraShelfOpen(false);
-    setModifyOpen(false, true);
     closeSketchSheet();
     if (state.holeTool) state.holeTool = false;
     if (state.edgeArm) {
@@ -11538,7 +11420,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function openSketchSheet(mode) {
-    setModifyOpen(false, true);
     setSelectionShelfOpen(false);
     setCameraShelfOpen(false);
     state.dimSheetOpen = false;
@@ -12875,7 +12756,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const wasTab = state.tab;
     state.tab = tab;
     if (tab === 'sketch') {
-      setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
       state.dimSheetOpen = false;
@@ -13526,7 +13406,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (open) {
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13554,7 +13433,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       closePopups();
       if (willOpen) {
         setCameraShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13573,7 +13451,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       closePopups();
       if (willOpen) {
         setSelectionShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13593,7 +13470,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13613,7 +13489,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (willOpen) {
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13637,29 +13512,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const cMenu = document.getElementById('createMenu');
       if (!cMenu || cMenu.hidden) return;
       message = 'Create';
-    } else if (action === 'modifyShelf') {
-      const shelf = document.getElementById('modifyShelf');
-      const willOpen = !shelf || shelf.hidden === true;
-      closeCreateMenu();
-      if (willOpen) {
-        setSelectionShelfOpen(false);
-        setCameraShelfOpen(false);
-        closeSketchSheet();
-        if (state.holeTool) state.holeTool = false;
-        state.dimSheetOpen = false;
-        state.propSheetOpen = false;
-      } else if (state.edgeArm) {
-        state.edgeArm = '';
-        paintEdgeChrome();
-      }
-      setModifyOpen(willOpen, true);
-      paintPrimFields();
-      if (!willOpen) {
-        clearToasts();
-        dismissStuckTooltips();
-        return;
-      }
-      message = 'Modify';
     } else if (action === 'downloadLog') {
       downloadText(window.__cadcamLogText || '', 'cadmvp-log.txt', 'text/plain');
       message = 'Download log';
@@ -13727,7 +13579,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'holeTool') {
       state.holeTool = !state.holeTool;
       if (state.holeTool) {
-        setModifyOpen(false, true);
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         closeSketchSheet();
@@ -13766,7 +13617,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       closePopups();
       if (opening) {
         setCameraShelfOpen(false);
-        setModifyOpen(false, true);
         closeSketchSheet();
         if (state.holeTool) state.holeTool = false;
         if (state.edgeArm) {
@@ -13806,7 +13656,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       message = 'Selection: ' + cap(state.selection);
       setHint(message);
     } else if (action === 'primitive') {
-      setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
       closeSketchSheet();
@@ -13916,7 +13765,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.dimSheetOpen = willOpen;
       if (willOpen) {
         closeCreateMenu();
-        setModifyOpen(false, true);
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         closeSketchSheet();
@@ -13933,7 +13781,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.propSheetOpen = willOpen;
       if (willOpen) {
         closeCreateMenu();
-        setModifyOpen(false, true);
         setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         closeSketchSheet();
@@ -13955,7 +13802,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         state.hudSizeCollapsed = state.hudSizeCollapsed !== true;
         if (state.hudSizeCollapsed !== true) {
           closeCreateMenu();
-          setModifyOpen(false, true);
           setSelectionShelfOpen(false);
           setCameraShelfOpen(false);
           closeSketchSheet();
@@ -14241,7 +14087,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (willOpen) {
           setSelectionShelfOpen(false);
           setCameraShelfOpen(false);
-          setModifyOpen(false, true);
           closeSketchSheet();
           if (state.holeTool) state.holeTool = false;
           if (state.edgeArm) {
@@ -15150,8 +14995,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const exportBefore = state.exportAllowed === true;
     const volumeBefore = state.volumeMm3;
     const bodiesBefore = state.bodies.length;
-    const shelf = document.getElementById('modifyShelf');
-    const shelfBefore = !shelf || shelf.hidden === true;
+    const shelfBefore = true;
     const result = {
       buttonW: 0,
       buttonH: 0,
@@ -15296,7 +15140,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       result.shapesAfter = (state.measureShapes || []).length;
       result.exportAfter = state.exportAllowed === true;
       result.bodiesAfter = state.bodies.length;
-      result.shelfAfter = !shelf || shelf.hidden === true;
+      result.shelfAfter = true;
       return result;
     } finally {
       state.unit = unitWas;
@@ -16212,7 +16056,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         return;
       }
-      setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
       state.dimSheetOpen = false;
@@ -16325,7 +16168,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const portrait = window.matchMedia('(orientation: portrait)').matches;
     document.documentElement.setAttribute('data-orientation', portrait ? 'portrait' : 'landscape');
     resize();
-    applyModifyDefault();
   }
   window.addEventListener('resize', onViewportChange);
   const orientMedia = window.matchMedia('(orientation: portrait)');
@@ -16599,7 +16441,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     spherical.radius = fitDistance();
     updateCamera();
   }
-  applyModifyDefault();
   const startTab = params.get('tab');
   if (startTab === 'sketch' || startTab === 'model' || startTab === 'repair' || startTab === 'export') setTab(startTab);
   else setTab('model');
