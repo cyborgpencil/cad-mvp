@@ -1257,8 +1257,8 @@ def create_menu_problems(cdp: Cdp) -> list[str]:
     return [str(item) for item in found]
 
 
-# Portrait sketch chrome only. Does not confirm a profile or extrude, so the
-# default 20 mm box is still the only body when this returns.
+# Portrait sketch chrome only. Creates the 20 mm box on empty boot and does not
+# confirm a profile or extrude, so that 20 mm box is the only body when this returns.
 SKETCH_PORTRAIT_EXPR = r"""
 (function(){
   var problems = [];
@@ -1445,6 +1445,30 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (!hook || typeof hook.tapFace !== 'function' || typeof hook.state !== 'function') {
     problems.push('missing sketch hook');
     return JSON.stringify(problems);
+  }
+  if (Number((window.__cadcamExportState || {}).bodyCount || 0) === 0) {
+    if (!openCreate()) {
+      problems.push('sketch prelude create menu did not open');
+      return JSON.stringify(problems);
+    }
+    var boxChoice = document.querySelector('#createMenu [data-action="primitive"][data-kind="box"]');
+    if (!boxChoice) {
+      problems.push('sketch prelude Create Box missing');
+      return JSON.stringify(problems);
+    }
+    boxChoice.click();
+    var xyChoice = document.querySelector('#originPlanes [data-plane="xy"]');
+    if (!xyChoice) {
+      problems.push('sketch prelude XY plane missing');
+      return JSON.stringify(problems);
+    }
+    xyChoice.click();
+    var confirmBox = document.getElementById('primConfirm');
+    if (!confirmBox) {
+      problems.push('sketch prelude primConfirm missing');
+      return JSON.stringify(problems);
+    }
+    confirmBox.click();
   }
   if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
   var menu = document.getElementById('createMenu');
@@ -2121,13 +2145,22 @@ ORIGIN_PLANE_EXPR = r"""
     problems.push('missing sketch hook');
     return JSON.stringify(problems);
   }
+  var emptyBoot = hook.state();
+  var emptyBootPub = window.__cadcamExportState || {};
+  if (!emptyBoot || emptyBoot.bodies !== 0 || emptyBoot.picker !== false || !Array.isArray(emptyBoot.bodyIds) || emptyBoot.bodyIds.length !== 0) {
+    problems.push('empty boot bodies ' + (emptyBoot && emptyBoot.bodies) + ' picker ' + (emptyBoot && emptyBoot.picker));
+  }
+  if (Number(emptyBootPub.bodyCount) !== 0 || emptyBootPub.primitiveKind !== '' || emptyBootPub.sceneCleared !== true) {
+    problems.push('empty boot state ' + emptyBootPub.primitiveKind + ' bodies ' + emptyBootPub.bodyCount + ' cleared ' + emptyBootPub.sceneCleared);
+  }
+  if (!addBox('cube start')) return JSON.stringify(problems);
   var before = hook.state();
   var beforePub = window.__cadcamExportState || {};
   if (!before || before.bodies !== 1 || before.picker !== false || !Array.isArray(before.bodyIds) || before.bodyIds.length !== 1) {
     problems.push('cube start bodies ' + (before && before.bodies) + ' picker ' + (before && before.picker));
   }
   if (beforePub.primitiveKind !== 'box' || !(Math.abs(Number(beforePub.volumeMm3) - 8000) < 0.5)) {
-    problems.push('boot cube ' + beforePub.primitiveKind + ' vol ' + beforePub.volumeMm3);
+    problems.push('seeded cube ' + beforePub.primitiveKind + ' vol ' + beforePub.volumeMm3);
   }
   if (!visibleClick('[data-action="createMenu"]')) problems.push('create opener hidden');
   var menu0 = document.getElementById('createMenu');
@@ -2749,7 +2782,8 @@ COVERAGE_EXPR = r"""
   if (!canvas) return JSON.stringify({ratio:0, problems:['missing canvas']});
   var canvasBox = canvas.getBoundingClientRect();
   if (canvasBox.width < 1 || canvasBox.height < 1) problems.push('canvas empty');
-  if (!panel || panel.hidden) problems.push('dimension panel hidden');
+  var hasBody = Number((window.__cadcamExportState || {}).bodyCount || 0) > 0;
+  if (!panel || (panel.hidden && (wantOpen || hasBody))) problems.push('dimension panel hidden');
   var open = !!(panel && panel.classList.contains('is-open'));
   if (wantOpen && !open) problems.push('panel not open');
   if (!wantOpen && open) problems.push('panel opened without a tap');
@@ -3901,6 +3935,9 @@ def _wait_body_count(cdp: Cdp, origin: str, count: int, timeout: float = 30) -> 
 
 
 def _delete_default_body(cdp: Cdp, origin: str) -> list[str]:
+    state = _export_state(cdp)
+    if int(state.get("bodyCount") or 0) == 0:
+        return []
     tapped = tap_selector(cdp, "#deleteBtn", "clear default box")
     if tapped:
         return tapped
@@ -3943,23 +3980,40 @@ WRAPUP_PHONE_EXPR = r"""
   walk(document.body);
   if (hits.length) problems.push('watertight text ' + hits.slice(0, 4).join(' | '));
   var st = window.__cadcamExportState || {};
-  var params = st.primitiveParams || {};
-  if (st.primitiveKind !== 'box' || st.bodyCount !== 1) problems.push('model ' + st.primitiveKind + ' bodies ' + st.bodyCount);
+  if (st.primitiveKind !== '' || st.bodyCount !== 0) problems.push('model ' + st.primitiveKind + ' bodies ' + st.bodyCount);
+  if (st.sceneCleared !== true) problems.push('sceneCleared ' + st.sceneCleared);
   if (st.undoDepth !== 0) problems.push('undo ' + st.undoDepth);
   if (st.projectDirty === true) problems.push('dirty');
-  if (st.exactVolume !== true) problems.push('exactVolume ' + st.exactVolume);
-  if (!(Math.abs(Number(st.volumeMm3) - 8000) < 0.01)) problems.push('volume ' + st.volumeMm3);
-  var bb = st.bboxMm || {};
-  ['dx', 'dy', 'dz'].forEach(function (key) {
-    if (!(Math.abs(Number(bb[key]) - 20) < 0.01)) problems.push('bbox ' + key + ' ' + bb[key]);
-  });
-  [['cx', 0], ['cy', 0], ['cz', 10], ['sx', 20], ['sy', 20], ['sz', 20]].forEach(function (pair) {
-    if (!(Math.abs(Number(params[pair[0]]) - pair[1]) < 0.01)) problems.push(pair[0] + ' ' + params[pair[0]]);
-  });
-  if (st.unitsPass !== true) problems.push('unitsPass');
-  if (st.occtGate !== true || st.gateOcct !== 'PASS') problems.push('gate ' + st.gateOcct);
-  if (st.exportAllowed !== true || st.exportDisabled !== false) problems.push('export');
+  if (st.exactVolume !== false) problems.push('exactVolume ' + st.exactVolume);
+  if (Number(st.volumeMm3) !== 0) problems.push('volume ' + st.volumeMm3);
+  if (st.bboxMm !== null) problems.push('bbox ' + JSON.stringify(st.bboxMm));
+  if (st.primitiveParams !== null) problems.push('primitiveParams ' + JSON.stringify(st.primitiveParams));
+  if (st.unitsPass !== false) problems.push('unitsPass ' + st.unitsPass);
+  if (st.occtGate !== false || st.gateOcct !== 'FAIL') problems.push('gate ' + st.gateOcct);
+  if (st.exportAllowed !== false || st.exportDisabled !== true) problems.push('export');
+  if (st.blockReason !== 'Nothing to export.') problems.push('blockReason ' + st.blockReason);
   if (st.bannerHidden !== true) problems.push('bannerHidden');
+  var browserH = document.querySelector('#browser .panel-h');
+  var bodiesBtn = document.querySelector('#browser [data-tool="Bodies"]');
+  if (!browserH || (browserH.textContent || '').trim() !== 'Items') problems.push('Items header missing');
+  if (!bodiesBtn || (bodiesBtn.textContent || '').trim() !== 'Bodies') problems.push('Bodies header missing');
+  var bodyNode = document.querySelector('#browser [data-action="node"][data-node="body"]');
+  var bodyRow = bodyNode ? bodyNode.closest('.row') : null;
+  if (!bodyRow || bodyRow.hidden !== true || shown(bodyNode) || shown(document.getElementById('isoBtn'))) {
+    problems.push('Body1 row visible on empty start');
+  }
+  var hudName = document.getElementById('hudName');
+  if (!hudName || (hudName.textContent || '').trim() !== 'Empty') {
+    problems.push('hudName ' + (hudName ? hudName.textContent : 'missing'));
+  }
+  var inspTitle = document.getElementById('inspTitle');
+  var inspSub = document.getElementById('inspSub');
+  if (inspTitle && (inspTitle.hidden !== true || /Body1/i.test(inspTitle.textContent || ''))) {
+    problems.push('inspTitle ' + inspTitle.textContent);
+  }
+  if (inspSub && (inspSub.hidden !== true || /placeholder cube/i.test(inspSub.textContent || ''))) {
+    problems.push('inspSub ' + inspSub.textContent);
+  }
   var lines = String(st.logText || '').split('\n').filter(Boolean);
   var iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z \[cadmvp\] /;
   if (!lines.length) problems.push('empty log');
@@ -3976,12 +4030,9 @@ WRAPUP_PHONE_EXPR = r"""
     });
     return found;
   }
-  var vol = parseFloat(lastMsg('volume ').replace('volume ', ''));
-  if (!(Math.abs(vol - 8000) < 0.01)) problems.push('log volume ' + lastMsg('volume '));
-  var boxParts = lastMsg('bbox ').replace('bbox ', '').split(' x ').map(parseFloat);
-  if (boxParts.length !== 3 || boxParts.some(function (n) { return !(Math.abs(n - 20) < 0.01); })) {
-    problems.push('log bbox ' + lastMsg('bbox '));
-  }
+  if (lastMsg('OCCT ').indexOf('Nothing to export.') < 0) problems.push('log occt ' + lastMsg('OCCT '));
+  if (lastMsg('volume ') !== 'volume unavailable') problems.push('log volume ' + lastMsg('volume '));
+  if (lastMsg('bbox ') !== 'bbox unavailable') problems.push('log bbox ' + lastMsg('bbox '));
   function tab(action) {
     var nodes = document.querySelectorAll('.topbar [data-action="' + action + '"]');
     for (var i = 0; i < nodes.length; i++) {
@@ -4175,7 +4226,7 @@ def _json_problems(raw: Any, err: str, label: str) -> list[str]:
 
 
 def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
-    """Default 20 mm box, [cadmvp] log, header Undo/Redo, desktop shelf."""
+    """Empty cold start, [cadmvp] log, header Undo/Redo, desktop shelf."""
     try:
         set_portrait(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
@@ -4212,7 +4263,7 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     after_state = (after or {}).get("state") if after else None
     if not isinstance(after_state, dict) or int(after_state.get("undoDepth") or 0) != 0:
         return [f"wrapup undo depth {after_state!r}"[:400]]
-    if int(after_state.get("bodyCount") or 0) != 1:
+    if int(after_state.get("bodyCount") or 0) != 0:
         return [f"wrapup undo changed the model {after_state.get('bodyCount')!r}"]
     covered = coverage_problems(cdp, False)
     if covered:
@@ -4235,7 +4286,7 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     problems = viewport_gradient_problems(cdp, "wrapup desktop gradient")
     if problems:
         return problems
-    desk_callouts = callout_problems(cdp, "box", {"boxSx": 20.0, "boxSy": 20.0, "boxSz": 20.0})
+    desk_callouts = callout_hidden_problems(cdp)
     if desk_callouts:
         return ["wrapup desktop callouts", *desk_callouts]
     escaped, esc_err = eval_expr(
@@ -4298,8 +4349,8 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     bad = [line for line in lines if not stamp.match(line)]
     if bad:
         return [f"wrapup download line {bad[0][:120]}"]
-    if not any("volume " in line and "8000" in line for line in lines):
-        return ["wrapup download missing volume 8000"]
+    if not any("volume unavailable" in line for line in lines):
+        return ["wrapup download missing volume unavailable"]
     print("wrapup pass", flush=True)
     return []
 
@@ -4504,43 +4555,40 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
                 problems.append(f"portrait {kind} sketch")
                 problems.extend(sketch_found)
                 return problems
-        # The default page is already the 20 mm box. Another Box tap adds a body.
-        if not (kind == "box" and _is_default_box(_state)):
-            if kind in ("cylinder", "disc"):
-                cleared = _delete_default_body(cdp, origin)
-                if cleared:
-                    problems.append(f"portrait {kind} clear")
-                    problems.extend(cleared[:12])
-                    return problems
-                hidden = callout_hidden_problems(cdp)
-                if hidden:
-                    problems.append(f"portrait {kind} callouts hidden")
-                    problems.extend(hidden)
-                    return problems
-            raw, err = eval_expr(cdp, toolbar_point_expr(kind))
-            if err or not isinstance(raw, str) or not raw.startswith("{"):
-                problems.append(f"portrait {kind} toolbar {raw or err}")
-                return problems
-            box = json.loads(raw)
-            if float(box["w"]) < 44 or float(box["h"]) < 44:
-                problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
-                return problems
-            touch_tap(cdp, float(box["x"]), float(box["y"]))
-            plane_problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', f"portrait {kind} plane")
-            if plane_problems:
-                problems.extend(plane_problems)
-                return problems
-            preview_data, preview_err = _callout_probe(cdp)
-            if preview_err or not isinstance(preview_data, dict):
-                problems.extend(preview_err or [f"portrait {kind} preview probe"])
-                return problems
-            if preview_data.get("hidden") is not True or preview_data.get("rows"):
-                problems.append(f"portrait {kind} preview callouts {preview_data!r}")
-                return problems
-            confirm_problems = tap_selector(cdp, "#primConfirm", f"portrait {kind} confirm")
-            if confirm_problems:
-                problems.extend(confirm_problems)
-                return problems
+        cleared = _delete_default_body(cdp, origin)
+        if cleared:
+            problems.append(f"portrait {kind} clear")
+            problems.extend(cleared[:12])
+            return problems
+        hidden = callout_hidden_problems(cdp)
+        if hidden:
+            problems.append(f"portrait {kind} callouts hidden")
+            problems.extend(hidden)
+            return problems
+        raw, err = eval_expr(cdp, toolbar_point_expr(kind))
+        if err or not isinstance(raw, str) or not raw.startswith("{"):
+            problems.append(f"portrait {kind} toolbar {raw or err}")
+            return problems
+        box = json.loads(raw)
+        if float(box["w"]) < 44 or float(box["h"]) < 44:
+            problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
+            return problems
+        touch_tap(cdp, float(box["x"]), float(box["y"]))
+        plane_problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', f"portrait {kind} plane")
+        if plane_problems:
+            problems.extend(plane_problems)
+            return problems
+        preview_data, preview_err = _callout_probe(cdp)
+        if preview_err or not isinstance(preview_data, dict):
+            problems.extend(preview_err or [f"portrait {kind} preview probe"])
+            return problems
+        if preview_data.get("hidden") is not True or preview_data.get("rows"):
+            problems.append(f"portrait {kind} preview callouts {preview_data!r}")
+            return problems
+        confirm_problems = tap_selector(cdp, "#primConfirm", f"portrait {kind} confirm")
+        if confirm_problems:
+            problems.extend(confirm_problems)
+            return problems
         created, wait_problems = wait_portrait(
             cdp, origin, kind, {str(spec["key"]): float(spec["fresh"])}, PAGE_TIMEOUT_S
         )
@@ -4760,6 +4808,12 @@ def run_portrait_holes(cdp: Cdp, origin: str) -> list[str]:
             return [f"portrait holes toolbar {raw or err}"]
         box = json.loads(raw)
         touch_tap(cdp, float(box["x"]), float(box["y"]))
+        plane_problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', "portrait holes plane")
+        if plane_problems:
+            return plane_problems
+        confirm_problems = tap_selector(cdp, "#primConfirm", "portrait holes confirm")
+        if confirm_problems:
+            return confirm_problems
     created, wait_problems = wait_portrait(cdp, origin, "box", {"sx": 20.0}, PAGE_TIMEOUT_S)
     if wait_problems or not isinstance(created, dict):
         return ["portrait holes create", *wait_problems[:20]]
@@ -8396,7 +8450,11 @@ def _measure_degrees(label: str) -> float | None:
 
 
 def measure_tool_problems(cdp: Cdp) -> list[str]:
-    """Default 20 mm cube. Measure is read-only: edge polyline, two-point, volume."""
+    """20 mm cube. Measure is read-only: edge polyline, two-point, volume."""
+    if int((_export_state(cdp)).get("bodyCount") or 0) == 0:
+        seeded, seed_err = _click_create_kind(cdp, "box")
+        if seed_err or not seeded or seeded.get("error"):
+            return ["measure seed box", str(seed_err or seeded)]
     raw, err = eval_expr(cdp, MEASURE_PROBE_EXPR, timeout=60)
     if err or not isinstance(raw, str) or not raw.startswith("{"):
         return [f"measure probe {raw or err}"]

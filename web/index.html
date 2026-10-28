@@ -2129,8 +2129,8 @@
       <h2 class="panel-h">Items</h2>
       <div class="branch">
         <button type="button" class="branch-name" data-tool="Bodies">Bodies</button>
-        <div class="row">
-          <button type="button" class="node is-on" data-action="node" data-node="body" data-tool="Body1">Body1</button>
+        <div class="row" hidden>
+          <button type="button" class="node is-on" data-action="node" data-node="body" data-tool="Body1"></button>
           <button type="button" class="mini on-word" id="isoBtn" data-action="isolate" data-tool="Isolate" title="Isolate Body1">Iso</button>
           <button type="button" class="mini eye" data-action="visible" data-target="body" data-tool="Hide Body1" title="Hide Body1" aria-pressed="true" aria-label="Toggle Body1 visibility"><svg class="ico on"><use href="#i-eye"></use></svg><svg class="ico off"><use href="#i-eyeoff"></use></svg></button>
         </div>
@@ -2199,7 +2199,7 @@
         </form>
       </div>
       <div class="hud" role="region" aria-label="View">
-        <div><b id="hudName">Body1</b></div>
+        <div><b id="hudName">Empty</b></div>
         <div><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel">Iso</span></div>
       </div>
       <form id="dimPanel" class="dim-panel" aria-label="Dimensions" hidden>
@@ -2387,10 +2387,10 @@
       <div class="prop" id="toolProp" data-side-panel="properties" role="tabpanel" aria-label="Properties">
         <button type="button" class="prop-toggle" id="propToggle" data-action="propShelf" data-tool="Properties" title="Properties" aria-expanded="false" aria-controls="propBody" aria-label="Properties">Properties</button>
         <div id="propBody" role="region" aria-label="Properties" hidden>
-        <h3 id="inspTitle">Body1</h3>
-        <div class="muted" id="inspSub">Solid body · placeholder cube</div>
+        <h3 id="inspTitle" hidden></h3>
+        <div class="muted" id="inspSub" hidden></div>
         <div class="kv" id="inspKv"></div>
-        <div id="inspColors">
+        <div id="inspColors" hidden>
           <div class="muted" style="margin-top:12px">Appearance</div>
           <div class="swatches">
             <button type="button" class="swatch is-on" style="background:#5aa4d6" data-action="color" data-color="#5aa4d6" data-tool="Appearance: Steel" title="Steel" aria-label="Steel"></button>
@@ -2399,7 +2399,7 @@
             <button type="button" class="swatch" style="background:#8b95a8" data-action="color" data-color="#8b95a8" data-tool="Appearance: Slate" title="Slate" aria-label="Slate"></button>
           </div>
         </div>
-        <p class="fine" id="inspFine">Labels only. This cube is not editable geometry.</p>
+        <p class="fine" id="inspFine" hidden></p>
         <div id="moveFields" class="move-fields">
           <div class="muted">Position (mm)</div>
           <label>X <input id="posX" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Position X mm"></label>
@@ -5956,10 +5956,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const nodeBtn = document.querySelector('[data-action="node"][data-node="body"]');
     if (nodeBtn) {
+      const row = nodeBtn.closest('.row');
+      if (row) row.hidden = state.bodies.length === 0;
       if (state.bodies.length > 1 && selected.length) {
         nodeBtn.textContent = selected.map(function (body, index) { return (index + 1) + ' ' + body.name; }).join(' · ');
       } else if (state.bodies.length === 1) nodeBtn.textContent = state.bodies[0].name;
-      else nodeBtn.textContent = 'Body1';
+      else if (state.bodies.length > 1) nodeBtn.textContent = state.bodies.map(function (body) { return body.name; }).join(' · ');
+      else nodeBtn.textContent = '';
     }
   }
 
@@ -6975,6 +6978,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       state.hoverId = null;
       state.selectedIds = [];
       state.booleanOp = '';
+      state.activeTool = '';
       state.demo = '';
       state.sceneCleared = true;
       state.lastError = '';
@@ -9458,10 +9462,37 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function updateInspector() {
     const tool = TOOL_INSP[state.activeTool];
-    const info = tool || INSP[state.node] || INSP.body;
-    document.getElementById('inspTitle').textContent = info.title;
-    document.getElementById('inspSub').textContent = info.sub || '';
+    const titleEl = document.getElementById('inspTitle');
+    const subEl = document.getElementById('inspSub');
     const kv = document.getElementById('inspKv');
+    const colorsEl = document.getElementById('inspColors');
+    const fineEl = document.getElementById('inspFine');
+    if (state.bodies.length === 0 && !tool && state.node === 'body') {
+      if (titleEl) { titleEl.textContent = ''; titleEl.hidden = true; }
+      if (subEl) { subEl.textContent = ''; subEl.hidden = true; }
+      if (kv) kv.innerHTML = '';
+      if (colorsEl) colorsEl.hidden = true;
+      if (fineEl) { fineEl.textContent = ''; fineEl.hidden = true; }
+      const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool], .touch-tool[data-tool]');
+      for (let i = 0; i < toolBtns.length; i++) {
+        if (toolBtns[i].closest('.topbar-shelves')) continue;
+        if (toolBtns[i].id === 'snapBtn' || toolBtns[i].getAttribute('data-action') === 'snap') continue;
+        if (toolBtns[i].getAttribute('data-action') === 'gizmoMode') continue;
+        toolBtns[i].classList.toggle('is-on', toolBtns[i].getAttribute('data-tool') === state.activeTool);
+      }
+      return;
+    }
+    const info = tool || INSP[state.node] || INSP.body;
+    if (titleEl) {
+      titleEl.hidden = false;
+      titleEl.textContent = (!tool && state.node === 'body' && state.bodies.length === 1 && state.bodies[0].name)
+        ? state.bodies[0].name
+        : info.title;
+    }
+    if (subEl) {
+      subEl.hidden = false;
+      subEl.textContent = info.sub || '';
+    }
     kv.innerHTML = '';
     const rows = (info.kv || []).slice();
     if (!tool && state.node === 'body') {
@@ -9487,8 +9518,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       kv.appendChild(k);
       kv.appendChild(v);
     }
-    document.getElementById('inspColors').hidden = !((INSP[state.node] || {}).colors && !tool);
-    document.getElementById('inspFine').textContent = info.fine || (state.node === 'body' ? 'Triangle mesh from the wasm checks.' : 'TBD. This control does not edit the mesh.');
+    colorsEl.hidden = !((INSP[state.node] || {}).colors && !tool);
+    if (fineEl) {
+      fineEl.hidden = false;
+      fineEl.textContent = info.fine || (state.node === 'body' ? 'Triangle mesh from the wasm checks.' : 'TBD. This control does not edit the mesh.');
+    }
     const toolBtns = document.querySelectorAll('.ribbon .tool-btn[data-tool], .touch-tool[data-tool]');
     for (let i = 0; i < toolBtns.length; i++) {
       if (toolBtns[i].closest('.topbar-shelves')) continue;
@@ -9905,7 +9939,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       cz: (minY + maxY) / 2
     };
     captureMeshCad();
-    document.getElementById('hudName').textContent = Module.fixtureName();
+    document.getElementById('hudName').textContent = (state.sceneCleared || state.bodies.length === 0) ? 'Empty' : Module.fixtureName();
     placeHandles();
   }
 
@@ -10544,9 +10578,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
       readout.textContent = names[state.display] || state.display;
     }
-    document.getElementById('hudName').textContent = state.sceneCleared
+    document.getElementById('hudName').textContent = (state.sceneCleared || state.bodies.length === 0)
       ? 'Empty'
-      : (state.node === 'body' ? Module.fixtureName() : (NODE_LABELS[state.node] || 'Body1'));
+      : (state.node === 'body' ? Module.fixtureName() : (NODE_LABELS[state.node] || 'Empty'));
     markPressed('[data-action="select"]', 'mode', state.selection);
     markPressed('[data-action="display"]', 'mode', state.display);
     markPressed('[data-action="units"]', 'unit', state.unit);
@@ -16424,14 +16458,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   syncAboutVersion();
   applyThemeTokens('default');
   onViewportChange();
-  syncFromKernel();
   spherical.radius = fitDistance();
   updateCamera();
-  refreshUnits();
-  applyLook();
   const params = new URLSearchParams(window.location.search);
   const wanted = params.get('fixture');
-  const primKind = params.get('primitive');
+  const primKind = params.get('primitive') || params.get('prim');
   const demoName = params.get('demo');
   const pairName = params.get('pair');
   let loadedQuery = false;
@@ -16479,7 +16510,21 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     updateCamera();
   }
   if (!loadedQuery) {
-    createPrimitive('box', null, 'item', false);
+    state.bodies = [];
+    state.primitive = null;
+    state.topology = null;
+    state.topologySource = 'occt';
+    state.shapeGate = null;
+    state.hoverId = null;
+    state.selectedIds = [];
+    state.booleanOp = '';
+    state.demo = '';
+    state.sceneCleared = true;
+    state.lastError = '';
+    mountBodyMeshes();
+    syncFromKernel();
+    refreshAnchor();
+    applyLook();
     if (typeof window.__cadcamClearUndo === 'function') window.__cadcamClearUndo();
     state.projectDirty = false;
     publishProjectHook();
