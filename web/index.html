@@ -607,6 +607,35 @@
   .eye.is-off .on { display: none; }
   .eye.is-off .off { display: block; }
   .eye.is-off { color: var(--muted); opacity: 0.55; }
+  .prim-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+    padding-top: 4px;
+    background: var(--panel);
+  }
+  .prim-actions[hidden] { display: none !important; }
+  .prim-actions button {
+    flex: 1 1 88px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 8px;
+    font-weight: 650;
+  }
+  .prim-actions .prim-confirm {
+    border: 1px solid var(--active-border);
+    background: var(--active-fill);
+    color: var(--ink);
+  }
+  .prim-actions .prim-cancel {
+    border: 1px solid var(--line);
+    background: var(--tab-bg);
+    color: var(--ink);
+  }
   #viewport {
     flex: 1;
     min-width: 0;
@@ -2229,6 +2258,10 @@
         </div>
         <button type="button" class="lock-btn is-on" id="lockProportions" data-action="lockProportions" data-tool="Lock proportions" aria-pressed="true">Lock proportions</button>
         <p class="fine dim-note" id="ellipseNote" hidden>Circles may become ellipses.</p>
+        <div id="primActions" class="prim-actions" hidden>
+          <button type="button" class="prim-confirm" id="primConfirm" data-action="confirmPrimitive" data-tool="Confirm">Confirm</button>
+          <button type="button" class="prim-cancel" id="primCancel" data-action="cancelPrimitive" data-tool="Cancel">Cancel</button>
+        </div>
         <div id="holeFields" hidden>
           <div class="dim-row"><span class="dim-label">Edge U</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="-1" data-unit="mm" data-tool="Edge U minus" aria-label="Edge U minus">−</button><input id="holeU" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge U mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeU" data-delta="1" data-unit="mm" data-tool="Edge U plus" aria-label="Edge U plus">+</button></div>
           <div class="dim-row"><span class="dim-label">Edge V</span><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="-1" data-unit="mm" data-tool="Edge V minus" aria-label="Edge V minus">−</button><input id="holeV" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Hole from edge V mm"><button type="button" class="dim-step" data-action="dimStep" data-dim="holeV" data-delta="1" data-unit="mm" data-tool="Edge V plus" aria-label="Edge V plus">+</button></div>
@@ -2831,6 +2864,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     holeDepthMode: 'through',
     holeCountersink: true,
     holeLog: [],
+    primCreate: null,
     sketchPlane: null,
     sketchProfile: null,
     sketchLineVertices: [],
@@ -3612,6 +3646,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   // One selected part among several bodies. A single body keeps the old path.
   function activeEditBody() {
+    if (state.primCreate && state.primCreate.step === 'dims' && state.primCreate.previewBodyId) {
+      const preview = findBody(state.primCreate.previewBodyId);
+      if (preview) return preview;
+    }
     if (state.bodies.length === 1) return state.bodies[0];
     if (state.selection !== 'item') return null;
     const picked = orderedBodies();
@@ -3620,6 +3658,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function sheetPrimitive() {
+    if (state.primCreate && state.primCreate.step === 'plane') return null;
+    if (state.primCreate && state.primCreate.step === 'dims' && state.primCreate.previewBodyId) {
+      const previewBody = findBody(state.primCreate.previewBodyId);
+      if (previewBody && previewBody.params && (previewBody.kind === 'box' || previewBody.kind === 'cylinder' || previewBody.kind === 'disc')) {
+        return { kind: previewBody.kind, params: previewBody.params, body: previewBody };
+      }
+    }
     if (state.bodies.length <= 1) return parametricBody() ? state.primitive : null;
     const body = activeEditBody();
     if (!body || !body.params) return null;
@@ -3629,6 +3674,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function sheetBBoxBody() {
+    if (state.primCreate) return null;
     if (state.bodies.length <= 1) return bboxMode() ? singleBody() : null;
     const body = activeEditBody();
     if (!body || !body.shape || sheetPrimitive()) return null;
@@ -3705,11 +3751,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const bboxBody = sheetBBoxBody();
     const bbox = !!bboxBody;
     const holeFields = document.getElementById('holeFields');
+    const primActions = document.getElementById('primActions');
+    const primPlaneStep = !!(state.primCreate && state.primCreate.step === 'plane');
+    const primDimsStep = !!(state.primCreate && state.primCreate.step === 'dims');
     const selected = state.selectedIds.length > 0;
     const centres = document.getElementById('primCentres');
     const rotate = document.getElementById('primRotate');
     const bboxHost = document.getElementById('primBbox');
-    host.hidden = state.tab === 'sketch' || (!prim && !bbox && !state.holeTool && !selected);
+    host.hidden = state.tab === 'sketch' || primPlaneStep || (!prim && !bbox && !state.holeTool && !selected);
     box.hidden = !prim || prim.kind !== 'box';
     cyl.hidden = !prim || prim.kind !== 'cylinder';
     disc.hidden = !prim || prim.kind !== 'disc';
@@ -3717,6 +3766,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (rotate) rotate.hidden = !prim;
     if (bboxHost) bboxHost.hidden = !bbox;
     if (holeFields) holeFields.hidden = !state.holeTool;
+    if (primActions) primActions.hidden = !primDimsStep;
     const unitLabel = document.getElementById('dimUnit');
     if (unitLabel) unitLabel.textContent = state.unit;
     const title = document.getElementById('primTitle');
@@ -3731,7 +3781,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       title.textContent = 'Selection';
     }
     const deleteBtn = document.getElementById('deleteBtn');
-    if (deleteBtn) deleteBtn.hidden = !selected;
+    if (deleteBtn) deleteBtn.hidden = !selected || primDimsStep;
     if (prim) {
       state.writingFields = true;
       writeLength('primCx', prim.params.cx);
@@ -3840,6 +3890,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const prim = sheetPrimitive();
     if (!prim || !prim.params) return [];
     if (prim.kind === 'box') {
+      if (state.primCreate && state.primCreate.step === 'dims') {
+        return [
+          { tag: 'L', dim: 'boxSx', label: 'Length', mm: Number(prim.params.sx) },
+          { tag: 'H', dim: 'boxSz', label: 'Height', mm: Number(prim.params.sz) }
+        ];
+      }
       return [
         { tag: 'L', dim: 'boxSx', label: 'Length', mm: Number(prim.params.sx) },
         { tag: 'W', dim: 'boxSy', label: 'Width', mm: Number(prim.params.sy) },
@@ -6627,6 +6683,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function doUndo() {
+    if (state.primCreate) cancelPrimCreate(true);
     const cmd = commandStack.undo();
     if (!cmd) {
       setHint('Nothing to undo');
@@ -6634,10 +6691,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     }
     installSnapshot(cmd.before);
+    paintPrimFields();
     setHint('Undo ' + (cmd.label || ''));
   }
 
   function doRedo() {
+    if (state.primCreate) cancelPrimCreate(true);
     const cmd = commandStack.redo();
     if (!cmd) {
       setHint('Nothing to redo');
@@ -6645,6 +6704,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     }
     installSnapshot(cmd.after);
+    paintPrimFields();
     setHint('Redo ' + (cmd.label || ''));
   }
 
@@ -8147,7 +8207,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function performResize(work) {
     state.resizeMethod = '';
-    const ok = runUndoable('Resize', function () { return work() === true; });
+    const ok = (state.primCreate && state.primCreate.step === 'dims')
+      ? (work() === true)
+      : runUndoable('Resize', function () { return work() === true; });
     if (ok) {
       state.lastResize = {
         ok: true,
@@ -8384,6 +8446,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const rotChanged = !nearly(next.rx, old.rx || 0) || !nearly(next.ry, old.ry || 0) || !nearly(next.rz, old.rz || 0);
     if (!sizesChanged && !centreChanged && !rotChanged) return false;
     if (!sizesChanged) {
+      if (state.primCreate && state.primCreate.step === 'dims') {
+        return createPrimitive(kind, next, null, true) === true;
+      }
       return runUndoable(centreChanged ? 'Move' : 'Rotate', function () {
         return createPrimitive(kind, next, null, true) === true;
       });
@@ -8577,6 +8642,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return replaceBodySolid(body, owned);
     }
     if (!sizesChanged) {
+      if (state.primCreate && state.primCreate.step === 'dims') {
+        return rebuildOwned() === true;
+      }
       return runUndoable(centreChanged ? 'Move' : 'Rotate', function () { return rebuildOwned() === true; });
     }
     // Rebuild from the typed parameters so live BRepGProp matches save/load.
@@ -8680,7 +8748,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         stageExactMm(field.id, next);
       }
       onPrimitiveCommit();
-      if (commandStack.depth() !== depth + 1) break;
+      if (!(state.primCreate && state.primCreate.step === 'dims') && commandStack.depth() !== depth + 1) break;
       applied += 1;
     }
     return applied;
@@ -10255,6 +10323,13 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       selectedEdge: selectedEdgeEnds(),
       primitiveKind: state.primitive ? state.primitive.kind : '',
       primitiveParams: state.primitive ? Object.assign({}, state.primitive.params) : null,
+      primCreateStep: state.primCreate ? state.primCreate.step : '',
+      primCreateKind: state.primCreate ? state.primCreate.kind : '',
+      primConfirmVisible: (function () {
+        const actions = document.getElementById('primActions');
+        const btn = document.getElementById('primConfirm');
+        return !!(actions && actions.hidden !== true && btn && btn.hidden !== true);
+      })(),
       dimPanelOpen: (function () {
         const panel = document.getElementById('dimPanel');
         return !!(panel && panel.hidden !== true);
@@ -10894,6 +10969,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     return 'Pick an ortho plane or tap a planar face';
   }
 
+  function primPlanePrompt() {
+    if (state.bodies.length === 0) return 'Pick Front, Back, Top, Bottom, Left, or Right';
+    return 'Pick an ortho plane or tap a planar face';
+  }
+
   // Right-hand outward, same axis rule as faceFrameFromTriangles:
   // u is the first world axis least aligned with outward, kept positive,
   // and v = outward × u. Top/XY outward is +Z. Bottom outward is -Z.
@@ -10989,6 +11069,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function paintOriginPicker() {
     const bar = document.getElementById('originPlanes');
     const sketchActive = state.tab === 'sketch';
+    const primPlaneActive = !!(state.tab === 'model' && state.primCreate && state.primCreate.step === 'plane');
     const hasPlane = !!(sketchActive && state.sketchPlane);
     document.documentElement.toggleAttribute('data-sketch-active', sketchActive);
     document.documentElement.toggleAttribute('data-sketch-plane', hasPlane);
@@ -10999,10 +11080,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (aboutWrap) aboutWrap.hidden = sketchActive;
     if (sketchActive && state.aboutOpen) setAboutOpen(false);
     if (!bar) return;
-    const show = sketchActive && !state.sketchPlane;
+    const show = (sketchActive && !state.sketchPlane) || primPlaneActive;
     bar.hidden = !show;
     const buttons = bar.querySelectorAll('[data-action="originPlane"]');
-    const picked = state.sketchPlane && state.sketchPlane.originPlane;
+    const picked = primPlaneActive
+      ? (state.primCreate && state.primCreate.originPlane)
+      : (state.sketchPlane && state.sketchPlane.originPlane);
     for (let i = 0; i < buttons.length; i += 1) {
       const on = picked === buttons[i].getAttribute('data-plane');
       buttons[i].classList.toggle('is-on', on);
@@ -11593,6 +11676,164 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
     }
     return best;
+  }
+
+  function startPrimCreate(kind) {
+    if (state.primCreate) cancelPrimCreate(true);
+    if (state.tab !== 'model') setTab('model', { keepTool: true });
+    const want = kind === 'cylinder' || kind === 'disc' ? kind : 'box';
+    const selectMode = state.selection === 'item' ? 'item' : state.selection;
+    const useAddAnother = state.bodies.length >= 1 || !!(state.sketchProfile && state.sketchProfile.closed);
+    state.primCreate = {
+      kind: want,
+      step: 'plane',
+      selectMode: selectMode,
+      useAddAnother: useAddAnother,
+      originPlane: '',
+      faceId: '',
+      bodyId: '',
+      frame: null,
+      snapshot: null,
+      bodySeqBefore: state.bodySeq,
+      projectDirtyBefore: state.projectDirty,
+      previewBodyId: ''
+    };
+    state.dimSheetOpen = false;
+    state.propSheetOpen = false;
+    state.activeTool = primitiveLabel(want);
+    paintOriginPicker();
+    paintPrimFields();
+    updateInspector();
+    applyLook();
+    const prompt = primPlanePrompt();
+    setHint(prompt);
+    toast(prompt);
+    publishGateState();
+    return true;
+  }
+
+  function enterPrimDims(planeSpec) {
+    if (!state.primCreate || state.primCreate.step !== 'plane') return false;
+    const cur = state.primCreate;
+    cur.snapshot = captureSnapshot();
+    cur.bodySeqBefore = state.bodySeq;
+    cur.projectDirtyBefore = state.projectDirty;
+    cur.step = 'dims';
+    cur.originPlane = (planeSpec && planeSpec.originPlane) || '';
+    cur.faceId = (planeSpec && planeSpec.faceId) || '';
+    cur.bodyId = (planeSpec && planeSpec.bodyId) || '';
+    cur.frame = (planeSpec && planeSpec.frame) || null;
+    let ok = false;
+    try {
+      if (cur.useAddAnother) {
+        ok = addAnotherBody(cur.kind) === true;
+      } else {
+        ok = createPrimitive(cur.kind, null, cur.selectMode, false) === true;
+      }
+    } catch (err) {
+      ok = false;
+      setHint(err && err.message ? err.message : String(err));
+    }
+    if (!ok) {
+      installSnapshot(cur.snapshot);
+      releaseSnapshot(cur.snapshot);
+      state.bodySeq = cur.bodySeqBefore;
+      state.projectDirty = cur.projectDirtyBefore;
+      state.primCreate = null;
+      paintOriginPicker();
+      paintPrimFields();
+      publishGateState();
+      return false;
+    }
+    cur.previewBodyId = state.bodies.length ? state.bodies[state.bodies.length - 1].id : '';
+    state.dimSheetOpen = true;
+    state.hudSizeCollapsed = false;
+    paintOriginPicker();
+    paintPrimFields();
+    applyLook();
+    publishGateState();
+    return true;
+  }
+
+  function setOriginPrimPlane(which) {
+    if (!state.primCreate || state.primCreate.step !== 'plane') return false;
+    const key = normalizeOriginPlaneKey(which);
+    return enterPrimDims({ originPlane: key, faceId: '', bodyId: '', frame: originPlaneFrame(key) });
+  }
+
+  function setFacePrimPlane(faceId) {
+    if (!state.primCreate || state.primCreate.step !== 'plane') return false;
+    if (!viewApi || typeof viewApi.faceFrameFromTriangles !== 'function') {
+      setHint('Tap a planar face');
+      return false;
+    }
+    const resolved = resolveSketchFace(faceId);
+    if (!resolved || !resolved.mesh || !resolved.face) {
+      if (!state.meshCad || !state.topology) setHint('Tap a planar face');
+      return false;
+    }
+    const face = resolved.face;
+    const owner = resolved.owner;
+    const meshCad = resolved.mesh;
+    const centre = owner ? bodyBoundsCenter(owner) : [0, 0, 0];
+    const frame = viewApi.faceFrameFromTriangles(meshCad.vertices, meshCad.triangles, face.tris, centre);
+    if (!frame) {
+      const why = 'That face is not planar.';
+      setHint(why);
+      toast(why);
+      return false;
+    }
+    return enterPrimDims({ originPlane: '', faceId: face.id, bodyId: owner ? owner.id : '', frame: frame });
+  }
+
+  function confirmPrimCreate() {
+    if (!state.primCreate || state.primCreate.step !== 'dims') return false;
+    const cur = state.primCreate;
+    state.primCreate = null;
+    state.dimSheetOpen = false;
+    const after = captureSnapshot();
+    releaseCommands(commandStack.push({
+      label: 'Create ' + primitiveLabel(cur.kind),
+      before: cur.snapshot,
+      after: after
+    }));
+    paintOriginPicker();
+    paintPrimFields();
+    applyLook();
+    paintAssembly();
+    const lastBody = state.bodies.length ? state.bodies[state.bodies.length - 1] : null;
+    const note = (cur.useAddAnother && state.bodies.length > 1 && lastBody)
+      ? ('Added ' + (lastBody.name || primitiveLabel(cur.kind)) + '. 1 is the target and 2 is the tool.')
+      : (userStatus() || primitiveLabel(cur.kind));
+    setHint(note);
+    toast(primitiveLabel(cur.kind));
+    publishGateState();
+    return true;
+  }
+
+  function cancelPrimCreate(silent) {
+    if (!state.primCreate) return false;
+    const cur = state.primCreate;
+    state.primCreate = null;
+    state.dimSheetOpen = false;
+    if (cur.step === 'dims' && cur.snapshot) {
+      installSnapshot(cur.snapshot);
+      releaseSnapshot(cur.snapshot);
+      state.bodySeq = cur.bodySeqBefore;
+      state.projectDirty = cur.projectDirtyBefore;
+      publishProjectHook();
+    }
+    paintOriginPicker();
+    paintPrimFields();
+    applyLook();
+    paintAssembly();
+    if (!silent) {
+      const note = userStatus() || 'Cancel';
+      setHint(note);
+      toast('Cancel');
+    }
+    publishGateState();
+    return true;
   }
 
   function setOriginSketchPlane(which) {
@@ -12567,6 +12808,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       if (chip) chip.setAttribute('aria-expanded', 'false');
     }
     if (tab !== 'model') {
+      if (state.primCreate) cancelPrimCreate(true);
       if (state.holeTool) state.holeTool = false;
       if (state.edgeArm) {
         state.edgeArm = '';
@@ -13497,17 +13739,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       const rawKind = btn.getAttribute('data-kind');
       const kind = rawKind === 'cylinder' || rawKind === 'disc' ? rawKind : 'box';
-      const label = 'Create ' + primitiveLabel(kind);
-      const selectMode = state.selection === 'item' ? 'item' : state.selection;
-      runUndoable(label, function () {
-        // A finished profile stays so Join or Cut can use the body added next.
-        if (state.bodies.length >= 1 || (state.sketchProfile && state.sketchProfile.closed)) {
-          return addAnotherBody(kind) === true;
-        }
-        return createPrimitive(kind, null, selectMode, false) === true;
-      });
-      message = primitiveLabel(kind);
+      startPrimCreate(kind);
+      return;
+    } else if (action === 'confirmPrimitive') {
+      confirmPrimCreate();
+      return;
+    } else if (action === 'cancelPrimitive') {
+      cancelPrimCreate(false);
+      return;
     } else if (action === 'boolean') {
+      if (state.primCreate) cancelPrimCreate(true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
       closeSketchSheet();
@@ -13722,13 +13963,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const swatches = document.querySelectorAll('.swatch');
       for (let i = 0; i < swatches.length; i++) swatches[i].classList.toggle('is-on', swatches[i] === btn);
     } else if (action === 'originPlane') {
-      if (state.planePickEnabled === false && state.tab === 'sketch' && !state.sketchPlane) return;
-      const which = btn.getAttribute('data-plane') || 'xy';
-      if (!setOriginSketchPlane(which)) {
-        message = sketchPlanePrompt();
-        setHint(message);
+      if (state.primCreate && state.primCreate.step === 'plane') {
+        if (state.planePickEnabled === false) return;
+        const which = btn.getAttribute('data-plane') || 'xy';
+        if (!setOriginPrimPlane(which)) {
+          message = primPlanePrompt();
+          setHint(message);
+        } else {
+          message = primitiveLabel(state.primCreate ? state.primCreate.kind : 'box');
+        }
       } else {
-        message = originPlaneLabel(which);
+        if (state.planePickEnabled === false && state.tab === 'sketch' && !state.sketchPlane) return;
+        const which = btn.getAttribute('data-plane') || 'xy';
+        if (!setOriginSketchPlane(which)) {
+          message = sketchPlanePrompt();
+          setHint(message);
+        } else {
+          message = originPlaneLabel(which);
+        }
       }
     } else if (action === 'newSketch') {
       if (state.bodies.length === 0) {
@@ -15531,6 +15783,16 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             }
           }
         }
+        if (state.tab === 'model' && state.primCreate && state.primCreate.step === 'plane') {
+          const faceId = state.planePickEnabled === false
+            ? null
+            : pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
+          if (faceId && setFacePrimPlane(faceId)) {
+            gesture = null;
+            pinch = null;
+            return;
+          }
+        }
         const hitId = pickElement(ev.clientX, ev.clientY, ev.pointerType);
         const modified = !!(ev.shiftKey || ev.ctrlKey || ev.metaKey);
         const multiBodyToggle = state.phoneMulti === true && !!hitId;
@@ -15842,6 +16104,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         calloutEntry.blur();
         return;
       }
+      if (state.primCreate) {
+        ev.preventDefault();
+        cancelPrimCreate(false);
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        return;
+      }
       setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
@@ -15996,7 +16264,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   window.__cadcamSketch = {
     topFace: function () { return topSketchFaceId(); },
-    tapFace: function (id) { return setSketchPlane(id || topSketchFaceId()); },
+    tapFace: function (id) {
+      const targetId = id || topSketchFaceId();
+      if (state.primCreate && state.primCreate.step === 'plane') return setFacePrimPlane(targetId);
+      return setSketchPlane(targetId);
+    },
     tapHoleFace: function (id) {
       state.selectedIds = id ? [id] : [];
       const ok = rememberHoleFace(id);
@@ -16093,6 +16365,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const startPt = activeSketchStartPoint();
       return {
         tab: state.tab,
+        primCreateStep: state.primCreate ? state.primCreate.step : '',
+        primCreateKind: state.primCreate ? state.primCreate.kind : '',
         plane: !!state.sketchPlane,
         faceId: state.sketchPlane ? state.sketchPlane.faceId : '',
         bodyId: state.sketchPlane && state.sketchPlane.bodyId ? state.sketchPlane.bodyId : '',
