@@ -2388,8 +2388,7 @@ ORIGIN_PLANE_EXPR = r"""
   var lineSheet = document.getElementById('sketchSheet');
   if (!lineSheet || lineSheet.hidden !== true) problems.push('line start sheet open');
   var trimRibbon = document.querySelector('.tool-btn[data-tool="Trim"]');
-  if (!trimRibbon) problems.push('Trim button missing');
-  else if (trimRibbon.getAttribute('data-action')) problems.push('Trim data-action ' + trimRibbon.getAttribute('data-action'));
+  if (trimRibbon) problems.push('Trim stub still present');
   if (openTools()) {
     var trimBtn = sheetBtn('Trim');
     if (trimBtn) problems.push('Trim sheet visible during sketch');
@@ -2630,8 +2629,7 @@ ORIGIN_PLANE_EXPR = r"""
   if (!dimRibbon) problems.push('Dimension button missing');
   else if (dimRibbon.getAttribute('data-action') !== 'sketchDimension') problems.push('Dimension data-action ' + dimRibbon.getAttribute('data-action'));
   var offsetRibbon = document.querySelector('.tool-btn[data-tool="Offset"]');
-  if (!offsetRibbon) problems.push('Offset button missing');
-  else if (offsetRibbon.getAttribute('data-action')) problems.push('Offset data-action ' + offsetRibbon.getAttribute('data-action'));
+  if (offsetRibbon) problems.push('Offset stub still present');
   if (openTools()) {
     var offsetBtn = sheetBtn('Offset');
     if (offsetBtn) problems.push('Offset sheet visible during sketch');
@@ -4084,7 +4082,7 @@ WRAPUP_PHONE_EXPR = r"""
     }
   });
   var shelf = document.getElementById('modifyShelf');
-  if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
+  if (shelf) problems.push('modifyShelf still present on phone');
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
   return JSON.stringify(problems);
 })()
@@ -4095,28 +4093,9 @@ WRAPUP_DESK_EXPR = r"""
 (function(){
   var problems = [];
   var shelf = document.getElementById('modifyShelf');
-  if (!shelf || shelf.hidden !== true) problems.push('shelf not collapsed at load');
+  if (shelf) problems.push('modifyShelf still present');
   var btn = document.getElementById('modifyDesktop');
   if (btn) problems.push('modifyDesktop still present');
-  if (shelf) {
-    shelf.hidden = false;
-    var cs = getComputedStyle(shelf);
-    if (cs.flexWrap !== 'nowrap') problems.push('wrap ' + cs.flexWrap);
-    var top = null;
-    var buttons = shelf.querySelectorAll('button');
-    for (var i = 0; i < buttons.length; i++) {
-      var br = buttons[i].getBoundingClientRect();
-      if (br.width < 1) continue;
-      if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
-        problems.push('shelf button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
-      }
-      if (top === null) top = br.top;
-      else if (Math.abs(br.top - top) > 0.5) problems.push('shelf top ' + br.top.toFixed(1) + ' vs ' + top.toFixed(1));
-    }
-    var sr = shelf.getBoundingClientRect();
-    if (sr.height < 44 || sr.height > 64) problems.push('shelf height ' + sr.height.toFixed(1));
-    shelf.hidden = true;
-  }
   var desk = document.querySelector('.desk-bottom');
   if (desk) problems.push('desk-bottom still present');
   var menu = document.getElementById('createMenu');
@@ -4325,7 +4304,7 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         cdp,
         "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));"
         "var shelf=document.getElementById('modifyShelf');"
-        "return JSON.stringify({hidden:!!(shelf&&shelf.hidden)});})()",
+        "return JSON.stringify({hidden:!shelf||!!shelf.hidden});})()",
     )
     if esc_err or not isinstance(escaped, str):
         return [f"wrapup esc {escaped or esc_err}"]
@@ -4338,11 +4317,11 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     created, create_err = eval_expr(
         cdp,
         "(function(){var tm=document.querySelector('[data-action=\"toolsMenu\"]');if(tm)tm.click();"
-        "var shelf=document.getElementById('modifyShelf');if(shelf)shelf.hidden=false;"
+        "var shelf=document.getElementById('modifyShelf');"
         "var b=document.querySelector('#toolsSheet [data-action=\"createMenu\"]');"
         "if(!b)return 'missing';b.click();"
         "var menu=document.getElementById('createMenu');"
-        "return JSON.stringify({shelf:!!(shelf&&shelf.hidden!==true),menu:!!(menu&&menu.hidden!==true)});})()",
+        "return JSON.stringify({shelf:!!shelf,menu:!!(menu&&menu.hidden!==true)});})()",
     )
     if create_err or not isinstance(created, str):
         return [f"wrapup create {created or create_err}"]
