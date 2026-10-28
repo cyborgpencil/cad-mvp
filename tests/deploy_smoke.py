@@ -88,6 +88,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import zlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -4020,6 +4021,125 @@ WRAPUP_DESK_EXPR = r"""
 """
 
 
+VIEWPORT_GRADIENT_EXPR = r"""
+(function(){
+  var problems = [];
+  var rootBg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toLowerCase();
+  if (rootBg !== '#0e2429') problems.push('root --bg ' + rootBg);
+  var vp = document.getElementById('viewport');
+  var canvas = document.getElementById('canvas');
+  if (!vp || !canvas) return JSON.stringify(['missing viewport or canvas']);
+  var vpStyle = getComputedStyle(vp);
+  var bgImg = String(vpStyle.backgroundImage || '').toLowerCase();
+  var wantBg = 'radial-gradient(1200px 700px at 50% 42%, rgb(26, 69, 76) 0%, rgb(18, 48, 56) 55%, rgb(14, 36, 41) 100%)';
+  if (bgImg !== wantBg) problems.push('viewport backgroundImage ' + bgImg);
+  var csStyle = getComputedStyle(canvas);
+  if (csStyle.backgroundColor !== 'rgba(0, 0, 0, 0)' || csStyle.backgroundImage !== 'none') {
+    problems.push('canvas css bg ' + csStyle.backgroundColor + ' ' + csStyle.backgroundImage);
+  }
+  var gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl) {
+    problems.push('missing webgl context');
+  } else {
+    var attrs = gl.getContextAttributes ? gl.getContextAttributes() : null;
+    if (!attrs || attrs.alpha !== true) problems.push('webgl alpha ' + (attrs ? attrs.alpha : 'missing'));
+    var cc = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+    if (!cc || Math.abs(Number(cc[3])) > 1e-6) {
+      problems.push('webgl clearAlpha ' + (cc ? cc[3] : 'missing'));
+    }
+  }
+  var sample = window.__cadcamFrameSample || {};
+  var corner = sample.colors && sample.colors[4];
+  if (!corner || corner[3] !== 0) {
+    problems.push('canvas corner clear not transparent ' + JSON.stringify(corner));
+  }
+  var r = vp.getBoundingClientRect();
+  return JSON.stringify({
+    problems: problems,
+    inner: {x: Math.round(r.left + r.width * 0.45), y: Math.round(r.top + 12)},
+    outer: {x: Math.round(r.left + 6), y: Math.round(r.bottom - 6)}
+  });
+})()
+"""
+
+
+def _png_1x1_rgb(b64: str) -> tuple[int, int, int] | None:
+    raw = base64.b64decode(b64)
+    if len(raw) < 24 or raw[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    pos = 8
+    idat = bytearray()
+    while pos + 8 <= len(raw):
+        length = struct.unpack(">I", raw[pos : pos + 4])[0]
+        kind = raw[pos + 4 : pos + 8]
+        if kind == b"IDAT":
+            idat.extend(raw[pos + 8 : pos + 8 + length])
+        pos += 12 + length
+    if not idat:
+        return None
+    row = zlib.decompress(bytes(idat))
+    if len(row) < 4:
+        return None
+    return (int(row[1]), int(row[2]), int(row[3]))
+
+
+def viewport_gradient_problems(cdp: Cdp, label: str) -> list[str]:
+    raw, err = eval_expr(cdp, VIEWPORT_GRADIENT_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"{label} {raw or err}"]
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"{label} {raw[:500]}"]
+    if not isinstance(payload, dict):
+        return [f"{label} {raw[:500]}"]
+    problems = [str(item) for item in (payload.get("problems") or [])]
+    if problems:
+        return [f"{label}: {item}" for item in problems]
+    inner_pt = payload.get("inner") or {}
+    outer_pt = payload.get("outer") or {}
+    try:
+        in_shot = cdp.call(
+            "Page.captureScreenshot",
+            {
+                "format": "png",
+                "clip": {
+                    "x": int(inner_pt["x"]),
+                    "y": int(inner_pt["y"]),
+                    "width": 1,
+                    "height": 1,
+                    "scale": 1,
+                },
+            },
+        )
+        out_shot = cdp.call(
+            "Page.captureScreenshot",
+            {
+                "format": "png",
+                "clip": {
+                    "x": int(outer_pt["x"]),
+                    "y": int(outer_pt["y"]),
+                    "width": 1,
+                    "height": 1,
+                    "scale": 1,
+                },
+            },
+        )
+        inner_rgb = _png_1x1_rgb(str(in_shot.get("data") or ""))
+        outer_rgb = _png_1x1_rgb(str(out_shot.get("data") or ""))
+    except Exception as exc:
+        return [f"{label} screenshot {exc}"]
+    if inner_rgb is None or outer_rgb is None:
+        return [f"{label} screenshot decode inner={inner_rgb!r} outer={outer_rgb!r}"]
+    if inner_rgb == (14, 36, 41):
+        return [f"{label} canvas inner background is flat #0e2429 {inner_rgb!r}"]
+    if inner_rgb == outer_rgb or sum(inner_rgb) <= sum(outer_rgb) + 10:
+        return [
+            f"{label} canvas gradient not visible inner={inner_rgb!r} outer={outer_rgb!r}"
+        ]
+    return []
+
+
 def _json_problems(raw: Any, err: str, label: str) -> list[str]:
     if err or not isinstance(raw, str):
         return [f"{label} {raw or err}"]
@@ -4047,6 +4167,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return ["wrapup phone returned no state"]
     raw, err = eval_expr(cdp, WRAPUP_PHONE_EXPR)
     problems = _json_problems(raw, err, "wrapup phone")
+    if problems:
+        return problems
+    problems = viewport_gradient_problems(cdp, "wrapup phone gradient")
     if problems:
         return problems
     clicked, click_err = eval_expr(
@@ -4085,6 +4208,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return ["wrapup desktop load", *load_problems[:20]]
     raw, err = eval_expr(cdp, WRAPUP_DESK_EXPR)
     problems = _json_problems(raw, err, "wrapup desktop")
+    if problems:
+        return problems
+    problems = viewport_gradient_problems(cdp, "wrapup desktop gradient")
     if problems:
         return problems
     desk_callouts = callout_problems(cdp, "box", {"boxSx": 20.0, "boxSy": 20.0, "boxSz": 20.0})

@@ -612,7 +612,7 @@
     min-width: 0;
     position: relative;
     z-index: 2;
-    background: var(--bg);
+    background: radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%);
     box-shadow: inset 0 0 0 2px var(--accent);
     touch-action: none;
     -webkit-user-select: none;
@@ -2784,7 +2784,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     '--top-h': 'calc(48px + env(safe-area-inset-top, 0px))',
     '--status-h': '44px'
   };
-  const DEFAULT_VIEWPORT_BACKGROUND = 'var(--bg)';
+  const DEFAULT_VIEWPORT_BACKGROUND = 'radial-gradient(1200px 700px at 50% 42%, #1a454c 0%, #123038 55%, #0e2429 100%)';
 
   const state = {
     tab: 'model',
@@ -2898,12 +2898,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const viewBar = document.querySelector('.topbar-shelves .vp-bar[aria-label="View"]');
   const sheetTools = document.getElementById('sheetTools');
 
-  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
   if (!renderer.getContext()) throw new Error('WebGL is unavailable in this browser.');
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.localClippingEnabled = true;
   renderer.autoClear = false;
-  renderer.setClearColor(0x0e2429, 1);
+  renderer.setClearColor(0x0e2429, 0);
   window.__cadcamContextLost = 0;
   window.__cadcamGlInfo = {
     isWebGL2: !!(renderer.capabilities && renderer.capabilities.isWebGL2),
