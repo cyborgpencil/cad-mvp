@@ -3273,26 +3273,58 @@ def nav_cube_problems(cdp: Cdp) -> list[str]:
     time.sleep(0.4)
     fresh, fresh_problems = read_nav(cdp)
     if fresh_problems or not isinstance(fresh, dict):
-        return ["home zone", *(fresh_problems or ["missing"])]
-    home_zone = nav_zone(fresh, "front", "face") or corner
-    if not isinstance(home_zone, dict):
-        return ["home tap zone missing"]
-    home = fresh.get("home")
-    if not isinstance(home, list) or len(home) != 3:
-        return [f"home dir {home!r}"]
-    doubled = _double_tap_zone(cdp, home_zone)
+        return ["projection zone", *(fresh_problems or ["missing"])]
+    if (
+        fresh.get("projection") != "Perspective"
+        or fresh.get("orthographic") is not False
+        or fresh.get("viewLabel") != "Perspective"
+    ):
+        return [
+            f"projection before double-tap {fresh.get('projection')!r} "
+            f"ortho {fresh.get('orthographic')!r} label {fresh.get('viewLabel')!r}"
+        ]
+    proj_zone = nav_zone(fresh, "front", "face") or corner
+    if not isinstance(proj_zone, dict):
+        return ["projection tap zone missing"]
+    before_proj_dir = fresh.get("direction")
+    if not isinstance(before_proj_dir, list) or len(before_proj_dir) != 3:
+        return [f"projection dir {before_proj_dir!r}"]
+    doubled = _double_tap_zone(cdp, proj_zone)
     if doubled:
         return doubled
-    # Double-tap Home: goView/animateSpherical refits selection (SC3); not cube snap timing/distance.
-    snapped = _wait_snap(
-        cdp,
-        (float(home[0]), float(home[1]), float(home[2])),
-        None,
-        "home",
-        check_snap_timing=False,
-    )
-    if snapped:
-        return snapped
+    cdp.drain(0.05)
+    ortho_nav, ortho_problems = read_nav(cdp)
+    if ortho_problems or not isinstance(ortho_nav, dict):
+        return ["projection ortho read", *(ortho_problems or ["missing"])]
+    if (
+        ortho_nav.get("projection") != "Orthographic"
+        or ortho_nav.get("orthographic") is not True
+        or ortho_nav.get("viewLabel") != "Orthographic"
+    ):
+        return [
+            f"double-tap to ortho {ortho_nav.get('projection')!r} "
+            f"ortho {ortho_nav.get('orthographic')!r} label {ortho_nav.get('viewLabel')!r}"
+        ]
+    ortho_dir = ortho_nav.get("direction")
+    if not isinstance(ortho_dir, list) or _angle_deg(before_proj_dir, ortho_dir) > 0.5:
+        return [f"double-tap moved direction {before_proj_dir!r} -> {ortho_dir!r}"]
+    time.sleep(0.4)
+    doubled_back = _double_tap_zone(cdp, proj_zone)
+    if doubled_back:
+        return doubled_back
+    cdp.drain(0.05)
+    persp_nav, persp_problems = read_nav(cdp)
+    if persp_problems or not isinstance(persp_nav, dict):
+        return ["projection perspective read", *(persp_problems or ["missing"])]
+    if (
+        persp_nav.get("projection") != "Perspective"
+        or persp_nav.get("orthographic") is not False
+        or persp_nav.get("viewLabel") != "Perspective"
+    ):
+        return [
+            f"double-tap to perspective {persp_nav.get('projection')!r} "
+            f"ortho {persp_nav.get('orthographic')!r} label {persp_nav.get('viewLabel')!r}"
+        ]
     time.sleep(0.4)
     fresh, fresh_problems = read_nav(cdp)
     if fresh_problems or not isinstance(fresh, dict):
