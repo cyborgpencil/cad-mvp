@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-27
+- 2026-10-27 PR #251 (merged at 7eba344): research - claim invent-free mvp-core-gaps-2026-10-27 (tip 3b4bd4e).
 - 2026-10-27 PR #249 (merged at a697a04): web - off-bar Close chrome slice 2 File/Export/Create/About + smoke skip closeSheet (tip 5aa0f4e).
 - 2026-10-27 PR #247 (merged at 1e3c564): web - off-bar float register slice 1 (tip 1a7d959).
 - 2026-10-27 PR #245 (merged at ba99c74): research - Dig invent-free item-10 overnight L-bracket + truck pack + INDEX (tip c188833).
