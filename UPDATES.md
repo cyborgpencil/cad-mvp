@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-27
+- 2026-10-27 PR #249 (merged at a697a04): web - off-bar Close chrome slice 2 File/Export/Create/About + smoke skip closeSheet (tip 5aa0f4e).
 - 2026-10-27 PR #247 (merged at 1e3c564): web - off-bar float register slice 1 (tip 1a7d959).
 - 2026-10-27 PR #245 (merged at ba99c74): research - Dig invent-free item-10 overnight L-bracket + truck pack + INDEX (tip c188833).
 - 2026-10-27 PR #243 (merged at 8fe7a4a): docs/research - Dig invent-free claim INDEX + float/plane GUI digests (tip a9ccfb4).
