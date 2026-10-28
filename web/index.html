@@ -2332,6 +2332,9 @@
           <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
           <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
           <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (4)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
+          <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
+          <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
+          <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
         </div>
       </div>
       <div id="cameraShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Show/hide camera" data-hscroll hidden>
@@ -2501,9 +2504,6 @@
   </div>
 
   <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
-    <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
-    <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
-    <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
     <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
     <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
     <div class="phone-tabs" role="tablist" aria-label="Workbench">
@@ -13605,7 +13605,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const opening = !chooser || chooser.hidden === true;
       closePopups();
       if (opening) {
-        setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         setModifyOpen(false, true);
         closeSketchSheet();
