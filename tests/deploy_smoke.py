@@ -1191,7 +1191,7 @@ CREATE_MENU_EXPR = r"""
   }
   if (menu.hidden) problems.push('menu stayed hidden');
   var want = ['Box', 'Cylinder', 'Disc', 'Hole', 'Sketch'];
-  var items = menu.querySelectorAll('button');
+  var items = menu.querySelectorAll('button:not([data-action="closeSheet"])');
   if (items.length !== want.length) problems.push('create items ' + items.length);
   var iw = window.innerWidth;
   var ih = window.innerHeight;

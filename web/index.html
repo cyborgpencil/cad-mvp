@@ -1979,6 +1979,9 @@
         <svg class="ico"><use href="#i-file"></use></svg><span>File</span>
       </button>
       <div class="menu" id="fileMenu" role="menu" aria-label="File" hidden>
+        <div class="sheet-h">
+          <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+        </div>
         <button type="button" data-tool="New">New</button>
         <button type="button" data-tool="Open">Open</button>
         <button type="button" id="saveProjectBtn" data-action="saveProject" data-tool="Save">Save</button>
@@ -2046,7 +2049,10 @@
       <div class="menu-wrap">
         <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="Info" aria-haspopup="true" aria-expanded="false">Info</button>
         <div class="menu" role="region" aria-label="About" hidden>
-          <h2 class="panel-h">About</h2>
+          <div class="sheet-h">
+            <h2 class="panel-h">About</h2>
+            <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+          </div>
           <p class="fine">Version: <b>TBD</b></p>
           <div class="muted">Theme</div>
           <div class="units" role="group" aria-label="Theme">
@@ -2149,6 +2155,9 @@
           <div class="export-wrap">
             <button type="button" class="export-btn" id="exportBtn" data-action="exportMenu" data-tool="Export" disabled aria-disabled="true" title="Checking units.">Export <svg class="ico"><use href="#i-chevron"></use></svg></button>
             <div class="menu" id="exportMenu" role="menu" aria-label="Export" hidden>
+              <div class="sheet-h">
+                <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+              </div>
               <button type="button" data-action="exportFmt" data-fmt="STL" data-tool="Export STL">STL</button>
               <button type="button" data-action="exportFmt" data-fmt="3MF" data-tool="Export 3MF">3MF</button>
             </div>
@@ -2517,6 +2526,9 @@
 </div>
 
 <div id="createMenu" class="create-menu" hidden role="menu" aria-label="Create">
+  <div class="sheet-h">
+    <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+  </div>
   <button type="button" role="menuitem" data-action="primitive" data-kind="box" data-tool="Box" title="Box">Box</button>
   <button type="button" role="menuitem" data-action="primitive" data-kind="cylinder" data-tool="Cylinder" title="Cylinder">Cylinder</button>
   <button type="button" role="menuitem" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
@@ -15766,7 +15778,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       pickCatalogItem(items[idx]);
       return;
     }
-    const btn = ev.target.closest('[data-tool]');
+    const btn = ev.target.closest('[data-tool], [data-action]');
     if (!btn) {
       if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
         const searchWasOpen = !searchDlg.hidden;
