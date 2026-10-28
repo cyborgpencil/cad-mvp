@@ -2503,6 +2503,7 @@
   <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
     <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
     <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
+    <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
     <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
     <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
     <div class="phone-tabs" role="tablist" aria-label="Workbench">
@@ -2881,6 +2882,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     selection: 'item',
     selectedIds: [],
     phoneMulti: false,
+    planePickEnabled: true,
     sceneCleared: false,
     hoverId: null,
     topology: null,
@@ -4710,6 +4712,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       chip.textContent = label;
       chip.setAttribute('aria-label', 'Pick ' + label);
       chip.setAttribute('aria-expanded', chooser && chooser.hidden !== true ? 'true' : 'false');
+    }
+    const planePick = document.querySelector('[data-action="planePickToggle"]');
+    if (planePick) {
+      const on = state.planePickEnabled !== false;
+      planePick.classList.toggle('is-on', on);
+      planePick.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     const multi = document.getElementById('multiToggle');
     if (multi) {
@@ -12733,6 +12741,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     document.getElementById('finishBar').hidden = tab !== 'sketch';
     if (tab !== 'sketch') closeSketchSheet();
+    paintPhoneChrome();
     paintPrimFields();
     paintSketchStatus();
     paintOriginPicker();
@@ -13621,6 +13630,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         ? phoneApi.filterLabel(filter)
         : filter);
       setHint(message);
+    } else if (action === 'planePickToggle') {
+      state.planePickEnabled = state.planePickEnabled !== true;
+      paintPhoneChrome();
+      return;
     } else if (action === 'multiToggle') {
       state.phoneMulti = state.phoneMulti !== true;
       paintPhoneChrome();
@@ -13870,6 +13883,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const swatches = document.querySelectorAll('.swatch');
       for (let i = 0; i < swatches.length; i++) swatches[i].classList.toggle('is-on', swatches[i] === btn);
     } else if (action === 'originPlane') {
+      if (state.planePickEnabled === false && state.tab === 'sketch' && !state.sketchPlane) return;
       const which = btn.getAttribute('data-plane') || 'xy';
       if (!setOriginSketchPlane(which)) {
         message = sketchPlanePrompt();
@@ -15658,7 +15672,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
             pinch = null;
             return;
           }
-          const faceId = pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
+          const faceId = (state.planePickEnabled === false && state.tab === 'sketch' && !state.sketchPlane)
+            ? null
+            : pickSketchFace(ev.clientX, ev.clientY, ev.pointerType);
           if (faceId && (!state.sketchPlane || faceId !== state.sketchPlane.faceId)) {
             setSketchPlane(faceId);
             gesture = null;
