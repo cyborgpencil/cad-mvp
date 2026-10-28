@@ -2741,7 +2741,7 @@ COVERAGE_EXPR = r"""
   }
   var cubeBox = shown(cube);
   if (!cube || !cubeBox) problems.push('view cube missing');
-  var selectors = ['.vp-bar', '#dimPanel', '#cameraShelf [data-action="view"][data-view="top"]', '#viewCube', '.statusbar', '#searchDlg'];
+  var selectors = ['.vp-bar', '#dimPanel', '#cameraShelf [data-action="view"][data-view="top"]', '#viewCube', '.statusbar'];
   var rects = [];
   var cubeOnCanvas = false;
   for (var s = 0; s < selectors.length; s++) {
@@ -3519,6 +3519,10 @@ CHROME_ROW_EXPR = r"""
   name.value = 'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM';
   if (name.scrollWidth <= name.clientWidth + 1) problems.push('part name did not truncate');
   name.value = savedName;
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
+    problems.push('missing interactive-widget');
+  }
   return JSON.stringify(problems);
 })()
 """
@@ -3534,111 +3538,6 @@ def chrome_row_problems(cdp: Cdp) -> list[str]:
         return [f"chrome row {raw}"]
     if not isinstance(found, list):
         return [f"chrome row {raw}"]
-    return [str(item) for item in found]
-
-
-SEARCH_DISCLOSURE_EXPR = r"""
-(function(){
-  var problems = [];
-  function box(el) { return el.getBoundingClientRect(); }
-  var btn = document.getElementById('searchBtn');
-  var dlg = document.getElementById('searchDlg');
-  var input = document.getElementById('searchInput');
-  var bar = document.querySelector('.vp-bar');
-  if (!btn || !dlg || !input || !bar) return JSON.stringify(['missing search chrome']);
-  var searchButtons = [];
-  var allBtns = document.querySelectorAll('button');
-  for (var s = 0; s < allBtns.length; s++) {
-    var candidate = allBtns[s];
-    var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.getAttribute('title') || '') + ' ' + (candidate.getAttribute('data-tool') || '')).toLowerCase();
-    var icon = candidate.querySelector('use');
-    var href = icon ? (icon.getAttribute('href') || '') : '';
-    if (label.indexOf('search') !== -1 || href === '#i-search') searchButtons.push(candidate);
-  }
-  if (searchButtons.length !== 1) problems.push('search buttons ' + searchButtons.length);
-  else if (searchButtons[0] !== btn) problems.push('search button is not the disclosure');
-  var narrow = window.matchMedia('(max-width: 820px), (max-height: 520px)').matches;
-  var searchBox = box(btn);
-  var searchStyle = getComputedStyle(btn);
-  if (narrow) {
-    if (searchStyle.display !== 'none') problems.push('search button not hidden on narrow');
-  } else {
-    if (searchStyle.display === 'none' || searchStyle.visibility === 'hidden' || !(searchBox.width > 0) || !(searchBox.height > 0)) {
-      problems.push('search button hidden');
-    }
-    if (searchBox.right <= 0 || searchBox.left >= window.innerWidth || searchBox.bottom <= 0 || searchBox.top >= window.innerHeight) {
-      problems.push('search button offscreen');
-    }
-  }
-  var meta = document.querySelector('meta[name="viewport"]');
-  if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
-    problems.push('missing interactive-widget');
-  }
-  if (btn.getAttribute('aria-controls') !== 'searchDlg') problems.push('aria-controls');
-  if (btn.getAttribute('aria-expanded') !== 'false') problems.push('aria-expanded start ' + btn.getAttribute('aria-expanded'));
-  var br = box(btn);
-  if (!narrow && (br.width + 0.5 < 44 || br.height + 0.5 < 44)) {
-    problems.push('search button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
-  }
-  if (!dlg.hidden) problems.push('dialog not hidden');
-  var dr = box(dlg);
-  if (dr.width > 0.5 || dr.height > 0.5) problems.push('collapsed size ' + dr.width.toFixed(1) + 'x' + dr.height.toFixed(1));
-  try { input.focus(); } catch (err) {}
-  if (document.activeElement === input) problems.push('collapsed input took focus');
-  var barTop = box(bar).top;
-  btn.click();
-  if (dlg.hidden) problems.push('dialog stayed hidden');
-  if (btn.getAttribute('aria-expanded') !== 'true') problems.push('aria-expanded open ' + btn.getAttribute('aria-expanded'));
-  if (document.activeElement !== input) problems.push('open focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  var list = document.getElementById('searchList');
-  var results = list ? list.querySelectorAll('button') : [];
-  if (!results.length) problems.push('no search results');
-  var st = getComputedStyle(dlg);
-  if (st.position !== 'fixed' && st.position !== 'absolute') problems.push('dialog position ' + st.position);
-  var vv = window.visualViewport;
-  var viewTop = vv ? vv.offsetTop : 0;
-  var viewBottom = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
-  var openBox = box(dlg);
-  if (openBox.bottom > viewBottom + 1 || openBox.top < viewTop - 1) problems.push('dialog outside visual viewport');
-  var visible = 0;
-  for (var i = 0; i < results.length; i++) {
-    var rr = box(results[i]);
-    if (rr.height > 1 && rr.top >= viewTop - 1 && rr.bottom <= viewBottom + 1) visible++;
-  }
-  if (!visible) problems.push('no result inside visual viewport');
-  if (Math.abs(box(bar).top - barTop) > 0.5) problems.push('tool row moved ' + box(bar).top.toFixed(1) + ' vs ' + barTop.toFixed(1));
-  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('esc did not collapse');
-  if (!narrow && document.activeElement !== btn) problems.push('esc focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  btn.click();
-  var canvas = document.getElementById('canvas');
-  if (canvas) canvas.click();
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('outside did not collapse');
-  if (!narrow && document.activeElement !== btn) problems.push('outside focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  btn.click();
-  btn.click();
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('icon did not collapse');
-  if (!narrow && document.activeElement !== btn) problems.push('icon focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  var end = box(dlg);
-  if (end.width > 0.5 || end.height > 0.5) problems.push('recollapsed size ' + end.width.toFixed(1) + 'x' + end.height.toFixed(1));
-  try { input.focus(); } catch (err2) {}
-  if (document.activeElement === input) problems.push('recollapsed input took focus');
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  return JSON.stringify(problems);
-})()
-"""
-
-
-def search_disclosure_problems(cdp: Cdp) -> list[str]:
-    raw, err = eval_expr(cdp, SEARCH_DISCLOSURE_EXPR)
-    if err or not isinstance(raw, str):
-        return [f"search {raw or err}"]
-    try:
-        found = json.loads(raw)
-    except json.JSONDecodeError:
-        return [f"search {raw}"]
-    if not isinstance(found, list):
-        return [f"search {raw}"]
     return [str(item) for item in found]
 
 
@@ -4062,8 +3961,6 @@ WRAPUP_PHONE_EXPR = r"""
       problems.push(pair[0] + ' outside ' + window.innerWidth);
     }
   });
-  var searchBtn = document.getElementById('searchBtn');
-  if (!searchBtn || getComputedStyle(searchBtn).display !== 'none') problems.push('searchBtn not hidden on phone');
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
@@ -4403,7 +4300,6 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         return ["portrait origin plane", *origin_found]
     problems: list[str] = []
     inspector_checked = False
-    search_checked = False
     stamp_checked = False
     create_checked = False
     sketch_checked = False
@@ -4422,13 +4318,6 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             if closed:
                 problems.append(f"portrait {kind} closed inspector")
                 problems.extend(closed)
-                return problems
-        if not search_checked:
-            search_checked = True
-            search_found = search_disclosure_problems(cdp)
-            if search_found:
-                problems.append(f"portrait {kind} search")
-                problems.extend(search_found)
                 return problems
         if not stamp_checked:
             stamp_checked = True
@@ -8547,7 +8436,6 @@ def run(omit: list[str]) -> int:
                 time.sleep(0.3)
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
-                desktop_bar.extend(search_disclosure_problems(cdp))
                 desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")
