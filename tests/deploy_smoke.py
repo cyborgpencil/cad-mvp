@@ -1385,7 +1385,7 @@ SKETCH_PORTRAIT_EXPR = r"""
     var sheet = document.getElementById('sketchSheet');
     var sheetBox = boxOf(sheet);
     if (!sheetBox) { problems.push(label + ' sheet hidden'); return; }
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < bars.length; i++) {
       var bar = document.querySelector(bars[i]);
       var barBox = boxOf(bar);
@@ -1404,7 +1404,7 @@ SKETCH_PORTRAIT_EXPR = r"""
     if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
     var names = [];
     var on = '';
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < chips.length; i++) {
       var text = (chips[i].textContent || '').replace(/\s+/g, '');
       names.push(text);
@@ -1855,7 +1855,7 @@ ORIGIN_PLANE_EXPR = r"""
     var barEl = document.getElementById('originPlanes');
     if (barEl && barEl.hidden) return;
     var chips = document.querySelectorAll('#originPlanes [data-action="originPlane"]');
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var c = 0; c < chips.length; c++) {
       var chip = chips[c];
       var text = (chip.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1920,7 +1920,7 @@ ORIGIN_PLANE_EXPR = r"""
     if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
     var names = [];
     var on = '';
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < chips.length; i++) {
       var text = (chips[i].textContent || '').replace(/\s+/g, '');
       names.push(text);
@@ -2366,7 +2366,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Line callout plus');
     var lineSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!lineSheetBox) problems.push('line sheet hidden');
-    var lineKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var lineKeep = ['#exportBtn', '#statusUnits'];
     for (var lk = 0; lk < lineKeep.length; lk++) {
       var keepEl = document.querySelector(lineKeep[lk]);
       var keepBox = boxOf(keepEl);
@@ -2483,7 +2483,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Arc callout plus');
     var arcSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!arcSheetBox) problems.push('arc sheet hidden');
-    var arcKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var arcKeep = ['#exportBtn', '#statusUnits'];
     for (var ak = 0; ak < arcKeep.length; ak++) {
       var arcKeepBox = boxOf(document.querySelector(arcKeep[ak]));
       if (arcKeepBox && overlaps(arcSheetBox, arcKeepBox)) problems.push('arc covers ' + arcKeep[ak]);
@@ -2619,7 +2619,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus1'), 'Polygon N plus');
     var polySheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!polySheetBox) problems.push('polygon sheet hidden');
-    var polyKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var polyKeep = ['#exportBtn', '#statusUnits'];
     for (var pk = 0; pk < polyKeep.length; pk++) {
       var polyKeepBox = boxOf(document.querySelector(polyKeep[pk]));
       if (polyKeepBox && overlaps(polySheetBox, polyKeepBox)) problems.push('polygon covers ' + polyKeep[pk]);
@@ -4040,9 +4040,9 @@ WRAPUP_PHONE_EXPR = r"""
     problems.push('log bbox ' + lastMsg('bbox '));
   }
   var bar = document.querySelector('.phone-tabbar');
-  if (!shown(bar)) problems.push('phone bar hidden');
+  if (shown(bar)) problems.push('phone bar shown');
   function tab(action) {
-    var nodes = document.querySelectorAll('.phone-tabbar [data-action="' + action + '"]');
+    var nodes = document.querySelectorAll('[data-action="' + action + '"]');
     for (var i = 0; i < nodes.length; i++) {
       var rect = shown(nodes[i]);
       if (rect) return {el: nodes[i], r: rect};
@@ -4051,8 +4051,8 @@ WRAPUP_PHONE_EXPR = r"""
   }
   var undo = tab('undo');
   var redo = tab('redo');
-  var create = tab('createMenu');
-  var modify = tab('modifyShelf');
+  var create = bar ? document.querySelector('.phone-tabbar [data-action="createMenu"]') : null;
+  var modify = bar ? document.querySelector('.phone-tabbar [data-action="modifyShelf"]') : null;
   [['undo', undo], ['redo', redo]].forEach(function (pair) {
     if (!pair[1]) problems.push(pair[0] + ' missing');
     else if (pair[1].r.width + 0.5 < 44 || pair[1].r.height + 0.5 < 44) {
@@ -4061,8 +4061,8 @@ WRAPUP_PHONE_EXPR = r"""
       problems.push(pair[0] + ' outside ' + window.innerWidth);
     }
   });
-  if (create) problems.push('phone create still present');
-  if (modify) problems.push('phone modify still present');
+  if (create && shown(create)) problems.push('phone create still present');
+  if (modify && shown(modify)) problems.push('phone modify still present');
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
@@ -4139,9 +4139,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return problems
     clicked, click_err = eval_expr(
         cdp,
-        "(function(){var b=document.querySelector('.phone-tabbar [data-action=\"undo\"]');"
+        "(function(){var b=document.querySelector('[data-action=\"undo\"]');"
         "if(!b)return 'missing';b.click();"
-        "var r=document.querySelector('.phone-tabbar [data-action=\"redo\"]');"
+        "var r=document.querySelector('[data-action=\"redo\"]');"
         "if(!r)return 'missing redo';r.click();return 'clicked';})()",
     )
     if click_err or clicked != "clicked":
