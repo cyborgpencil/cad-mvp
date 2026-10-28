@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-28
+- 2026-10-28 PR #265 (merged at 6908eca): web - PROJECTION H+A Persp/Ortho HUD + cube dbltap toggle (LOCK PROJECTION H+A YES; tip a8e11bb).
 - 2026-10-28 PR #263 (merged at e5d21a1): web - EMPTY_START no cold-start seed + smoke rewrite (LOCK EMPTY_START YES; tip a18f39d).
 - 2026-10-28 PR #261 (merged at efc210c): web - overnight C create flow plane->dims->Confirm/Cancel (LOCK CREATE_FLOW C YES; tip cc889e4).
 - 2026-10-28 PR #259 (merged at bce51be): web - overnight B smooth solids deflection 0.01 + default shaded (LOCK SMOOTH_SOLIDS B YES; tip 506de7a).
