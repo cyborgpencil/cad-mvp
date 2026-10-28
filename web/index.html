@@ -1249,17 +1249,6 @@
     font-weight: 650;
     background: var(--tab-bg);
   }
-  .phone-tabbar {
-    display: none;
-    flex: none;
-    flex-wrap: nowrap;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    background: var(--top);
-    border-top: 1px solid var(--line-strong);
-  }
-  .phone-tabbar::-webkit-scrollbar { display: none; }
   .pick-chooser {
     position: fixed;
     left: 8px;
@@ -1288,7 +1277,6 @@
     background: var(--active-fill);
     color: var(--ink);
   }
-  .phone-tabs { display: flex; flex: 1; min-width: 0; }
   .modify-shelf {
     display: flex;
     flex: none;
@@ -1522,35 +1510,6 @@
       padding-right: max(8px, env(safe-area-inset-right, 0px));
     }
     .dim-panel { top: 8px; max-height: min(42vh, calc(100% - 120px)); }
-    .phone-tabbar {
-      display: flex;
-      height: var(--phone-tabs-h);
-      padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
-      align-items: stretch;
-    }
-    .phone-tabs { display: contents; }
-    .phone-tabbar .tab {
-      flex: 1;
-      border-bottom: 0;
-      border-top: 2px solid transparent;
-      border-radius: 8px 8px 0 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      font-size: 11px;
-      min-width: 44px;
-      min-height: 44px;
-      height: auto;
-      padding: 4px 2px 0;
-    }
-    .phone-tabbar .tab.is-on {
-      background: var(--active-fill);
-      border-color: var(--active-border);
-      color: var(--ink);
-    }
-    .phone-tabbar .ico { width: 20px; height: 20px; }
     #toasts { bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px); }
     .statusbar { gap: 10px; padding: 0 8px; font-size: 11px; }
     .gate { padding: 4px; gap: 10px; }
@@ -2501,16 +2460,6 @@
     <button type="button" class="bool-op" data-action="boolean" data-op="intersect" data-tool="Intersect" title="Intersect" disabled aria-disabled="true">Intersect</button>
     <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
   </div>
-
-  <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
-    <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
-    <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
-    <div class="phone-tabs" role="tablist" aria-label="Workbench">
-    <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
-    <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
-    <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
-    </div>
-  </nav>
 
   <footer class="statusbar" aria-label="Units">
     <span class="stat">Units <b id="statusUnits">mm</b></span>
@@ -4860,7 +4809,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     function blocked(client) {
       const el = document.elementFromPoint(client.x, client.y);
       if (!el) return true;
-      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
       if (el !== canvas && el !== viewport) return true;
       if (handles.visible && pickHandle(client.x, client.y)) return true;
       return false;
