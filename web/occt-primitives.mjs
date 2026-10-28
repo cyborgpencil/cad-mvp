@@ -63,7 +63,7 @@ export const PLACEHOLDER_DISC_MM = Object.freeze({
 // ControlSurfaceDeflection, InParallel. The same object is passed to
 // BRepMesh_IncrementalMesh(shape, parameters). Display and export both
 // use tessellate(), so they share these values. Not a Sides control.
-export const TESSELLATION_DEFLECTION_MM = 0.05;
+export const TESSELLATION_DEFLECTION_MM = 0.01;
 export const TESSELLATION_ANGULAR = 0.2;
 export const TESSELLATION_RELATIVE = false;
 export const TESSELLATION_CONTROL_SURFACE = true;

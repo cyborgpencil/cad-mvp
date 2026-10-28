@@ -492,17 +492,19 @@ expect('stl bbox 40x20x40', Math.abs((stlBounds.xmax - stlBounds.xmin) - 40) <= 
   && Math.abs((stlBounds.ymax - stlBounds.ymin) - 20) <= boundTol
   && Math.abs((stlBounds.zmax - stlBounds.zmin) - 40) <= boundTol);
 
-expect('mesh deflection 0.05', TESSELLATION_DEFLECTION_MM === 0.05);
+expect('mesh deflection 0.01', TESSELLATION_DEFLECTION_MM === 0.01);
 expect('mesh angle 0.2', TESSELLATION_ANGULAR === 0.2);
 expect('mesh relative false', TESSELLATION_RELATIVE === false);
 expect('mesh control surface', TESSELLATION_CONTROL_SURFACE === true);
 expect('mesh not parallel', TESSELLATION_IN_PARALLEL === false);
 expect('box mesh path', box.meshPath === 'IMeshTools_Parameters');
-expect('box mesh deflection readback', box.meshSettings && Math.abs(box.meshSettings.Deflection - 0.05) < 1e-9);
+expect('box mesh deflection readback', box.meshSettings && Math.abs(box.meshSettings.Deflection - 0.01) < 1e-9);
 expect('box mesh angle readback', box.meshSettings && Math.abs(box.meshSettings.Angle - 0.2) < 1e-9);
 expect('box mesh relative readback', box.meshSettings && box.meshSettings.Relative === false);
 expect('box mesh control readback', box.meshSettings && box.meshSettings.ControlSurfaceDeflection === true);
 expect('box mesh parallel readback', box.meshSettings && box.meshSettings.InParallel === false);
+expect('cylinder denser silhouette at 0.01', cyl.meshSettings && Math.abs(cyl.meshSettings.Deflection - 0.01) < 1e-9 && cyl.mesh.triangles.length > 248);
+expect('disc denser silhouette at 0.01', disc.meshSettings && Math.abs(disc.meshSettings.Deflection - 0.01) < 1e-9 && disc.mesh.triangles.length > 248);
 
 function nearBounds(name, got, want, tol) {
   const keys = ['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax'];
@@ -826,6 +828,8 @@ expect('hole defaults on the page', pageSrc.indexOf('value="4.5"') !== -1 && pag
 expect('closed inspector hidden', pageSrc.indexOf('.inspector:not(.open)') !== -1 && pageSrc.indexOf('visibility: hidden') !== -1);
 expect('tap slop in page', pageSrc.indexOf('tapSlopPx()') !== -1);
 expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);
+expect('default display toolbar shaded is-on', pageSrc.indexOf('class="is-on" data-action="display" data-mode="shaded"') !== -1 && pageSrc.indexOf('class="is-on" data-action="display" data-mode="edges"') === -1 && pageSrc.indexOf("display: 'shaded'") !== -1 && pageSrc.indexOf('data-action="display" data-mode="edges"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="wire"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="xray"') !== -1);
+expect('smooth material and vertex normals kept', pageSrc.indexOf('new THREE.MeshStandardMaterial(') !== -1 && pageSrc.indexOf('geo.computeVertexNormals()') !== -1);
 
 if (blinkMod && blinkFile) {
   const blinkPlan = blinkMod.blinkHolePlan(null);
@@ -879,7 +883,7 @@ if (blinkMod && blinkFile) {
     const blinkStl = writeCheckedStl('blink.stl', blink.mesh, blinkBounds, 0.05);
     console.log('blink triangles', blinkStl.triangles, 'bytes', blinkStl.bytes);
   }
-  expect('blink mesh settings', blink.meshSettings && Math.abs(blink.meshSettings.Deflection - 0.05) < 1e-9 && blink.meshSettings.Relative === false && Math.abs(blink.meshSettings.Angle - 0.2) < 1e-9);
+  expect('blink mesh settings', blink.meshSettings && Math.abs(blink.meshSettings.Deflection - 0.01) < 1e-9 && blink.meshSettings.Relative === false && Math.abs(blink.meshSettings.Angle - 0.2) < 1e-9);
 
   const huge = ops.applyPickedEdgeOp(oc, blink.shape, [blinkMod.blinkPickSegments(null)[0]], 'fillet', 100);
   expect('oversized fillet rejected', huge.ok === false && huge.shape === null && huge.kept === true);
