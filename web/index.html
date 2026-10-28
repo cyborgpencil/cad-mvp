@@ -156,7 +156,7 @@
     border-radius: 8px;
     border: 1px solid transparent;
     color: var(--muted);
-    padding: 0 10px;
+    padding: 0 8px;
     font-weight: 650;
   }
   .units button.is-on {
@@ -1898,7 +1898,6 @@
 <div id="app">
   <!-- Panel labels: reuse existing control/aria labels; exact per-panel label text, which surfaces count as panels, and phone vs desktop placement stay TBD (mvp/requirements.md park). -->
   <header class="topbar" aria-label="CAD/CAM">
-    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
     <div class="brand">
       <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9z" fill="currentColor"/><path d="M12 12 22 7.5M12 12 2 7.5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
       <span class="brand-name">CAD/CAM</span>
@@ -1958,6 +1957,7 @@
       </nav>
       <div class="ribbon" role="region" aria-label="Tools">
     <div class="topbar-shelves" role="toolbar" aria-label="Tools">
+      <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
       <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
         <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
       </button>

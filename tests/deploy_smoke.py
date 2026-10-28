@@ -3483,7 +3483,23 @@ CHROME_ROW_EXPR = r"""
   var nr = box(name);
   if (tr.width + 0.5 < 44 || tr.height + 0.5 < 44) problems.push('Tree ' + tr.width.toFixed(1) + 'x' + tr.height.toFixed(1));
   if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
-  if (Math.abs(tr.top - ir.top) > 0.5) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  var shelves = document.querySelector('.topbar-shelves');
+  var browser = document.getElementById('browser');
+  if (!shelves || shelves.firstElementChild !== tree) problems.push('Tree is not first in topbar-shelves');
+  if (tree.closest('.topbar')) problems.push('Tree still in topbar');
+  if (!(tr.top > ir.top + 0.5)) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  if (!browser) {
+    problems.push('missing browser drawer');
+  } else if (!browser.classList.contains('open')) {
+    tree.click();
+    if (!browser.classList.contains('open') || tree.getAttribute('aria-expanded') !== 'true') {
+      problems.push('Tree did not open browser');
+    }
+    tree.click();
+    if (browser.classList.contains('open') || tree.getAttribute('aria-expanded') !== 'false') {
+      problems.push('Tree did not close browser');
+    }
+  }
   if (ir.right > nr.left + 0.5) problems.push('Info is not left of the part name');
   var buttons = document.querySelectorAll('.topbar button');
   for (var i = 0; i < buttons.length; i++) {
