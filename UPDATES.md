@@ -5,6 +5,7 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #243 (merged at 8fe7a4a): docs/research - Dig invent-free claim INDEX + float/plane GUI digests (tip a9ccfb4).
 - 2026-10-27 PR #241 (merged at b905486): prompts - float 3-way agy split + plane-pick toggle (Chief A+B; tip abb8948).
 - 2026-10-27 PR #239 (merged at 3280162): prompts - off-bar menus float+drag+X (Chief lock 3) (tip adf0a7d).
 - 2026-10-27 item-7 attempt3 DONE VALID: verify-only MATCH @ 91369e1 (7-C1+B1+E1; no coding PR).
