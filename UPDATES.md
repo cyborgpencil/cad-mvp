@@ -5,6 +5,8 @@ Newest entries at the top.
 
 ## 2026-10-27
 
+- 2026-10-27 PR #239 (merged at 3280162): prompts - off-bar menus float+drag+X (Chief lock 3) (tip adf0a7d).
+- 2026-10-27 item-7 attempt3 DONE VALID: verify-only MATCH @ 91369e1 (7-C1+B1+E1; no coding PR).
 - 2026-10-27 PR #237 (merged at 91369e1): docs - invent-free item-7 prompt retip (7-C1+B1+E1; flesh HOLD) (tip c7e3939).
 
 - 2026-10-27 PR #235 (merged at e2a32dc): docs - invent-free 6-D Home iso verify-only prompt retip (tip 4f944e5).
