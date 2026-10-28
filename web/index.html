@@ -678,8 +678,8 @@
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
-  .hud b { font-size: 14px; font-weight: 650; }
-  .hud div { color: var(--ink); font-size: 12px; }
+  .hud b { color: var(--ink); font-size: 14px; font-weight: 650; }
+  .hud div { color: var(--muted); font-size: 12px; }
   .vc-home {
     position: absolute;
     top: 8px;
@@ -2200,7 +2200,7 @@
       </div>
       <div class="hud" role="region" aria-label="View">
         <div><b id="hudName">Empty</b></div>
-        <div><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel">Iso</span></div>
+        <div class="muted"><span id="hudSize" hidden>…</span><span id="hudSizeSep" hidden> · </span><span id="viewLabel" class="muted">Perspective</span></div>
       </div>
       <form id="dimPanel" class="dim-panel" aria-label="Dimensions" hidden>
         <div class="dim-head">
@@ -2891,6 +2891,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     measurePicks: [],
     measureShapes: [],
     display: 'shaded',
+    projection: 'perspective',
     isolated: false,
     node: 'body',
     watertight: false,
@@ -2952,7 +2953,11 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }, false);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
+  const perspCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
+  const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 800);
+  orthoCamera.fov = perspCamera.fov;
+  orthoCamera.aspect = perspCamera.aspect;
+  let camera = perspCamera;
   const target = new THREE.Vector3(0, 10, 0);
   const spherical = new THREE.Spherical(60, VIEWS.iso.phi, VIEWS.iso.theta);
   const raycaster = new THREE.Raycaster();
@@ -3133,6 +3138,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   let tween = 0;
   let cubeSnap = null;
   let cubeTapMs = 0;
+  let lastCubeTapPose = null;
   let cubeFaceName = '';
   let lastSnapMs = 0;
   let lastSnapBudget = 0;
@@ -8899,6 +8905,24 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     el.style.height = rect.s + 'px';
   }
 
+  function syncCameraProjection() {
+    const w = Math.max(viewport.clientWidth || 1, 1);
+    const h = Math.max(viewport.clientHeight || 1, 1);
+    const aspect = w / h;
+    perspCamera.aspect = aspect;
+    perspCamera.updateProjectionMatrix();
+    const dist = Math.max(1e-3, camera.position.distanceTo(target) || spherical.radius || 60);
+    const halfH = Math.tan(THREE.MathUtils.degToRad(perspCamera.fov) / 2) * dist;
+    const halfW = halfH * aspect;
+    orthoCamera.fov = perspCamera.fov;
+    orthoCamera.aspect = aspect;
+    orthoCamera.left = -halfW;
+    orthoCamera.right = halfW;
+    orthoCamera.top = halfH;
+    orthoCamera.bottom = -halfH;
+    orthoCamera.updateProjectionMatrix();
+  }
+
   function resize() {
     const w = viewport.clientWidth;
     const h = viewport.clientHeight;
@@ -8906,8 +8930,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const pr = Math.min(window.devicePixelRatio || 1, 2);
     const bw = Math.floor(w * pr);
     const bh = Math.floor(h * pr);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    syncCameraProjection();
     layoutChrome();
     if (canvas.width === bw && canvas.height === bh) return;
     renderer.setPixelRatio(pr);
@@ -8949,6 +8972,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     camera.position.copy(target).add(offset);
     camera.up.set(0, 1, 0);
     camera.lookAt(target);
+    syncCameraProjection();
     camera.updateMatrixWorld(true);
     syncViewCube();
     placeHandles();
@@ -9045,6 +9069,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     if (u >= 1) camera.position.copy(snap.end);
     camera.up.copy(snap.up);
     camera.lookAt(snap.focus);
+    syncCameraProjection();
     camera.updateMatrixWorld(true);
     writeSphericalFromCamera();
     syncViewCube();
@@ -9438,13 +9463,32 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   };
 
   function viewCaption() {
-    const off = camera.position.clone().sub(target).normalize();
-    const items = [
-      ['Right', off.x], ['Left', -off.x], ['Top', off.y],
-      ['Bottom', -off.y], ['Front', off.z], ['Back', -off.z]
-    ];
-    items.sort(function (a, b) { return b[1] - a[1]; });
-    return items[0][1] > 0.9 ? items[0][0] : 'Iso';
+    return (camera && camera.isOrthographicCamera) || state.projection === 'orthographic'
+      ? 'Orthographic'
+      : 'Perspective';
+  }
+
+  function setProjection(mode) {
+    const ortho = mode === 'orthographic' || mode === 'Orthographic' || mode === true;
+    state.projection = ortho ? 'orthographic' : 'perspective';
+    const nextCam = ortho ? orthoCamera : perspCamera;
+    if (nextCam !== camera) {
+      nextCam.position.copy(camera.position);
+      nextCam.up.copy(camera.up);
+      nextCam.quaternion.copy(camera.quaternion);
+      nextCam.updateMatrixWorld(true);
+      camera = nextCam;
+    }
+    syncCameraProjection();
+    syncViewCube();
+    placeHandles();
+    const viewLabel = document.getElementById('viewLabel');
+    if (viewLabel) viewLabel.textContent = viewCaption();
+    return viewCaption();
+  }
+
+  function toggleProjection() {
+    return setProjection(state.projection === 'orthographic' ? 'perspective' : 'orthographic');
   }
 
   function cap(value) {
@@ -14413,6 +14457,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       direction: [dir.x, dir.y, dir.z],
       target: [target.x, target.y, target.z],
       home: [home.x, home.y, home.z],
+      projection: viewCaption(),
+      orthographic: !!(camera && camera.isOrthographicCamera),
+      viewLabel: (function () {
+        const lbl = document.getElementById('viewLabel');
+        return lbl ? String(lbl.textContent || '') : '';
+      })(),
       visible: { x: box.left, y: box.top, w: box.width, h: box.height },
       zones: listed
     };
@@ -15721,12 +15771,30 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           const doubleTap = cubeTapMs > 0 && (now - cubeTapMs) <= CUBE_DOUBLE_MS;
           if (doubleTap) {
             cubeTapMs = 0;
-            goView('home');
-            toast('View: Home');
+            cancelTween();
+            if (lastCubeTapPose) {
+              cubeFaceName = lastCubeTapPose.faceName || '';
+              target.copy(lastCubeTapPose.focus);
+              camera.position.copy(lastCubeTapPose.pos);
+              camera.up.copy(lastCubeTapPose.up);
+              camera.lookAt(target);
+              camera.updateMatrixWorld(true);
+              syncCameraProjection();
+              writeSphericalFromCamera();
+              syncViewCube();
+              lastCubeTapPose = null;
+            }
+            toggleProjection();
           } else if (cubeSnap) {
-            /* A tap during the snap is ignored unless it is the double-tap home. */
+            /* A tap during the snap is ignored unless it is the double-tap projection toggle. */
           } else {
             cubeTapMs = now;
+            lastCubeTapPose = {
+              faceName: cubeFaceName,
+              pos: camera.position.clone(),
+              up: camera.up.clone(),
+              focus: target.clone()
+            };
             const picked = pickViewCube(ev.clientX, ev.clientY);
             if (picked && picked.dir) {
               const faceName = picked.kind === 'face' ? picked.name : '';
