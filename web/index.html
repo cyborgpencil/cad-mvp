@@ -1996,8 +1996,8 @@
           <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
         </div>
         <div class="vp-cluster" role="group" aria-label="Display">
-          <button type="button" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
-          <button type="button" class="is-on" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
+          <button type="button" class="is-on" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
+          <button type="button" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
           <button type="button" data-action="display" data-mode="wire" data-tool="Display: Wireframe" title="Wireframe"><svg class="ico"><use href="#i-wire"></use></svg></button>
           <button type="button" data-action="display" data-mode="xray" data-tool="Display: X-Ray" title="X-Ray"><svg class="ico"><use href="#i-xray"></use></svg></button>
         </div>
@@ -2399,7 +2399,7 @@
       </div>
       <div data-side-panel="display" role="tabpanel" aria-label="Display" hidden>
         <h2 class="panel-h">Display</h2>
-        <p class="fine side-note">Active display: <b id="displayReadout">Shaded + Edges</b>. Change it from the view bar.</p>
+        <p class="fine side-note">Active display: <b id="displayReadout">Shaded</b>. Change it from the view bar.</p>
       </div>
       <div data-side-panel="lists" role="tabpanel" aria-label="Lists" hidden>
         <h2 class="panel-h">Lists</h2>
@@ -2856,7 +2856,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     measure: false,
     measurePicks: [],
     measureShapes: [],
-    display: 'edges',
+    display: 'shaded',
     isolated: false,
     node: 'body',
     watertight: false,
@@ -13677,7 +13677,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       message = 'Axis ' + axis;
     } else if (action === 'display') {
-      state.display = btn.getAttribute('data-mode') || 'edges';
+      state.display = btn.getAttribute('data-mode') || 'shaded';
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
       message = 'Display: ' + (names[state.display] || state.display);
       applyLook();
