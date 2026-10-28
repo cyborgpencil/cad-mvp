@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-27
+- 2026-10-27 PR #245 (merged at ba99c74): research - Dig invent-free item-10 overnight L-bracket + truck pack + INDEX (tip c188833).
 
 - 2026-10-27 PR #243 (merged at 8fe7a4a): docs/research - Dig invent-free claim INDEX + float/plane GUI digests (tip a9ccfb4).
 - 2026-10-27 PR #241 (merged at b905486): prompts - float 3-way agy split + plane-pick toggle (Chief A+B; tip abb8948).
