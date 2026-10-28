@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-28
+- 2026-10-28 PR #257 (merged at a5e343c): web - overnight A viewport Dig radial-gradient + transparent clear (LOCK VIEWPORT_GRADIENT A YES; tip 6a4c625).
 - 2026-10-28 PR #255 (merged at ef968be): web - phone-tabbar REMOVE + Units pad 10->8 keep min-width 44 + Tree first in topbar-shelves (T1+U0; tip 599aab5).
 
 ## 2026-10-27
