@@ -13609,7 +13609,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       publishGateState();
       message = state.holeCountersink ? 'Countersink on' : 'Countersink off';
     } else if (action === 'applyHole') {
-      applyHole();
+      runUndoable('Hole', function () { return applyHole() === true; });
       message = state.lastError || ('Hole ' + state.holeLog.length);
     } else if (action === 'pickFilter') {
       const chooser = document.getElementById('pickChooser');
