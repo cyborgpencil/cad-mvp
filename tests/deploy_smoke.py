@@ -1673,7 +1673,15 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (!openCreate()) problems.push('face new create hidden');
   menu = document.getElementById('createMenu');
   var faceBox = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
-  if (faceBox) faceBox.click();
+  if (faceBox) {
+    faceBox.click();
+    var faceBoxPlane = document.querySelector('#originPlanes [data-plane="xy"]');
+    if (faceBoxPlane) faceBoxPlane.click();
+    else problems.push('face new box plane missing');
+    var faceBoxConfirm = document.getElementById('primConfirm');
+    if (faceBoxConfirm) faceBoxConfirm.click();
+    else problems.push('face new box confirm missing');
+  }
   else problems.push('face new box missing');
   st = hook.state();
   if (!st || st.bodies !== 1) problems.push('face new box bodies ' + (st && st.bodies));
@@ -1757,7 +1765,15 @@ SKETCH_PORTRAIT_EXPR = r"""
   if (!openCreate()) problems.push('restore create hidden');
   menu = document.getElementById('createMenu');
   var restoreBox = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
-  if (restoreBox) restoreBox.click();
+  if (restoreBox) {
+    restoreBox.click();
+    var restoreBoxPlane = document.querySelector('#originPlanes [data-plane="xy"]');
+    if (restoreBoxPlane) restoreBoxPlane.click();
+    else problems.push('restore box plane missing');
+    var restoreBoxConfirm = document.getElementById('primConfirm');
+    if (restoreBoxConfirm) restoreBoxConfirm.click();
+    else problems.push('restore box confirm missing');
+  }
   else problems.push('restore box missing');
   st = hook.state();
   published = window.__cadcamExportState || {};
@@ -1962,6 +1978,12 @@ ORIGIN_PLANE_EXPR = r"""
     var boxBtn = menu ? menu.querySelector('[data-action="primitive"][data-kind="box"]') : null;
     if (!boxBtn) { problems.push(label + ' box missing'); return false; }
     boxBtn.click();
+    var planeBtn = document.querySelector('#originPlanes [data-plane="xy"]');
+    if (!planeBtn) { problems.push(label + ' box plane missing'); return false; }
+    planeBtn.click();
+    var confirmBtn = document.getElementById('primConfirm');
+    if (!confirmBtn) { problems.push(label + ' box confirm missing'); return false; }
+    confirmBtn.click();
     return true;
   }
   function selectItem(label) {
@@ -4504,6 +4526,21 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
                 problems.append(f"portrait {kind} button {box['w']}x{box['h']}")
                 return problems
             touch_tap(cdp, float(box["x"]), float(box["y"]))
+            plane_problems = tap_selector(cdp, '#originPlanes [data-plane="xy"]', f"portrait {kind} plane")
+            if plane_problems:
+                problems.extend(plane_problems)
+                return problems
+            preview_data, preview_err = _callout_probe(cdp)
+            if preview_err or not isinstance(preview_data, dict):
+                problems.extend(preview_err or [f"portrait {kind} preview probe"])
+                return problems
+            if preview_data.get("hidden") is not True or preview_data.get("rows"):
+                problems.append(f"portrait {kind} preview callouts {preview_data!r}")
+                return problems
+            confirm_problems = tap_selector(cdp, "#primConfirm", f"portrait {kind} confirm")
+            if confirm_problems:
+                problems.extend(confirm_problems)
+                return problems
         created, wait_problems = wait_portrait(
             cdp, origin, kind, {str(spec["key"]): float(spec["fresh"])}, PAGE_TIMEOUT_S
         )
@@ -6514,6 +6551,12 @@ SAVELOAD_EXPR = r"""
       var button = menu ? menu.querySelector('[data-action="primitive"][data-kind="' + kind + '"]') : null;
       if (!button) { problems.push('missing create ' + kind); return false; }
       button.click();
+      var pl = document.querySelector('#originPlanes [data-plane="xy"]');
+      if (!pl) { problems.push('missing create plane ' + kind); return false; }
+      pl.click();
+      var cf = document.getElementById('primConfirm');
+      if (!cf) { problems.push('missing create confirm ' + kind); return false; }
+      cf.click();
       return true;
     }
     function visibleClick(selector) {
@@ -7170,7 +7213,12 @@ def multi_body_size_problems(cdp: Cdp, origin: str) -> list[str]:
     added, add_err = eval_expr(
         cdp,
         "(function(){var b=document.querySelector('[data-action=\"primitive\"][data-kind=\"cylinder\"]');"
-        "if(!b) return 'missing'; b.click(); return 'added';})()",
+        "if(!b) return 'missing'; b.click();"
+        "var pl=document.querySelector('#originPlanes [data-plane=\"xy\"]');"
+        "if(!pl) return 'missing plane'; pl.click();"
+        "var cf=document.getElementById('primConfirm');"
+        "if(!cf) return 'missing confirm'; cf.click();"
+        "return 'added';})()",
         timeout=120,
     )
     if add_err or added != "added":
@@ -7425,7 +7473,12 @@ def multi_body_move_problems(cdp: Cdp, origin: str) -> list[str]:
     added, add_err = eval_expr(
         cdp,
         "(function(){var b=document.querySelector('[data-action=\"primitive\"][data-kind=\"cylinder\"]');"
-        "if(!b) return 'missing'; b.click(); return 'added';})()",
+        "if(!b) return 'missing'; b.click();"
+        "var pl=document.querySelector('#originPlanes [data-plane=\"xy\"]');"
+        "if(!pl) return 'missing plane'; pl.click();"
+        "var cf=document.getElementById('primConfirm');"
+        "if(!cf) return 'missing confirm'; cf.click();"
+        "return 'added';})()",
         timeout=120,
     )
     if add_err or added != "added":
@@ -7882,7 +7935,13 @@ def boolean_unique_names_problems(cdp: Cdp, origin: str) -> list[str]:
         "var afterFirst=names().slice();"
         "var add=document.querySelector('[data-action=\"primitive\"][data-kind=\"box\"]');"
         "if(!add) return JSON.stringify({error:'add missing',names:afterFirst});"
-        "add.click(); add.click();"
+        "for(var ai=0;ai<2;ai++){"
+        "add.click();"
+        "var apl=document.querySelector('#originPlanes [data-plane=\"xy\"]');"
+        "if(apl) apl.click();"
+        "var acf=document.getElementById('primConfirm');"
+        "if(acf) acf.click();"
+        "}"
         "if(rows().length<3) return JSON.stringify({error:'need three',names:names(),rows:rows().length});"
         "selectLastTwo();"
         "var second=clickCut();"
@@ -8021,6 +8080,23 @@ def _click_create_kind(cdp: Cdp, kind: str) -> tuple[dict[str, Any] | None, str]
         f"var b=menu.querySelector('[data-kind={json.dumps(kind)}]');"
         "if(!b) return JSON.stringify({error:'missing kind'});"
         "b.click();"
+        "var stPlane=window.__cadcamExportState||{};"
+        "var bar=document.getElementById('originPlanes');"
+        "if(stPlane.primCreateStep!=='plane'||!bar||bar.hidden) return JSON.stringify({error:'plane step missing',step:stPlane.primCreateStep});"
+        "var pl=bar.querySelector(\'[data-plane=\"xy\"]\');"
+        "if(!pl) return JSON.stringify({error:'missing xy plane'});"
+        "pl.click();"
+        "var stDims=window.__cadcamExportState||{};"
+        "var cf=document.getElementById('primConfirm');"
+        "var cc=document.getElementById('primCancel');"
+        "var act=document.getElementById('primActions');"
+        "if(stDims.primCreateStep!=='dims'||!act||act.hidden||!cf||!cc) return JSON.stringify({error:'dims step missing',step:stDims.primCreateStep});"
+        "var cProbe=window.__cadcamCallouts&&window.__cadcamCallouts.probe?window.__cadcamCallouts.probe():null;"
+        f"if({json.dumps(kind)}==='box'&&cProbe&&!cProbe.phone){{"
+        "var rTags=(cProbe.rows||[]).map(function(r){return r.tag;}).join(',');"
+        "if(rTags!=='L,H') return JSON.stringify({error:'box preview callouts '+rTags});"
+        "}"
+        "cf.click();"
         + CREATE_STACK_JS
         + "})()",
     )
@@ -8075,6 +8151,28 @@ def create_undo_problems(cdp: Cdp, origin: str) -> list[str]:
     empty, empty_err = _create_stack(cdp)
     if empty_err or not empty or int(empty.get("body") or 0) != 0 or int(empty.get("undo") or 0) != 0:
         return [f"create undo empty {empty_err or empty}"]
+    cancel_check, cancel_err = _json_eval(
+        cdp,
+        "(function(){"
+        "var opener=document.querySelector(\'[data-action=\"createMenu\"]\');"
+        "if(opener) opener.click();"
+        "var b=document.querySelector(\'#createMenu [data-kind=\"box\"]\');"
+        "if(!b) return JSON.stringify({error:'cancel box missing'});"
+        "b.click();"
+        "var pl=document.querySelector(\'#originPlanes [data-plane=\"xy\"]\');"
+        "if(!pl) return JSON.stringify({error:'cancel plane missing'});"
+        "pl.click();"
+        "if(window.__cadcamResize) window.__cadcamResize({lock:false,sx:30});"
+        "var mid=window.__cadcamExportState||{};"
+        "if(mid.bodyCount!==1||mid.undoDepth!==0) return JSON.stringify({error:'cancel preview state',mid:mid});"
+        "var cc=document.getElementById('primCancel');"
+        "if(!cc) return JSON.stringify({error:'cancel btn missing'});"
+        "cc.click();"
+        + CREATE_STACK_JS
+        + "})()",
+    )
+    if cancel_err or not cancel_check or cancel_check.get("error") or int(cancel_check.get("body") or 0) != 0 or int(cancel_check.get("undo") or 0) != 0:
+        return [f"create cancel check {cancel_err or cancel_check}"]
     for kind, label in (("disc", "Disc"), ("box", "Box"), ("cylinder", "Cylinder")):
         made, made_err = _click_create_kind(cdp, kind)
         if made_err or not made or made.get("error"):
