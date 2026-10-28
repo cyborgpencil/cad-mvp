@@ -41,7 +41,7 @@ Asserts window.__cadcamExportState.occtReady for:
                         before those primitive taps, sketch on the default cube:
                         Finish Sketch, Tools-sheet Rectangle and Circle, L×W / Ø /
                         Blind inputs, and Extrude Confirm are at least 44 px; the
-                        sketch sheet does not cover the phone tab bar, status bar,
+                        sketch sheet does not cover the status bar
                         or view bar; the top face becomes the plane with no V/E/F
                         highlight; the origin-plane picker stays off; Extrude on
                         that face opens on Join, and New / Join / Cut are each at
@@ -50,7 +50,7 @@ Asserts window.__cadcamExportState.occtReady for:
                         leaves two bodies; the page is restored to the 20 mm box
   portrait origin plane empty doc (bodies.length === 0, not projectBlank):
                         Top / Front / Right chips are at least 44 px and do not
-                        cover the phone tab bar, status bar, or view bar; Top is
+                        cover the status bar or view bar; Top is
                         XY with +Z outward; rectangle 10×10 and circle Ø10 each
                         open Extrude on New and Blind 10 mm add a new body that
                         passes OCCT and mm; Join or Cut with no body, or without
@@ -3557,13 +3557,18 @@ SEARCH_DISCLOSURE_EXPR = r"""
   }
   if (searchButtons.length !== 1) problems.push('search buttons ' + searchButtons.length);
   else if (searchButtons[0] !== btn) problems.push('search button is not the disclosure');
+  var narrow = window.matchMedia('(max-width: 820px), (max-height: 520px)').matches;
   var searchBox = box(btn);
   var searchStyle = getComputedStyle(btn);
-  if (searchStyle.display === 'none' || searchStyle.visibility === 'hidden' || !(searchBox.width > 0) || !(searchBox.height > 0)) {
-    problems.push('search button hidden');
-  }
-  if (searchBox.right <= 0 || searchBox.left >= window.innerWidth || searchBox.bottom <= 0 || searchBox.top >= window.innerHeight) {
-    problems.push('search button offscreen');
+  if (narrow) {
+    if (searchStyle.display !== 'none') problems.push('search button not hidden on narrow');
+  } else {
+    if (searchStyle.display === 'none' || searchStyle.visibility === 'hidden' || !(searchBox.width > 0) || !(searchBox.height > 0)) {
+      problems.push('search button hidden');
+    }
+    if (searchBox.right <= 0 || searchBox.left >= window.innerWidth || searchBox.bottom <= 0 || searchBox.top >= window.innerHeight) {
+      problems.push('search button offscreen');
+    }
   }
   var meta = document.querySelector('meta[name="viewport"]');
   if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
@@ -3572,7 +3577,7 @@ SEARCH_DISCLOSURE_EXPR = r"""
   if (btn.getAttribute('aria-controls') !== 'searchDlg') problems.push('aria-controls');
   if (btn.getAttribute('aria-expanded') !== 'false') problems.push('aria-expanded start ' + btn.getAttribute('aria-expanded'));
   var br = box(btn);
-  if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
+  if (!narrow && (br.width + 0.5 < 44 || br.height + 0.5 < 44)) {
     problems.push('search button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
   }
   if (!dlg.hidden) problems.push('dialog not hidden');
@@ -3604,16 +3609,16 @@ SEARCH_DISCLOSURE_EXPR = r"""
   if (Math.abs(box(bar).top - barTop) > 0.5) problems.push('tool row moved ' + box(bar).top.toFixed(1) + ' vs ' + barTop.toFixed(1));
   document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
   if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('esc did not collapse');
-  if (document.activeElement !== btn) problems.push('esc focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  if (!narrow && document.activeElement !== btn) problems.push('esc focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
   btn.click();
   var canvas = document.getElementById('canvas');
   if (canvas) canvas.click();
   if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('outside did not collapse');
-  if (document.activeElement !== btn) problems.push('outside focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  if (!narrow && document.activeElement !== btn) problems.push('outside focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
   btn.click();
   btn.click();
   if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('icon did not collapse');
-  if (document.activeElement !== btn) problems.push('icon focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
+  if (!narrow && document.activeElement !== btn) problems.push('icon focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
   var end = box(dlg);
   if (end.width > 0.5 || end.height > 0.5) problems.push('recollapsed size ' + end.width.toFixed(1) + 'x' + end.height.toFixed(1));
   try { input.focus(); } catch (err2) {}
@@ -4039,10 +4044,8 @@ WRAPUP_PHONE_EXPR = r"""
   if (boxParts.length !== 3 || boxParts.some(function (n) { return !(Math.abs(n - 20) < 0.01); })) {
     problems.push('log bbox ' + lastMsg('bbox '));
   }
-  var bar = document.querySelector('.phone-tabbar');
-  if (shown(bar)) problems.push('phone bar shown');
   function tab(action) {
-    var nodes = document.querySelectorAll('[data-action="' + action + '"]');
+    var nodes = document.querySelectorAll('.topbar [data-action="' + action + '"]');
     for (var i = 0; i < nodes.length; i++) {
       var rect = shown(nodes[i]);
       if (rect) return {el: nodes[i], r: rect};
@@ -4051,8 +4054,6 @@ WRAPUP_PHONE_EXPR = r"""
   }
   var undo = tab('undo');
   var redo = tab('redo');
-  var create = bar ? document.querySelector('.phone-tabbar [data-action="createMenu"]') : null;
-  var modify = bar ? document.querySelector('.phone-tabbar [data-action="modifyShelf"]') : null;
   [['undo', undo], ['redo', redo]].forEach(function (pair) {
     if (!pair[1]) problems.push(pair[0] + ' missing');
     else if (pair[1].r.width + 0.5 < 44 || pair[1].r.height + 0.5 < 44) {
@@ -4061,8 +4062,8 @@ WRAPUP_PHONE_EXPR = r"""
       problems.push(pair[0] + ' outside ' + window.innerWidth);
     }
   });
-  if (create && shown(create)) problems.push('phone create still present');
-  if (modify && shown(modify)) problems.push('phone modify still present');
+  var searchBtn = document.getElementById('searchBtn');
+  if (!searchBtn || getComputedStyle(searchBtn).display !== 'none') problems.push('searchBtn not hidden on phone');
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
@@ -4099,8 +4100,6 @@ WRAPUP_DESK_EXPR = r"""
   }
   var desk = document.querySelector('.desk-bottom');
   if (desk) problems.push('desk-bottom still present');
-  var phone = document.querySelector('.phone-tabbar');
-  if (phone && getComputedStyle(phone).display !== 'none') problems.push('phone bar shown on desktop');
   var menu = document.getElementById('createMenu');
   if (menu && menu.hidden !== true) problems.push('create menu open at start');
   return JSON.stringify(problems);
@@ -4121,7 +4120,7 @@ def _json_problems(raw: Any, err: str, label: str) -> list[str]:
 
 
 def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
-    """Default 20 mm box, [cadmvp] log, phone Undo/Redo/Modify, desktop shelf."""
+    """Default 20 mm box, [cadmvp] log, header Undo/Redo, desktop shelf."""
     try:
         set_portrait(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
@@ -4139,9 +4138,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return problems
     clicked, click_err = eval_expr(
         cdp,
-        "(function(){var b=document.querySelector('[data-action=\"undo\"]');"
+        "(function(){var b=document.querySelector('.topbar [data-action=\"undo\"]');"
         "if(!b)return 'missing';b.click();"
-        "var r=document.querySelector('[data-action=\"redo\"]');"
+        "var r=document.querySelector('.topbar [data-action=\"redo\"]');"
         "if(!r)return 'missing redo';r.click();return 'clicked';})()",
     )
     if click_err or clicked != "clicked":

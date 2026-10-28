@@ -55,7 +55,6 @@
     --shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     --top-h: calc(48px + env(safe-area-inset-top, 0px));
     --status-h: 44px;
-    --phone-tabs-h: calc(56px + env(safe-area-inset-bottom, 0px));
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -1252,7 +1251,7 @@
   .pick-chooser {
     position: fixed;
     left: 8px;
-    bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px);
+    bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px) + 8px);
     z-index: 42;
     display: flex;
     flex-direction: column;
@@ -1503,14 +1502,14 @@
       left: 0;
       right: 0;
       top: auto;
-      bottom: var(--phone-tabs-h);
+      bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px));
       width: auto;
       border-radius: 16px 16px 0 0;
       padding-left: max(8px, env(safe-area-inset-left, 0px));
       padding-right: max(8px, env(safe-area-inset-right, 0px));
     }
     .dim-panel { top: 8px; max-height: min(42vh, calc(100% - 120px)); }
-    #toasts { bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px); }
+    #toasts { bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px) + 8px); }
     .statusbar { gap: 10px; padding: 0 8px; font-size: 11px; }
     .gate { padding: 4px; gap: 10px; }
     .export-tools.tools { height: auto; max-height: none; min-height: 0; overflow: visible; }
@@ -1958,7 +1957,7 @@
     <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector" aria-controls="inspector" aria-expanded="false">Info</button>
     <input class="doc" id="docName" value="Part 1" title="Part 1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
-    <button type="button" class="icon-btn" id="searchBtn" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search" aria-expanded="false" aria-controls="searchDlg"><svg class="ico"><use href="#i-search"></use></svg></button>
+    <button type="button" class="icon-btn hide-narrow" id="searchBtn" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search" aria-expanded="false" aria-controls="searchDlg"><svg class="ico"><use href="#i-search"></use></svg></button>
     <div class="units" role="group" aria-label="Units">
       <button type="button" class="is-on" data-action="units" data-unit="mm" data-tool="Units: mm" aria-pressed="true">mm</button>
       <button type="button" data-action="units" data-unit="in" data-tool="Units: inch" aria-pressed="false">in</button>
@@ -2817,8 +2816,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     '--disabled-ink': '#d5e4e2',
     '--shadow': '0 10px 28px rgba(0, 0, 0, 0.45)',
     '--top-h': 'calc(48px + env(safe-area-inset-top, 0px))',
-    '--status-h': '44px',
-    '--phone-tabs-h': 'calc(56px + env(safe-area-inset-bottom, 0px))'
+    '--status-h': '44px'
   };
   const DEFAULT_VIEWPORT_BACKGROUND = 'var(--bg)';
 
