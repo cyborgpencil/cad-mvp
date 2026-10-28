@@ -41,7 +41,7 @@ Asserts window.__cadcamExportState.occtReady for:
                         before those primitive taps, sketch on the default cube:
                         Finish Sketch, Tools-sheet Rectangle and Circle, L×W / Ø /
                         Blind inputs, and Extrude Confirm are at least 44 px; the
-                        sketch sheet does not cover the phone tab bar, status bar,
+                        sketch sheet does not cover the status bar
                         or view bar; the top face becomes the plane with no V/E/F
                         highlight; the origin-plane picker stays off; Extrude on
                         that face opens on Join, and New / Join / Cut are each at
@@ -50,7 +50,7 @@ Asserts window.__cadcamExportState.occtReady for:
                         leaves two bodies; the page is restored to the 20 mm box
   portrait origin plane empty doc (bodies.length === 0, not projectBlank):
                         Top / Front / Right chips are at least 44 px and do not
-                        cover the phone tab bar, status bar, or view bar; Top is
+                        cover the status bar or view bar; Top is
                         XY with +Z outward; rectangle 10×10 and circle Ø10 each
                         open Extrude on New and Blind 10 mm add a new body that
                         passes OCCT and mm; Join or Cut with no body, or without
@@ -1385,7 +1385,7 @@ SKETCH_PORTRAIT_EXPR = r"""
     var sheet = document.getElementById('sketchSheet');
     var sheetBox = boxOf(sheet);
     if (!sheetBox) { problems.push(label + ' sheet hidden'); return; }
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < bars.length; i++) {
       var bar = document.querySelector(bars[i]);
       var barBox = boxOf(bar);
@@ -1404,7 +1404,7 @@ SKETCH_PORTRAIT_EXPR = r"""
     if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
     var names = [];
     var on = '';
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < chips.length; i++) {
       var text = (chips[i].textContent || '').replace(/\s+/g, '');
       names.push(text);
@@ -1855,7 +1855,7 @@ ORIGIN_PLANE_EXPR = r"""
     var barEl = document.getElementById('originPlanes');
     if (barEl && barEl.hidden) return;
     var chips = document.querySelectorAll('#originPlanes [data-action="originPlane"]');
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var c = 0; c < chips.length; c++) {
       var chip = chips[c];
       var text = (chip.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1920,7 +1920,7 @@ ORIGIN_PLANE_EXPR = r"""
     if (chips.length !== 3) problems.push(label + ' chip count ' + chips.length);
     var names = [];
     var on = '';
-    var bars = ['.phone-tabbar', '.statusbar', '.vp-bar'];
+    var bars = ['.statusbar', '.vp-bar'];
     for (var i = 0; i < chips.length; i++) {
       var text = (chips[i].textContent || '').replace(/\s+/g, '');
       names.push(text);
@@ -2366,7 +2366,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Line callout plus');
     var lineSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!lineSheetBox) problems.push('line sheet hidden');
-    var lineKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var lineKeep = ['#exportBtn', '#statusUnits'];
     for (var lk = 0; lk < lineKeep.length; lk++) {
       var keepEl = document.querySelector(lineKeep[lk]);
       var keepBox = boxOf(keepEl);
@@ -2483,7 +2483,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus0'), 'Arc callout plus');
     var arcSheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!arcSheetBox) problems.push('arc sheet hidden');
-    var arcKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var arcKeep = ['#exportBtn', '#statusUnits'];
     for (var ak = 0; ak < arcKeep.length; ak++) {
       var arcKeepBox = boxOf(document.querySelector(arcKeep[ak]));
       if (arcKeepBox && overlaps(arcSheetBox, arcKeepBox)) problems.push('arc covers ' + arcKeep[ak]);
@@ -2619,7 +2619,7 @@ ORIGIN_PLANE_EXPR = r"""
     need(document.getElementById('calloutPlus1'), 'Polygon N plus');
     var polySheetBox = boxOf(document.getElementById('sketchSheet'));
     if (!polySheetBox) problems.push('polygon sheet hidden');
-    var polyKeep = ['.phone-tabbar', '#exportBtn', '#statusUnits'];
+    var polyKeep = ['#exportBtn', '#statusUnits'];
     for (var pk = 0; pk < polyKeep.length; pk++) {
       var polyKeepBox = boxOf(document.querySelector(polyKeep[pk]));
       if (polyKeepBox && overlaps(polySheetBox, polyKeepBox)) problems.push('polygon covers ' + polyKeep[pk]);
@@ -2741,7 +2741,7 @@ COVERAGE_EXPR = r"""
   }
   var cubeBox = shown(cube);
   if (!cube || !cubeBox) problems.push('view cube missing');
-  var selectors = ['.vp-bar', '#dimPanel', '#cameraShelf [data-action="view"][data-view="top"]', '#viewCube', '.statusbar', '#searchDlg'];
+  var selectors = ['.vp-bar', '#dimPanel', '#cameraShelf [data-action="view"][data-view="top"]', '#viewCube', '.statusbar'];
   var rects = [];
   var cubeOnCanvas = false;
   for (var s = 0; s < selectors.length; s++) {
@@ -3483,7 +3483,23 @@ CHROME_ROW_EXPR = r"""
   var nr = box(name);
   if (tr.width + 0.5 < 44 || tr.height + 0.5 < 44) problems.push('Tree ' + tr.width.toFixed(1) + 'x' + tr.height.toFixed(1));
   if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
-  if (Math.abs(tr.top - ir.top) > 0.5) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  var shelves = document.querySelector('.topbar-shelves');
+  var browser = document.getElementById('browser');
+  if (!shelves || shelves.firstElementChild !== tree) problems.push('Tree is not first in topbar-shelves');
+  if (tree.closest('.topbar')) problems.push('Tree still in topbar');
+  if (!(tr.top > ir.top + 0.5)) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  if (!browser) {
+    problems.push('missing browser drawer');
+  } else if (!browser.classList.contains('open')) {
+    tree.click();
+    if (!browser.classList.contains('open') || tree.getAttribute('aria-expanded') !== 'true') {
+      problems.push('Tree did not open browser');
+    }
+    tree.click();
+    if (browser.classList.contains('open') || tree.getAttribute('aria-expanded') !== 'false') {
+      problems.push('Tree did not close browser');
+    }
+  }
   if (ir.right > nr.left + 0.5) problems.push('Info is not left of the part name');
   var buttons = document.querySelectorAll('.topbar button');
   for (var i = 0; i < buttons.length; i++) {
@@ -3519,6 +3535,10 @@ CHROME_ROW_EXPR = r"""
   name.value = 'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM';
   if (name.scrollWidth <= name.clientWidth + 1) problems.push('part name did not truncate');
   name.value = savedName;
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
+    problems.push('missing interactive-widget');
+  }
   return JSON.stringify(problems);
 })()
 """
@@ -3534,106 +3554,6 @@ def chrome_row_problems(cdp: Cdp) -> list[str]:
         return [f"chrome row {raw}"]
     if not isinstance(found, list):
         return [f"chrome row {raw}"]
-    return [str(item) for item in found]
-
-
-SEARCH_DISCLOSURE_EXPR = r"""
-(function(){
-  var problems = [];
-  function box(el) { return el.getBoundingClientRect(); }
-  var btn = document.getElementById('searchBtn');
-  var dlg = document.getElementById('searchDlg');
-  var input = document.getElementById('searchInput');
-  var bar = document.querySelector('.vp-bar');
-  if (!btn || !dlg || !input || !bar) return JSON.stringify(['missing search chrome']);
-  var searchButtons = [];
-  var allBtns = document.querySelectorAll('button');
-  for (var s = 0; s < allBtns.length; s++) {
-    var candidate = allBtns[s];
-    var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.getAttribute('title') || '') + ' ' + (candidate.getAttribute('data-tool') || '')).toLowerCase();
-    var icon = candidate.querySelector('use');
-    var href = icon ? (icon.getAttribute('href') || '') : '';
-    if (label.indexOf('search') !== -1 || href === '#i-search') searchButtons.push(candidate);
-  }
-  if (searchButtons.length !== 1) problems.push('search buttons ' + searchButtons.length);
-  else if (searchButtons[0] !== btn) problems.push('search button is not the disclosure');
-  var searchBox = box(btn);
-  var searchStyle = getComputedStyle(btn);
-  if (searchStyle.display === 'none' || searchStyle.visibility === 'hidden' || !(searchBox.width > 0) || !(searchBox.height > 0)) {
-    problems.push('search button hidden');
-  }
-  if (searchBox.right <= 0 || searchBox.left >= window.innerWidth || searchBox.bottom <= 0 || searchBox.top >= window.innerHeight) {
-    problems.push('search button offscreen');
-  }
-  var meta = document.querySelector('meta[name="viewport"]');
-  if (!meta || String(meta.content).indexOf('interactive-widget=resizes-content') < 0) {
-    problems.push('missing interactive-widget');
-  }
-  if (btn.getAttribute('aria-controls') !== 'searchDlg') problems.push('aria-controls');
-  if (btn.getAttribute('aria-expanded') !== 'false') problems.push('aria-expanded start ' + btn.getAttribute('aria-expanded'));
-  var br = box(btn);
-  if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
-    problems.push('search button ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
-  }
-  if (!dlg.hidden) problems.push('dialog not hidden');
-  var dr = box(dlg);
-  if (dr.width > 0.5 || dr.height > 0.5) problems.push('collapsed size ' + dr.width.toFixed(1) + 'x' + dr.height.toFixed(1));
-  try { input.focus(); } catch (err) {}
-  if (document.activeElement === input) problems.push('collapsed input took focus');
-  var barTop = box(bar).top;
-  btn.click();
-  if (dlg.hidden) problems.push('dialog stayed hidden');
-  if (btn.getAttribute('aria-expanded') !== 'true') problems.push('aria-expanded open ' + btn.getAttribute('aria-expanded'));
-  if (document.activeElement !== input) problems.push('open focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  var list = document.getElementById('searchList');
-  var results = list ? list.querySelectorAll('button') : [];
-  if (!results.length) problems.push('no search results');
-  var st = getComputedStyle(dlg);
-  if (st.position !== 'fixed' && st.position !== 'absolute') problems.push('dialog position ' + st.position);
-  var vv = window.visualViewport;
-  var viewTop = vv ? vv.offsetTop : 0;
-  var viewBottom = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
-  var openBox = box(dlg);
-  if (openBox.bottom > viewBottom + 1 || openBox.top < viewTop - 1) problems.push('dialog outside visual viewport');
-  var visible = 0;
-  for (var i = 0; i < results.length; i++) {
-    var rr = box(results[i]);
-    if (rr.height > 1 && rr.top >= viewTop - 1 && rr.bottom <= viewBottom + 1) visible++;
-  }
-  if (!visible) problems.push('no result inside visual viewport');
-  if (Math.abs(box(bar).top - barTop) > 0.5) problems.push('tool row moved ' + box(bar).top.toFixed(1) + ' vs ' + barTop.toFixed(1));
-  document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('esc did not collapse');
-  if (document.activeElement !== btn) problems.push('esc focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  btn.click();
-  var canvas = document.getElementById('canvas');
-  if (canvas) canvas.click();
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('outside did not collapse');
-  if (document.activeElement !== btn) problems.push('outside focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  btn.click();
-  btn.click();
-  if (!dlg.hidden || btn.getAttribute('aria-expanded') !== 'false') problems.push('icon did not collapse');
-  if (document.activeElement !== btn) problems.push('icon focus ' + (document.activeElement && (document.activeElement.id || document.activeElement.tagName)));
-  var end = box(dlg);
-  if (end.width > 0.5 || end.height > 0.5) problems.push('recollapsed size ' + end.width.toFixed(1) + 'x' + end.height.toFixed(1));
-  try { input.focus(); } catch (err2) {}
-  if (document.activeElement === input) problems.push('recollapsed input took focus');
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  return JSON.stringify(problems);
-})()
-"""
-
-
-def search_disclosure_problems(cdp: Cdp) -> list[str]:
-    raw, err = eval_expr(cdp, SEARCH_DISCLOSURE_EXPR)
-    if err or not isinstance(raw, str):
-        return [f"search {raw or err}"]
-    try:
-        found = json.loads(raw)
-    except json.JSONDecodeError:
-        return [f"search {raw}"]
-    if not isinstance(found, list):
-        return [f"search {raw}"]
     return [str(item) for item in found]
 
 
@@ -4039,10 +3959,8 @@ WRAPUP_PHONE_EXPR = r"""
   if (boxParts.length !== 3 || boxParts.some(function (n) { return !(Math.abs(n - 20) < 0.01); })) {
     problems.push('log bbox ' + lastMsg('bbox '));
   }
-  var bar = document.querySelector('.phone-tabbar');
-  if (!shown(bar)) problems.push('phone bar hidden');
   function tab(action) {
-    var nodes = document.querySelectorAll('.phone-tabbar [data-action="' + action + '"]');
+    var nodes = document.querySelectorAll('.topbar [data-action="' + action + '"]');
     for (var i = 0; i < nodes.length; i++) {
       var rect = shown(nodes[i]);
       if (rect) return {el: nodes[i], r: rect};
@@ -4051,8 +3969,6 @@ WRAPUP_PHONE_EXPR = r"""
   }
   var undo = tab('undo');
   var redo = tab('redo');
-  var create = tab('createMenu');
-  var modify = tab('modifyShelf');
   [['undo', undo], ['redo', redo]].forEach(function (pair) {
     if (!pair[1]) problems.push(pair[0] + ' missing');
     else if (pair[1].r.width + 0.5 < 44 || pair[1].r.height + 0.5 < 44) {
@@ -4061,8 +3977,6 @@ WRAPUP_PHONE_EXPR = r"""
       problems.push(pair[0] + ' outside ' + window.innerWidth);
     }
   });
-  if (create) problems.push('phone create still present');
-  if (modify) problems.push('phone modify still present');
   var shelf = document.getElementById('modifyShelf');
   if (!shelf || shelf.hidden !== true) problems.push('shelf not hidden on phone');
   if (st.modifyOpen === true) problems.push('modifyOpen on phone');
@@ -4099,8 +4013,6 @@ WRAPUP_DESK_EXPR = r"""
   }
   var desk = document.querySelector('.desk-bottom');
   if (desk) problems.push('desk-bottom still present');
-  var phone = document.querySelector('.phone-tabbar');
-  if (phone && getComputedStyle(phone).display !== 'none') problems.push('phone bar shown on desktop');
   var menu = document.getElementById('createMenu');
   if (menu && menu.hidden !== true) problems.push('create menu open at start');
   return JSON.stringify(problems);
@@ -4121,7 +4033,7 @@ def _json_problems(raw: Any, err: str, label: str) -> list[str]:
 
 
 def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
-    """Default 20 mm box, [cadmvp] log, phone Undo/Redo/Modify, desktop shelf."""
+    """Default 20 mm box, [cadmvp] log, header Undo/Redo, desktop shelf."""
     try:
         set_portrait(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
@@ -4139,9 +4051,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
         return problems
     clicked, click_err = eval_expr(
         cdp,
-        "(function(){var b=document.querySelector('.phone-tabbar [data-action=\"undo\"]');"
+        "(function(){var b=document.querySelector('.topbar [data-action=\"undo\"]');"
         "if(!b)return 'missing';b.click();"
-        "var r=document.querySelector('.phone-tabbar [data-action=\"redo\"]');"
+        "var r=document.querySelector('.topbar [data-action=\"redo\"]');"
         "if(!r)return 'missing redo';r.click();return 'clicked';})()",
     )
     if click_err or clicked != "clicked":
@@ -4404,7 +4316,6 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
         return ["portrait origin plane", *origin_found]
     problems: list[str] = []
     inspector_checked = False
-    search_checked = False
     stamp_checked = False
     create_checked = False
     sketch_checked = False
@@ -4423,13 +4334,6 @@ def run_portrait(cdp: Cdp, origin: str) -> list[str]:
             if closed:
                 problems.append(f"portrait {kind} closed inspector")
                 problems.extend(closed)
-                return problems
-        if not search_checked:
-            search_checked = True
-            search_found = search_disclosure_problems(cdp)
-            if search_found:
-                problems.append(f"portrait {kind} search")
-                problems.extend(search_found)
                 return problems
         if not stamp_checked:
             stamp_checked = True
@@ -8548,7 +8452,6 @@ def run(omit: list[str]) -> int:
                 time.sleep(0.3)
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
-                desktop_bar.extend(search_disclosure_problems(cdp))
                 desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")

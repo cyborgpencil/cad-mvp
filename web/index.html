@@ -55,7 +55,6 @@
     --shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     --top-h: calc(48px + env(safe-area-inset-top, 0px));
     --status-h: 44px;
-    --phone-tabs-h: calc(56px + env(safe-area-inset-bottom, 0px));
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -157,7 +156,7 @@
     border-radius: 8px;
     border: 1px solid transparent;
     color: var(--muted);
-    padding: 0 10px;
+    padding: 0 8px;
     font-weight: 650;
   }
   .units button.is-on {
@@ -1162,24 +1161,7 @@
     padding: 10px 12px;
     border-radius: 8px;
   }
-  .search-dlg {
-    position: fixed;
-    left: 50%;
-    top: 18%;
-    transform: translateX(-50%);
-    width: min(92vw, 420px);
-    max-height: min(70vh, 520px);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--panel-2);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    z-index: 36;
-    padding: 10px;
-  }
-  .search-dlg input, .sheet input {
+  .sheet input {
     width: 100%;
     min-height: 44px;
     height: 44px;
@@ -1188,9 +1170,8 @@
     background: var(--field);
     padding: 0 12px;
   }
-  .search-list, .sheet-grid { list-style: none; margin: 8px 0 0; padding: 0; max-height: 46vh; overflow: auto; }
-  .search-dlg .search-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; }
-  .search-list button, .sheet-grid button {
+  .sheet-grid { list-style: none; margin: 8px 0 0; padding: 0; max-height: 46vh; overflow: auto; }
+  .sheet-grid button {
     width: 100%;
     min-height: 44px;
     display: flex;
@@ -1201,8 +1182,8 @@
     border-radius: 8px;
     text-align: left;
   }
-  .search-list button:hover, .sheet-grid button:hover, .search-list button.is-on { background: var(--accent-dim); }
-  .search-list small, .sheet-grid small { color: var(--muted); }
+  .sheet-grid button:hover { background: var(--accent-dim); }
+  .sheet-grid small { color: var(--muted); }
   .sheet {
     position: absolute;
     left: 0;
@@ -1249,21 +1230,10 @@
     font-weight: 650;
     background: var(--tab-bg);
   }
-  .phone-tabbar {
-    display: none;
-    flex: none;
-    flex-wrap: nowrap;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    background: var(--top);
-    border-top: 1px solid var(--line-strong);
-  }
-  .phone-tabbar::-webkit-scrollbar { display: none; }
   .pick-chooser {
     position: fixed;
     left: 8px;
-    bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px);
+    bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px) + 8px);
     z-index: 42;
     display: flex;
     flex-direction: column;
@@ -1288,7 +1258,6 @@
     background: var(--active-fill);
     color: var(--ink);
   }
-  .phone-tabs { display: flex; flex: 1; min-width: 0; }
   .modify-shelf {
     display: flex;
     flex: none;
@@ -1449,15 +1418,6 @@
     .hide-narrow { display: none !important; }
     .brand { display: none; }
     .topbar { padding-left: 4px; padding-right: 4px; gap: 2px; }
-    .search-dlg {
-      left: 8px;
-      right: 8px;
-      top: 8px;
-      width: auto;
-      transform: none;
-      max-height: 70vh;
-      z-index: 40;
-    }
     .spacer { display: none; }
     .doc {
       flex: 1 1 auto;
@@ -1515,43 +1475,14 @@
       left: 0;
       right: 0;
       top: auto;
-      bottom: var(--phone-tabs-h);
+      bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px));
       width: auto;
       border-radius: 16px 16px 0 0;
       padding-left: max(8px, env(safe-area-inset-left, 0px));
       padding-right: max(8px, env(safe-area-inset-right, 0px));
     }
     .dim-panel { top: 8px; max-height: min(42vh, calc(100% - 120px)); }
-    .phone-tabbar {
-      display: flex;
-      height: var(--phone-tabs-h);
-      padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
-      align-items: stretch;
-    }
-    .phone-tabs { display: contents; }
-    .phone-tabbar .tab {
-      flex: 1;
-      border-bottom: 0;
-      border-top: 2px solid transparent;
-      border-radius: 8px 8px 0 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      font-size: 11px;
-      min-width: 44px;
-      min-height: 44px;
-      height: auto;
-      padding: 4px 2px 0;
-    }
-    .phone-tabbar .tab.is-on {
-      background: var(--active-fill);
-      border-color: var(--active-border);
-      color: var(--ink);
-    }
-    .phone-tabbar .ico { width: 20px; height: 20px; }
-    #toasts { bottom: calc(var(--phone-tabs-h) + var(--status-h) + 8px); }
+    #toasts { bottom: calc(var(--status-h) + env(safe-area-inset-bottom, 0px) + 8px); }
     .statusbar { gap: 10px; padding: 0 8px; font-size: 11px; }
     .gate { padding: 4px; gap: 10px; }
     .export-tools.tools { height: auto; max-height: none; min-height: 0; overflow: visible; }
@@ -1668,7 +1599,6 @@
       overflow-y: hidden;
       scroll-snap-type: x mandatory;
     }
-    .hide-tight { display: none !important; }
     .vp-cluster { display: contents; }
     .vc-home { z-index: 8; }
   }
@@ -1947,7 +1877,6 @@
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M8 8H5V5M5.5 13a7 7 0 1 0 1.5-5.5L5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-redo" viewBox="0 0 24 24"><path d="M16 8h3V5M18.5 13a7 7 0 1 1-1.5-5.5L19 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 15l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-tools" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-modify" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="9" cy="7" r="2.1" fill="currentColor"/><circle cx="15" cy="12" r="2.1" fill="currentColor"/><circle cx="8" cy="17" r="2.1" fill="currentColor"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
@@ -1969,7 +1898,6 @@
 <div id="app">
   <!-- Panel labels: reuse existing control/aria labels; exact per-panel label text, which surfaces count as panels, and phone vs desktop placement stay TBD (mvp/requirements.md park). -->
   <header class="topbar" aria-label="CAD/CAM">
-    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
     <div class="brand">
       <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9z" fill="currentColor"/><path d="M12 12 22 7.5M12 12 2 7.5M12 12v10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
       <span class="brand-name">CAD/CAM</span>
@@ -1994,13 +1922,12 @@
         <button type="button" id="threeFingerUndo" data-action="threeFingerUndo" data-tool="Three-finger undo/redo" aria-pressed="true">Three-finger undo/redo</button>
       </div>
     </div>
-    <button type="button" class="icon-btn hide-tight" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
-    <button type="button" class="icon-btn hide-tight" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
+    <button type="button" class="icon-btn" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
+    <button type="button" class="icon-btn" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
     <span class="spacer"></span>
     <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector" aria-controls="inspector" aria-expanded="false">Info</button>
     <input class="doc" id="docName" value="Part 1" title="Part 1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
-    <button type="button" class="icon-btn" id="searchBtn" data-action="search" data-tool="Tool search" title="Tool search (X)" aria-label="Tool search" aria-expanded="false" aria-controls="searchDlg"><svg class="ico"><use href="#i-search"></use></svg></button>
     <div class="units" role="group" aria-label="Units">
       <button type="button" class="is-on" data-action="units" data-unit="mm" data-tool="Units: mm" aria-pressed="true">mm</button>
       <button type="button" data-action="units" data-unit="in" data-tool="Units: inch" aria-pressed="false">in</button>
@@ -2030,6 +1957,7 @@
       </nav>
       <div class="ribbon" role="region" aria-label="Tools">
     <div class="topbar-shelves" role="toolbar" aria-label="Tools">
+      <button type="button" class="drawer-btn" data-action="drawer" data-drawer="browser" data-tool="Browser" aria-label="Browser tree" aria-controls="browser" aria-expanded="false">Tree</button>
       <button type="button" class="tool-btn tools-menu-btn" data-action="toolsMenu" data-tool="Tools menu" title="Tools" aria-label="Tools" aria-controls="toolsSheet" aria-expanded="false">
         <svg class="ico"><use href="#i-tools"></use></svg><span>Tools</span>
       </button>
@@ -2332,6 +2260,9 @@
           <button type="button" data-action="select" data-mode="edge" data-tool="Selection: Edge" title="Edge (2)"><svg class="ico"><use href="#i-edge"></use></svg></button>
           <button type="button" data-action="select" data-mode="face" data-tool="Selection: Face" title="Face (3)"><svg class="ico"><use href="#i-face"></use></svg></button>
           <button type="button" class="is-on" data-action="select" data-mode="item" data-tool="Selection: Item" title="Item (4)" aria-pressed="true"><svg class="ico"><use href="#i-body"></use></svg></button>
+          <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
+          <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
+          <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
         </div>
       </div>
       <div id="cameraShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Show/hide camera" data-hscroll hidden>
@@ -2500,19 +2431,6 @@
     <button type="button" data-action="delete" data-tool="Delete" title="Delete">Delete</button>
   </div>
 
-  <nav class="phone-tabbar" data-hscroll aria-label="Workbench">
-    <button type="button" class="tab" id="pickFilter" data-action="pickFilter" data-tool="Pick filter" aria-haspopup="menu" aria-expanded="false" aria-controls="pickChooser" aria-label="Pick Body">Body</button>
-    <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
-    <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
-    <button type="button" class="tab" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg>Undo</button>
-    <button type="button" class="tab" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg>Redo</button>
-    <div class="phone-tabs" role="tablist" aria-label="Workbench">
-    <button type="button" class="tab is-on" role="tab" data-action="tab" data-tab="model" data-tool="Model" aria-selected="true"><svg class="ico"><use href="#i-tab-model"></use></svg>Model</button>
-    <button type="button" class="tab" role="tab" data-action="tab" data-tab="repair" data-tool="Repair" aria-selected="false"><svg class="ico"><use href="#i-tab-repair"></use></svg>Repair</button>
-    <button type="button" class="tab" role="tab" data-action="tab" data-tab="export" data-tool="Export" aria-selected="false"><svg class="ico"><use href="#i-tab-export"></use></svg>Export</button>
-    </div>
-  </nav>
-
   <footer class="statusbar" aria-label="Units">
     <span class="stat">Units <b id="statusUnits">mm</b></span>
     <span class="hint" id="statusHint">Loading checks…</span>
@@ -2535,11 +2453,6 @@
   <button type="button" role="menuitem" data-action="primitive" data-kind="disc" data-tool="Disc" title="Disc">Disc</button>
   <button type="button" role="menuitem" data-action="holeTool" data-tool="Hole" title="Hole">Hole</button>
   <button type="button" role="menuitem" data-action="newSketch" data-tool="Sketch" title="Sketch">Sketch</button>
-</div>
-<div class="search-dlg" id="searchDlg" role="dialog" aria-label="Tool search" hidden>
-  <h2 class="panel-h">Tool search</h2>
-  <input id="searchInput" placeholder="Search tools" aria-label="Search tools" autocomplete="off" spellcheck="false" autocapitalize="off">
-  <ul class="search-list" id="searchList"></ul>
 </div>
 <div id="toasts"></div>
 <p id="bootError" class="boot-error" hidden></p>
@@ -2869,8 +2782,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     '--disabled-ink': '#d5e4e2',
     '--shadow': '0 10px 28px rgba(0, 0, 0, 0.45)',
     '--top-h': 'calc(48px + env(safe-area-inset-top, 0px))',
-    '--status-h': '44px',
-    '--phone-tabs-h': 'calc(56px + env(safe-area-inset-bottom, 0px))'
+    '--status-h': '44px'
   };
   const DEFAULT_VIEWPORT_BACKGROUND = 'var(--bg)';
 
@@ -2971,8 +2883,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     meshMessage: '',
     rustGate: null,
     failReason: 'Loading checks',
-    activeTool: '',
-    searchIndex: 0
+    activeTool: ''
   };
   const vis = { body: true, sketch: false, xz: true, xy: false, yz: false };
 
@@ -2981,10 +2892,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const measureSvg = document.getElementById('measureSvg');
   const fileMenu = document.getElementById('fileMenu');
   const exportMenu = document.getElementById('exportMenu');
-  const searchDlg = document.getElementById('searchDlg');
-  const searchBtn = document.getElementById('searchBtn');
-  const searchInput = document.getElementById('searchInput');
-  const searchList = document.getElementById('searchList');
   const toolsSheet = document.getElementById('toolsSheet');
   const selectionShelf = document.getElementById('selectionShelf');
   const cameraShelf = document.getElementById('cameraShelf');
@@ -4861,7 +4768,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     function blocked(client) {
       const el = document.elementFromPoint(client.x, client.y);
       if (!el) return true;
-      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .phone-tabbar, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
+      if (el.closest('button, a, input, textarea, select, .vp-bar, .sheet, .hud, .dim-panel, .callout-layer, .touch-toolbar, .pick-chooser, .statusbar, .topbar, .modify-shelf, .create-menu, .edge-sheet, #viewCube')) return true;
       if (el !== canvas && el !== viewport) return true;
       if (handles.visible && pickHandle(client.x, client.y)) return true;
       return false;
@@ -10884,8 +10791,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
     if (exportMenu) exportMenu.hidden = true;
-    searchDlg.hidden = true;
-    if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
     setToolsOpen(false);
     setAboutOpen(false);
     closeCreateMenu();
@@ -10897,61 +10802,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     dismissStuckTooltips();
   }
 
-  function placeSearch() {
-    if (!searchDlg) return;
-    const phone = window.matchMedia('(max-width: 820px)').matches;
-    if (searchDlg.hidden || !phone) {
-      searchDlg.style.left = '';
-      searchDlg.style.right = '';
-      searchDlg.style.width = '';
-      searchDlg.style.top = '';
-      searchDlg.style.maxHeight = '';
-      searchDlg.style.transform = '';
-      return;
-    }
-    const vv = window.visualViewport;
-    const offsetTop = vv ? vv.offsetTop : 0;
-    const viewH = vv ? vv.height : window.innerHeight;
-    searchDlg.style.left = '8px';
-    searchDlg.style.right = '8px';
-    searchDlg.style.width = 'auto';
-    searchDlg.style.top = (offsetTop + 8) + 'px';
-    searchDlg.style.transform = 'none';
-    searchDlg.style.maxHeight = Math.max(96, viewH - 16) + 'px';
-  }
-
-  function openSearchDialog() {
-    fileMenu.hidden = true;
-    document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
-    if (exportMenu) exportMenu.hidden = true;
-    setToolsOpen(false);
-    closeCreateMenu();
-    closeDrawers();
-    searchDlg.hidden = false;
-    searchInput.value = '';
-    state.searchIndex = 0;
-    fillSearch('');
-    if (searchBtn) searchBtn.setAttribute('aria-expanded', 'true');
-    placeSearch();
-    searchInput.focus();
-  }
-
-  function closeSearch(restoreFocus) {
-    const wasOpen = !searchDlg.hidden;
-    searchDlg.hidden = true;
-    if (searchBtn) searchBtn.setAttribute('aria-expanded', 'false');
-    clearToasts();
-    dismissStuckTooltips();
-    if (restoreFocus && wasOpen && searchBtn) searchBtn.focus();
-  }
-
-  function toggleSearch() {
-    if (searchDlg.hidden) openSearchDialog();
-    else closeSearch(true);
-  }
-
   function openToolsMenu() {
-    closeSearch(false);
     closeDrawers();
     fileMenu.hidden = true;
     document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
@@ -12779,17 +12630,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       tab.textContent = items[i].tab ? TAB_LABELS[items[i].tab] : 'View';
       btn.appendChild(label);
       btn.appendChild(tab);
-      if (i === state.searchIndex) btn.classList.add('is-on');
       host.appendChild(btn);
     }
     host._items = items;
     host._query = query;
-  }
-
-  function fillSearch(query) {
-    const items = filterTools(query);
-    if (state.searchIndex >= items.length) state.searchIndex = Math.max(0, items.length - 1);
-    renderToolList(searchList, items, query);
   }
 
   function fillSheet(query) {
@@ -13345,7 +13189,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const action = btn.getAttribute('data-action') || '';
     const isViewBarToggle = !action && btn.getAttribute('data-tool') === 'View' && !!btn.closest('.topbar-shelves');
     let message = btn.getAttribute('data-tool') || 'Tool';
-    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'search' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && !isViewBarToggle && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter' && action !== 'aboutMenu' && action !== 'theme') {
+    if (action !== 'fileMenu' && action !== 'exportMenu' && action !== 'toolsMenu' && action !== 'selectionShelf' && action !== 'cameraShelf' && !isViewBarToggle && action !== 'createMenu' && action !== 'loadProject' && action !== 'pickFilter' && action !== 'aboutMenu' && action !== 'theme') {
       closePopups();
     }
     if (action === 'tab') {
@@ -13377,10 +13221,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       document.getElementById('fileBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
       if (!open) return;
       message = 'File';
-    } else if (action === 'search') {
-      toggleSearch();
-      if (searchDlg.hidden) return;
-      message = 'Tool search';
     } else if (action === 'toolsMenu') {
       if (toolsSheet && !toolsSheet.hidden) {
         setToolsOpen(false);
@@ -13605,7 +13445,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const opening = !chooser || chooser.hidden === true;
       closePopups();
       if (opening) {
-        setSelectionShelfOpen(false);
         setCameraShelfOpen(false);
         setModifyOpen(false, true);
         closeSketchSheet();
@@ -15787,7 +15626,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   });
 
   document.addEventListener('click', function (ev) {
-    const pickHost = ev.target.closest('#searchList, #sheetTools');
+    const pickHost = ev.target.closest('#sheetTools');
     if (pickHost && ev.target.closest('button[data-pick]')) {
       const items = pickHost._items || [];
       const idx = parseInt(ev.target.closest('button').getAttribute('data-pick'), 10);
@@ -15796,22 +15635,15 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const btn = ev.target.closest('[data-tool], [data-action]');
     if (!btn) {
-      if (!ev.target.closest('.menu-wrap, .export-wrap, .search-dlg, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
-        const searchWasOpen = !searchDlg.hidden;
+      if (!ev.target.closest('.menu-wrap, .export-wrap, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
         closePopups();
-        if (searchWasOpen && searchBtn) searchBtn.focus();
       }
       return;
     }
-    if (btn.closest('#searchList, #sheetTools')) return;
+    if (btn.closest('#sheetTools')) return;
     runAction(btn);
   });
 
-  function onSearchType(ev) {
-    state.searchIndex = 0;
-    if (ev.target === searchInput) fillSearch(searchInput.value);
-  }
-  searchInput.addEventListener('input', onSearchType);
   const edgeSizeInput = document.getElementById('edgeSize');
   if (edgeSizeInput) {
     edgeSizeInput.addEventListener('input', function () {
@@ -16010,7 +15842,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         calloutEntry.blur();
         return;
       }
-      const searchWasOpen = !searchDlg.hidden;
       setModifyOpen(false, true);
       setSelectionShelfOpen(false);
       setCameraShelfOpen(false);
@@ -16020,8 +15851,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       closePopups();
       closeDrawers();
       paintPrimFields();
-      if (searchWasOpen && searchBtn) searchBtn.focus();
-      else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       return;
     }
     if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !isTypingTarget(document.activeElement)) {
@@ -16039,19 +15869,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     if (ev.ctrlKey || ev.metaKey) return;
     const typing = isTypingTarget(document.activeElement);
-    if (!searchDlg.hidden && !ev.altKey && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter')) {
-      const items = searchList._items || [];
-      if (ev.key === 'ArrowDown') state.searchIndex = Math.min(items.length - 1, state.searchIndex + 1);
-      if (ev.key === 'ArrowUp') state.searchIndex = Math.max(0, state.searchIndex - 1);
-      if (ev.key === 'Enter') {
-        pickCatalogItem(items[state.searchIndex]);
-        ev.preventDefault();
-        return;
-      }
-      fillSearch(searchInput.value);
-      ev.preventDefault();
-      return;
-    }
     if (typing) return;
     if (ev.key === 'Delete' && window.matchMedia('(min-width: 821px)').matches) {
       ev.preventDefault();
@@ -16081,11 +15898,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     }
     // Plain 4 selects the whole body (Item). Plain 5 does the same. Alt+4 still opens Export.
-    if (ev.key === 'x' || ev.key === 'X') {
-      openSearchDialog();
-      toast('Tool search');
-      ev.preventDefault();
-    }
   });
 
   function parkTitle(el) {
@@ -16143,12 +15955,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const portrait = window.matchMedia('(orientation: portrait)').matches;
     document.documentElement.setAttribute('data-orientation', portrait ? 'portrait' : 'landscape');
     resize();
-    placeSearch();
     applyModifyDefault();
-  }
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', placeSearch);
-    window.visualViewport.addEventListener('scroll', placeSearch);
   }
   window.addEventListener('resize', onViewportChange);
   const orientMedia = window.matchMedia('(orientation: portrait)');
@@ -16479,7 +16286,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function setupFloatingPanelDock() {
     const floatPanels = Array.from(
-      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #searchDlg, #browser, #inspector, #fileMenu, #exportMenu, #createMenu, .menu-wrap .menu[aria-label="About"]')
+      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #browser, #inspector, #fileMenu, #exportMenu, #createMenu, .menu-wrap .menu[aria-label="About"]')
     );
     let dragState = null;
     let suppressPanelClick = false;
