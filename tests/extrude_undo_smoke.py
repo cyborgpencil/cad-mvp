@@ -2,10 +2,15 @@
 """Phone Extrude Undo/Redo smoke (390x844, Chromium and WebKit).
 
 Verifies:
-- New, Join, Cut: each Undo returns body count and volume to pre-extrude values;
-  Redo restores post-extrude values.
+- New, Join, Cut: each Undo returns body count and volume to pre-extrude values
+  and restores the closed sketch profile, drawn loops, and sketch plane so
+  Extrude works again without redrawing; Redo clears the profile and restores
+  post-extrude values.
+- 10 consecutive Undo/Redo cycles do not leak OCCT shapes (live shape count and
+  hook state remain stable).
 - A failed extrude pushes nothing onto the undo stack.
-- Hole -> Extrude -> Undo removes only the Extrude.
+- Hole -> Extrude -> Undo removes only the Extrude (and restores its profile);
+  repair (Auto-heal) and open-sheet Undo/Redo behave as before.
 - Open sketch sheet (extrude and profile), Undo/Redo: sheet closes
   (state.sketchSheetMode falsy, #sketchSheet hidden), prior/redo scene restored,
   and the next Confirm cannot extrude onto the restored scene.
@@ -244,6 +249,111 @@ def set_extrude_depth(page: Any, depth_str: str) -> None:
     )
 
 
+def check_sketch_restored(page: Any, kind: str, label: str, problems: list[str]) -> None:
+    probe = page.evaluate(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const sk = window.__cadcamSketch ? window.__cadcamSketch.state() : {};
+          const sheet = document.getElementById('sketchSheet');
+          const status = document.getElementById('sketchStatus');
+          return {
+            sketchClosed: s.sketchClosed,
+            sketchProfile: s.sketchProfile,
+            sketchPlane: s.sketchPlane,
+            sketchFace: s.sketchFace,
+            sketchSheetOpen: s.sketchSheetOpen,
+            sheetHidden: !!(sheet && sheet.hidden === true),
+            statusText: status ? (status.textContent || '').trim() : '',
+            skClosed: sk.closed,
+            skProfile: sk.profile,
+            skPlane: sk.plane,
+            skFaceId: sk.faceId,
+            skLineDims: Array.isArray(sk.lineDimensions) ? sk.lineDimensions.length : -1,
+            skEmptyBodies: sk.emptyBodies
+          };
+        }"""
+    )
+    if not isinstance(probe, dict):
+        problems.append(f"{kind} {label} sketch probe {probe!r}")
+        return
+    if (
+        probe.get("sketchClosed") is not True
+        or probe.get("sketchProfile") != "rect"
+        or probe.get("sketchPlane") is not True
+        or not probe.get("sketchFace")
+        or probe.get("sketchSheetOpen") is not False
+        or probe.get("sheetHidden") is not True
+        or probe.get("skClosed") is not True
+        or probe.get("skProfile") != "rect"
+        or probe.get("skPlane") is not True
+        or not probe.get("skFaceId")
+        or probe.get("skLineDims") != 4
+        or probe.get("skEmptyBodies") != 0
+        or not str(probe.get("statusText") or "").startswith("Closed profile kept")
+    ):
+        problems.append(f"{kind} {label} sketch not restored: {probe!r}")
+
+
+def check_sketch_cleared(page: Any, kind: str, label: str, problems: list[str]) -> None:
+    probe = page.evaluate(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const sk = window.__cadcamSketch ? window.__cadcamSketch.state() : {};
+          const sheet = document.getElementById('sketchSheet');
+          return {
+            sketchClosed: s.sketchClosed,
+            sketchProfile: s.sketchProfile,
+            sketchPlane: s.sketchPlane,
+            sketchFace: s.sketchFace,
+            sketchSheetOpen: s.sketchSheetOpen,
+            sheetHidden: !!(sheet && sheet.hidden === true),
+            skClosed: sk.closed,
+            skProfile: sk.profile,
+            skPlane: sk.plane,
+            skFaceId: sk.faceId,
+            skLineDims: Array.isArray(sk.lineDimensions) ? sk.lineDimensions.length : -1,
+            skEmptyBodies: sk.emptyBodies
+          };
+        }"""
+    )
+    if not isinstance(probe, dict):
+        problems.append(f"{kind} {label} sketch cleared probe {probe!r}")
+        return
+    if (
+        probe.get("sketchClosed") is not False
+        or probe.get("sketchProfile") != ""
+        or probe.get("sketchPlane") is not False
+        or probe.get("sketchFace") != ""
+        or probe.get("sketchSheetOpen") is not False
+        or probe.get("sheetHidden") is not True
+        or probe.get("skClosed") is not False
+        or probe.get("skProfile") != ""
+        or probe.get("skPlane") is not False
+        or probe.get("skFaceId") != ""
+        or probe.get("skLineDims") != 0
+        or probe.get("skEmptyBodies") != 0
+    ):
+        problems.append(f"{kind} {label} sketch not cleared: {probe!r}")
+
+
+def open_extrude_from_restored_profile(page: Any, kind: str, stage: str, problems: list[str]) -> None:
+    open_tools_sheet(page)
+    tap(page, "#sheetTools button:has-text('Extrude (Push/Pull)')")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const depthRow = document.getElementById('sketchDepthRow');
+          const modeRow = document.getElementById('sketchModeRow');
+          const btn = document.getElementById('sketchConfirm');
+          return s.sketchSheetOpen === true
+            && !!(depthRow && depthRow.hidden === false)
+            && !!(modeRow && modeRow.hidden === false)
+            && !!(btn && btn.disabled === false && btn.getAttribute('aria-disabled') === 'false');
+        }"""
+    )
+    check_confirm_btn(page, kind, stage, problems)
+
+
 def wait_extrude_state(
     page: Any,
     *,
@@ -278,7 +388,7 @@ def wait_extrude_state(
     return read_state(page)
 
 
-def run_case(page: Any, kind: str) -> list[str]:
+def run_case(page: Any, kind: str, origin: str) -> list[str]:
     problems: list[str] = []
     page.wait_for_function(
         """() => {
@@ -296,7 +406,9 @@ def run_case(page: Any, kind: str) -> list[str]:
     if problems:
         return problems
 
-    # 1. Failed extrude pushes nothing onto the undo stack, then New Extrude -> Undo -> Redo.
+    # 1. Failed extrude pushes nothing onto the undo stack, then New Extrude -> Undo
+    #    restores closed profile (and Extrude again works without redrawing); Redo clears it;
+    #    10 consecutive Undo/Redo cycles do not leak OCCT shapes.
     sketch_rect_and_open_extrude(page, kind, problems)
     if problems:
         return problems
@@ -316,60 +428,107 @@ def run_case(page: Any, kind: str) -> list[str]:
     set_extrude_mode(page, "new")
     tap(page, "#sketchConfirm")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=2, volume=9000.0)
+    check_sketch_cleared(page, kind, "new-extrude", problems)
     check_gate_and_units(page, kind, "new-extrude", problems)
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "new-undo", problems)
     check_gate_and_units(page, kind, "new-undo", problems)
 
-    tap(page, ".topbar [data-action='redo']")
+    # Extrude again works without redrawing.
+    open_extrude_from_restored_profile(page, kind, "re-extrude-new", problems)
+    set_extrude_depth(page, "10")
+    set_extrude_mode(page, "new")
+    tap(page, "#sketchConfirm")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=2, volume=9000.0)
-    check_gate_and_units(page, kind, "new-redo", problems)
+    check_sketch_cleared(page, kind, "re-extrude-new", problems)
+    check_gate_and_units(page, kind, "re-extrude-new", problems)
+
+    # 10 consecutive Undo/Redo cycles do not leak OCCT shapes.
+    live_redo_baseline = int(page.evaluate("() => window.__cadcamLiveOcctShapes()"))
+    if live_redo_baseline <= 0:
+        problems.append(f"{kind} invalid live_redo_baseline={live_redo_baseline}")
+    live_undo_baseline: int | None = None
+    for cycle in range(1, 11):
+        tap(page, ".topbar [data-action='undo']")
+        wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+        check_sketch_restored(page, kind, f"cycle-{cycle}-undo", problems)
+        check_gate_and_units(page, kind, f"cycle-{cycle}-undo", problems)
+        live_now_undo = int(page.evaluate("() => window.__cadcamLiveOcctShapes()"))
+        if live_undo_baseline is None:
+            live_undo_baseline = live_now_undo
+        elif live_now_undo != live_undo_baseline:
+            problems.append(
+                f"{kind} cycle-{cycle}-undo leaked OCCT shapes: "
+                f"live={live_now_undo} baseline={live_undo_baseline}"
+            )
+
+        tap(page, ".topbar [data-action='redo']")
+        wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=2, volume=9000.0)
+        check_sketch_cleared(page, kind, f"cycle-{cycle}-redo", problems)
+        check_gate_and_units(page, kind, f"cycle-{cycle}-redo", problems)
+        live_now_redo = int(page.evaluate("() => window.__cadcamLiveOcctShapes()"))
+        if live_now_redo != live_redo_baseline:
+            problems.append(
+                f"{kind} cycle-{cycle}-redo leaked OCCT shapes: "
+                f"live={live_now_redo} baseline={live_redo_baseline}"
+            )
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "after-10-cycles-undo", problems)
+    check_gate_and_units(page, kind, "after-10-cycles-undo", problems)
 
-    # 2. Join Extrude -> Undo -> Redo.
-    sketch_rect_and_open_extrude(page, kind, problems)
+    # 2. Join Extrude from restored profile (without redrawing) -> Undo -> Redo -> Undo.
+    open_extrude_from_restored_profile(page, kind, "join-from-restored", problems)
     if problems:
         return problems
     set_extrude_depth(page, "10")
     set_extrude_mode(page, "join")
     tap(page, "#sketchConfirm")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=1, volume=9000.0)
+    check_sketch_cleared(page, kind, "join-extrude", problems)
     check_gate_and_units(page, kind, "join-extrude", problems)
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "join-undo", problems)
     check_gate_and_units(page, kind, "join-undo", problems)
 
     tap(page, ".topbar [data-action='redo']")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=1, volume=9000.0)
+    check_sketch_cleared(page, kind, "join-redo", problems)
     check_gate_and_units(page, kind, "join-redo", problems)
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "join-undo-2", problems)
 
-    # 3. Cut Extrude -> Undo -> Redo.
-    sketch_rect_and_open_extrude(page, kind, problems)
+    # 3. Cut Extrude -> Undo -> Redo -> Undo.
+    open_extrude_from_restored_profile(page, kind, "cut-from-restored", problems)
     if problems:
         return problems
     set_extrude_depth(page, "10")
     set_extrude_mode(page, "cut")
     tap(page, "#sketchConfirm")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=1, volume=7000.0)
+    check_sketch_cleared(page, kind, "cut-extrude", problems)
     check_gate_and_units(page, kind, "cut-extrude", problems)
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "cut-undo", problems)
     check_gate_and_units(page, kind, "cut-undo", problems)
 
     tap(page, ".topbar [data-action='redo']")
     wait_extrude_state(page, undo_depth=1, redo_depth=0, bodies=1, volume=7000.0)
+    check_sketch_cleared(page, kind, "cut-redo", problems)
     check_gate_and_units(page, kind, "cut-redo", problems)
 
     tap(page, ".topbar [data-action='undo']")
     wait_extrude_state(page, undo_depth=0, redo_depth=1, bodies=1, volume=8000.0)
+    check_sketch_restored(page, kind, "cut-undo-2", problems)
 
     # 4. Hole -> Extrude -> Undo removes only the Extrude.
     open_create_menu(page)
@@ -430,6 +589,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         volume=hole_vol + 1000.0,
         tol=1.0,
     )
+    check_sketch_cleared(page, kind, "hole-then-extrude", problems)
     check_gate_and_units(page, kind, "hole-then-extrude", problems)
 
     tap(page, ".topbar [data-action='undo']")
@@ -444,6 +604,7 @@ def run_case(page: Any, kind: str) -> list[str]:
     undone_extrude = read_state(page)
     if int(undone_extrude.get("holeCount") or 0) != 1:
         problems.append(f"{kind} holeCount after extrude undo {undone_extrude.get('holeCount')!r}")
+    check_sketch_restored(page, kind, "hole-extrude-undo", problems)
     check_gate_and_units(page, kind, "hole-extrude-undo", problems)
 
     # 5. Open sketch sheet -> Undo/Redo closes the sheet (sketchSheetMode falsy),
@@ -656,6 +817,50 @@ def run_case(page: Any, kind: str) -> list[str]:
     )
     check_gate_and_units(page, kind, "open-rect-sheet-undo", problems)
     check_controls(page, kind, problems)
+
+    # 6. Repair (Auto-heal) Undo/Redo behaves as before.
+    repair_url = origin + "/?fixture=flipped_box&tab=repair"
+    page.goto(repair_url, wait_until="domcontentloaded", timeout=deploy_smoke.PAGE_TIMEOUT_S * 1000)
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState;
+          return !!(s && s.occtReady === true
+            && s.fixture === 'flipped_box'
+            && s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false && s.unitsPass === true);
+        }"""
+    )
+    open_tools_sheet(page)
+    tap(page, "#sheetTools button:has-text('Auto-heal')")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          return s.undoDepth === 1 && s.redoDepth === 0
+            && s.watertight === true && s.meshPass === true
+            && s.unitsPass === true;
+        }"""
+    )
+    tap(page, ".topbar [data-action='undo']")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          return s.undoDepth === 0 && s.redoDepth === 1
+            && s.watertight === false && s.meshPass === false
+            && s.unitsPass === true;
+        }"""
+    )
+    tap(page, ".topbar [data-action='redo']")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          return s.undoDepth === 1 && s.redoDepth === 0
+            && s.watertight === true && s.meshPass === true
+            && s.unitsPass === true;
+        }"""
+    )
+    units_text = (page.locator("#statusUnits").text_content() or "").strip()
+    if units_text.lower() != "mm":
+        problems.append(f"{kind} repair-redo statusUnits={units_text!r}")
     return problems
 
 
@@ -676,6 +881,34 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
                 is_mobile=True,
                 has_touch=True,
             )
+        context.add_init_script(
+            """(() => {
+              const shapes = [];
+              const origCreate = Object.create;
+              Object.create = function (proto, props) {
+                const obj = origCreate.call(this, proto, props);
+                if (
+                  obj &&
+                  typeof obj.isDeleted === 'function' &&
+                  typeof obj.ShapeType === 'function'
+                ) {
+                  shapes.push(obj);
+                }
+                return obj;
+              };
+              window.__cadcamLiveOcctShapes = function () {
+                let live = 0;
+                for (let i = 0; i < shapes.length; i += 1) {
+                  try {
+                    if (!shapes[i].isDeleted()) live += 1;
+                  } catch (_err) {
+                    /* ignore */
+                  }
+                }
+                return live;
+              };
+            })();"""
+        )
         kind = "webkit" if engine == "webkit" else "chromium"
         page = context.new_page()
         errors: list[str] = []
@@ -697,7 +930,7 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
         url = origin + "/?primitive=box&select=item"
         print(f"load {kind} {url}", flush=True)
         page.goto(url, wait_until="domcontentloaded", timeout=deploy_smoke.PAGE_TIMEOUT_S * 1000)
-        problems = run_case(page, kind)
+        problems = run_case(page, kind, origin)
         if errors:
             problems = [f"{kind} js: {item}" for item in errors[:8]] + problems
         if problems:
