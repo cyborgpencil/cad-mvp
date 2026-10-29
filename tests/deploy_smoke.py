@@ -3653,6 +3653,45 @@ def chrome_row_problems(cdp: Cdp) -> list[str]:
     return [str(item) for item in found]
 
 
+FILE_PICK_EXPR = r"""
+(function(){
+  var problems = [];
+  var info = document.querySelector('#fileMenu [data-drawer="inspector"]');
+  var about = document.querySelector('#fileMenu [data-action="aboutMenu"]');
+  var fileMenu = document.getElementById('fileMenu');
+  if (!info || !about || !fileMenu) return JSON.stringify(['missing File menu Info or About']);
+  var wasFileHidden = fileMenu.hidden;
+  fileMenu.hidden = false;
+  info.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking Info');
+  fileMenu.hidden = false;
+  info.click();
+  fileMenu.hidden = false;
+  about.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking About');
+  fileMenu.hidden = false;
+  about.click();
+  fileMenu.hidden = wasFileHidden;
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def file_pick_problems(cdp: Cdp) -> list[str]:
+    # Desktop pass only: the Info/About clicks toggle drawers and would
+    # disturb portrait sheet state if run inside chrome_row_problems.
+    raw, err = eval_expr(cdp, FILE_PICK_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"file pick {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"file pick {raw}"]
+    if not isinstance(found, list):
+        return [f"file pick {raw}"]
+    return [str(item) for item in found]
+
+
 def read_home_aim(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
     raw, err = eval_expr(
         cdp,
@@ -8754,6 +8793,7 @@ def run(omit: list[str]) -> int:
                 time.sleep(0.3)
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
+                desktop_bar.extend(file_pick_problems(cdp))
                 desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")
