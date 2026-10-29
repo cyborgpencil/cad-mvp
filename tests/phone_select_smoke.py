@@ -7,6 +7,7 @@ Exit 77 when Playwright or libcascade is missing.
 from __future__ import annotations
 
 import math
+import os
 import sys
 import threading
 from pathlib import Path
@@ -20,7 +21,18 @@ SKIP = 77
 FILTERS = ("body", "face", "edge", "vertex")
 
 
+def in_ci() -> bool:
+    return os.environ.get("CI", "").strip().lower() not in {"", "0", "false", "no"}
+
+
 def skip_missing_playwright() -> int:
+    if in_ci():
+        print(
+            "FAIL phone_select_smoke: playwright is not importable; "
+            "CI must not skip this test.",
+            flush=True,
+        )
+        return 1
     print(
         "SKIP phone_select_smoke: playwright is not importable. "
         "Use builds/pwvenv/Scripts/python.exe.",
@@ -119,7 +131,20 @@ def box_ok(page: Any, selector: str) -> dict[str, float] | None:
     return {"w": float(box["width"]), "h": float(box["height"])}
 
 
+def open_selection_shelf(page: Any) -> None:
+    if page.evaluate("() => document.getElementById('selectionShelf').hidden === true"):
+        page.locator("[data-action='selectionShelf']").click()
+        page.wait_for_function("() => document.getElementById('selectionShelf').hidden === false")
+
+
+def close_selection_shelf(page: Any) -> None:
+    if page.evaluate("() => document.getElementById('selectionShelf').hidden === false"):
+        page.locator("[data-action='selectionShelf']").click()
+        page.wait_for_function("() => document.getElementById('selectionShelf').hidden === true")
+
+
 def choose_filter(page: Any, name: str) -> None:
+    open_selection_shelf(page)
     page.locator("#pickFilter").click()
     page.locator(f"#pickChooser [data-filter='{name}']").click()
     page.wait_for_function(
@@ -132,6 +157,7 @@ def choose_filter(page: Any, name: str) -> None:
         }""",
         arg=name,
     )
+    close_selection_shelf(page)
 
 
 def wait_field(page: Any, script: str, arg: Any = None) -> None:
@@ -162,6 +188,7 @@ def run_case(page: Any, kind: str) -> list[str]:
     if hook.get("slopPx") != 8:
         problems.append(f"{kind} slop {hook.get('slopPx')!r}")
 
+    open_selection_shelf(page)
     chip = box_ok(page, "#pickFilter")
     multi = box_ok(page, "#multiToggle")
     print(f"{kind} chip {chip} multi {multi}", flush=True)
@@ -185,6 +212,7 @@ def run_case(page: Any, kind: str) -> list[str]:
           return state.selectionCount === 1 && state.phoneFilter === 'body' && !!(chooser && chooser.hidden);
         }"""
     )
+    close_selection_shelf(page)
 
     found = aims(page)
     empty = found.get("empty") if isinstance(found.get("empty"), dict) else None
@@ -291,7 +319,7 @@ def run_case(page: Any, kind: str) -> list[str]:
     if int(deleted.get("undoDepth") or 0) != depth + 1:
         problems.append(f"{kind} solid undo depth {deleted.get('undoDepth')!r} was {depth}")
 
-    page.locator(".phone-tabbar [data-action='undo']").click()
+    page.locator(".topbar [data-action='undo']").click()
     wait_field(
         page,
         """() => {
@@ -300,7 +328,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         }""",
     )
     shot(page, kind, "09-solid-undo")
-    page.locator(".phone-tabbar [data-action='redo']").click()
+    page.locator(".topbar [data-action='redo']").click()
     wait_field(
         page,
         """() => {
@@ -309,7 +337,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         }""",
     )
     shot(page, kind, "10-solid-redo")
-    page.locator(".phone-tabbar [data-action='undo']").click()
+    page.locator(".topbar [data-action='undo']").click()
     wait_field(
         page,
         """() => {
@@ -318,11 +346,14 @@ def run_case(page: Any, kind: str) -> list[str]:
         }""",
     )
 
+    open_selection_shelf(page)
     page.locator("#multiToggle").click()
     wait_field(page, "() => (window.__cadcamExportState || {}).phoneMulti === true")
     page.locator("[data-action='toolsMenu']").click()
     page.locator("#toolsSheet [data-action='createMenu']").click()
     page.locator("#createMenu [data-kind='box']").click()
+    page.locator("#originPlanes [data-plane='xy']").click()
+    page.locator("#primConfirm").click()
     wait_field(page, "() => (window.__cadcamExportState || {}).bodyCount === 2")
     shot(page, kind, "11-two-bodies")
     found = aims(page)
@@ -353,6 +384,9 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} multi count text {count_text(page)!r}")
     if both.get("selectionHighlight") is not True:
         problems.append(f"{kind} multi highlight off")
+    found = aims(page)
+    bodies = found.get("bodies") if isinstance(found.get("bodies"), list) else []
+    second = next((item for item in bodies if item.get("id") == second.get("id")), second)
     pointer(page, {"x": second["x"], "y": second["y"], "pointerId": 58})
     removed = read_state(page)
     shot(page, kind, "13-multi-remove")
@@ -400,7 +434,7 @@ def run_case(page: Any, kind: str) -> list[str]:
     after_face = read_state(page)
     if int(after_face.get("undoDepth") or 0) != face_depth + 1:
         problems.append(f"{kind} face undo depth {after_face.get('undoDepth')!r} was {face_depth}")
-    page.locator(".phone-tabbar [data-action='undo']").click()
+    page.locator(".topbar [data-action='undo']").click()
     wait_field(
         page,
         """(spec) => {
@@ -410,7 +444,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         arg={"holed": holed, "tol": 0.01},
     )
     shot(page, kind, "16-face-undo")
-    page.locator(".phone-tabbar [data-action='redo']").click()
+    page.locator(".topbar [data-action='redo']").click()
     wait_field(
         page,
         """(spec) => {
@@ -475,7 +509,12 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
 def run() -> int:
     gaps = deploy_smoke.libcascade_gaps()
     if gaps:
-        print("SKIP phone_select_smoke: " + "; ".join(gaps), flush=True)
+        text = "; ".join(gaps)
+        if in_ci():
+            print(f"FAIL phone_select_smoke: {text}", flush=True)
+            print("CI must not skip phone_select_smoke.", flush=True)
+            return 1
+        print("SKIP phone_select_smoke: " + text, flush=True)
         return SKIP
     assembler = deploy_smoke.load_assembler()
     site = WORK / "_site"

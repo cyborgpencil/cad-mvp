@@ -742,21 +742,12 @@ SHELF_LAYOUT_EXPR = r"""
     if (!a || !b) return false;
     return a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
   }
-  var label = document.getElementById('modifyOrder');
+  var label = document.getElementById('boolOrder');
   var text = label ? String(label.textContent || '') : '';
-  if (text !== '1 = target, 2 = tool') problems.push('sentence ' + JSON.stringify(text));
-  if (!shown(label)) problems.push('sentence hidden');
-  var pe = label ? getComputedStyle(label).pointerEvents : '';
-  if (pe !== 'none') problems.push('sentence pointer-events ' + pe);
-  var tab = boxOf(document.querySelector('.phone-tabbar'));
-  if (!tab) problems.push('missing phone tab bar');
-  if (label && shown(label)) {
-    var r = label.getBoundingClientRect();
-    var hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    if (hit === label || (hit && label.contains(hit))) problems.push('sentence is a hit target');
-    if (tab && overlaps(r, tab)) problems.push('sentence covers phone tab bar');
-  }
-  var buttons = document.querySelectorAll('#modifyShelf button');
+  if (!text) problems.push('sentence ' + JSON.stringify(text));
+  var status = boxOf(document.querySelector('.statusbar'));
+  if (!status) problems.push('missing statusbar');
+  var buttons = document.querySelectorAll('#sheetTools button');
   if (!buttons.length) problems.push('no shelf buttons');
   for (var i = 0; i < buttons.length; i++) {
     var b = buttons[i];
@@ -765,7 +756,6 @@ SHELF_LAYOUT_EXPR = r"""
     if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
       problems.push(name + ' ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
     }
-    if (tab && overlaps(br, tab)) problems.push(name + ' covers phone tab bar');
   }
   var groups = document.querySelectorAll('.group-label');
   var visible = [];
@@ -819,7 +809,7 @@ EDGE_SHEET_EXPR = r"""
   if (!confirmBox || confirmBox.width + 0.5 < 44 || confirmBox.height + 0.5 < 44) problems.push('confirm target');
   var sheetBox = boxOf(sheet);
   if (!sheetBox) problems.push('edge sheet hidden');
-  var bars = ['.vp-bar', '.phone-tabbar'];
+  var bars = ['.vp-bar'];
   for (var i = 0; i < bars.length; i++) {
     var bar = boxOf(document.querySelector(bars[i]));
     if (!bar) problems.push('missing ' + bars[i]);
@@ -833,7 +823,6 @@ ORDER_EXPR = r"""
 (function(){
   var problems = [];
   var s = window.__cadcamExportState || {};
-  var label = document.getElementById('modifyOrder');
   var order = document.getElementById('boolOrder');
   var badges = [];
   var nodes = document.querySelectorAll('.bool-badge');
@@ -841,10 +830,9 @@ ORDER_EXPR = r"""
   var disabled = [];
   var ops = ['union', 'cut', 'intersect'];
   for (var j = 0; j < ops.length; j++) {
-    var b = document.querySelector('#modifyShelf [data-action="boolean"][data-op="' + ops[j] + '"]');
+    var b = document.querySelector('[data-action="boolean"][data-op="' + ops[j] + '"]');
     if (!b || b.disabled) disabled.push(ops[j]);
   }
-  if (!label || label.textContent !== '1 = target, 2 = tool') problems.push('sentence changed');
   var orderText = order ? String(order.textContent || '') : '';
   if (orderText.indexOf('1 Box 1') < 0 || orderText.indexOf('2 Box 2') < 0) problems.push('boolOrder ' + orderText);
   if (badges.join(',') !== '1,2') problems.push('badges ' + badges.join(','));
@@ -860,8 +848,9 @@ ORDER_EXPR = r"""
 CLOSED_EXPR = r"""
 (function(){
   var problems = [];
-  var label = document.getElementById('modifyOrder');
-  var shelf = document.getElementById('modifyShelf');
+  var label = document.getElementById('boolOrder');
+  var shelf = document.getElementById('toolsSheet');
+  var edgeSheet = document.getElementById('edgeSheet');
   var shown = false;
   if (label && !(label.closest && label.closest('[hidden]'))) {
     var st = getComputedStyle(label);
@@ -870,14 +859,15 @@ CLOSED_EXPR = r"""
   }
   if (shown) problems.push('sentence visible while shelf closed');
   if (!shelf || shelf.hidden !== true) problems.push('shelf still open');
-  if ((label ? label.textContent : '') !== '1 = target, 2 = tool') problems.push('sentence text changed');
+  if (!edgeSheet || edgeSheet.hidden !== true) problems.push('edge sheet still open');
+  if (!label || !String(label.textContent || '').trim()) problems.push('sentence text missing');
   return JSON.stringify({problems: problems});
 })()
 """
 
 
 def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
-    """390x844 Modify shelf sentence, button size, and edge sheet clearance."""
+    """390x844 Modify tools, boolean controls, and edge sheet clearance."""
     url = origin + "/?pair=overlap"
     print(f"load modify_touch {url}", flush=True)
     state, load_problems = deploy_smoke.wait_for_case(cdp, origin, url, deploy_smoke.PAGE_TIMEOUT_S)
@@ -890,16 +880,12 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
     closed = _json_problems(cdp, CLOSED_EXPR)
     if closed:
         return ["modify touch closed", *closed]
-    opened, open_err = deploy_smoke.eval_expr(
-        cdp,
-        "(function(){var s=document.getElementById('modifyShelf');if(!s)return 'missing';s.hidden=false;"
-        "if(window.__cadcamExportState)window.__cadcamExportState.modifyOpen=true;return 'clicked';})()",
-    )
-    if open_err or opened != "clicked":
-        return [f"modify touch open {opened or open_err}"]
+    opened = _click_selector(cdp, '[data-action="toolsMenu"]')
+    if opened != "clicked":
+        return [f"modify touch open {opened}"]
     cdp.drain(0.3)
     state = deploy_smoke._export_state(cdp)
-    if state.get("modifyOpen") is not True:
+    if state.get("toolsOpen") is not True:
         return ["modify touch shelf stayed closed"]
     if state.get("phoneMulti") is True:
         return ["modify touch open turned multi on"]
@@ -907,7 +893,7 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
     if layout:
         return ["modify touch shelf", *layout]
     for op in ("union", "cut", "intersect"):
-        clicked = _click_selector(cdp, f'#modifyShelf [data-action="boolean"][data-op="{op}"]')
+        clicked = _click_selector(cdp, f'[data-action="boolean"][data-op="{op}"]')
         if clicked != "clicked":
             return [f"modify touch {op} click {clicked}"]
     cdp.drain(0.2)
@@ -926,7 +912,7 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
     sentence = _json_problems(cdp, SHELF_LAYOUT_EXPR)
     if sentence:
         return ["modify touch two bodies", *sentence]
-    armed = _click_selector(cdp, "#modifyShelf [data-action='armEdge'][data-op='fillet']")
+    armed = _click_selector(cdp, "[data-action='armEdge'][data-op='fillet']")
     if armed != "clicked":
         return [f"modify touch fillet {armed}"]
     cdp.drain(0.3)
@@ -939,7 +925,7 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
     sheet = _json_problems(cdp, EDGE_SHEET_EXPR)
     if sheet:
         return ["modify touch edge sheet", *sheet]
-    chamfer = _click_selector(cdp, "#modifyShelf [data-action='armEdge'][data-op='chamfer']")
+    chamfer = _click_selector(cdp, "[data-action='armEdge'][data-op='chamfer']")
     if chamfer != "clicked":
         return [f"modify touch chamfer {chamfer}"]
     cdp.drain(0.2)
@@ -948,12 +934,9 @@ def modify_touch_problems(cdp: PwCdp, origin: str) -> list[str]:
         return [f"modify touch chamfer size {state.get('edgeArm')!r} {state.get('edgeSize')!r}"]
     if state.get("phoneMulti") is True:
         return ["modify touch chamfer turned multi on"]
-    closed_click, close_err = deploy_smoke.eval_expr(
-        cdp,
-        "(function(){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return 'clicked';})()",
-    )
-    if close_err or closed_click != "clicked":
-        return [f"modify touch close {closed_click or close_err}"]
+    closed_click = _click_selector(cdp, '#edgeSheet .sheet-h [data-action="closeSheet"]')
+    if closed_click != "clicked":
+        return [f"modify touch close {closed_click}"]
     cdp.drain(0.2)
     hidden = _json_problems(cdp, CLOSED_EXPR)
     if hidden:

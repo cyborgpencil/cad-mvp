@@ -151,6 +151,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y /tmp/chrome.deb
           google-chrome --version
+      - name: Install Playwright for the browser smoke tests
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/playwright-env"
+          echo "${RUNNER_TEMP}/playwright-env/bin" >> "${GITHUB_PATH}"
+          export PATH="${RUNNER_TEMP}/playwright-env/bin:${PATH}"
+          pip install playwright
+          playwright install --with-deps chromium webkit
       - name: Native CTest
         if: steps.changes.outputs.code == 'true'
         # Before upload. occt_gate and deploy_smoke run here, once, and a

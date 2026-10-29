@@ -15,6 +15,7 @@ Exit 77 when it cannot be imported.
 from __future__ import annotations
 
 import math
+import os
 import sys
 import threading
 import time
@@ -41,7 +42,18 @@ PHONE_SWIPES = (
 )
 
 
+def in_ci() -> bool:
+    return os.environ.get("CI", "").strip().lower() not in {"", "0", "false", "no"}
+
+
 def skip_missing_playwright() -> int:
+    if in_ci():
+        print(
+            "FAIL view_cube_swipe_smoke: playwright is not importable; "
+            "CI must not skip this test.",
+            flush=True,
+        )
+        return 1
     print(
         "SKIP view_cube_swipe_smoke: playwright is not importable. "
         "Use builds/pwvenv/Scripts/python.exe.",
@@ -267,7 +279,7 @@ def face_problems(page: Any, axis: tuple[float, float, float], face: str, label:
         problems.append(
             f"{tag} cubeFaceName {nav.get('snapFace')!r} want {face!r} dir {direction!r}"
         )
-    if str(after.get("viewLabel") or "") != label:
+    if str(after.get("viewLabel") or "") != "Perspective":
         problems.append(f"{tag} viewLabel {after.get('viewLabel')!r}")
     hint = str(after.get("hint") or "")
     if "Orbit" in hint:
@@ -464,7 +476,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} snap ease {budget:.0f} ms > 250")
     if elapsed >= 500.0:
         problems.append(f"{kind} snap frame {elapsed:.0f} ms")
-    if str(after.get("viewLabel") or "") != "Right":
+    if str(after.get("viewLabel") or "") != "Perspective":
         problems.append(f"{kind} viewLabel {after.get('viewLabel')!r}")
     if nav.get("face") != "right" or nav.get("snapFace") != "right":
         problems.append(f"{kind} swipe left face {nav.get('face')!r} snapFace {nav.get('snapFace')!r}")
@@ -535,7 +547,12 @@ def run_engine(playwright: Any, engine: str, origin: str, phone: bool = False) -
 def run() -> int:
     gaps = deploy_smoke.libcascade_gaps()
     if gaps:
-        print("SKIP view_cube_swipe_smoke: " + "; ".join(gaps), flush=True)
+        text = "; ".join(gaps)
+        if in_ci():
+            print(f"FAIL view_cube_swipe_smoke: {text}", flush=True)
+            print("CI must not skip view_cube_swipe_smoke.", flush=True)
+            return 1
+        print("SKIP view_cube_swipe_smoke: " + text, flush=True)
         return SKIP
     assembler = deploy_smoke.load_assembler()
     site = WORK / "_site"

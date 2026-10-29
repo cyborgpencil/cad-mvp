@@ -11,6 +11,7 @@ pwvenv. Exit 77 when it cannot be imported.
 from __future__ import annotations
 
 import math
+import os
 import sys
 import threading
 import time
@@ -22,7 +23,18 @@ WORK = ROOT / "builds" / "three-finger-smoke"
 SKIP = 77
 
 
+def in_ci() -> bool:
+    return os.environ.get("CI", "").strip().lower() not in {"", "0", "false", "no"}
+
+
 def skip_missing_playwright() -> int:
+    if in_ci():
+        print(
+            "FAIL three_finger_smoke: playwright is not importable; "
+            "CI must not skip this test.",
+            flush=True,
+        )
+        return 1
     print(
         "SKIP three_finger_smoke: playwright is not importable. "
         "Use builds/pwvenv/Scripts/python.exe.",
@@ -330,7 +342,12 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
 def run() -> int:
     gaps = deploy_smoke.libcascade_gaps()
     if gaps:
-        print("SKIP three_finger_smoke: " + "; ".join(gaps), flush=True)
+        text = "; ".join(gaps)
+        if in_ci():
+            print(f"FAIL three_finger_smoke: {text}", flush=True)
+            print("CI must not skip three_finger_smoke.", flush=True)
+            return 1
+        print("SKIP three_finger_smoke: " + text, flush=True)
         return SKIP
     assembler = deploy_smoke.load_assembler()
     site = WORK / "_site"
