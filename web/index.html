@@ -1990,8 +1990,8 @@
           <button type="button" data-action="section" data-tool="Section" title="Section"><svg class="ico"><use href="#i-section"></use></svg></button>
         </div>
         <div class="vp-cluster" role="group" aria-label="Display">
-          <button type="button" class="is-on" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
-          <button type="button" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
+          <button type="button" data-action="display" data-mode="shaded" data-tool="Display: Shaded" title="Shaded"><svg class="ico"><use href="#i-shaded"></use></svg></button>
+          <button type="button" class="is-on" data-action="display" data-mode="edges" data-tool="Display: Shaded + Edges" title="Shaded + Edges"><svg class="ico"><use href="#i-edges"></use></svg></button>
           <button type="button" data-action="display" data-mode="wire" data-tool="Display: Wireframe" title="Wireframe"><svg class="ico"><use href="#i-wire"></use></svg></button>
           <button type="button" data-action="display" data-mode="xray" data-tool="Display: X-Ray" title="X-Ray"><svg class="ico"><use href="#i-xray"></use></svg></button>
         </div>
@@ -2393,7 +2393,7 @@
       </div>
       <div data-side-panel="display" role="tabpanel" aria-label="Display" hidden>
         <h2 class="panel-h">Display</h2>
-        <p class="fine side-note">Active display: <b id="displayReadout">Shaded</b>. Change it from the view bar.</p>
+        <p class="fine side-note">Active display: <b id="displayReadout">Shaded + Edges</b>. Change it from the view bar.</p>
       </div>
       <div data-side-panel="lists" role="tabpanel" aria-label="Lists" hidden>
         <h2 class="panel-h">Lists</h2>
@@ -2809,7 +2809,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     measure: false,
     measurePicks: [],
     measureShapes: [],
-    display: 'shaded',
+    display: 'edges',
     projection: 'perspective',
     isolated: false,
     node: 'body',
@@ -2883,12 +2883,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.38));
   scene.add(new THREE.HemisphereLight(0xdde7f5, 0x2a313c, 0.7));
-  const key = new THREE.DirectionalLight(0xffffff, 1.2);
-  key.position.set(36, 58, 28);
-  scene.add(key);
-  const rim = new THREE.DirectionalLight(0xb7d4ff, 0.4);
-  rim.position.set(-28, 18, -22);
-  scene.add(rim);
 
   const grid = new THREE.GridHelper(200, 20, 0x6e8f96, 0x1e4a52);
   scene.add(grid);
@@ -2912,10 +2906,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const planeXY = makePlane(new THREE.Euler(0, 0, 0), 0x6aa2ff);
   const planeYZ = makePlane(new THREE.Euler(0, Math.PI / 2, 0), 0x7dcea0);
 
-  const bodyMat = new THREE.MeshStandardMaterial({
+  const bodyMat = new THREE.MeshLambertMaterial({
     color: 0x5aa4d6,
-    metalness: 0,
-    roughness: 0.6
+    flatShading: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
   });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), bodyMat);
   mesh.position.y = 10;
@@ -2976,24 +2972,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   sketchProfileLine.visible = false;
   sketchProfileLine.renderOrder = 4;
   scene.add(sketchProfileLine);
-
-  const shadowCanvas = document.createElement('canvas');
-  shadowCanvas.width = 128;
-  shadowCanvas.height = 128;
-  const sg = shadowCanvas.getContext('2d');
-  const grad = sg.createRadialGradient(64, 64, 10, 64, 64, 62);
-  grad.addColorStop(0, 'rgba(0,0,0,0.4)');
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  sg.fillStyle = grad;
-  sg.fillRect(0, 0, 128, 128);
-  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(46, 46),
-    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.03;
-  scene.add(shadow);
 
   const clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 10);
   const sectionMat = new THREE.MeshBasicMaterial({
@@ -9896,8 +9874,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     ]);
     corners.geometry.dispose();
     corners.geometry = cornersGeo;
-    shadow.position.set(cx, 0.03, cz);
-    shadow.scale.set(Math.max(dx, 1) / 20, 1, Math.max(dz, 1) / 20);
     state.boundsCad = {
       cx: (minX + maxX) / 2,
       cy: (minZ + maxZ) / 2,
@@ -10523,7 +10499,6 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const extras = !state.isolated;
     sketch.visible = vis.sketch && extras;
     grid.visible = vis.xz && extras;
-    shadow.visible = showBody && extras;
     planeXY.visible = vis.xy && extras;
     planeYZ.visible = vis.yz && extras;
     measureSvg.hidden = !state.measure;
@@ -13890,7 +13865,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       }
       message = 'Axis ' + axis;
     } else if (action === 'display') {
-      state.display = btn.getAttribute('data-mode') || 'shaded';
+      state.display = btn.getAttribute('data-mode') || 'edges';
       const names = { shaded: 'Shaded', edges: 'Shaded + Edges', wire: 'Wireframe', xray: 'X-Ray' };
       message = 'Display: ' + (names[state.display] || state.display);
       applyLook();
