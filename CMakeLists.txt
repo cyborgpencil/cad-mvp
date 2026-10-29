@@ -188,11 +188,10 @@ else()
 endif()
 
 
-# Pages file set in headless Edge/Chromium. The script exits 77 only when
-# the browser or libcascade is missing and CI is unset. CI must not skip.
-# gizmo_drag_smoke exits 77 when Playwright cannot be imported. Prefer the
-# sibling pwvenv when it exists so a local run is not that skip. CI without
-# that tree still finds python3 and treats exit 77 as a skip.
+# Pages file set in headless Edge/Chromium. The scripts exit 77 only when
+# the browser, Playwright, or libcascade is missing and CI is unset. CI must
+# not skip. Prefer the sibling pwvenv when it exists so a local run is not
+# that skip.
 if(NOT CADCAM_PYTHON)
     set(_cadcam_pwvenv "${CMAKE_SOURCE_DIR}/../cadcam-mvp/builds/pwvenv/Scripts/python.exe")
     if(EXISTS "${_cadcam_pwvenv}")
@@ -203,6 +202,18 @@ if(NOT CADCAM_PYTHON)
     find_program(CADCAM_PYTHON NAMES python3 python py)
 endif()
 if(CADCAM_PYTHON)
+    if(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
+        execute_process(
+            COMMAND "${CADCAM_PYTHON}" -c "import playwright.sync_api"
+            RESULT_VARIABLE _cadcam_playwright_rc
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        if(NOT _cadcam_playwright_rc EQUAL 0)
+            message(FATAL_ERROR
+                "gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, and edge_fillet_smoke require Playwright in ${CADCAM_PYTHON}; CI must not skip them")
+        endif()
+    endif()
     add_test(
         NAME deploy_smoke
         COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/deploy_smoke.py"
@@ -266,7 +277,7 @@ if(CADCAM_PYTHON)
         SKIP_RETURN_CODE 77
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
-elseif(DEFINED ENV{CI})
+elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
     message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, and edge_fillet_smoke require Python; CI must not skip them")
 else()
     message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, and edge_fillet_smoke not added: Python was not found")
