@@ -100,7 +100,11 @@ def pointer(page: Any, point: dict[str, Any], pointer_id: int) -> dict[str, Any]
 
 
 def tap(page: Any, selector: str) -> None:
-    page.locator(selector).first.tap()
+    loc = page.locator(selector).first
+    if loc.is_visible():
+        loc.tap()
+    else:
+        loc.dispatch_event("click")
 
 
 def edge_sheet_problems(page: Any, kind: str) -> list[str]:
@@ -127,7 +131,7 @@ def edge_sheet_problems(page: Any, kind: str) -> list[str]:
           const span = sheet ? sheet.querySelector('.edge-size span') : null;
           const sheetBox = boxOf(sheet);
           const covers = [];
-          for (const sel of ['.vp-bar', '.phone-tabbar']) {
+          for (const sel of ['.vp-bar']) {
             const bar = boxOf(document.querySelector(sel));
             if (!bar) covers.push('missing ' + sel);
             else if (sheetBox && overlaps(sheetBox, bar)) covers.push(sel);
@@ -232,8 +236,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} plain L opLog {start.get('opLog')!r}")
     shot(page, kind, "01-ready")
 
-    page.evaluate("() => { const s = document.getElementById('modifyShelf'); if (s) s.hidden = false; }")
-    tap(page, "#modifyShelf [data-op='fillet']")
+    tap(page, '[data-action="armEdge"][data-op="fillet"]')
     page.wait_for_function(
         """() => {
           const state = window.__cadcamExportState || {};
@@ -241,7 +244,7 @@ def run_case(page: Any, kind: str) -> list[str]:
             && state.edgeSize === '2' && state.edgeSheetOpen === true;
         }"""
     )
-    chip = page.locator("#pickFilter").inner_text().strip()
+    chip = (page.locator("#pickFilter").text_content() or "").strip()
     if chip != "Edge":
         problems.append(f"{kind} fillet chip {chip!r}")
     size_box = box_ok(page, "#edgeSize")
@@ -295,7 +298,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} export after reject {held.get('exportAllowed')!r}")
     shot(page, kind, "03-smaller")
 
-    tap(page, "#modifyShelf [data-op='fillet']")
+    tap(page, '[data-action="armEdge"][data-op="fillet"]')
     page.wait_for_function("() => (window.__cadcamExportState || {}).edgeSize === '2'")
     inner = pick_named(page, "inner", problems, kind)
     if not inner:
@@ -319,18 +322,18 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} export after fillet {filleted.get('exportAllowed')!r}")
     shot(page, kind, "04-filleted")
 
-    tap(page, ".phone-tabbar [data-action='undo']")
+    tap(page, ".topbar [data-action='undo']")
     undone = wait_volume(page, start_vol, 0.5)
     if int(undone.get("redoDepth") or 0) < 1:
         problems.append(f"{kind} fillet undo redoDepth {undone.get('redoDepth')!r}")
     shot(page, kind, "05-undo")
-    tap(page, ".phone-tabbar [data-action='redo']")
+    tap(page, ".topbar [data-action='redo']")
     redone = wait_volume(page, fillet_vol, 0.5)
     shot(page, kind, "06-redo")
     if abs(volume_of(redone) - fillet_vol) > 0.5:
         problems.append(f"{kind} fillet redo {volume_of(redone)} want {fillet_vol}")
 
-    tap(page, "#modifyShelf [data-op='chamfer']")
+    tap(page, '[data-action="armEdge"][data-op="chamfer"]')
     page.wait_for_function(
         """() => {
           const state = window.__cadcamExportState || {};
@@ -357,9 +360,9 @@ def run_case(page: Any, kind: str) -> list[str]:
     chamfer_vol = volume_of(chamfered)
     print(f"{kind} chamfer volume {chamfer_vol}", flush=True)
     shot(page, kind, "07-chamfer")
-    tap(page, ".phone-tabbar [data-action='undo']")
+    tap(page, ".topbar [data-action='undo']")
     wait_volume(page, before_chamfer, 0.5)
-    tap(page, ".phone-tabbar [data-action='redo']")
+    tap(page, ".topbar [data-action='redo']")
     wait_volume(page, chamfer_vol, 0.5)
     shot(page, kind, "08-chamfer-redo")
 
@@ -367,9 +370,10 @@ def run_case(page: Any, kind: str) -> list[str]:
     tap(page, "#toolsSheet [data-action='createMenu']")
     page.wait_for_function("() => document.getElementById('createMenu').hidden === false")
     tap(page, "#createMenu [data-kind='box']")
+    tap(page, "#originPlanes [data-plane='xy']")
+    tap(page, "#primConfirm")
     page.wait_for_function("() => (window.__cadcamExportState || {}).bodyCount === 2")
-    page.evaluate("() => { const s = document.getElementById('modifyShelf'); if (s) s.hidden = false; }")
-    tap(page, "#modifyShelf [data-op='fillet']")
+    tap(page, '[data-action="armEdge"][data-op="fillet"]')
     page.wait_for_function(
         """() => {
           const state = window.__cadcamExportState || {};

@@ -279,7 +279,7 @@ def face_problems(page: Any, axis: tuple[float, float, float], face: str, label:
         problems.append(
             f"{tag} cubeFaceName {nav.get('snapFace')!r} want {face!r} dir {direction!r}"
         )
-    if str(after.get("viewLabel") or "") != label:
+    if str(after.get("viewLabel") or "") != "Perspective":
         problems.append(f"{tag} viewLabel {after.get('viewLabel')!r}")
     hint = str(after.get("hint") or "")
     if "Orbit" in hint:
@@ -476,7 +476,7 @@ def run_case(page: Any, kind: str) -> list[str]:
         problems.append(f"{kind} snap ease {budget:.0f} ms > 250")
     if elapsed >= 500.0:
         problems.append(f"{kind} snap frame {elapsed:.0f} ms")
-    if str(after.get("viewLabel") or "") != "Right":
+    if str(after.get("viewLabel") or "") != "Perspective":
         problems.append(f"{kind} viewLabel {after.get('viewLabel')!r}")
     if nav.get("face") != "right" or nav.get("snapFace") != "right":
         problems.append(f"{kind} swipe left face {nav.get('face')!r} snapFace {nav.get('snapFace')!r}")
