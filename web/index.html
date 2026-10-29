@@ -6495,6 +6495,19 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         watertight: body.watertight || null
       });
     }
+    const prof = state.sketchProfile && state.sketchProfile.closed ? state.sketchProfile : null;
+    const sketchProfile = prof ? {
+      kind: prof.kind,
+      shape: prof.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, prof.shape) : null,
+      loop: cloneData(prof.loop) || [],
+      closed: true,
+      lengthMm: prof.lengthMm || 0,
+      widthMm: prof.widthMm || 0,
+      diameterMm: prof.diameterMm || 0,
+      radiusMm: prof.radiusMm || 0,
+      sides: prof.sides || 0,
+      arcPoints: prof.arcPoints || 0
+    } : null;
     const kernel = copyKernelMesh();
     return {
       sceneCleared: state.sceneCleared === true,
@@ -6513,14 +6526,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       positions: kernel.positions,
       indices: kernel.indices,
       fixture: kernel.fixture,
-      projectBlank: state.projectBlank === true
+      projectBlank: state.projectBlank === true,
+      sketchProfile: sketchProfile,
+      sketchDrawnLoops: cloneData(state.sketchDrawnLoops) || [],
+      sketchPlane: state.sketchPlane ? {
+        faceId: state.sketchPlane.faceId || '',
+        bodyId: state.sketchPlane.bodyId || '',
+        originPlane: state.sketchPlane.originPlane || '',
+        frame: state.sketchPlane.frame || null
+      } : null
     };
   }
 
   function releaseSnapshot(snap) {
-    if (!snap || !snap.bodies) return;
-    for (let i = 0; i < snap.bodies.length; i += 1) dropShape(snap.bodies[i].shape);
-    snap.bodies = [];
+    if (!snap) return;
+    if (snap.bodies) {
+      for (let i = 0; i < snap.bodies.length; i += 1) dropShape(snap.bodies[i].shape);
+      snap.bodies = [];
+    }
+    if (snap.sketchProfile && snap.sketchProfile.shape) dropShape(snap.sketchProfile.shape);
+    snap.sketchProfile = null;
   }
 
   function releaseCommands(cmds) {
@@ -6540,6 +6565,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function installSnapshot(snap) {
     for (let i = 0; i < state.bodies.length; i += 1) dropShape(state.bodies[i].shape);
+    if (state.sketchProfile && state.sketchProfile.shape) dropShape(state.sketchProfile.shape);
     const next = [];
     for (let i = 0; i < snap.bodies.length; i += 1) {
       const src = snap.bodies[i];
@@ -6577,6 +6603,26 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.booleanMessage = snap.booleanMessage || '';
     state.demo = snap.demo || '';
     state.projectBlank = snap.projectBlank === true;
+    const prof = snap.sketchProfile && snap.sketchProfile.closed ? snap.sketchProfile : null;
+    state.sketchProfile = prof ? {
+      kind: prof.kind,
+      shape: prof.shape && opsApi && typeof opsApi.copyShape === 'function' ? opsApi.copyShape(oc, prof.shape) : null,
+      loop: cloneData(prof.loop) || [],
+      closed: true,
+      lengthMm: prof.lengthMm || 0,
+      widthMm: prof.widthMm || 0,
+      diameterMm: prof.diameterMm || 0,
+      radiusMm: prof.radiusMm || 0,
+      sides: prof.sides || 0,
+      arcPoints: prof.arcPoints || 0
+    } : null;
+    state.sketchDrawnLoops = cloneData(snap.sketchDrawnLoops) || [];
+    state.sketchPlane = snap.sketchPlane ? {
+      faceId: snap.sketchPlane.faceId || '',
+      bodyId: snap.sketchPlane.bodyId || '',
+      originPlane: snap.sketchPlane.originPlane || '',
+      frame: snap.sketchPlane.frame || null
+    } : null;
     if (!state.sceneCleared && snap.positions && snap.indices && snap.indices.length && typeof Module.replaceMesh === 'function') {
       const positions = new snap.positions.constructor(snap.positions);
       const indices = new snap.indices.constructor(snap.indices);
@@ -6587,6 +6633,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     refreshAnchor();
     applyLook();
     paintAssembly();
+    paintSketchStatus();
+    paintSketchVisuals();
+    paintLineDimensions();
+    paintOriginPicker();
     publishGateState();
   }
 
