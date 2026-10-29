@@ -7,8 +7,12 @@ Verifies:
 - Scene has no DirectionalLight; keeps AmbientLight(0xffffff, 0.38) and
   HemisphereLight(0xdde7f5, 0x2a313c, 0.7).
 - Body material is matte MeshLambertMaterial with flatShading: true, color 0x5aa4d6,
-  and polygonOffset (true, factor 1, units 1); edge LineSegments (EdgesGeometry +
-  LineBasicMaterial, 0x10283a) present and visible by default for single- and multi-body.
+  and polygonOffset (true, factor 1, units 1); edge LineSegments (EdgesGeometry with
+  thresholdAngle 20 deg + LineBasicMaterial, 0x10283a) present and visible by default
+  for single- and multi-body.
+- Feature-edge threshold angle (20 deg): box stays at 12 edge segments (24 vertices);
+  curved parts (cylinder 200 vs 300 segments at 1 deg; filleted L-bracket 55 vs 72
+  segments at 1 deg) drop internal facet lines while keeping feature edges.
 - No fake blob shadow in the scene; renderer color space/clipping, viewport CSS gradient,
   and GridHelper unchanged; no environment map or AO.
 - Other display modes (Shaded, Wireframe, X-Ray, Shaded+Edges), selection color,
@@ -51,6 +55,20 @@ CAPTURE_SCENE_SCRIPT = """
       return inst;
     };
     window.THREE.WebGLRenderer.prototype = OrigRenderer.prototype;
+    if (window.THREE.BufferGeometry && window.THREE.BufferGeometry.prototype && !window.__cadcamEdgesDisposeHooked) {
+      window.__cadcamEdgesDisposeHooked = true;
+      const origDispose = window.THREE.BufferGeometry.prototype.dispose;
+      window.THREE.BufferGeometry.prototype.dispose = function () {
+        if (this.type === 'EdgesGeometry' && this.parameters && this.parameters.geometry && this.parameters.geometry.type === 'BoxGeometry') {
+          const pos = this.attributes && this.attributes.position;
+          window.__cadcamInitialBoxEdges = {
+            thresholdAngle: Number(this.parameters.thresholdAngle),
+            segCount: pos ? Number(pos.count) / 2 : 0
+          };
+        }
+        return origDispose.apply(this, arguments);
+      };
+    }
   }
   Object.defineProperty(window, 'createCadcam', {
     configurable: true,
@@ -168,6 +186,12 @@ def probe_render(page: Any) -> dict[str, Any]:
               const emat = (edgeChild && edgeChild.material) || {};
               const egeo = (edgeChild && edgeChild.geometry) || {};
               const posAttr = egeo.attributes && egeo.attributes.position;
+              const egeo1 = (ch.geometry && window.THREE && window.THREE.EdgesGeometry)
+                ? new window.THREE.EdgesGeometry(ch.geometry, 1)
+                : null;
+              const posAttr1 = egeo1 && egeo1.attributes && egeo1.attributes.position;
+              const segCount1 = posAttr1 ? Number(posAttr1.count) / 2 : 0;
+              if (egeo1 && egeo1.dispose) egeo1.dispose();
               singleMesh = {
                 visible: ch.visible === true,
                 matType: mat.type || '',
@@ -183,7 +207,12 @@ def probe_render(page: Any) -> dict[str, Any]:
                 edgePresent: !!edgeChild,
                 edgeVisible: !!(edgeChild && edgeChild.visible === true),
                 edgeGeoType: egeo.type || '',
+                edgeThresholdAngle: (egeo.parameters && typeof egeo.parameters.thresholdAngle === 'number')
+                  ? Number(egeo.parameters.thresholdAngle)
+                  : null,
                 edgeVertCount: posAttr ? Number(posAttr.count) : 0,
+                edgeSegCount: posAttr ? Number(posAttr.count) / 2 : 0,
+                edgeSegCount1Deg: segCount1,
                 edgeMatType: emat.type || '',
                 edgeColor: emat.color ? emat.color.getHex() : null,
                 edgeClippingCount: Array.isArray(emat.clippingPlanes) ? emat.clippingPlanes.length : 0
@@ -201,6 +230,12 @@ def probe_render(page: Any) -> dict[str, Any]:
                     const wmat = (wire && wire.material) || {};
                     const wgeo = (wire && wire.geometry) || {};
                     const wpos = wgeo.attributes && wgeo.attributes.position;
+                    const wgeo1 = (sub.geometry && window.THREE && window.THREE.EdgesGeometry)
+                      ? new window.THREE.EdgesGeometry(sub.geometry, 1)
+                      : null;
+                    const wpos1 = wgeo1 && wgeo1.attributes && wgeo1.attributes.position;
+                    const wseg1 = wpos1 ? Number(wpos1.count) / 2 : 0;
+                    if (wgeo1 && wgeo1.dispose) wgeo1.dispose();
                     return {
                       bodyId: sub.userData.bodyId,
                       visible: sub.visible === true,
@@ -219,7 +254,12 @@ def probe_render(page: Any) -> dict[str, Any]:
                       wirePresent: !!(wire && wire.isLineSegments),
                       wireVisible: !!(wire && wire.visible === true),
                       wireGeoType: wgeo.type || '',
+                      wireThresholdAngle: (wgeo.parameters && typeof wgeo.parameters.thresholdAngle === 'number')
+                        ? Number(wgeo.parameters.thresholdAngle)
+                        : null,
                       wireVertCount: wpos ? Number(wpos.count) : 0,
+                      wireSegCount: wpos ? Number(wpos.count) / 2 : 0,
+                      wireSegCount1Deg: wseg1,
                       wireMatType: wmat.type || '',
                       wireColor: wmat.color ? wmat.color.getHex() : null,
                       wireClippingCount: Array.isArray(wmat.clippingPlanes) ? wmat.clippingPlanes.length : 0
@@ -245,6 +285,7 @@ def probe_render(page: Any) -> dict[str, Any]:
             singleMesh: singleMesh,
             bodyRootInfo: bodyRootInfo,
             sectionQuadInfo: sectionQuadInfo,
+            initialBoxEdges: window.__cadcamInitialBoxEdges || null,
             vpBg: vpBg,
             watertight: s.watertight === true,
             occtGate: s.occtGate === true,
@@ -308,7 +349,10 @@ def check_base_invariants(snap: dict[str, Any], tag: str, problems: list[str]) -
     if (
         sm.get("edgePresent") is not True
         or sm.get("edgeMatType") != "LineBasicMaterial"
-        or (not snap.get("sceneCleared") and sm.get("edgeGeoType") != "EdgesGeometry")
+        or (
+            not snap.get("sceneCleared")
+            and (sm.get("edgeGeoType") != "EdgesGeometry" or sm.get("edgeThresholdAngle") != 20)
+        )
     ):
         problems.append(f"{tag} edge LineSegments mismatch: {sm!r}")
 
@@ -334,7 +378,7 @@ def check_gate_and_mm(snap: dict[str, Any], tag: str, problems: list[str]) -> No
         problems.append(f"{tag} unitsPass={snap.get('unitsPass')!r} statusUnits={snap.get('statusUnits')!r}")
 
 
-def create_box_via_ui(page: Any, expected_bodies: int) -> None:
+def create_primitive_via_ui(page: Any, kind: str, expected_bodies: int) -> None:
     is_narrow = page.evaluate("() => window.matchMedia('(max-width: 820px)').matches")
     if is_narrow:
         is_open = page.evaluate(
@@ -351,7 +395,7 @@ def create_box_via_ui(page: Any, expected_bodies: int) -> None:
     page.wait_for_function(
         "() => { const m = document.getElementById('createMenu'); return !!(m && m.hidden === false); }"
     )
-    tap(page, "#createMenu [data-action='primitive'][data-kind='box']")
+    tap(page, f"#createMenu [data-action='primitive'][data-kind='{kind}']")
     page.wait_for_function(
         "() => (window.__cadcamExportState || {}).primCreateStep === 'plane'"
     )
@@ -390,25 +434,36 @@ def run_viewport_case(page: Any, kind: str, width: int, height: int, origin: str
         }"""
     )
 
-    # 1. Cold-start load: Shaded+Edges is default, no DirectionalLight, matte material, no blob shadow.
+    # 1. Cold-start load: Shaded+Edges is default, no DirectionalLight, matte material, no blob shadow,
+    #    and initial BoxGeometry(20, 20, 20) EdgesGeometry at L2920 used thresholdAngle 20 with 12 edges.
     snap0 = probe_render(page)
     check_base_invariants(snap0, f"{tag} cold-start", problems)
     check_edges_default_active(snap0, f"{tag} cold-start", problems)
     sm0 = snap0.get("singleMesh") or {}
     if sm0.get("color") != 0x5AA4D6 or sm0.get("edgeColor") != 0x10283A:
         problems.append(f"{tag} cold-start colors body={sm0.get('color')!r} edge={sm0.get('edgeColor')!r}")
+    init_box = snap0.get("initialBoxEdges") or {}
+    if init_box.get("thresholdAngle") != 20 or init_box.get("segCount") != 12:
+        problems.append(f"{tag} initial BoxGeometry EdgesGeometry mismatch {init_box!r} (want thresholdAngle=20, segCount=12)")
     if problems:
         return problems
 
-    # 2. Create first body (single-body): Shaded+Edges stays default, mesh + edges visible.
-    create_box_via_ui(page, 1)
+    # 2. Create first body (single-body box): Shaded+Edges stays default, mesh + edges visible,
+    #    box stays at exactly 12 edge segments (24 vertices) with thresholdAngle 20.
+    create_primitive_via_ui(page, "box", 1)
     snap1 = probe_render(page)
     check_base_invariants(snap1, f"{tag} single-body", problems)
     check_edges_default_active(snap1, f"{tag} single-body", problems)
     check_gate_and_mm(snap1, f"{tag} single-body", problems)
     sm1 = snap1.get("singleMesh") or {}
-    if sm1.get("visible") is not True or sm1.get("edgeVisible") is not True or int(sm1.get("edgeVertCount") or 0) < 24:
-        problems.append(f"{tag} single-body mesh/edge visibility {sm1!r}")
+    if (
+        sm1.get("visible") is not True
+        or sm1.get("edgeVisible") is not True
+        or sm1.get("edgeSegCount") != 12
+        or sm1.get("edgeVertCount") != 24
+        or sm1.get("edgeThresholdAngle") != 20
+    ):
+        problems.append(f"{tag} single-body box mesh/edge mismatch (want 12 segs / 24 verts / 20 deg): {sm1!r}")
     if snap1.get("selectionHighlight") is not True:
         problems.append(f"{tag} single-body selectionHighlight={snap1.get('selectionHighlight')!r}")
 
@@ -525,9 +580,10 @@ def run_viewport_case(page: Any, kind: str, width: int, height: int, origin: str
     if (snap_swatch_reset.get("singleMesh") or {}).get("color") != 0x5AA4D6:
         problems.append(f"{tag} swatch #5aa4d6 reset failed: {snap_swatch_reset.get('singleMesh')!r}")
 
-    # 6. Create second body (multi-body): per-body edges from L5401 visible by default,
-    #    matte material + polygonOffset cloned, selection color works on selected body.
-    create_box_via_ui(page, 2)
+    # 6. Create second body as a cylinder (multi-body): per-body edges from mountBodyMeshes
+    #    visible by default with thresholdAngle 20; box stays at 12 edge segments while
+    #    cylinder drops vs 1-deg threshold (200 vs 300 segments).
+    create_primitive_via_ui(page, "cylinder", 2)
     page.evaluate("() => { const row = document.querySelector('#partList .part-row'); if (row) row.click(); }")
     page.wait_for_function(
         "() => ((window.__cadcamExportState || {}).selectedIds || []).length === 1"
@@ -540,7 +596,8 @@ def run_viewport_case(page: Any, kind: str, width: int, height: int, origin: str
     if br.get("visible") is not True or br.get("count") != 2:
         problems.append(f"{tag} multi-body bodyRoot {br!r}")
     else:
-        for binfo in br.get("bodies") or []:
+        bodies = br.get("bodies") or []
+        for binfo in bodies:
             if (
                 binfo.get("visible") is not True
                 or binfo.get("matType") != "MeshLambertMaterial"
@@ -551,13 +608,59 @@ def run_viewport_case(page: Any, kind: str, width: int, height: int, origin: str
                 or binfo.get("wirePresent") is not True
                 or binfo.get("wireVisible") is not True
                 or binfo.get("wireGeoType") != "EdgesGeometry"
+                or binfo.get("wireThresholdAngle") != 20
                 or binfo.get("wireMatType") != "LineBasicMaterial"
                 or int(binfo.get("wireVertCount") or 0) < 24
             ):
                 problems.append(f"{tag} multi-body child mismatch {binfo!r}")
-        emissives = [float(b.get("emissiveIntensity") or 0) for b in (br.get("bodies") or [])]
+        if len(bodies) == 2:
+            box_b, cyl_b = bodies[0], bodies[1]
+            if box_b.get("wireSegCount") != 12 or box_b.get("wireVertCount") != 24:
+                problems.append(f"{tag} multi-body box edge count {box_b!r} (want 12 segs / 24 verts)")
+            cyl_segs = int(cyl_b.get("wireSegCount") or 0)
+            cyl_segs_1deg = int(cyl_b.get("wireSegCount1Deg") or 0)
+            if cyl_segs != 200 or cyl_segs_1deg != 300 or not (0 < cyl_segs < cyl_segs_1deg):
+                problems.append(
+                    f"{tag} multi-body cylinder edge count {cyl_segs} vs 1-deg {cyl_segs_1deg} "
+                    f"(want 200 vs 300): {cyl_b!r}"
+                )
+        emissives = [float(b.get("emissiveIntensity") or 0) for b in bodies]
         if not any(abs(val - 0.25) < 1e-6 for val in emissives):
-            problems.append(f"{tag} multi-body selection emissive missing {br.get('bodies')!r}")
+            problems.append(f"{tag} multi-body selection emissive missing {bodies!r}")
+
+    # 7. Single-body curved cases (cylinder and filleted L-bracket) via replaceBody:
+    #    edge segment count drops vs 1-deg threshold while watertight and mm checks pass.
+    for query, label, want_20deg, want_1deg in (
+        ("/?primitive=cylinder", "single-body cylinder", 200, 300),
+        ("/?demo=lbracket", "filleted L-bracket", 55, 72),
+    ):
+        page.goto(origin + query, wait_until="domcontentloaded", timeout=deploy_smoke.PAGE_TIMEOUT_S * 1000)
+        page.wait_for_function(
+            """() => {
+              const s = window.__cadcamExportState;
+              return !!(s && s.sceneCleared === false
+                && s.occtReady === true && s.watertight === true && s.occtGate === true
+                && s.unitsPass === true && window.__cadcamMainScene);
+            }"""
+        )
+        snap_curved = probe_render(page)
+        sub_tag = f"{tag} {label}"
+        check_base_invariants(snap_curved, sub_tag, problems)
+        check_edges_default_active(snap_curved, sub_tag, problems)
+        check_gate_and_mm(snap_curved, sub_tag, problems)
+        sm_curved = snap_curved.get("singleMesh") or {}
+        segs_20 = int(sm_curved.get("edgeSegCount") or 0)
+        segs_1 = int(sm_curved.get("edgeSegCount1Deg") or 0)
+        if (
+            sm_curved.get("edgeThresholdAngle") != 20
+            or segs_20 != want_20deg
+            or segs_1 != want_1deg
+            or not (0 < segs_20 < segs_1)
+        ):
+            problems.append(
+                f"{sub_tag} edge segment count {segs_20} vs 1-deg {segs_1} "
+                f"(want {want_20deg} vs {want_1deg}, thresholdAngle=20): {sm_curved!r}"
+            )
 
     return problems
 
