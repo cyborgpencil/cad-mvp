@@ -3580,17 +3580,6 @@ CHROME_ROW_EXPR = r"""
   if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
   if (ar.width + 0.5 < 44 || ar.height + 0.5 < 44) problems.push('About ' + ar.width.toFixed(1) + 'x' + ar.height.toFixed(1));
   if (wasFileHidden) fileMenu.hidden = true;
-  fileMenu.hidden = false;
-  info.click();
-  if (!fileMenu.hidden) problems.push('File still open after picking Info');
-  fileMenu.hidden = false;
-  info.click();
-  fileMenu.hidden = false;
-  about.click();
-  if (!fileMenu.hidden) problems.push('File still open after picking About');
-  fileMenu.hidden = false;
-  about.click();
-  fileMenu.hidden = wasFileHidden;
   var shelves = document.querySelector('.topbar-shelves');
   var browser = document.getElementById('browser');
   if (!shelves || shelves.firstElementChild !== tree) problems.push('Tree is not first in topbar-shelves');
@@ -3661,6 +3650,45 @@ def chrome_row_problems(cdp: Cdp) -> list[str]:
         return [f"chrome row {raw}"]
     if not isinstance(found, list):
         return [f"chrome row {raw}"]
+    return [str(item) for item in found]
+
+
+FILE_PICK_EXPR = r"""
+(function(){
+  var problems = [];
+  var info = document.querySelector('#fileMenu [data-drawer="inspector"]');
+  var about = document.querySelector('#fileMenu [data-action="aboutMenu"]');
+  var fileMenu = document.getElementById('fileMenu');
+  if (!info || !about || !fileMenu) return JSON.stringify(['missing File menu Info or About']);
+  var wasFileHidden = fileMenu.hidden;
+  fileMenu.hidden = false;
+  info.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking Info');
+  fileMenu.hidden = false;
+  info.click();
+  fileMenu.hidden = false;
+  about.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking About');
+  fileMenu.hidden = false;
+  about.click();
+  fileMenu.hidden = wasFileHidden;
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def file_pick_problems(cdp: Cdp) -> list[str]:
+    # Desktop pass only: the Info/About clicks toggle drawers and would
+    # disturb portrait sheet state if run inside chrome_row_problems.
+    raw, err = eval_expr(cdp, FILE_PICK_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"file pick {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"file pick {raw}"]
+    if not isinstance(found, list):
+        return [f"file pick {raw}"]
     return [str(item) for item in found]
 
 
@@ -8765,6 +8793,7 @@ def run(omit: list[str]) -> int:
                 time.sleep(0.3)
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
+                desktop_bar.extend(file_pick_problems(cdp))
                 desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")
