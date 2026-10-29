@@ -3580,6 +3580,17 @@ CHROME_ROW_EXPR = r"""
   if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
   if (ar.width + 0.5 < 44 || ar.height + 0.5 < 44) problems.push('About ' + ar.width.toFixed(1) + 'x' + ar.height.toFixed(1));
   if (wasFileHidden) fileMenu.hidden = true;
+  fileMenu.hidden = false;
+  info.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking Info');
+  fileMenu.hidden = false;
+  info.click();
+  fileMenu.hidden = false;
+  about.click();
+  if (!fileMenu.hidden) problems.push('File still open after picking About');
+  fileMenu.hidden = false;
+  about.click();
+  fileMenu.hidden = wasFileHidden;
   var shelves = document.querySelector('.topbar-shelves');
   var browser = document.getElementById('browser');
   if (!shelves || shelves.firstElementChild !== tree) problems.push('Tree is not first in topbar-shelves');
