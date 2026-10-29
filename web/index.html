@@ -6612,6 +6612,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function doUndo() {
     if (state.primCreate) cancelPrimCreate(true);
+    if (state.sketchSheetMode) closeSketchSheet();
     const cmd = commandStack.undo();
     if (!cmd) {
       setHint('Nothing to undo');
@@ -6625,6 +6626,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function doRedo() {
     if (state.primCreate) cancelPrimCreate(true);
+    if (state.sketchSheetMode) closeSketchSheet();
     const cmd = commandStack.redo();
     if (!cmd) {
       setHint('Nothing to redo');
