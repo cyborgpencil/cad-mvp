@@ -13393,6 +13393,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       setTab(btn.getAttribute('data-tab'));
       message = TAB_LABELS[state.tab];
     } else if (action === 'drawer') {
+      if (btn.closest('#fileMenu')) {
+        fileMenu.hidden = true;
+        document.getElementById('fileBtn').setAttribute('aria-expanded', 'false');
+      }
       const id = btn.getAttribute('data-drawer') === 'inspector' ? 'inspector' : 'browser';
       const open = !document.getElementById(id).classList.contains('open');
       setDrawer(btn.getAttribute('data-drawer'), open);
