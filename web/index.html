@@ -2916,7 +2916,8 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), bodyMat);
   mesh.position.y = 10;
   const edgeMat = new THREE.LineBasicMaterial({ color: 0x10283a });
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), edgeMat);
+  const FEATURE_EDGE_ANGLE_DEG = 20;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, FEATURE_EDGE_ANGLE_DEG), edgeMat);
   mesh.add(edges);
   const cornerList = [
     [-10, -10, -10], [10, -10, -10], [-10, 10, -10], [10, 10, -10],
@@ -5376,7 +5377,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       const material = bodyMat.clone();
       const solid = new THREE.Mesh(geo, material);
       solid.userData.bodyId = body.id;
-      const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
+      const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo, FEATURE_EDGE_ANGLE_DEG), edgeMat.clone());
       solid.add(wire);
       bodyRoot.add(solid);
     }
@@ -9905,7 +9906,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     mesh.quaternion.identity();
     mesh.scale.set(1, 1, 1);
     edges.geometry.dispose();
-    edges.geometry = new THREE.EdgesGeometry(geo);
+    edges.geometry = new THREE.EdgesGeometry(geo, FEATURE_EDGE_ANGLE_DEG);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     const cz = (minZ + maxZ) / 2;
