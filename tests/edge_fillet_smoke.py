@@ -308,12 +308,22 @@ def run_case(page: Any, kind: str) -> list[str]:
     inner = pick_named(page, "inner", problems, kind)
     if not inner:
         return problems
-    pointer(page, inner, 62)
+    inner_id = inner.get("id")
+    if not inner_id:
+        problems.append(f"{kind} inner aim id {inner!r}")
+        return problems
+    # The size-80 reject keeps this edge selected and Confirm on.
+    # A second tap on that same point inside the phone double-tap
+    # window (three-finger SWIPE_MS) is Fit and restores the empty
+    # selection, so Confirm stays off. Wait on the edge already held.
     page.wait_for_function(
-        """() => {
+        """(edgeId) => {
           const state = window.__cadcamExportState || {};
-          return state.selectionCount === 1 && state.edgeConfirmEnabled === true;
-        }"""
+          const ids = Array.isArray(state.selectedIds) ? state.selectedIds : [];
+          return state.selectionCount === 1 && state.edgeConfirmEnabled === true
+            && ids.length === 1 && ids[0] === edgeId;
+        }""",
+        arg=inner_id,
     )
     before_fillet = int(read_state(page).get("undoDepth") or 0)
     tap(page, "#edgeConfirm")
