@@ -14100,10 +14100,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       updateInspector();
     } else if (action === 'autoHeal' || action === 'meshRepair') {
       state.activeTool = action === 'autoHeal' ? 'Auto-heal' : 'Mesh repair';
-      message = Module.repairMesh();
-      syncFromKernel();
-      setHint(message);
-      updateInspector();
+      const repairLabel = (btn.textContent || '').trim() || state.activeTool;
+      runUndoable(repairLabel, function () {
+        message = Module.repairMesh();
+        syncFromKernel();
+        setHint(message);
+        updateInspector();
+        return typeof message === 'string' && message.startsWith('Repaired. ');
+      });
     } else if (action === 'preview') {
       state.preview = !state.preview;
       const previewBtn = document.getElementById('previewBtn');
