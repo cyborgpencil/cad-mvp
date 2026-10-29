@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-29
+- 2026-10-29 feat/antigravity-extrude-undo-sketch-restore: web/tests - snapshot closed sketchProfile (copying shape via opsApi.copyShape), sketchDrawnLoops, and sketchPlane in captureSnapshot/installSnapshot/releaseSnapshot so Extrude Undo restores the closed profile and Redo clears it without leaking OCCT shapes; extend extrude_undo_smoke (re-extrude without redrawing, 10-cycle shape-leak check, repair/Hole/open-sheet undo) in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-undo-open-sketch: web/tests - close open sketch sheet (if (state.sketchSheetMode) closeSketchSheet();) in doUndo and doRedo before snapshot restore; extend extrude_undo_smoke for open-sheet Undo/Redo in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-autoheal-undo: web/tests - wrap Module.repairMesh() in runUndoable using the clicked button label (Auto-heal / Mesh repair), pushing an undo step only on Repaired.; add repair_undo_smoke in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-extrude-undo: web/tests/docs - Extrude (New/Join/Cut) now undoable via runUndoable; failed extrude adds no undo step; sketch restore queued as follow-up. Docs: stale Tool Search text marked removed per #255.
