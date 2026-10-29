@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-29
+- 2026-10-29 cursor/webkit-fillet-double-tap: tests - edge_fillet_smoke waits on the inner edge the size-80 reject already selected, instead of a second tap that WebKit treats as double-tap Fit and clears.
 - 2026-10-29 feat/antigravity-undo-open-sketch: web/tests - close open sketch sheet (if (state.sketchSheetMode) closeSketchSheet();) in doUndo and doRedo before snapshot restore; extend extrude_undo_smoke for open-sheet Undo/Redo in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-autoheal-undo: web/tests - wrap Module.repairMesh() in runUndoable using the clicked button label (Auto-heal / Mesh repair), pushing an undo step only on Repaired.; add repair_undo_smoke in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-extrude-undo: web/tests/docs - Extrude (New/Join/Cut) now undoable via runUndoable; failed extrude adds no undo step; sketch restore queued as follow-up. Docs: stale Tool Search text marked removed per #255.
