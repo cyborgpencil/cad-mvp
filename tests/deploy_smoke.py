@@ -3561,20 +3561,30 @@ CHROME_ROW_EXPR = r"""
 (function(){
   var problems = [];
   var tree = document.querySelector('[data-drawer="browser"]');
-  var info = document.querySelector('[data-drawer="inspector"]');
+  var info = document.querySelector('#fileMenu [data-drawer="inspector"]');
+  var about = document.querySelector('#fileMenu [data-action="aboutMenu"]');
+  var fileMenu = document.getElementById('fileMenu');
   var name = document.getElementById('docName');
-  if (!tree || !info || !name) return JSON.stringify(['missing tree, info, or part name']);
+  if (!tree || !info || !about || !fileMenu || !name) return JSON.stringify(['missing tree, info, about, or part name']);
   function box(el) { return el.getBoundingClientRect(); }
   var tr = box(tree);
-  var ir = box(info);
   var nr = box(name);
   if (tr.width + 0.5 < 44 || tr.height + 0.5 < 44) problems.push('Tree ' + tr.width.toFixed(1) + 'x' + tr.height.toFixed(1));
+  if (document.querySelector('.topbar > [data-drawer="inspector"]')) problems.push('Info still in topbar');
+  if (document.querySelector('.topbar-shelves [data-action="aboutMenu"]')) problems.push('About still in topbar-shelves');
+  if (fileMenu.lastElementChild !== about || about.previousElementSibling !== info) problems.push('Info/About not items 9/10 at end of fileMenu');
+  var wasFileHidden = fileMenu.hidden;
+  if (wasFileHidden) fileMenu.hidden = false;
+  var ir = box(info);
+  var ar = box(about);
   if (ir.width + 0.5 < 44 || ir.height + 0.5 < 44) problems.push('Info ' + ir.width.toFixed(1) + 'x' + ir.height.toFixed(1));
+  if (ar.width + 0.5 < 44 || ar.height + 0.5 < 44) problems.push('About ' + ar.width.toFixed(1) + 'x' + ar.height.toFixed(1));
+  if (wasFileHidden) fileMenu.hidden = true;
   var shelves = document.querySelector('.topbar-shelves');
   var browser = document.getElementById('browser');
   if (!shelves || shelves.firstElementChild !== tree) problems.push('Tree is not first in topbar-shelves');
   if (tree.closest('.topbar')) problems.push('Tree still in topbar');
-  if (!(tr.top > ir.top + 0.5)) problems.push('Info top ' + ir.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
+  if (!(tr.top > nr.top + 0.5)) problems.push('part name top ' + nr.top.toFixed(1) + ' Tree top ' + tr.top.toFixed(1));
   if (!browser) {
     problems.push('missing browser drawer');
   } else if (!browser.classList.contains('open')) {
@@ -3587,7 +3597,6 @@ CHROME_ROW_EXPR = r"""
       problems.push('Tree did not close browser');
     }
   }
-  if (ir.right > nr.left + 0.5) problems.push('Info is not left of the part name');
   var buttons = document.querySelectorAll('.topbar button');
   for (var i = 0; i < buttons.length; i++) {
     var b = buttons[i];
