@@ -323,6 +323,10 @@ add_executable(test_create tests/test_create.cpp)
 target_link_libraries(test_create PRIVATE model)
 add_test(NAME create COMMAND test_create)
 
+add_executable(test_repair tests/test_repair.cpp)
+target_link_libraries(test_repair PRIVATE model)
+add_test(NAME test_repair COMMAND test_repair)
+
 add_executable(export_part src/export_part.cpp)
 target_link_libraries(export_part PRIVATE model)
 

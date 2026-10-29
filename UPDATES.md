@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-29
+- 2026-10-29 feat/repair-native-test: tests/cmake - add native test_repair covering repair_manifold (clean box, inward-wound box, duplicate-vertex soup weld, zero-area triangle drop, open box cannot-repair, and failed-repair result.mesh mutation probe) and add browser open-box g_mesh probe to repair_undo_smoke in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-flat-render: web/tests - remove key and rim DirectionalLights (keep AmbientLight 0.38 and HemisphereLight 0.7), replace bodyMat with MeshLambertMaterial(color: 0x5aa4d6, flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1), default display to Shaded+Edges ('edges'), remove fake blob shadow, and add flat_render_smoke in Chromium and WebKit.
 - 2026-10-29 cursor/webkit-fillet-double-tap: tests - edge_fillet_smoke waits on the inner edge the size-80 reject already selected, instead of a second tap that WebKit treats as double-tap Fit and clears.
 - 2026-10-29 feat/antigravity-extrude-undo-sketch-restore: web/tests - snapshot closed sketchProfile (copying shape via opsApi.copyShape), sketchDrawnLoops, and sketchPlane in captureSnapshot/installSnapshot/releaseSnapshot so Extrude Undo restores the closed profile and Redo clears it without leaking OCCT shapes; extend extrude_undo_smoke (re-extrude without redrawing, 10-cycle shape-leak check, repair/Hole/open-sheet undo) in Chromium and WebKit.

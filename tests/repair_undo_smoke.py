@@ -630,6 +630,198 @@ def run_extrude_and_scene_cleared_case(page: Any, kind: str, origin: str) -> lis
     return problems
 
 
+def run_open_box_probe_case(page: Any, kind: str, origin: str) -> list[str]:
+    problems: list[str] = []
+    url = origin + "/?fixture=open_box&tab=repair"
+    print(f"load {kind} {url}", flush=True)
+    page.goto(url, wait_until="domcontentloaded", timeout=deploy_smoke.PAGE_TIMEOUT_S * 1000)
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState;
+          const mod = window.__cadcamTestModule;
+          return !!(s && mod && s.occtReady === true
+            && s.fixture === 'open_box'
+            && s.sceneCleared === false
+            && s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false
+            && s.unitsPass === true);
+        }"""
+    )
+    pre_open = read_mesh_and_validity(page)
+    if str(pre_open.get("statusUnits") or "").lower() != "mm" or pre_open.get("unitsPass") is not True:
+        problems.append(
+            f"{kind} open_box initial units {pre_open.get('statusUnits')!r} unitsPass={pre_open.get('unitsPass')!r}"
+        )
+        return problems
+
+    pre_v = len(pre_open.get("positions") or []) // 3
+    pre_t = len(pre_open.get("indices") or []) // 3
+    pre_undo = pre_open.get("undoDepth")
+    pre_redo = pre_open.get("redoDepth")
+
+    # 1. Clean-vertices open_box: call Module.repairMesh(), then click Auto-heal and Mesh repair.
+    direct_msg = page.evaluate("() => String(window.__cadcamTestModule.repairMesh() || '')")
+    if not str(direct_msg).startswith("cannot repair: "):
+        problems.append(f"{kind} open_box Module.repairMesh msg={direct_msg!r}")
+    after_direct = read_mesh_and_validity(page)
+    if after_direct.get("undoDepth") != 0 or after_direct.get("redoDepth") != 0:
+        problems.append(
+            f"{kind} open_box after Module.repairMesh undo={after_direct.get('undoDepth')!r} "
+            f"redo={after_direct.get('redoDepth')!r}"
+        )
+
+    tap_repair_tool(page, "Auto-heal")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const hint = document.getElementById('statusHint');
+          const text = hint ? String(hint.textContent || '') : '';
+          return s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false && s.unitsPass === true
+            && text.indexOf('cannot repair: ') === 0;
+        }"""
+    )
+    after_autoheal = read_mesh_and_validity(page)
+
+    tap(page, "[data-action='meshRepair']")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const hint = document.getElementById('statusHint');
+          const text = hint ? String(hint.textContent || '') : '';
+          return s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false && s.unitsPass === true
+            && text.indexOf('cannot repair: ') === 0;
+        }"""
+    )
+    post_open = read_mesh_and_validity(page)
+    post_v = len(post_open.get("positions") or []) // 3
+    post_t = len(post_open.get("indices") or []) // 3
+    if post_open.get("undoDepth") != 0 or post_open.get("redoDepth") != 0:
+        problems.append(
+            f"{kind} open_box undo stack changed undo={post_open.get('undoDepth')!r} "
+            f"redo={post_open.get('redoDepth')!r}"
+        )
+    if post_open.get("unitsPass") is not True or str(post_open.get("statusUnits") or "").lower() != "mm":
+        problems.append(
+            f"{kind} open_box post units {post_open.get('statusUnits')!r} unitsPass={post_open.get('unitsPass')!r}"
+        )
+
+    open_changed = (
+        after_direct.get("positions") != pre_open.get("positions")
+        or after_direct.get("indices") != pre_open.get("indices")
+        or after_autoheal.get("positions") != pre_open.get("positions")
+        or after_autoheal.get("indices") != pre_open.get("indices")
+        or post_open.get("positions") != pre_open.get("positions")
+        or post_open.get("indices") != pre_open.get("indices")
+    )
+    print(
+        f"PROBE {kind} g_mesh open_box (clean vertices): "
+        f"{'CONFIRMED' if open_changed else 'NOT REPRODUCED'} "
+        f"(vertices {pre_v}->{post_v}, triangles {pre_t}->{post_t}, "
+        f"undoDepth {pre_undo}->{post_open.get('undoDepth')}, redoDepth {pre_redo}->{post_open.get('redoDepth')})",
+        flush=True,
+    )
+
+    # 2. Open box with duplicate vertex: weld_exact runs before check_watertight fails,
+    # and bindings.cpp:152 assigns g_mesh = result.mesh unconditionally.
+    def seed_open_box_with_dup_vertex() -> dict[str, Any]:
+        page.evaluate(
+            """() => {
+              const mod = window.__cadcamTestModule;
+              mod.loadFixture('open_box');
+              const pos = Array.from(mod.meshPositions());
+              const idx = Array.from(mod.meshIndices());
+              const dupIndex = pos.length / 3;
+              pos.push(pos[0], pos[1], pos[2]);
+              idx[0] = dupIndex;
+              mod.replaceMesh(new Float64Array(pos), new Uint32Array(idx), 'open_box');
+              const checkBtn = document.querySelector('[data-action="checkShape"]');
+              if (checkBtn) checkBtn.click();
+            }"""
+        )
+        page.wait_for_function(
+            """() => {
+              const s = window.__cadcamExportState || {};
+              const mod = window.__cadcamTestModule;
+              return !!(mod && mod.meshPositions().length === 27
+                && mod.meshIndices().length === 30
+                && s.undoDepth === 0 && s.redoDepth === 0
+                && s.watertight === false && s.unitsPass === true);
+            }"""
+        )
+        return read_mesh_and_validity(page)
+
+    pre_dup_direct = seed_open_box_with_dup_vertex()
+    dup_msg = page.evaluate("() => String(window.__cadcamTestModule.repairMesh() || '')")
+    if not str(dup_msg).startswith("cannot repair: "):
+        problems.append(f"{kind} open_box+dup Module.repairMesh msg={dup_msg!r}")
+    post_dup_direct = read_mesh_and_validity(page)
+    if post_dup_direct.get("undoDepth") != 0 or post_dup_direct.get("redoDepth") != 0:
+        problems.append(
+            f"{kind} open_box+dup after Module.repairMesh undo={post_dup_direct.get('undoDepth')!r}"
+        )
+
+    pre_dup_auto = seed_open_box_with_dup_vertex()
+    tap_repair_tool(page, "Auto-heal")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const hint = document.getElementById('statusHint');
+          const text = hint ? String(hint.textContent || '') : '';
+          return s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false && s.unitsPass === true
+            && text.indexOf('cannot repair: ') === 0;
+        }"""
+    )
+    post_dup_auto = read_mesh_and_validity(page)
+    if post_dup_auto.get("undoDepth") != 0 or post_dup_auto.get("redoDepth") != 0:
+        problems.append(
+            f"{kind} open_box+dup after Auto-heal undo={post_dup_auto.get('undoDepth')!r}"
+        )
+
+    pre_dup_mesh = seed_open_box_with_dup_vertex()
+    tap(page, "[data-action='meshRepair']")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const hint = document.getElementById('statusHint');
+          const text = hint ? String(hint.textContent || '') : '';
+          return s.undoDepth === 0 && s.redoDepth === 0
+            && s.watertight === false && s.unitsPass === true
+            && text.indexOf('cannot repair: ') === 0;
+        }"""
+    )
+    post_dup_mesh = read_mesh_and_validity(page)
+    if post_dup_mesh.get("undoDepth") != 0 or post_dup_mesh.get("redoDepth") != 0:
+        problems.append(
+            f"{kind} open_box+dup after Mesh repair undo={post_dup_mesh.get('undoDepth')!r}"
+        )
+    if post_dup_mesh.get("unitsPass") is not True or str(post_dup_mesh.get("statusUnits") or "").lower() != "mm":
+        problems.append(
+            f"{kind} open_box+dup post units {post_dup_mesh.get('statusUnits')!r} "
+            f"unitsPass={post_dup_mesh.get('unitsPass')!r}"
+        )
+
+    dup_pre_v = len(pre_dup_mesh.get("positions") or []) // 3
+    dup_pre_t = len(pre_dup_mesh.get("indices") or []) // 3
+    dup_post_v = len(post_dup_mesh.get("positions") or []) // 3
+    dup_post_t = len(post_dup_mesh.get("indices") or []) // 3
+    dup_mutated = (
+        post_dup_direct.get("positions") != pre_dup_direct.get("positions")
+        or post_dup_auto.get("positions") != pre_dup_auto.get("positions")
+        or post_dup_mesh.get("positions") != pre_dup_mesh.get("positions")
+    )
+    print(
+        f"PROBE {kind} g_mesh open_box+dup_vertices (Module.repairMesh / Auto-heal / Mesh repair): "
+        f"{'CONFIRMED' if dup_mutated else 'NOT REPRODUCED'} "
+        f"(vertices {dup_pre_v}->{dup_post_v}, triangles {dup_pre_t}->{dup_post_t}, "
+        f"undoDepth={post_dup_mesh.get('undoDepth')}, redoDepth={post_dup_mesh.get('redoDepth')})",
+        flush=True,
+    )
+    return problems
+
+
 def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
     browser = getattr(playwright, engine).launch(headless=True)
     try:
@@ -667,6 +859,8 @@ def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
         page.on("console", on_console)
         page.set_default_timeout(deploy_smoke.PAGE_TIMEOUT_S * 1000)
         problems = run_flipped_box_case(page, kind, origin)
+        if not problems:
+            problems = run_open_box_probe_case(page, kind, origin)
         if not problems:
             problems = run_extrude_and_scene_cleared_case(page, kind, origin)
         if errors:
