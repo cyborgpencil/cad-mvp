@@ -149,7 +149,9 @@ std::string find_open_edges() {
 
 std::string repair_mesh() {
     const RepairResult result = repair_manifold(g_mesh);
-    g_mesh = result.mesh;
+    if (result.pass) {
+        g_mesh = result.mesh;
+    }
     if (result.pass && result.changed) {
         return "Repaired. " + result.message;
     }

@@ -151,20 +151,26 @@ int main() {
 
     // 6b. Open box that also has duplicate vertices: weld_exact reduces vertex count (9 -> 8)
     // and remaps triangle indices, setting result.mesh = welded and result.changed = true
-    // BEFORE check_watertight fails on the missing top face. repair_manifold then returns
-    // pass=false with the mutated result.mesh (so bindings.cpp:152 g_mesh = result.mesh
-    // overwrites g_mesh on a failed repair).
+    // BEFORE check_watertight fails on the missing top face. repair_manifold returns
+    // pass=false with the welded result.mesh; web/bindings.cpp repair_mesh() assigns
+    // g_mesh = result.mesh only when result.pass is true (browser g_mesh assertion in
+    // tests/repair_undo_smoke.py).
     MeshSolid open_dup = open_box();
     open_dup.vertices.push_back(open_dup.vertices[0]);
     open_dup.triangles[0][0] = static_cast<std::uint32_t>(open_dup.vertices.size() - 1);
-    const RepairResult open_dup_res = repair_manifold(open_dup);
-    const bool open_dup_equals_input = mesh_equals(open_dup_res.mesh, open_dup);
+    const MeshSolid open_dup_before = open_dup;
+    MeshSolid active_mesh = open_dup;
+    const RepairResult open_dup_res = repair_manifold(active_mesh);
+    if (open_dup_res.pass) {
+        active_mesh = open_dup_res.mesh;
+    }
+    const bool open_dup_equals_input = mesh_equals(open_dup_res.mesh, open_dup_before);
     std::cout << "PROBE native open_box+dup_vertices: "
               << (!open_dup_equals_input ? "CONFIRMED" : "NOT REPRODUCED")
               << " (pass=" << (open_dup_res.pass ? "true" : "false")
               << ", changed=" << (open_dup_res.changed ? "true" : "false")
-              << ", vertices " << open_dup.vertices.size() << "->" << open_dup_res.mesh.vertices.size()
-              << ", triangles " << open_dup.triangles.size() << "->" << open_dup_res.mesh.triangles.size()
+              << ", vertices " << open_dup_before.vertices.size() << "->" << open_dup_res.mesh.vertices.size()
+              << ", triangles " << open_dup_before.triangles.size() << "->" << open_dup_res.mesh.triangles.size()
               << ", mesh_equals_input=" << (open_dup_equals_input ? "true" : "false") << ")\n";
     expect_repair_case("open_box_with_duplicate_vertices", open_dup_res, false, true, "cannot repair: ");
     expect("probe_open_box_dup_mutates_result_mesh",
@@ -172,6 +178,10 @@ int main() {
                open_dup_res.mesh.vertices.size() == 8 &&
                open_dup_res.mesh.triangles.size() == 10 &&
                mesh_equals(open_dup_res.mesh, open));
+    expect("open_box_dup_failed_repair_leaves_active_mesh_unchanged",
+           active_mesh.vertices.size() == 9 &&
+               active_mesh.triangles.size() == 10 &&
+               mesh_equals(active_mesh, open_dup_before));
 
     if (g_failures != 0) {
         std::cerr << g_failures << " failed\n";
