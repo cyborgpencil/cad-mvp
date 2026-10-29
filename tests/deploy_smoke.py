@@ -3773,6 +3773,49 @@ FLOAT_CLOSE_EXPR = r"""
     if (restoreSel) restoreSel.click();
   }
 
+  var aboutPanel = document.querySelector('.menu[aria-label="About"]');
+  var aboutOpener = document.querySelector('#fileMenu [data-action="aboutMenu"]');
+  if (!aboutPanel || !aboutOpener || !fileMenu) {
+    problems.push('missing About panel or opener');
+  } else {
+    var aClose = aboutPanel.querySelector('.sheet-h > button.icon-btn[data-action="closeSheet"][aria-label="Close"]');
+    var aHead = aboutPanel.querySelector('.sheet-h .panel-h');
+    if (!aClose) {
+      problems.push('About missing .sheet-h closeSheet button');
+    } else {
+      var aText = (aClose.textContent || '').trim();
+      if (aText !== '\u00d7') problems.push('About close glyph ' + aText);
+      if ((aClose.textContent || '').toLowerCase().indexOf('close') >= 0) {
+        problems.push('About close still shows Close text');
+      }
+      if (aboutPanel.hidden) {
+        fileMenu.hidden = false;
+        aboutOpener.click();
+      }
+      if (aboutPanel.hidden) {
+        problems.push('About did not open');
+      } else {
+        var ar = aboutPanel.getBoundingClientRect();
+        var br = aClose.getBoundingClientRect();
+        var hr = aHead ? aHead.getBoundingClientRect() : null;
+        if (br.width + 0.5 < 44 || br.height + 0.5 < 44) {
+          problems.push('About close size ' + br.width.toFixed(1) + 'x' + br.height.toFixed(1));
+        }
+        if (hr && !(br.left >= hr.right - 1)) {
+          problems.push('About close not right of heading');
+        }
+        if (!(br.top <= ar.top + 24 && br.bottom <= ar.bottom)) {
+          problems.push('About close not at top of About');
+        }
+      }
+      aClose.click();
+      if (!aboutPanel.hidden) problems.push('About still open after closeSheet');
+      if (window.__cadcamExportState && window.__cadcamExportState.aboutOpen) {
+        problems.push('aboutOpen still true after closeSheet');
+      }
+    }
+  }
+
   return JSON.stringify(problems);
 })()
 """
