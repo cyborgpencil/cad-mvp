@@ -16,7 +16,7 @@ Measuring: in Chrome DevTools, open the device toolbar, choose Responsive and en
 ## 2. Shortcuts (1-4 tabs, X search)
 Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+1..8, Ctrl+9, Ctrl+K/Ctrl+E, Alt+F/Alt+E (Chrome menu) and Alt+Left/Right. On Mac it reserves Cmd+1..9 and Cmd+Opt+Left/Right. Plain digits and plain X are not on the list [6].
 - **K1 (Chrome, Windows desktop):** Click the 3D view, then press 1, 2, 3, 4. Expected: the tab switches to Sketch, Model, Repair and Export in turn. Source: D10.
-- **K2:** Press X. Expected: the tool search box opens with focus. Typing finds a tool; Esc closes it. Source: D10, R.
+- **K2 (REMOVED per #255 / `8e18de0`):** Press X. Expected: the tool search box opens with focus. Typing finds a tool; Esc closes it. Source: D10, R. *(Tool search and `X` hotkey removed in #255.)*
 - **K3:** Focus a text input (search box, Part1 rename, dimension field), then press 1-4 and X. Expected: the characters go into the field, with no tab switch and no search popup. Repeat inside any contenteditable element. Source: D10.
 - **K4:** Press Ctrl+1, Ctrl+Tab, Ctrl+PgDn and Alt+F. Expected: Chrome handles them (browser tab or menu), and the app neither blocks them nor reacts to them. Source: [6].
 - **K5 (Android Chrome, no keyboard):** Expected: the tab bar and the search button in the tools menu reach every tab and tool. Source: D10, R.
@@ -33,7 +33,7 @@ Chrome on Windows/Linux reserves Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PgUp/PgDn, Ctrl+
 
 ## 4. Layout
 - **L1 (1440x900):** Expected: the top bar has File, Undo/Redo, the tabs Sketch/Model/Repair/Export and mm/in. The tree is on the left, the inspector on the right, the viewport in the center, and the status bar at the bottom. Source: D1, D6, prompt.
-- **L2 (390x844):** Expected: the tabs are in a bottom bar, and the tree and inspector open as drawers and close again. Tool search sits in the tools menu. Source: prompt, R.
+- **L2 (390x844):** Expected: the tabs are in a bottom bar, and the tree and inspector open as drawers and close again. Tool search sits in the tools menu *(REMOVED per #255 / `8e18de0`)*. Source: prompt, R.
 - **L3:** On Model, tap New Sketch. Expected: the Sketch tab becomes active, and a Finish Sketch bar is visible. Tapping it returns to Model. Source: D2.
 - **L4:** On every tab. Expected: exactly one floating view bar (select modes, Measure, Section, display modes, Orbit/Pan/Zoom/Fit, views, Isolate/Hide) plus the ViewCube, top right. The view controls are not repeated in the toolbar. Clicking a ViewCube face snaps the view. Source: D4, prompt.
 - **L5:** Expected: no radial menu (right-click or long-press shows none) and no history timeline. Only the browser tree ships. Source: D5, D8.

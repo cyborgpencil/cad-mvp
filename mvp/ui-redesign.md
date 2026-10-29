@@ -64,7 +64,7 @@ Phone (narrow) layout: tabs become a bottom tab bar, the tab toolbar becomes a h
 ## Research-backed proposals (not Erik's decisions)
 - Top tabs work like Blender's workspaces, with each tab's tools grouped into panels like Fusion's toolbar tabs.
 - Shared tools stay fixed across tabs, like FreeCAD's Std commands and Onshape's fixed controls.
-- Tool search (like Onshape Alt+C) and panels that collapse into dropdowns on phones.
+- Tool search (like Onshape Alt+C; REMOVED per #255 / `8e18de0`) and panels that collapse into dropdowns on phones.
 - The watertight and units check is shown inside the Export tab, right before every export, and also in the status bar.
 
 ## Current mockup controls mapped to tabs (from Repo Keeper's read-only inventory of mockup/index.html, 2026-10-21)
@@ -83,7 +83,7 @@ Findings:
 - The mockup has no mesh repair tools yet, so the Mesh/Repair tool list is TBD.
 - The timeline (Origin, Sketch1, Extrude1, Fillet1) is visual only, which ties to the open timeline TBD.
 - Appearance swatches (Steel, Orange, Green, Slate): placement TBD.
-- Tab-switch keys and tool search keys are TBD. Research notes Blender uses Ctrl+PageUp/PageDown, which Chrome on Windows reserves for its own tabs (per 3T), so it is ruled out, and Onshape uses Alt+C for tool search. See research/gui/ui-layout-review.md.
+- Tab-switch keys and tool search keys (tool search REMOVED per #255 / `8e18de0`) are TBD. Research notes Blender uses Ctrl+PageUp/PageDown, which Chrome on Windows reserves for its own tabs (per 3T), so it is ruled out, and Onshape uses Alt+C for tool search. See research/gui/ui-layout-review.md.
 
 ## Team decisions (final) (2026-10-21, at Erik's request; Erik reviews afterward)
 These replace the TBDs above where they conflict.
@@ -96,7 +96,7 @@ These replace the TBDs above where they conflict.
 7. There's one Export button, and it lives only on the Export tab, behind the watertight and units check. There's no quick export, so nothing can skip the check.
 8. The history timeline is out of the MVP, and only the browser tree ships. The mockup labels the timeline visual only, and nothing behind it supports history yet.
 9. The visual style is dark neutral with one accent color, based on the mockup's Slate theme, with touch targets of at least 44 px and no other new style work in the MVP.
-10. Plain keys 1 to 4 switch between Sketch, Model, Repair and Export, active only when no text field has focus, and X opens tool search. Chrome reserves Ctrl+1 to 8, Ctrl+Tab, Ctrl+PgUp/PgDn and Ctrl+K, and Alt+letter opens its menus (research/gui/ui-layout-review.md, sources 11 to 17). On phones, search sits in the tools menu. The keys still need a browser test.
+10. Plain keys 1 to 4 switch between Sketch, Model, Repair and Export, active only when no text field has focus, and X opens tool search *(tool search and `X` hotkey REMOVED per #255 / `8e18de0`)*. Chrome reserves Ctrl+1 to 8, Ctrl+Tab, Ctrl+PgUp/PgDn and Ctrl+K, and Alt+letter opens its menus (research/gui/ui-layout-review.md, sources 11 to 17). On phones, search sits in the tools menu *(REMOVED per #255 / `8e18de0`)*. The keys still need a browser test.
 
 ## Touch swipe gestures (approved by 3T 2026-10-23; build order 1 to 3)
 All web-only, in the pointer handler in `web/index.html`; no C++. Sources: [Onshape view navigation](https://cad.onshape.com/help/Content/View/view_navigation_and_the_view_cube.htm), [Shapr3D gestures](https://support.shapr3d.com/hc/en-us/articles/7873906073884-Keyboard-shortcuts-gestures-and-hotkeys), [Shapr3D forum on 3-finger undo](https://discourse.shapr3d.com/t/2-finger-undo-3-finger-redo/19784), [Nomad history](https://nomadsculpt.com/manual/history), [Nomad interface](https://nomadsculpt.com/manual/interface), [MDN touch-action](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action), [MDN pointer events](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events).

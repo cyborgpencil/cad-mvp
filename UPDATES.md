@@ -3,6 +3,9 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-29
+- 2026-10-29 feat/antigravity-extrude-undo: web/tests/docs - Extrude (New/Join/Cut) now undoable via runUndoable; failed extrude adds no undo step; sketch restore queued as follow-up. Docs: stale Tool Search text marked removed per #255.
+
 ## 2026-10-28
 - 2026-10-28 ci/smoke-playwright: ci/tests - install Playwright + Chromium before CTest in CI and fail hard when CI is set if Playwright or libcascade is missing in the 6 browser smoke scripts.
 - 2026-10-28 fix/float-close-x: web - add .sheet-h close button to #sketchSheet, #edgeSheet, #browser, and #inspector; smoke asserts close button presence and close behavior on all four panels.
