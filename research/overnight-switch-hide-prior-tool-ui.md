@@ -76,7 +76,7 @@ Antigravity feed: `prompts/antigravity-switch-hide-prior-tool-ui.md`. This diges
 1. **No single helper** that, on every tool arm or menu open, hides the previous tool’s UI panel set.
 2. **Tool→tool** paths (e.g. fillet/chamfer `#edgeSheet` vs sketch `#sketchSheet` vs Modify shelf vs dim/prop) are not uniformly gated in one place — some hide via `paintEdgeChrome` / tab change / create open; others may leave prior UI up. Exact leftover pairs need a tip-time audit during coding, not invented here.
 3. Which surfaces count as “prior tool UI” vs permanent chrome is still partly **TBD** under the always-visible chrome brief (region mapping TBD).
-4. Whether opening Tool Search must hide `#sketchSheet` / `#edgeSheet` / Modify (today `openSearchDialog` closes tools/create/drawers/file/export, not those tool panels) is **TBD**.
+4. Whether opening Tool Search must hide `#sketchSheet` / `#edgeSheet` / Modify (today `openSearchDialog` closes tools/create/drawers/file/export, not those tool panels) is **TBD**. *(Superseded by #255 / `8e18de0` — Tool Search removed.)*
 5. Themes / Active chrome B must not be reopened.
 
 ---
@@ -96,7 +96,7 @@ Implement Erik’s overnight rule by **extending existing P4 / always-visible ch
 **Do not bake / TBD:**
 
 - Exact enumeration of every panel id that counts as “prior tool UI” (beyond P4 list + always-visible TBD mapping)
-- Whether Tool Search open must hide sketch/edge/modify panels
+- Whether Tool Search open must hide sketch/edge/modify panels *(Superseded by #255 / `8e18de0` — Tool Search removed.)*
 - Whether switching tools cancels in-progress tool state (geometry) vs only hides UI — **UI hide only** unless Erik locks cancel semantics
 - Phone vs desktop differences beyond existing locks
 - New control ids, CSS, pixels, icon art, hotkeys
@@ -110,11 +110,11 @@ Implement Erik’s overnight rule by **extending existing P4 / always-visible ch
 Cite: Erik overnight item (2) ~11:55 PM MT 2026-10-26; P4 `prompts/p4-tool-shelf-show-hide.md`; always-visible chrome park + #191/#193; tip `e805614` `web/index.html` behavior above.
 
 1. Switching to another **tool** hides the previous tool’s non-permanent UI (only one active tool shelf / tool sheet visible), consistent with P4 “only open shelf is the active tool's shelf.”
-2. Opening another **menu** (Tools / Create / Selection / Camera / About / Tool Search as applicable) hides the prior menu or tool shelf per existing mutual-exclusion patterns, extended only where a tip-time audit shows a leftover prior tool UI still visible.
+2. Opening another **menu** (Tools / Create / Selection / Camera / About / Tool Search as applicable; *Tool Search superseded by #255 / `8e18de0`*) hides the prior menu or tool shelf per existing mutual-exclusion patterns, extended only where a tip-time audit shows a leftover prior tool UI still visible.
 3. Permanent chrome stays: very top (tree + filename), tools menu bar, very bottom (Modify / Create etc.).
 4. No invented panel list, no gesture invents, no theme / Active chrome B work, no kernel / wasm, no export-path edits.
 
-Outside this hard bar (TBD — do not bake): full panel-id taxonomy; Tool Search vs sketch/edge/modify hide matrix; cancel-vs-hide for in-progress tools; phone vs desktop extras; control ids / CSS / pixels / icon art / hotkeys; Fusion/Shapr matrices not stated in fetched docs.
+Outside this hard bar (TBD — do not bake): full panel-id taxonomy; Tool Search *(Superseded by #255 / `8e18de0`)* vs sketch/edge/modify hide matrix; cancel-vs-hide for in-progress tools; phone vs desktop extras; control ids / CSS / pixels / icon art / hotkeys; Fusion/Shapr matrices not stated in fetched docs.
 
 ## Out of scope
 

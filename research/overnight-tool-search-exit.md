@@ -1,6 +1,6 @@
 # Tool Search exit — invent-free digest (overnight item 1)
 
-Status: invent-free digest (MVP Research Digest). Compiled **2026-10-27 ~12:24 AM MT** (America/Denver).
+Status: invent-free digest (MVP Research Digest). Compiled **2026-10-27 ~12:24 AM MT** (America/Denver). **Superseded by #255 (`8e18de0`):** Tool Search chrome (`#searchBtn`, `#searchDlg`, `X` hotkey) was removed on main.
 Antigravity feed: `prompts/antigravity-tool-search-exit.md`. This digest does not start an `agy`.
 
 **Owner draft:** MVP Research Digest (content). Doc Steward primary tip for any `prompts/` PR.
