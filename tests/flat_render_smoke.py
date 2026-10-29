@@ -559,7 +559,72 @@ def run_viewport_case(page: Any, kind: str, width: int, height: int, origin: str
         if not any(abs(val - 0.25) < 1e-6 for val in emissives):
             problems.append(f"{tag} multi-body selection emissive missing {br.get('bodies')!r}")
 
+    # 7. About close button shows X ('\u00d7') top-right, no 'Close' text, aria-label='Close', and closes About.
+    check_about_close_x(page, tag, problems)
+    check_gate_and_mm(probe_render(page), f"{tag} post-about", problems)
+
     return problems
+
+
+def check_about_close_x(page: Any, tag: str, problems: list[str]) -> None:
+    tap(page, "#fileBtn")
+    page.wait_for_function(
+        "() => { const m = document.getElementById('fileMenu'); return !!(m && m.hidden === false); }"
+    )
+    tap(page, "#fileMenu [data-action='aboutMenu']")
+    page.wait_for_function(
+        """() => {
+          const about = document.querySelector('.menu[aria-label="About"]');
+          const s = window.__cadcamExportState || {};
+          return !!(about && about.hidden === false && s.aboutOpen === true);
+        }"""
+    )
+    info = page.evaluate(
+        """() => {
+          const about = document.querySelector('.menu[aria-label="About"]');
+          if (!about) return { ok: false, reason: 'missing About menu' };
+          const h2 = about.querySelector('.sheet-h .panel-h');
+          const btn = about.querySelector('.sheet-h > button.icon-btn[data-action="closeSheet"][aria-label="Close"]');
+          if (!btn) return { ok: false, reason: 'missing About closeSheet button' };
+          const rawText = String(btn.textContent || '');
+          const text = rawText.trim();
+          const aria = String(btn.getAttribute('aria-label') || '');
+          const ar = about.getBoundingClientRect();
+          const hr = h2 ? h2.getBoundingClientRect() : null;
+          const br = btn.getBoundingClientRect();
+          return {
+            ok: true,
+            rawText: rawText,
+            text: text,
+            aria: aria,
+            width: br.width,
+            height: br.height,
+            rightOfHeading: hr ? (br.left >= hr.right - 1) : false,
+            atTop: br.top <= ar.top + 24 && br.bottom <= ar.bottom
+          };
+        }"""
+    )
+    if not isinstance(info, dict) or not info.get("ok"):
+        problems.append(f"{tag} About close probe failed: {info!r}")
+        return
+    if info.get("text") != "\u00d7":
+        problems.append(f"{tag} About close text={info.get('text')!r} (want '\u00d7')")
+    if "close" in str(info.get("rawText") or "").lower():
+        problems.append(f"{tag} About close still has Close text: {info.get('rawText')!r}")
+    if info.get("aria") != "Close":
+        problems.append(f"{tag} About close aria-label={info.get('aria')!r} (want 'Close')")
+    if float(info.get("width") or 0) + 0.5 < 44 or float(info.get("height") or 0) + 0.5 < 44:
+        problems.append(f"{tag} About close size {info.get('width')}x{info.get('height')}")
+    if info.get("rightOfHeading") is not True or info.get("atTop") is not True:
+        problems.append(f"{tag} About close position {info!r}")
+    tap(page, '.menu[aria-label="About"] .sheet-h > button.icon-btn[data-action="closeSheet"][aria-label="Close"]')
+    page.wait_for_function(
+        """() => {
+          const about = document.querySelector('.menu[aria-label="About"]');
+          const s = window.__cadcamExportState || {};
+          return !!(about && about.hidden === true && s.aboutOpen === false);
+        }"""
+    )
 
 
 def run_engine(playwright: Any, engine: str, origin: str) -> list[str]:
