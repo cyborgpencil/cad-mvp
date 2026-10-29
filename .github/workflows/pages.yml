@@ -167,6 +167,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y /tmp/chrome.deb
           google-chrome --version
+      - name: Install Playwright for the browser smoke tests
+        # Same as ci.yml. The CMake CI guard requires Playwright, and deploy must not skip the smokes.
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/playwright-env"
+          echo "${RUNNER_TEMP}/playwright-env/bin" >> "${GITHUB_PATH}"
+          export PATH="${RUNNER_TEMP}/playwright-env/bin:${PATH}"
+          pip install playwright
+          playwright install --with-deps chromium webkit
       - name: Native CTest
         # Before upload. occt_gate and deploy_smoke run here, once, and a
         # failure blocks the Pages artifact. CI=true forbids those skips.
