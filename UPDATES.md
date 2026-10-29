@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-29
+- 2026-10-29 fix/repair-no-mutate: web/tests - repair_mesh replaces g_mesh only when repair passes; a failed repair leaves the mesh unchanged with no undo step (case confirmed by #282 probe); repair_undo_smoke gates it in Chromium and WebKit.
 - 2026-10-29 feat/repair-native-test: tests/cmake - add native test_repair covering repair_manifold (clean box, inward-wound box, duplicate-vertex soup weld, zero-area triangle drop, open box cannot-repair, and failed-repair result.mesh mutation probe) and add browser open-box g_mesh probe to repair_undo_smoke in Chromium and WebKit.
 - 2026-10-29 feat/antigravity-flat-render: web/tests - remove key and rim DirectionalLights (keep AmbientLight 0.38 and HemisphereLight 0.7), replace bodyMat with MeshLambertMaterial(color: 0x5aa4d6, flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1), default display to Shaded+Edges ('edges'), remove fake blob shadow, and add flat_render_smoke in Chromium and WebKit.
 - 2026-10-29 cursor/webkit-fillet-double-tap: tests - edge_fillet_smoke waits on the inner edge the size-80 reject already selected, instead of a second tap that WebKit treats as double-tap Fit and clears.
