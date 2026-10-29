@@ -234,6 +234,7 @@
   .ribbon { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); display: flex; flex-wrap: wrap; align-items: stretch; }
   .ribbon > .tools { flex: 1; min-width: 0; }
   .topbar-shelves {
+    position: relative;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -1921,12 +1922,13 @@
         <button type="button" data-tool="Import STL">Import STL</button>
         <button type="button" data-action="downloadLog" data-tool="Download log">Download log</button>
         <button type="button" id="threeFingerUndo" data-action="threeFingerUndo" data-tool="Three-finger undo/redo" aria-pressed="true">Three-finger undo/redo</button>
+        <button type="button" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector" aria-controls="inspector" aria-expanded="false">Info</button>
+        <button type="button" data-action="aboutMenu" data-tool="About" title="About" aria-label="About" aria-haspopup="true" aria-expanded="false">About</button>
       </div>
     </div>
     <button type="button" class="icon-btn" data-action="undo" data-tool="Undo" title="Undo" aria-label="Undo"><svg class="ico"><use href="#i-undo"></use></svg></button>
     <button type="button" class="icon-btn" data-action="redo" data-tool="Redo" title="Redo" aria-label="Redo"><svg class="ico"><use href="#i-redo"></use></svg></button>
     <span class="spacer"></span>
-    <button type="button" class="drawer-btn" data-action="drawer" data-drawer="inspector" data-tool="Inspector" aria-label="Inspector" aria-controls="inspector" aria-expanded="false">Info</button>
     <input class="doc" id="docName" value="Part 1" title="Part 1" aria-label="Part name" spellcheck="false" autocomplete="off">
     <span class="pill hide-narrow">WASM</span>
     <div class="units" role="group" aria-label="Units">
@@ -1969,19 +1971,16 @@
       <button type="button" class="tool-btn is-on" data-tool="View" title="View" aria-label="View" aria-expanded="true">
         <svg class="ico"><use href="#i-eye"></use></svg><span>View</span>
       </button>
-      <div class="menu-wrap">
-        <button type="button" class="tool-btn" data-action="aboutMenu" data-tool="About" title="About" aria-label="About" aria-haspopup="true" aria-expanded="false">About</button>
-        <div class="menu" role="region" aria-label="About" hidden>
-          <div class="sheet-h">
-            <h2 class="panel-h">About</h2>
-            <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
-          </div>
-          <p class="fine">Version: <b>TBD</b></p>
-          <div class="muted">Theme</div>
-          <div class="units" role="group" aria-label="Theme">
-            <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
-            <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
-          </div>
+      <div class="menu" role="region" aria-label="About" hidden>
+        <div class="sheet-h">
+          <h2 class="panel-h">About</h2>
+          <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+        </div>
+        <p class="fine">Version: <b>TBD</b></p>
+        <div class="muted">Theme</div>
+        <div class="units" role="group" aria-label="Theme">
+          <button type="button" class="is-on" data-action="theme" data-theme="default" data-tool="Theme: default" aria-pressed="true">default</button>
+          <button type="button" data-action="theme" data-theme="modo" data-tool="Theme: modo" aria-pressed="false">modo</button>
         </div>
       </div>
       <div class="vp-bar" role="toolbar" aria-label="View" data-hscroll>
@@ -10625,10 +10624,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     for (let i = 0; i < buttons.length; i += 1) {
       buttons[i].setAttribute('aria-expanded', next ? 'true' : 'false');
       buttons[i].classList.toggle('is-on', next);
-      const wrap = buttons[i].closest('.menu-wrap');
-      const menu = wrap ? wrap.querySelector('.menu') : null;
-      if (menu) menu.hidden = !next;
     }
+    const menu = document.querySelector('.menu[aria-label="About"]');
+    if (menu) menu.hidden = !next;
     if (!next) {
       clearToasts();
       dismissStuckTooltips();
@@ -11035,10 +11033,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     document.documentElement.toggleAttribute('data-sketch-plane', hasPlane);
     const sketchPanel = document.querySelector('[data-panel="sketch"]');
     if (sketchPanel) sketchPanel.hidden = !hasPlane;
-    const aboutBtn = document.querySelector('.topbar-shelves [data-action="aboutMenu"]');
-    const aboutWrap = aboutBtn ? aboutBtn.closest('.menu-wrap') : null;
-    if (aboutWrap) aboutWrap.hidden = sketchActive;
     if (sketchActive && state.aboutOpen) setAboutOpen(false);
+    const aboutMenu = document.querySelector('.menu[aria-label="About"]');
+    if (aboutMenu) aboutMenu.hidden = sketchActive || !state.aboutOpen;
     if (!bar) return;
     const show = (sketchActive && !state.sketchPlane) || primPlaneActive;
     bar.hidden = !show;
@@ -15843,7 +15840,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     }
     const btn = ev.target.closest('[data-tool], [data-action]');
     if (!btn) {
-      if (!ev.target.closest('.menu-wrap, .export-wrap, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
+      if (!ev.target.closest('.menu-wrap, .menu[aria-label="About"], .export-wrap, .sheet, .create-menu, .pick-chooser, #sketchSheet')) {
         closePopups();
       }
       return;
@@ -16514,7 +16511,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
 
   function setupFloatingPanelDock() {
     const floatPanels = Array.from(
-      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #browser, #inspector, #fileMenu, #exportMenu, #createMenu, .menu-wrap .menu[aria-label="About"]')
+      document.querySelectorAll('#sketchSheet, #edgeSheet, #toolsSheet, .vp-bar, #browser, #inspector, #fileMenu, #exportMenu, #createMenu, .menu[aria-label="About"]')
     );
     let dragState = null;
     let suppressPanelClick = false;
@@ -16532,7 +16529,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
           panel.id === 'fileMenu' ||
           panel.id === 'exportMenu' ||
           panel.id === 'createMenu' ||
-          (panel.matches && panel.matches('.menu-wrap .menu[aria-label="About"]'))
+          (panel.matches && panel.matches('.menu[aria-label="About"]'))
         )
       );
     }
