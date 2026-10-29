@@ -11244,7 +11244,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   }
 
   function installExtrudeOnBody(body, owned) {
-    if (!body || !owned || !owned.shape || !primApi) return false;
+    if (!body || !owned || !owned.shape || !primApi) {
+      state.lastError = 'FAIL: the prior body was kept.';
+      return false;
+    }
     const previous = {
       shape: body.shape,
       mesh: body.mesh,
@@ -11402,7 +11405,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     };
     const ok = installExtrudeOnBody(target, owned);
     dropShape(prism);
-    if (!ok) return state.lastError || 'FAIL: the prior body was kept.';
+    if (!ok) {
+      if (!state.lastError) state.lastError = 'FAIL: the prior body was kept.';
+      return state.lastError;
+    }
     state.selection = 'item';
     state.selectedIds = state.bodies.length === 1 ? ['item'] : [target.id];
     state.hoverId = null;
@@ -12661,12 +12667,14 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const plane = state.sketchPlane;
     if (!profile || !profile.closed || !profile.shape || !plane || !plane.frame) {
       const why = 'Finish a closed profile first.';
+      state.lastError = why;
       setHint(why);
       toast(why);
       return why;
     }
     if (!oc || !opsApi || !primApi || typeof opsApi.makePrismSolid !== 'function') {
       const why = 'FAIL: extrude ops are not loaded. The profile was kept.';
+      state.lastError = why;
       setHint(why);
       toast(why);
       return why;
@@ -12674,6 +12682,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     const depth = readField('sketchDepth');
     if (!(depth > 0)) {
       const why = 'Blind distance must be millimetres above 0. The profile was kept.';
+      state.lastError = why;
       setHint(why);
       toast(why);
       return why;
@@ -12748,6 +12757,9 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     state.sceneCleared = false;
     state.projectBlank = false;
     const synced = installBodiesAndSync('extrude');
+    if (!synced && !state.lastError) {
+      state.lastError = 'FAIL: the new body did not pass the gate.';
+    }
     clearSketchGeometry();
     closeSketchSheet();
     paintPrimFields();
@@ -14061,7 +14073,12 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       return;
     } else if (action === 'confirmSketch') {
       if (state.sketchSheetMode === 'circle') message = commitSketchCircle();
-      else if (state.sketchSheetMode === 'extrude') message = commitSketchExtrude();
+      else if (state.sketchSheetMode === 'extrude') {
+        runUndoable('Extrude', function () {
+          message = commitSketchExtrude();
+          return state.lastError === '';
+        });
+      }
       else if (state.sketchSheetMode === 'line') message = commitSketchLine();
       else if (state.sketchSheetMode === 'arc') message = commitSketchArc();
       else if (state.sketchSheetMode === 'polygon') message = commitSketchPolygon();
