@@ -299,12 +299,22 @@ def run_case(page: Any, kind: str) -> list[str]:
     shot(page, kind, "03-smaller")
 
     tap(page, '[data-action="armEdge"][data-op="fillet"]')
-    page.wait_for_function("() => (window.__cadcamExportState || {}).edgeSize === '2'")
+    page.wait_for_function(
+        """() => {
+          const state = window.__cadcamExportState || {};
+          return state.edgeArm === 'fillet' && state.edgeSize === '2';
+        }"""
+    )
     inner = pick_named(page, "inner", problems, kind)
     if not inner:
         return problems
     pointer(page, inner, 62)
-    page.wait_for_function("() => (window.__cadcamExportState || {}).edgeConfirmEnabled === true")
+    page.wait_for_function(
+        """() => {
+          const state = window.__cadcamExportState || {};
+          return state.selectionCount === 1 && state.edgeConfirmEnabled === true;
+        }"""
+    )
     before_fillet = int(read_state(page).get("undoDepth") or 0)
     tap(page, "#edgeConfirm")
     page.wait_for_function(
@@ -344,7 +354,12 @@ def run_case(page: Any, kind: str) -> list[str]:
     if not tip:
         return problems
     pointer(page, tip, 63)
-    page.wait_for_function("() => (window.__cadcamExportState || {}).edgeConfirmEnabled === true")
+    page.wait_for_function(
+        """() => {
+          const state = window.__cadcamExportState || {};
+          return state.selectionCount === 1 && state.edgeConfirmEnabled === true;
+        }"""
+    )
     before_chamfer = volume_of(read_state(page))
     chamfer_depth = int(read_state(page).get("undoDepth") or 0)
     tap(page, "#edgeConfirm")
