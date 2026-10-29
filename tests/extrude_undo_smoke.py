@@ -6,6 +6,9 @@ Verifies:
   Redo restores post-extrude values.
 - A failed extrude pushes nothing onto the undo stack.
 - Hole -> Extrude -> Undo removes only the Extrude.
+- Open sketch sheet (extrude and profile), Undo/Redo: sheet closes
+  (state.sketchSheetMode falsy, #sketchSheet hidden), prior/redo scene restored,
+  and the next Confirm cannot extrude onto the restored scene.
 - After Undo and Redo: validity gate passes (watertight) and units stay mm.
 - Undo/Redo controls, labels, and Confirm button stay unchanged (>= 44x44 CSS px).
 
@@ -442,6 +445,216 @@ def run_case(page: Any, kind: str) -> list[str]:
     if int(undone_extrude.get("holeCount") or 0) != 1:
         problems.append(f"{kind} holeCount after extrude undo {undone_extrude.get('holeCount')!r}")
     check_gate_and_units(page, kind, "hole-extrude-undo", problems)
+
+    # 5. Open sketch sheet -> Undo/Redo closes the sheet (sketchSheetMode falsy),
+    # restores the prior/redo scene, and the next Confirm cannot extrude onto it.
+    sketch_rect_and_open_extrude(page, kind, problems)
+    if problems:
+        return problems
+    set_extrude_depth(page, "10")
+    set_extrude_mode(page, "new")
+    tap(page, ".topbar [data-action='undo']")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sheet = document.getElementById('sketchSheet');
+          const vol = Number(s.volumeMm3);
+          return s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && s.holeCount === 0
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 0, "redo": 2, "bodies": 1, "vol": 8000.0, "tol": 0.5},
+    )
+    check_gate_and_units(page, kind, "open-sheet-undo", problems)
+
+    page.evaluate("document.getElementById('toasts').replaceChildren()")
+    tap(page, "#sketchConfirm")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sk = window.__cadcamSketch ? window.__cadcamSketch.state() : {};
+          const sheet = document.getElementById('sketchSheet');
+          const hint = document.getElementById('statusHint');
+          const toasts = document.getElementById('toasts');
+          const vol = Number(s.volumeMm3);
+          return !!(toasts && (toasts.textContent || '').includes('Sketch'))
+            && !!(hint && (hint.textContent || '').trim().startsWith('Undo'))
+            && sk.closed === true
+            && s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && s.holeCount === 0
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 0, "redo": 2, "bodies": 1, "vol": 8000.0, "tol": 0.5},
+    )
+    check_gate_and_units(page, kind, "open-sheet-undo-confirm", problems)
+
+    open_tools_sheet(page)
+    tap(page, "#sheetTools button:has-text('Extrude (Push/Pull)')")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const depthRow = document.getElementById('sketchDepthRow');
+          const modeRow = document.getElementById('sketchModeRow');
+          return s.sketchSheetOpen === true
+            && !!(depthRow && depthRow.hidden === false)
+            && !!(modeRow && modeRow.hidden === false);
+        }"""
+    )
+    set_extrude_depth(page, "10")
+    set_extrude_mode(page, "new")
+    tap(page, ".topbar [data-action='redo']")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sheet = document.getElementById('sketchSheet');
+          const vol = Number(s.volumeMm3);
+          return s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && s.holeCount === 1
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 1, "redo": 1, "bodies": 1, "vol": hole_vol, "tol": 0.5},
+    )
+    check_gate_and_units(page, kind, "open-sheet-redo", problems)
+
+    page.evaluate("document.getElementById('toasts').replaceChildren()")
+    tap(page, "#sketchConfirm")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sk = window.__cadcamSketch ? window.__cadcamSketch.state() : {};
+          const sheet = document.getElementById('sketchSheet');
+          const hint = document.getElementById('statusHint');
+          const toasts = document.getElementById('toasts');
+          const vol = Number(s.volumeMm3);
+          return !!(toasts && (toasts.textContent || '').includes('Sketch'))
+            && !!(hint && (hint.textContent || '').trim().startsWith('Redo'))
+            && sk.closed === true
+            && s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && s.holeCount === 1
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 1, "redo": 1, "bodies": 1, "vol": hole_vol, "tol": 0.5},
+    )
+    check_gate_and_units(page, kind, "open-sheet-redo-confirm", problems)
+
+    open_create_menu(page)
+    tap(page, "#createMenu [data-action='newSketch']")
+    page.wait_for_function(
+        "() => !!(window.__cadcamSketch && window.__cadcamSketch.state().tab === 'sketch')"
+    )
+    tapped = page.evaluate(
+        "() => window.__cadcamSketch.tapFace(window.__cadcamSketch.topFace())"
+    )
+    if tapped is not True:
+        problems.append(f"{kind} open-rect tapFace {tapped!r}")
+        return problems
+    page.wait_for_function(
+        """() => {
+          const st = window.__cadcamSketch ? window.__cadcamSketch.state() : null;
+          return !!(st && st.plane === true && st.faceId);
+        }"""
+    )
+    open_tools_sheet(page)
+    tap(page, "#sheetTools button:has-text('Rectangle')")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const row = document.getElementById('sketchRectRow');
+          return s.sketchSheetOpen === true && !!(row && row.hidden === false);
+        }"""
+    )
+    tap(page, ".topbar [data-action='redo']")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sheet = document.getElementById('sketchSheet');
+          const callouts = window.__cadcamCallouts ? window.__cadcamCallouts.probe() : null;
+          const vol = Number(s.volumeMm3);
+          return s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && !!(callouts && callouts.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 2, "redo": 0, "bodies": 2, "vol": hole_vol + 1000.0, "tol": 1.0},
+    )
+    check_gate_and_units(page, kind, "open-rect-sheet-redo", problems)
+
+    open_tools_sheet(page)
+    tap(page, "#sheetTools button:has-text('Rectangle')")
+    page.wait_for_function(
+        """() => {
+          const s = window.__cadcamExportState || {};
+          const row = document.getElementById('sketchRectRow');
+          return s.sketchSheetOpen === true && !!(row && row.hidden === false);
+        }"""
+    )
+    tap(page, ".topbar [data-action='undo']")
+    page.wait_for_function(
+        """(spec) => {
+          const s = window.__cadcamExportState || {};
+          const sheet = document.getElementById('sketchSheet');
+          const callouts = window.__cadcamCallouts ? window.__cadcamCallouts.probe() : null;
+          const vol = Number(s.volumeMm3);
+          return s.sketchSheetOpen === false
+            && !!(sheet && sheet.hidden === true)
+            && !!(callouts && callouts.hidden === true)
+            && s.undoDepth === spec.undo
+            && s.redoDepth === spec.redo
+            && s.bodyCount === spec.bodies
+            && Number.isFinite(vol)
+            && Math.abs(vol - spec.vol) <= spec.tol
+            && s.occtGate === true
+            && s.gateOcct === 'PASS'
+            && s.watertight === true
+            && s.unitsPass === true;
+        }""",
+        arg={"undo": 1, "redo": 1, "bodies": 1, "vol": hole_vol, "tol": 0.5},
+    )
+    check_gate_and_units(page, kind, "open-rect-sheet-undo", problems)
     check_controls(page, kind, problems)
     return problems
 
