@@ -828,8 +828,8 @@ expect('hole defaults on the page', pageSrc.indexOf('value="4.5"') !== -1 && pag
 expect('closed inspector hidden', pageSrc.indexOf('.inspector:not(.open)') !== -1 && pageSrc.indexOf('visibility: hidden') !== -1);
 expect('tap slop in page', pageSrc.indexOf('tapSlopPx()') !== -1);
 expect('no layout constants in web ops', opsSrc.indexOf('BLINK_') === -1 && opsSrc.indexOf('buildBlink') === -1);
-expect('default display toolbar shaded is-on', pageSrc.indexOf('class="is-on" data-action="display" data-mode="shaded"') !== -1 && pageSrc.indexOf('class="is-on" data-action="display" data-mode="edges"') === -1 && pageSrc.indexOf("display: 'shaded'") !== -1 && pageSrc.indexOf('data-action="display" data-mode="edges"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="wire"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="xray"') !== -1);
-expect('smooth material and vertex normals kept', pageSrc.indexOf('new THREE.MeshStandardMaterial(') !== -1 && pageSrc.indexOf('geo.computeVertexNormals()') !== -1);
+expect('default display toolbar edges is-on', pageSrc.indexOf('class="is-on" data-action="display" data-mode="edges"') !== -1 && pageSrc.indexOf('class="is-on" data-action="display" data-mode="shaded"') === -1 && pageSrc.indexOf("display: 'edges'") !== -1 && pageSrc.indexOf('data-action="display" data-mode="shaded"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="wire"') !== -1 && pageSrc.indexOf('data-action="display" data-mode="xray"') !== -1);
+expect('matte material and vertex normals kept', pageSrc.indexOf('new THREE.MeshLambertMaterial(') !== -1 && pageSrc.indexOf('flatShading: true') !== -1 && pageSrc.indexOf('geo.computeVertexNormals()') !== -1);
 
 if (blinkMod && blinkFile) {
   const blinkPlan = blinkMod.blinkHolePlan(null);
