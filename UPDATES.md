@@ -4,6 +4,7 @@
 Newest entries at the top.
 
 ## 2026-10-28
+- 2026-10-28 fix/float-close-x: web - add .sheet-h close button to #sketchSheet, #edgeSheet, #browser, and #inspector; smoke asserts close button presence and close behavior on all four panels.
 - 2026-10-28 fix/file-menu-info-close: web - picking Info from #fileMenu now closes File (drawer branch); smoke checks File hidden after Info and About.
 - 2026-10-28 PR #271 (merged at b990b68): web - About + Info moved into #fileMenu items 9/10 (LOCK; tip 9379db5).
 - 2026-10-28 PR #269 (merged at 0c5b5e4): web - Hole undo-wrap applyHole in runUndoable (tip 91ecd26).

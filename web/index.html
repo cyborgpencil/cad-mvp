@@ -2075,7 +2075,10 @@
       </div>
     </aside>
     <aside class="browser" id="browser" aria-label="Items">
-      <h2 class="panel-h">Items</h2>
+      <div class="sheet-h">
+        <h2 class="panel-h">Items</h2>
+        <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+      </div>
       <div class="branch">
         <button type="button" class="branch-name" data-tool="Bodies">Bodies</button>
         <div class="row" hidden>
@@ -2267,7 +2270,10 @@
         </div>
       </div>
       <div id="sketchSheet" class="edge-sheet sketch-sheet" role="region" aria-label="Sketch" hidden>
-        <p id="sketchNote" class="edge-note">Rectangle</p>
+        <div class="sheet-h">
+          <p id="sketchNote" class="edge-note">Rectangle</p>
+          <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+        </div>
         <div class="edge-sheet-row extrude-modes" id="sketchModeRow" hidden role="group" aria-label="Extrude mode">
           <button type="button" data-action="sketchExtrudeMode" data-mode="new" data-tool="Extrude New" title="New body" aria-pressed="true">New</button>
           <button type="button" data-action="sketchExtrudeMode" data-mode="join" data-tool="Extrude Join" title="Join the prism into one body" aria-pressed="false">Join</button>
@@ -2300,7 +2306,10 @@
         </div>
       </div>
       <div id="edgeSheet" class="edge-sheet" role="region" aria-label="Modify" hidden>
-        <h2 class="panel-h">Modify</h2>
+        <div class="sheet-h">
+          <h2 class="panel-h">Modify</h2>
+          <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+        </div>
         <p id="edgeNote" class="edge-note" hidden></p>
         <div class="edge-sheet-row">
           <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="2" aria-label="Edge size mm"><span>mm</span></label>
@@ -2323,7 +2332,10 @@
     </main>
 
     <aside class="inspector" id="inspector" aria-label="Inspector">
-      <h2 class="panel-h">Inspector</h2>
+      <div class="sheet-h">
+        <h2 class="panel-h">Inspector</h2>
+        <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
+      </div>
       <div class="side-head">
         <nav class="side-tabs" role="tablist" aria-label="Item panels">
           <button type="button" class="side-tab is-on" data-action="sideTab" data-side="properties" data-tool="Properties" role="tab" aria-selected="true">Properties</button>
@@ -13517,6 +13529,27 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       downloadText(window.__cadcamLogText || '', 'cadmvp-log.txt', 'text/plain');
       message = 'Download log';
     } else if (action === 'closeSheet') {
+      if (btn.closest('#sketchSheet')) {
+        closeSketchSheet();
+        publishGateState();
+        return;
+      }
+      if (btn.closest('#edgeSheet')) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+        updateInspector();
+        applyLook();
+        publishGateState();
+        return;
+      }
+      if (btn.closest('#browser')) {
+        setDrawer('browser', false);
+        return;
+      }
+      if (btn.closest('#inspector')) {
+        setDrawer('inspector', false);
+        return;
+      }
       setToolsOpen(false);
       return;
     } else if (action === 'units') {

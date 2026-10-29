@@ -3692,6 +3692,105 @@ def file_pick_problems(cdp: Cdp) -> list[str]:
     return [str(item) for item in found]
 
 
+FLOAT_CLOSE_EXPR = r"""
+(function(){
+  var problems = [];
+  var ids = ['sketchSheet', 'edgeSheet', 'browser', 'inspector'];
+  for (var i = 0; i < ids.length; i++) {
+    var panel = document.getElementById(ids[i]);
+    if (!panel) {
+      problems.push('missing #' + ids[i]);
+      continue;
+    }
+    var btn = panel.querySelector('.sheet-h > button.icon-btn[data-action="closeSheet"][aria-label="Close"]');
+    if (!btn) {
+      problems.push('#' + ids[i] + ' missing .sheet-h closeSheet button');
+    } else if ((btn.textContent || '').trim() !== 'Close') {
+      problems.push('#' + ids[i] + ' close label ' + (btn.textContent || '').trim());
+    }
+  }
+  if (problems.length) return JSON.stringify(problems);
+
+  var browser = document.getElementById('browser');
+  var treeBtn = document.querySelector('[data-action="drawer"][data-drawer="browser"]');
+  if (!treeBtn) {
+    problems.push('missing browser opener');
+  } else {
+    if (!browser.classList.contains('open')) treeBtn.click();
+    if (!browser.classList.contains('open')) problems.push('#browser did not open');
+    var bClose = browser.querySelector('.sheet-h [data-action="closeSheet"]');
+    bClose.click();
+    if (browser.classList.contains('open')) problems.push('#browser still open after closeSheet');
+  }
+
+  var inspector = document.getElementById('inspector');
+  var infoBtn = document.querySelector('#fileMenu [data-action="drawer"][data-drawer="inspector"]');
+  var fileMenu = document.getElementById('fileMenu');
+  if (!infoBtn || !fileMenu) {
+    problems.push('missing inspector opener');
+  } else {
+    if (!inspector.classList.contains('open')) {
+      fileMenu.hidden = false;
+      infoBtn.click();
+    }
+    if (!inspector.classList.contains('open')) problems.push('#inspector did not open');
+    var iClose = inspector.querySelector('.sheet-h [data-action="closeSheet"]');
+    iClose.click();
+    if (inspector.classList.contains('open')) problems.push('#inspector still open after closeSheet');
+  }
+
+  var sketchSheet = document.getElementById('sketchSheet');
+  var extrudeBtn = document.querySelector('[data-action="sketchExtrude"]');
+  if (!extrudeBtn) {
+    problems.push('missing sketchExtrude opener');
+  } else {
+    if (sketchSheet.hidden) extrudeBtn.click();
+    if (sketchSheet.hidden) problems.push('#sketchSheet did not open');
+    var sClose = sketchSheet.querySelector('.sheet-h [data-action="closeSheet"]');
+    sClose.click();
+    if (!sketchSheet.hidden) problems.push('#sketchSheet still open after closeSheet');
+    if (window.__cadcamExportState && window.__cadcamExportState.sketchSheetOpen) {
+      problems.push('sketchSheetOpen still true after closeSheet');
+    }
+  }
+
+  var edgeSheet = document.getElementById('edgeSheet');
+  var filletBtn = document.querySelector('[data-action="armEdge"][data-op="fillet"]');
+  if (!filletBtn) {
+    problems.push('missing armEdge opener');
+  } else {
+    var prevSel = document.querySelector('[data-action="select"].is-on');
+    var prevMode = prevSel ? (prevSel.getAttribute('data-mode') || 'item') : 'item';
+    if (edgeSheet.hidden) filletBtn.click();
+    if (edgeSheet.hidden) problems.push('#edgeSheet did not open');
+    var eClose = edgeSheet.querySelector('.sheet-h [data-action="closeSheet"]');
+    eClose.click();
+    if (!edgeSheet.hidden) problems.push('#edgeSheet still open after closeSheet');
+    if (window.__cadcamExportState && (window.__cadcamExportState.edgeSheetOpen || window.__cadcamExportState.edgeArm)) {
+      problems.push('edgeSheet state still armed after closeSheet');
+    }
+    var restoreSel = document.querySelector('[data-action="select"][data-mode="' + prevMode + '"]');
+    if (restoreSel) restoreSel.click();
+  }
+
+  return JSON.stringify(problems);
+})()
+"""
+
+
+def float_close_problems(cdp: Cdp) -> list[str]:
+    raw, err = eval_expr(cdp, FLOAT_CLOSE_EXPR)
+    if err or not isinstance(raw, str):
+        return [f"float close {raw or err}"]
+    try:
+        found = json.loads(raw)
+    except json.JSONDecodeError:
+        return [f"float close {raw}"]
+    if not isinstance(found, list):
+        return [f"float close {raw}"]
+    return [str(item) for item in found]
+
+
 def read_home_aim(cdp: Cdp) -> tuple[dict[str, Any] | None, str]:
     raw, err = eval_expr(
         cdp,
@@ -4330,6 +4429,9 @@ def run_wrapup(cdp: Cdp, origin: str) -> list[str]:
     fit = portrait_fit_problems(cdp)
     if fit:
         return ["wrapup phone fit", *fit[:20]]
+    close_x = float_close_problems(cdp)
+    if close_x:
+        return ["wrapup phone close x", *close_x[:20]]
     try:
         set_desktop(cdp)
     except (RuntimeError, TimeoutError, OSError) as exc:
@@ -8794,6 +8896,7 @@ def run(omit: list[str]) -> int:
                 desktop_bar = toolbar_row_problems(cdp)
                 desktop_bar.extend(chrome_row_problems(cdp))
                 desktop_bar.extend(file_pick_problems(cdp))
+                desktop_bar.extend(float_close_problems(cdp))
                 desktop_bar.extend(create_menu_problems(cdp))
                 if desktop_bar:
                     failures.append("desktop toolbar")
