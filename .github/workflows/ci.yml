@@ -158,7 +158,7 @@ jobs:
           echo "${RUNNER_TEMP}/playwright-env/bin" >> "${GITHUB_PATH}"
           export PATH="${RUNNER_TEMP}/playwright-env/bin:${PATH}"
           pip install playwright
-          playwright install chromium
+          playwright install --with-deps chromium webkit
       - name: Native CTest
         if: steps.changes.outputs.code == 'true'
         # Before upload. occt_gate and deploy_smoke run here, once, and a
