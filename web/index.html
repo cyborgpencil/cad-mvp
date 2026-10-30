@@ -422,6 +422,55 @@
   .sketch-sheet .edge-size input { width: auto; flex: 1 1 auto; }
   #edgeSheet .edge-size span { flex: none; font-weight: 650; }
   #edgeSheet .edge-size input { width: auto; flex: 1 1 auto; }
+  .edge-sheet .dim-step {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+    font-size: 18px;
+    font-weight: 650;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+  .edge-sheet .dim-step:hover { background: var(--surface-hover); }
+  .selection-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 6px;
+    margin-left: 4px;
+    border-left: 1px solid var(--line);
+  }
+  .selection-actions[hidden] { display: none !important; }
+  .context-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    touch-action: manipulation;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .context-action[hidden] { display: none !important; }
+  .context-action.danger { color: #ff6b6b; }
+  .context-action.clear-btn {
+    border-left: 1px solid var(--line);
+    margin-left: 4px;
+    padding-left: 8px;
+    color: var(--muted);
+  }
   .edge-note {
     margin: 0;
     min-height: 44px;
@@ -1471,7 +1520,11 @@
       scrollbar-width: none;
     }
     .vp-bar::-webkit-scrollbar { display: none; }
-    .topbar-shelf { bottom: 72px; }
+    .vp-bar { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+    .topbar-shelf { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+    .edge-sheet { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+    .context-action span { display: none; }
+    .context-action.clear-btn span { display: inline-block; }
     .hud { top: 8px; left: 8px; }
     .measure-readout { top: 60px; left: 8px; }
     .create-menu {
@@ -2249,6 +2302,19 @@
           <button type="button" class="tab" id="multiToggle" data-action="multiToggle" data-tool="Multi" title="Multi" aria-pressed="false" aria-label="Multi">Multi</button>
           <button type="button" class="tab is-on" data-action="planePickToggle" aria-pressed="true"></button>
         </div>
+        <div id="selectionActions" class="vp-cluster selection-actions" role="group" aria-label="Entity Actions" hidden>
+          <button type="button" class="tab context-action" data-action="contextFaceOp" data-op="pushPull" data-tool="Push/Pull" title="Push/Pull" hidden><svg class="ico"><use href="#i-extrude"></use></svg><span>Push/Pull</span></button>
+          <button type="button" class="tab context-action" data-action="contextFaceOp" data-op="editExtrude" data-tool="Edit Extrude" title="Edit Extrude" hidden><svg class="ico"><use href="#i-rect"></use></svg><span>Edit</span></button>
+          <button type="button" class="tab context-action" data-action="contextFaceOp" data-op="sketchOnFace" data-tool="Sketch on Face" title="Sketch on Face" hidden><svg class="ico"><use href="#i-line"></use></svg><span>Sketch</span></button>
+          <button type="button" class="tab context-action" data-action="armEdge" data-op="fillet" data-tool="Fillet" title="Fillet" hidden><svg class="ico"><use href="#i-fillet"></use></svg><span>Fillet</span></button>
+          <button type="button" class="tab context-action" data-action="armEdge" data-op="chamfer" data-tool="Chamfer" title="Chamfer" hidden><svg class="ico"><use href="#i-chamfer"></use></svg><span>Chamfer</span></button>
+          <button type="button" class="tab context-action" data-action="contextBodyOp" data-op="gizmo" data-tool="Gizmo" title="Transform Gizmo" hidden><svg class="ico"><use href="#i-grab"></use></svg><span>Gizmo</span></button>
+          <button type="button" class="tab context-action" data-action="contextBodyOp" data-op="union" data-tool="Union" title="Union bodies" hidden><svg class="ico"><use href="#i-coin"></use></svg><span>Union</span></button>
+          <button type="button" class="tab context-action" data-action="contextBodyOp" data-op="cut" data-tool="Cut" title="Cut body" hidden><svg class="ico"><use href="#i-hole"></use></svg><span>Cut</span></button>
+          <button type="button" class="tab context-action" data-action="contextBodyOp" data-op="intersect" data-tool="Intersect" title="Intersect bodies" hidden><svg class="ico"><use href="#i-box"></use></svg><span>Intersect</span></button>
+          <button type="button" class="tab context-action danger" data-action="contextBodyOp" data-op="delete" data-tool="Delete Body" title="Delete selected body" hidden><svg class="ico"><use href="#i-trash"></use></svg><span>Delete</span></button>
+          <button type="button" class="tab context-action clear-btn" data-action="clearSelection" data-tool="Clear selection" title="Clear selection"><span>Clear</span></button>
+        </div>
       </div>
       <div id="cameraShelf" class="vp-bar topbar-shelf" role="toolbar" aria-label="Show/hide camera" data-hscroll hidden>
         <span class="modify-order">Camera</span>
@@ -2307,12 +2373,14 @@
       </div>
       <div id="edgeSheet" class="edge-sheet" role="region" aria-label="Modify" hidden>
         <div class="sheet-h">
-          <h2 class="panel-h">Modify</h2>
+          <h2 class="panel-h" id="edgeSheetTitle">Modify</h2>
           <button type="button" class="icon-btn" data-action="closeSheet" aria-label="Close"><span>Close</span></button>
         </div>
         <p id="edgeNote" class="edge-note" hidden></p>
         <div class="edge-sheet-row">
+          <button type="button" class="dim-step" data-action="edgeStep" data-delta="-0.5" aria-label="Decrease size" data-tool="Decrease size">−</button>
           <label class="edge-size" title="Fillet radius or chamfer distance in millimetres. Applies on Confirm."><input id="edgeSize" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="2" aria-label="Edge size mm"><span>mm</span></label>
+          <button type="button" class="dim-step" data-action="edgeStep" data-delta="0.5" aria-label="Increase size" data-tool="Increase size">+</button>
           <button type="button" class="edge-confirm" id="edgeConfirm" data-action="confirmEdge" data-tool="Confirm" title="Apply the fillet or chamfer on the picked edges." disabled aria-disabled="true">Confirm</button>
         </div>
       </div>
@@ -4599,6 +4667,41 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
         buttons[i].setAttribute('aria-checked', on ? 'true' : 'false');
       }
     }
+    const selCluster = document.getElementById('selectionActions');
+    if (selCluster) {
+      const hasSel = Array.isArray(state.selectedIds) && state.selectedIds.length > 0;
+      selCluster.hidden = !hasSel;
+      if (hasSel) {
+        const mode = state.selection;
+        const isFace = mode === 'face';
+        const isEdge = mode === 'edge';
+        const isBody = mode === 'item';
+        const bodyCount = state.bodies.length;
+
+        const faceBtns = selCluster.querySelectorAll('[data-action="contextFaceOp"]');
+        for (let i = 0; i < faceBtns.length; i += 1) faceBtns[i].hidden = !isFace;
+
+        const edgeBtns = selCluster.querySelectorAll('[data-action="armEdge"]');
+        for (let i = 0; i < edgeBtns.length; i += 1) edgeBtns[i].hidden = !isEdge;
+
+        const bodyBtns = selCluster.querySelectorAll('[data-action="contextBodyOp"]');
+        for (let i = 0; i < bodyBtns.length; i += 1) {
+          const op = bodyBtns[i].getAttribute('data-op');
+          if (op === 'union' || op === 'cut' || op === 'intersect') {
+            bodyBtns[i].hidden = !isBody || bodyCount < 2;
+          } else {
+            bodyBtns[i].hidden = !isBody;
+          }
+        }
+      }
+    }
+    const selectModeButtons = document.querySelectorAll('[data-action="select"]');
+    for (let i = 0; i < selectModeButtons.length; i += 1) {
+      const btnMode = selectModeButtons[i].getAttribute('data-mode');
+      const on = btnMode === state.selection || (btnMode === 'item' && state.selection === 'item');
+      selectModeButtons[i].classList.toggle('is-on', on);
+      selectModeButtons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
   }
 
   function setPhoneFilter(filter) {
@@ -6138,6 +6241,10 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
   function paintEdgeChrome() {
     const sheet = document.getElementById('edgeSheet');
     const note = document.getElementById('edgeNote');
+    const titleEl = document.getElementById('edgeSheetTitle');
+    if (titleEl) {
+      titleEl.textContent = state.edgeArm === 'chamfer' ? 'Chamfer' : state.edgeArm === 'fillet' ? 'Fillet' : 'Modify';
+    }
     const confirmBtn = document.getElementById('edgeConfirm');
     const armed = state.edgeArm === 'fillet' || state.edgeArm === 'chamfer';
     if (sheet) sheet.hidden = !armed;
@@ -10288,6 +10395,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       exportDisabled: !!(btn && btn.disabled),
       gateOcct: gateLabel,
       volumeMm3: state.volumeMm3,
+      volume: state.volumeMm3,
       cppVolumeMm3: state.cppVolumeMm3,
       rustGate: state.rustGate || null,
       bboxMm: state.bboxMm,
@@ -10300,6 +10408,7 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       theme: state.theme || 'default',
       aboutOpen: state.aboutOpen === true,
       selectionMode: state.selection,
+      selection: state.selection,
       selectionCount: state.selectedIds.length,
       selectedIds: state.selectedIds.slice(),
       selectionAll: state.selection !== 'item' && state.selectedIds.length === 0,
@@ -11061,6 +11170,29 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
       arr[i * 3 + 2] = p[1] + n[1] * lift;
     }
     return arr;
+  }
+
+  function resolveFaceTarget(faceId) {
+    if (!faceId) return null;
+    for (let b = 0; b < state.bodies.length; b += 1) {
+      const body = state.bodies[b];
+      if (!body.topology || !Array.isArray(body.topology.faces)) continue;
+      for (let f = 0; f < body.topology.faces.length; f += 1) {
+        const face = body.topology.faces[f];
+        if (face.id === faceId || (body.id + ':' + face.id) === faceId) {
+          return { face: face, owner: body, mesh: body.mesh || state.meshCad };
+        }
+      }
+    }
+    if (state.topology && Array.isArray(state.topology.faces)) {
+      for (let f = 0; f < state.topology.faces.length; f += 1) {
+        const face = state.topology.faces[f];
+        if (face.id === faceId) {
+          return { face: face, owner: state.bodies.length === 1 ? state.bodies[0] : null, mesh: state.meshCad };
+        }
+      }
+    }
+    return null;
   }
 
   function paintOriginPicker() {
@@ -13808,6 +13940,89 @@ function main(Module, oc, gateApi, primApi, selApi, viewApi, opsApi, projectApi,
     } else if (action === 'confirmEdge') {
       const label = state.edgeArm === 'chamfer' ? 'Chamfer' : 'Fillet';
       runUndoable(label, function () { return confirmPickedEdge() === true; });
+      return;
+    } else if (action === 'edgeStep') {
+      const delta = Number(btn.getAttribute('data-delta')) || 0;
+      const sizeInput = document.getElementById('edgeSize');
+      if (sizeInput) {
+        const cur = parseFloat(sizeInput.value.replace(',', '.')) || (state.edgeArm === 'chamfer' ? 0.5 : 2.0);
+        const nextVal = Math.max(0.1, Math.round((cur + delta) * 10) / 10);
+        sizeInput.value = String(nextVal);
+        sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        paintEdgeChrome();
+      }
+      return;
+    } else if (action === 'clearSelection') {
+      state.selectedIds = [];
+      state.hoverId = null;
+      if (state.edgeArm) {
+        state.edgeArm = '';
+        paintEdgeChrome();
+      }
+      refreshAnchor();
+      applyLook();
+      setHint('Selection cleared');
+      return;
+    } else if (action === 'contextFaceOp') {
+      const op = btn.getAttribute('data-op');
+      if (op === 'pushPull') {
+        if (state.selectedIds.length === 1 && state.selection === 'face') {
+          const resolved = resolveFaceTarget(state.selectedIds[0]);
+          if (resolved) {
+            selectFaceForSketch(resolved);
+            state.sketchExtrudeMode = 'join';
+            paintExtrudeModes();
+            openSketchSheet('rect');
+            const depthRow = document.getElementById('sketchDepthRow');
+            if (depthRow) depthRow.hidden = false;
+            toast('Push/Pull: adjust depth and confirm');
+            setHint('Push/Pull face extrude. Adjust depth and Confirm.');
+          }
+        }
+      } else if (op === 'editExtrude') {
+        if (state.selectedIds.length === 1 && state.selection === 'face') {
+          const body = bodyOwningFace(state.selectedIds[0]);
+          if (body && body.params) {
+            paintPrimFields();
+            toast('Edit solid parameters');
+          } else {
+            toast('Select an editable solid face');
+          }
+        }
+      } else if (op === 'sketchOnFace') {
+        if (state.selectedIds.length === 1 && state.selection === 'face') {
+          const resolved = resolveFaceTarget(state.selectedIds[0]);
+          if (resolved) {
+            selectFaceForSketch(resolved);
+            setTab('sketch');
+            toast('Sketch on face');
+            setHint('Sketching on selected face');
+          } else {
+            toast('Pick a planar face first');
+          }
+        }
+      }
+      return;
+    } else if (action === 'contextBodyOp') {
+      const op = btn.getAttribute('data-op');
+      if (op === 'gizmo') {
+        state.gizmoVisible = !state.gizmoVisible;
+        handles.visible = gizmoShouldShow();
+        applyLook();
+        toast(state.gizmoVisible ? 'Gizmo enabled' : 'Gizmo hidden');
+      } else if (op === 'union' || op === 'cut' || op === 'intersect') {
+        const selected = orderedBodies();
+        if (selected.length === 2) {
+          const boolLabel = op === 'cut' ? 'Cut' : op === 'intersect' ? 'Intersect' : 'Union';
+          runUndoable(boolLabel, function () { return applySceneBoolean(op) === true; });
+        } else {
+          state.booleanOp = op;
+          toast('Select target and tool bodies for ' + cap(op));
+          setHint('Pick two bodies, then apply ' + cap(op));
+        }
+      } else if (op === 'delete') {
+        deleteSelection();
+      }
       return;
     } else if (action === 'calloutEdit') {
       openCalloutEntry(btn.getAttribute('data-dim') || '');
