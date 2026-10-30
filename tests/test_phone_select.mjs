@@ -401,6 +401,51 @@ expect('empty face ids', emptyFace.ids, []);
 expect('empty face all', emptyFace.all, true);
 expect('empty face highlight', emptyFace.highlight, false);
 
+
+// Context bar state tests
+expect('context states filter', phone.CONTEXT_STATES.FILTER, 'filter');
+expect('context states action', phone.CONTEXT_STATES.ACTION, 'action');
+expect('context states param', phone.CONTEXT_STATES.PARAM, 'param');
+
+// Entity action sets
+const faceActions = phone.contextActionsForEntity('face', ['f1'], 1);
+expect('face actions count', faceActions.length, 3);
+expect('face actions push_pull', faceActions.map(a => a.id), ['push_pull', 'edit_extrude', 'sketch_face']);
+
+const edgeActions = phone.contextActionsForEntity('edge', ['e1'], 1);
+expect('edge actions count', edgeActions.length, 2);
+expect('edge actions fillet_chamfer', edgeActions.map(a => a.id), ['fillet', 'chamfer']);
+
+const body1Actions = phone.contextActionsForEntity('item', ['item'], 1);
+expect('body 1 action count', body1Actions.length, 2);
+expect('body 1 actions', body1Actions.map(a => a.id), ['gizmo', 'delete']);
+
+const body2Actions = phone.contextActionsForEntity('item', ['item'], 2);
+expect('body 2 action count', body2Actions.length, 5);
+expect('body 2 actions', body2Actions.map(a => a.id), ['gizmo', 'union', 'cut', 'intersect', 'delete']);
+
+// Dimension parsing
+expect('parse dim 2.5', phone.parseDimensionMm('2.5'), { ok: true, value: 2.5 });
+expect('parse dim comma 2,5', phone.parseDimensionMm('2,5'), { ok: true, value: 2.5 });
+expect('parse dim spaced 0.8', phone.parseDimensionMm('  0.8  '), { ok: true, value: 0.8 });
+expect('parse dim blank', phone.parseDimensionMm('', 1.0), { ok: false, value: 1.0 });
+expect('parse dim negative', phone.parseDimensionMm('-2', 1.0), { ok: false, value: -2 });
+expect('parse dim zero', phone.parseDimensionMm('0', 1.0), { ok: false, value: 0 });
+expect('parse dim text', phone.parseDimensionMm('abc', 2.0), { ok: false, value: 2.0 });
+
+// Hotkey suspension helper
+const mockInput = { tagName: 'INPUT', nodeType: 1 };
+const mockTextarea = { tagName: 'TEXTAREA', nodeType: 1 };
+const mockCanvas = { tagName: 'CANVAS', nodeType: 1 };
+expect('suspend on input', phone.shouldSuspendHotkeys(mockInput), true);
+expect('suspend on textarea', phone.shouldSuspendHotkeys(mockTextarea), true);
+expect('allow on canvas', phone.shouldSuspendHotkeys(mockCanvas), false);
+
+// Selection isolation
+expect('isolate same mode', phone.isolateSelectionMode('edge', 'edge', ['e1', 'e2']), ['e1', 'e2']);
+expect('isolate diff mode', phone.isolateSelectionMode('face', 'edge', ['f1']), []);
+expect('isolate body to edge', phone.isolateSelectionMode('item', 'edge', ['b1']), []);
+
 if (failures.length) {
   console.error('FAIL ' + failures.length);
   process.exit(1);

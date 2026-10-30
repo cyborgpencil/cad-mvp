@@ -274,3 +274,81 @@ export function pointBesideSegment(ax, ay, bx, by, distance) {
     y: my + (dx / len) * step,
   };
 }
+
+
+// Adaptive Solid-Editing Context Bar states and action mappings
+export const CONTEXT_STATES = {
+  FILTER: 'filter',
+  ACTION: 'action',
+  PARAM: 'param',
+};
+
+export const ENTITY_ACTIONS = {
+  face: [
+    { id: 'push_pull', label: 'Push/Pull', icon: 'i-extrude', title: 'Extrude or offset face' },
+    { id: 'edit_extrude', label: 'Edit', icon: 'i-edit', title: 'Edit feature extrude' },
+    { id: 'sketch_face', label: 'Sketch', icon: 'i-sketch', title: 'New sketch on planar face' },
+  ],
+  edge: [
+    { id: 'fillet', label: 'Fillet', icon: 'i-fillet', title: 'Fillet selected edges', defaultMm: FILLET_DEFAULT_MM },
+    { id: 'chamfer', label: 'Chamfer', icon: 'i-chamfer', title: 'Chamfer selected edges', defaultMm: CHAMFER_DEFAULT_MM },
+  ],
+  body: [
+    { id: 'gizmo', label: 'Gizmo', icon: 'i-gizmo', title: 'Transform gizmo' },
+    { id: 'union', label: 'Union', icon: 'i-union', title: 'Union bodies', minBodies: 2 },
+    { id: 'cut', label: 'Cut', icon: 'i-cut', title: 'Cut body from target', minBodies: 2 },
+    { id: 'intersect', label: 'Intersect', icon: 'i-intersect', title: 'Common volume', minBodies: 2 },
+    { id: 'delete', label: 'Delete', icon: 'i-trash', title: 'Delete selected body', danger: true },
+  ],
+};
+
+export function contextActionsForEntity(mode, selectedIds, bodyCount) {
+  const named = FILTER_BY_MODE[mode] || mode;
+  const list = ENTITY_ACTIONS[named];
+  if (!Array.isArray(list)) return [];
+  const count = Array.isArray(selectedIds) ? selectedIds.length : 0;
+  if (count === 0 && named !== 'body') return [];
+  const bodies = Number(bodyCount) > 0 ? Number(bodyCount) : 1;
+  return list.filter(function (action) {
+    if (action.minBodies && bodies < action.minBodies) return false;
+    return true;
+  });
+}
+
+// Sanitize dimension input: accept positive finite numbers, supports commas, prevents NaN
+export function parseDimensionMm(text, fallback) {
+  const def = Number.isFinite(Number(fallback)) && Number(fallback) > 0 ? Number(fallback) : 1.0;
+  if (text == null) return { ok: false, value: def };
+  const raw = String(text).trim().replace(',', '.');
+  if (!raw) return { ok: false, value: def };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { ok: false, value: def };
+  if (!(n > 0)) return { ok: false, value: n };
+  return { ok: true, value: n };
+}
+
+// Check if keyboard shortcuts (1-4) should be suspended (e.g. focused in input or parameter sheet)
+export function shouldSuspendHotkeys(activeEl, eventTarget) {
+  const check = function (node) {
+    let curr = node;
+    while (curr && curr.nodeType !== 9) {
+      if (curr.nodeType === 1) {
+        const tag = String(curr.tagName || '').toUpperCase();
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+        if (curr.isContentEditable === true) return true;
+        if (curr.classList && (curr.classList.contains('context-tool-sheet') || curr.classList.contains('edge-sheet') || curr.classList.contains('dim-row'))) return true;
+      }
+      curr = curr.parentElement || curr.parentNode || null;
+    }
+    return false;
+  };
+  return check(activeEl) || check(eventTarget);
+}
+
+// Selection isolation: switching picking modes cleanly drops prior highlights
+export function isolateSelectionMode(currentMode, nextMode, stateSelectedIds) {
+  if (currentMode === nextMode) {
+    return Array.isArray(stateSelectedIds) ? stateSelectedIds.slice() : [];
+  }
+  return [];
+}

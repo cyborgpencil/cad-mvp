@@ -211,7 +211,7 @@ if(CADCAM_PYTHON)
         )
         if(NOT _cadcam_playwright_rc EQUAL 0)
             message(FATAL_ERROR
-                "gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, and flat_render_smoke require Playwright in ${CADCAM_PYTHON}; CI must not skip them")
+                "gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, flat_render_smoke, and context_bar_smoke require Playwright in ${CADCAM_PYTHON}; CI must not skip them")
         endif()
     endif()
     add_test(
@@ -304,10 +304,19 @@ if(CADCAM_PYTHON)
         SKIP_RETURN_CODE 77
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
+    add_test(
+        NAME context_bar_smoke
+        COMMAND "${CADCAM_PYTHON}" "${CMAKE_SOURCE_DIR}/tests/context_bar_smoke.py"
+    )
+    set_tests_properties(context_bar_smoke PROPERTIES
+        TIMEOUT 600
+        SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
 elseif(DEFINED ENV{CI} OR DEFINED ENV{GITHUB_ACTIONS})
-    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, and flat_render_smoke require Python; CI must not skip them")
+    message(FATAL_ERROR "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, flat_render_smoke, and context_bar_smoke require Python; CI must not skip them")
 else()
-    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, and flat_render_smoke not added: Python was not found")
+    message(STATUS "deploy_smoke, gizmo_drag_smoke, view_cube_swipe_smoke, three_finger_smoke, field_nudge_smoke, phone_select_smoke, edge_fillet_smoke, extrude_undo_smoke, repair_undo_smoke, flat_render_smoke, and context_bar_smoke not added: Python was not found")
 endif()
 
 add_library(model

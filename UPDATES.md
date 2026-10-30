@@ -3,6 +3,15 @@
 **Purpose**: Quick chronological record of changes so anyone (or future-you) can see what moved without reading every file.  
 Newest entries at the top.
 
+## 2026-10-30
+- 2026-10-30 feat/antigravity-context-bar: web/tests - unified adaptive solid-editing context bar & mobile dimension workflow:
+  - Context Bar: Pre-selection filter chips (Vertex, Edge, Face, Body) with Apple HIG >= 44x44px touch targets; dynamic post-selection action state exposing contextual actions (Face: Push/Pull, Edit, Sketch; Edge: Fillet, Chamfer; Body: Gizmo, Union, Cut, Intersect, Delete).
+  - Selection Isolation: Switching selection filters cleanly drops active highlights and resets selection count from other entity types.
+  - Mobile Ergonomics: Bottom-docked sheets with safe-area insets (`env(safe-area-inset-bottom, 0px)`), numeric stepper buttons (`-` / `+`) with `type="text" inputmode="decimal"` preventing iOS Safari auto-zoom/spinners.
+  - Shortcut Safeguards: Suspends desktop hotkeys 1-4 while any dimension or text field is focused to prevent accidental filter switching while typing.
+  - Engine & State: Preserves keep-last-good pattern rejecting invalid operations without solid corruption; edge operations commit through unified undo stack via `runUndoable`.
+  - Comprehensive Test Suite: 183 passing unit assertions in `tests/test_phone_select.mjs`, and full green passes for `tests/phone_select_smoke.py`, `tests/edge_fillet_smoke.py`, and new `tests/context_bar_smoke.py` across Chromium and WebKit.
+
 ## 2026-10-29
 - 2026-10-29 fix/pages-deploy-playwright: ci - Pages build installs Playwright (Chromium + WebKit) before Native CTest, same as ci.yml, so the CMake CI guard passes and main deploys again (run 40912871897 failed at configure).
 - 2026-10-29 feat/antigravity-flat-render: web/tests - remove key and rim DirectionalLights (keep AmbientLight 0.38 and HemisphereLight 0.7), replace bodyMat with MeshLambertMaterial(color: 0x5aa4d6, flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1), default display to Shaded+Edges ('edges'), remove fake blob shadow, and add flat_render_smoke in Chromium and WebKit.
